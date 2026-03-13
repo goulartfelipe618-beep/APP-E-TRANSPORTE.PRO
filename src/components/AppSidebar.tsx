@@ -126,12 +126,16 @@ export function AppSidebar() {
   return (
     <Sidebar collapsible="icon" className="border-r border-border">
       <div className="p-4 flex items-center gap-3 border-b border-border">
-        <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center">
-          <Car className="h-4 w-4 text-primary-foreground" />
-        </div>
+        {config.logo_url ? (
+          <img src={config.logo_url} alt="Logo" className="h-8 w-8 rounded-full object-cover" />
+        ) : (
+          <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center">
+            <Car className="h-4 w-4 text-primary-foreground" />
+          </div>
+        )}
         {!collapsed && (
           <div>
-            <p className="text-sm font-bold text-foreground">E-Transporte.pro</p>
+            <p className="text-sm font-bold text-foreground">{config.nome_projeto}</p>
             <p className="text-xs text-muted-foreground">Gestão de Frota</p>
           </div>
         )}
