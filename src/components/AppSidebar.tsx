@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/collapsible";
 import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useConfiguracoes } from "@/contexts/ConfiguracoesContext";
 
 const menuStructure = [
   {
