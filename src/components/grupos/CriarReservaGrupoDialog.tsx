@@ -10,13 +10,26 @@ import { ArrowLeftRight, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
+export interface GrupoInitialData {
+  nome_cliente?: string;
+  whatsapp?: string;
+  tipo_veiculo?: string;
+  embarque?: string;
+  destino?: string;
+  data_ida?: string;
+  num_passageiros?: number | null;
+  mensagem?: string;
+  solicitacao_id?: string;
+}
+
 interface CriarReservaGrupoDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onCreated?: () => void;
+  initialData?: GrupoInitialData | null;
 }
 
-export default function CriarReservaGrupoDialog({ open, onOpenChange, onCreated }: CriarReservaGrupoDialogProps) {
+export default function CriarReservaGrupoDialog({ open, onOpenChange, onCreated, initialData }: CriarReservaGrupoDialogProps) {
   const [saving, setSaving] = useState(false);
   const [valorBase, setValorBase] = useState("0");
   const [desconto, setDesconto] = useState("0");

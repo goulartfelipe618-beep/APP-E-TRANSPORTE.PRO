@@ -10,16 +10,29 @@ import { ArrowLeftRight, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
+export interface TransferInitialData {
+  nome_completo?: string;
+  contato?: string;
+  tipo?: string;
+  embarque?: string;
+  desembarque?: string;
+  data_viagem?: string;
+  num_passageiros?: number | null;
+  mensagem?: string;
+  solicitacao_id?: string;
+}
+
 interface CriarReservaTransferDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onCreated?: () => void;
+  initialData?: TransferInitialData | null;
 }
 
 type TipoViagem = "somente_ida" | "ida_volta" | "por_hora";
 type QuemViaja = "motorista" | "eu_mesmo";
 
-export default function CriarReservaTransferDialog({ open, onOpenChange, onCreated }: CriarReservaTransferDialogProps) {
+export default function CriarReservaTransferDialog({ open, onOpenChange, onCreated, initialData }: CriarReservaTransferDialogProps) {
   const [tipoViagem, setTipoViagem] = useState<TipoViagem>("somente_ida");
   const [quemViaja, setQuemViaja] = useState<QuemViaja>("motorista");
   const [valorBase, setValorBase] = useState("0");
