@@ -6,6 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import DetalhesSolicitacaoMotoristaSheet from "@/components/solicitacoes/DetalhesSolicitacaoMotoristaSheet";
+import CadastrarMotoristaDialog from "@/components/motoristas/CadastrarMotoristaDialog";
 
 interface Solicitacao {
   id: string;
@@ -20,11 +21,23 @@ interface Solicitacao {
   created_at: string;
 }
 
+export interface MotoristaInitialData {
+  nome?: string;
+  email?: string;
+  telefone?: string;
+  cpf?: string;
+  cnh?: string;
+  cidade?: string;
+  solicitacao_id?: string;
+}
+
 export default function MotoristaSolicitacoesPage() {
   const [solicitacoes, setSolicitacoes] = useState<Solicitacao[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Solicitacao | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [initialData, setInitialData] = useState<MotoristaInitialData | null>(null);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -45,9 +58,25 @@ export default function MotoristaSolicitacoesPage() {
   };
 
   const handleConverter = async (s: Solicitacao) => {
-    const { error } = await supabase.from("solicitacoes_motoristas").update({ status: "cadastrado" }).eq("id", s.id);
-    if (error) toast.error("Erro ao converter");
-    else { toast.success("Motorista convertido para cadastrado!"); setSheetOpen(false); fetchData(); }
+    setSheetOpen(false);
+    setInitialData({
+      nome: s.nome,
+      email: s.email || undefined,
+      telefone: s.telefone || undefined,
+      cpf: s.cpf || undefined,
+      cnh: s.cnh || undefined,
+      cidade: s.cidade || undefined,
+      solicitacao_id: s.id,
+    });
+    setDialogOpen(true);
+  };
+
+  const handleCadastrado = async () => {
+    if (initialData?.solicitacao_id) {
+      await supabase.from("solicitacoes_motoristas").update({ status: "cadastrado" }).eq("id", initialData.solicitacao_id);
+    }
+    setInitialData(null);
+    fetchData();
   };
 
   const handleComunicar = (s: Solicitacao) => {
@@ -123,6 +152,13 @@ export default function MotoristaSolicitacoesPage() {
         onOpenChange={setSheetOpen}
         onConverter={handleConverter}
         onComunicar={handleComunicar}
+      />
+
+      <CadastrarMotoristaDialog
+        open={dialogOpen}
+        onOpenChange={(open) => { setDialogOpen(open); if (!open) setInitialData(null); }}
+        onCreated={handleCadastrado}
+        initialData={initialData}
       />
     </div>
   );

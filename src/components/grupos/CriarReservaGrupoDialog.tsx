@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,13 +10,26 @@ import { ArrowLeftRight, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
+export interface GrupoInitialData {
+  nome_cliente?: string;
+  whatsapp?: string;
+  tipo_veiculo?: string;
+  embarque?: string;
+  destino?: string;
+  data_ida?: string;
+  num_passageiros?: number | null;
+  mensagem?: string;
+  solicitacao_id?: string;
+}
+
 interface CriarReservaGrupoDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onCreated?: () => void;
+  initialData?: GrupoInitialData | null;
 }
 
-export default function CriarReservaGrupoDialog({ open, onOpenChange, onCreated }: CriarReservaGrupoDialogProps) {
+export default function CriarReservaGrupoDialog({ open, onOpenChange, onCreated, initialData }: CriarReservaGrupoDialogProps) {
   const [saving, setSaving] = useState(false);
   const [valorBase, setValorBase] = useState("0");
   const [desconto, setDesconto] = useState("0");
@@ -46,6 +59,21 @@ export default function CriarReservaGrupoDialog({ open, onOpenChange, onCreated 
   }, [valorBase, desconto]);
 
   const valorTotalFormatted = valorTotalNum.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+
+  // Pre-fill from solicitação data
+  useEffect(() => {
+    if (open && initialData) {
+      setNomeCompleto(initialData.nome_cliente || "");
+      setWhatsapp(initialData.whatsapp || "");
+      setTipoVeiculo(initialData.tipo_veiculo || "");
+      setEmbarque(initialData.embarque || "");
+      setDestino(initialData.destino || "");
+      setDataIda(initialData.data_ida || "");
+      setNumPassageiros(initialData.num_passageiros?.toString() || "");
+      setObservacoesViagem(initialData.mensagem || "");
+    }
+    if (open && !initialData) resetForm();
+  }, [open, initialData]);
 
   const resetForm = () => {
     setNomeCompleto(""); setCpfCnpj(""); setEmail(""); setWhatsapp("");

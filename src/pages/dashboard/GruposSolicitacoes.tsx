@@ -6,6 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import DetalhesSolicitacaoGrupoSheet from "@/components/solicitacoes/DetalhesSolicitacaoGrupoSheet";
+import CriarReservaGrupoDialog, { type GrupoInitialData } from "@/components/grupos/CriarReservaGrupoDialog";
 
 interface Solicitacao {
   id: string;
@@ -26,6 +27,8 @@ export default function GruposSolicitacoesPage() {
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Solicitacao | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [initialData, setInitialData] = useState<GrupoInitialData | null>(null);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -46,9 +49,27 @@ export default function GruposSolicitacoesPage() {
   };
 
   const handleConverter = async (s: Solicitacao) => {
-    const { error } = await supabase.from("solicitacoes_grupos").update({ status: "convertida" }).eq("id", s.id);
-    if (error) toast.error("Erro ao converter");
-    else { toast.success("Solicitação convertida! Crie a reserva na aba Reservas."); setSheetOpen(false); fetchData(); }
+    setSheetOpen(false);
+    setInitialData({
+      nome_cliente: s.nome_cliente,
+      whatsapp: s.whatsapp || undefined,
+      tipo_veiculo: s.tipo_veiculo || undefined,
+      embarque: s.embarque || undefined,
+      destino: s.destino || undefined,
+      data_ida: s.data_ida || undefined,
+      num_passageiros: s.num_passageiros,
+      mensagem: s.mensagem || undefined,
+      solicitacao_id: s.id,
+    });
+    setDialogOpen(true);
+  };
+
+  const handleReservaCriada = async () => {
+    if (initialData?.solicitacao_id) {
+      await supabase.from("solicitacoes_grupos").update({ status: "convertida" }).eq("id", initialData.solicitacao_id);
+    }
+    setInitialData(null);
+    fetchData();
   };
 
   const handleComunicar = (s: Solicitacao) => {
@@ -124,6 +145,13 @@ export default function GruposSolicitacoesPage() {
         onOpenChange={setSheetOpen}
         onConverter={handleConverter}
         onComunicar={handleComunicar}
+      />
+
+      <CriarReservaGrupoDialog
+        open={dialogOpen}
+        onOpenChange={(open) => { setDialogOpen(open); if (!open) setInitialData(null); }}
+        onCreated={handleReservaCriada}
+        initialData={initialData}
       />
     </div>
   );

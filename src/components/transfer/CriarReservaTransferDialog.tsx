@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,16 +10,29 @@ import { ArrowLeftRight, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
+export interface TransferInitialData {
+  nome_completo?: string;
+  contato?: string;
+  tipo?: string;
+  embarque?: string;
+  desembarque?: string;
+  data_viagem?: string;
+  num_passageiros?: number | null;
+  mensagem?: string;
+  solicitacao_id?: string;
+}
+
 interface CriarReservaTransferDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onCreated?: () => void;
+  initialData?: TransferInitialData | null;
 }
 
 type TipoViagem = "somente_ida" | "ida_volta" | "por_hora";
 type QuemViaja = "motorista" | "eu_mesmo";
 
-export default function CriarReservaTransferDialog({ open, onOpenChange, onCreated }: CriarReservaTransferDialogProps) {
+export default function CriarReservaTransferDialog({ open, onOpenChange, onCreated, initialData }: CriarReservaTransferDialogProps) {
   const [tipoViagem, setTipoViagem] = useState<TipoViagem>("somente_ida");
   const [quemViaja, setQuemViaja] = useState<QuemViaja>("motorista");
   const [valorBase, setValorBase] = useState("0");
@@ -63,6 +76,24 @@ export default function CriarReservaTransferDialog({ open, onOpenChange, onCreat
   }, [valorBase, desconto]);
 
   const valorTotalFormatted = valorTotalNum.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+
+  // Pre-fill from solicitação data
+  useEffect(() => {
+    if (open && initialData) {
+      setNomeCompleto(initialData.nome_completo || "");
+      setTelefone(initialData.contato || "");
+      setIdaEmbarque(initialData.embarque || "");
+      setIdaDesembarque(initialData.desembarque || "");
+      setIdaData(initialData.data_viagem || "");
+      setIdaPassageiros(initialData.num_passageiros?.toString() || "");
+      setObservacoes(initialData.mensagem || "");
+      if (initialData.tipo) {
+        const tipoMap: Record<string, TipoViagem> = { ida: "somente_ida", ida_volta: "ida_volta", por_hora: "por_hora" };
+        setTipoViagem(tipoMap[initialData.tipo] || "somente_ida");
+      }
+    }
+    if (open && !initialData) resetForm();
+  }, [open, initialData]);
 
   const resetForm = () => {
     setNomeCompleto(""); setCpfCnpj(""); setEmail(""); setTelefone("");
