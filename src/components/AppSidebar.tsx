@@ -71,12 +71,18 @@ const menuStructure = [
       {
         title: "Campanhas",
         icon: Megaphone,
-        children: [],
+        children: [
+          { title: "Ativos", url: "/dashboard/campanhas/ativos", icon: Globe },
+          { title: "Leads", url: "/dashboard/campanhas/leads", icon: UserCheck },
+        ],
       },
       {
         title: "Marketing",
         icon: BarChart3,
-        children: [],
+        children: [
+          { title: "Receptivos", url: "/dashboard/marketing/receptivos", icon: MapPin },
+          { title: "QR Code", url: "/dashboard/marketing/qrcode", icon: Search },
+        ],
       },
       { title: "Network", url: "/dashboard/network", icon: Globe },
       { title: "Google", url: "/dashboard/google", icon: Search },
