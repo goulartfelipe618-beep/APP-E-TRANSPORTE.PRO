@@ -41,6 +41,39 @@ export type Database = {
         }
         Relationships: []
       }
+      automacoes: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          id: string
+          mappings: Json
+          nome: string
+          tipo: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          id?: string
+          mappings?: Json
+          nome: string
+          tipo: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          id?: string
+          mappings?: Json
+          nome?: string
+          tipo?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       configuracoes: {
         Row: {
           created_at: string
