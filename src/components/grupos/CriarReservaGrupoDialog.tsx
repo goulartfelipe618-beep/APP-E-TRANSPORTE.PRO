@@ -60,6 +60,21 @@ export default function CriarReservaGrupoDialog({ open, onOpenChange, onCreated,
 
   const valorTotalFormatted = valorTotalNum.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
+  // Pre-fill from solicitação data
+  useEffect(() => {
+    if (open && initialData) {
+      setNomeCompleto(initialData.nome_cliente || "");
+      setWhatsapp(initialData.whatsapp || "");
+      setTipoVeiculo(initialData.tipo_veiculo || "");
+      setEmbarque(initialData.embarque || "");
+      setDestino(initialData.destino || "");
+      setDataIda(initialData.data_ida || "");
+      setNumPassageiros(initialData.num_passageiros?.toString() || "");
+      setObservacoesViagem(initialData.mensagem || "");
+    }
+    if (open && !initialData) resetForm();
+  }, [open, initialData]);
+
   const resetForm = () => {
     setNomeCompleto(""); setCpfCnpj(""); setEmail(""); setWhatsapp("");
     setTipoVeiculo(""); setNumPassageiros(""); setEmbarque(""); setDestino("");

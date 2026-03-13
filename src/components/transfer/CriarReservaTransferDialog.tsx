@@ -77,6 +77,24 @@ export default function CriarReservaTransferDialog({ open, onOpenChange, onCreat
 
   const valorTotalFormatted = valorTotalNum.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
+  // Pre-fill from solicitação data
+  useEffect(() => {
+    if (open && initialData) {
+      setNomeCompleto(initialData.nome_completo || "");
+      setTelefone(initialData.contato || "");
+      setIdaEmbarque(initialData.embarque || "");
+      setIdaDesembarque(initialData.desembarque || "");
+      setIdaData(initialData.data_viagem || "");
+      setIdaPassageiros(initialData.num_passageiros?.toString() || "");
+      setObservacoes(initialData.mensagem || "");
+      if (initialData.tipo) {
+        const tipoMap: Record<string, TipoViagem> = { ida: "somente_ida", ida_volta: "ida_volta", por_hora: "por_hora" };
+        setTipoViagem(tipoMap[initialData.tipo] || "somente_ida");
+      }
+    }
+    if (open && !initialData) resetForm();
+  }, [open, initialData]);
+
   const resetForm = () => {
     setNomeCompleto(""); setCpfCnpj(""); setEmail(""); setTelefone("");
     setTipoViagem("somente_ida"); setQuemViaja("motorista");
