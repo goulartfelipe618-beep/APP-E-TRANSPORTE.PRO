@@ -44,9 +44,11 @@ const grupoFields = [
 ];
 
 const motoristaFields = [
-  "Nome do Cliente", "E-mail do Cliente", "WhatsApp do Cliente",
-  "Tipo de Veículo", "Data", "Hora", "Endereço de Embarque", "Destino",
-  "Observações", "Cupom de Desconto", "Como nos encontrou",
+  "Nome Completo", "E-mail", "Telefone / WhatsApp", "CPF", "Data de Nascimento",
+  "Endereço Completo", "Cidade", "Estado",
+  "Número da CNH", "Categoria da CNH", "Possui Veículo (sim/não)",
+  "Marca do Veículo", "Modelo do Veículo", "Ano do Veículo", "Placa do Veículo",
+  "Experiência", "Mensagem / Observações",
 ];
 
 const transferSomenteIdaFields = [
