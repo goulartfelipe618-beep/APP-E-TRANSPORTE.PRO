@@ -70,8 +70,9 @@ export default function NetworkPage() {
           <Building2 className="h-4 w-4" /> Empresas Cadastradas
           <Badge variant="secondary" className="ml-2">0 registros</Badge>
         </h3>
-        <div className="flex items-center justify-center py-10">
-          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
+        <div className="flex flex-col items-center justify-center py-10 text-muted-foreground">
+          <Building2 className="h-10 w-10 mb-2 opacity-40" />
+          <p>Nenhuma empresa cadastrada</p>
         </div>
       </div>
     </div>
