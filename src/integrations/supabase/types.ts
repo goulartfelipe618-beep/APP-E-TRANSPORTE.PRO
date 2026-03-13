@@ -80,6 +80,222 @@ export type Database = {
         }
         Relationships: []
       }
+      reservas_grupos: {
+        Row: {
+          cpf_cnpj: string
+          created_at: string
+          cupom: string | null
+          data_ida: string | null
+          data_retorno: string | null
+          desconto: number
+          destino: string | null
+          email: string
+          embarque: string | null
+          hora_ida: string | null
+          hora_retorno: string | null
+          id: string
+          metodo_pagamento: string | null
+          nome_completo: string
+          nome_motorista: string | null
+          num_passageiros: number | null
+          observacoes_viagem: string | null
+          status: string
+          telefone_motorista: string | null
+          tipo_veiculo: string | null
+          updated_at: string
+          user_id: string
+          valor_base: number
+          valor_total: number
+          veiculo_id: string | null
+          whatsapp: string
+        }
+        Insert: {
+          cpf_cnpj: string
+          created_at?: string
+          cupom?: string | null
+          data_ida?: string | null
+          data_retorno?: string | null
+          desconto?: number
+          destino?: string | null
+          email: string
+          embarque?: string | null
+          hora_ida?: string | null
+          hora_retorno?: string | null
+          id?: string
+          metodo_pagamento?: string | null
+          nome_completo: string
+          nome_motorista?: string | null
+          num_passageiros?: number | null
+          observacoes_viagem?: string | null
+          status?: string
+          telefone_motorista?: string | null
+          tipo_veiculo?: string | null
+          updated_at?: string
+          user_id: string
+          valor_base?: number
+          valor_total?: number
+          veiculo_id?: string | null
+          whatsapp: string
+        }
+        Update: {
+          cpf_cnpj?: string
+          created_at?: string
+          cupom?: string | null
+          data_ida?: string | null
+          data_retorno?: string | null
+          desconto?: number
+          destino?: string | null
+          email?: string
+          embarque?: string | null
+          hora_ida?: string | null
+          hora_retorno?: string | null
+          id?: string
+          metodo_pagamento?: string | null
+          nome_completo?: string
+          nome_motorista?: string | null
+          num_passageiros?: number | null
+          observacoes_viagem?: string | null
+          status?: string
+          telefone_motorista?: string | null
+          tipo_veiculo?: string | null
+          updated_at?: string
+          user_id?: string
+          valor_base?: number
+          valor_total?: number
+          veiculo_id?: string | null
+          whatsapp?: string
+        }
+        Relationships: []
+      }
+      reservas_transfer: {
+        Row: {
+          cpf_cnpj: string
+          created_at: string
+          desconto: number
+          email: string
+          id: string
+          ida_cupom: string | null
+          ida_data: string | null
+          ida_desembarque: string | null
+          ida_embarque: string | null
+          ida_hora: string | null
+          ida_mensagem: string | null
+          ida_passageiros: number | null
+          metodo_pagamento: string | null
+          motorista_id: string | null
+          nome_completo: string
+          observacoes: string | null
+          por_hora_cupom: string | null
+          por_hora_data: string | null
+          por_hora_endereco_inicio: string | null
+          por_hora_hora: string | null
+          por_hora_itinerario: string | null
+          por_hora_passageiros: number | null
+          por_hora_ponto_encerramento: string | null
+          por_hora_qtd_horas: number | null
+          quem_viaja: string
+          status: string
+          telefone: string
+          tipo_viagem: string
+          updated_at: string
+          user_id: string
+          valor_base: number
+          valor_total: number
+          veiculo_id: string | null
+          volta_cupom: string | null
+          volta_data: string | null
+          volta_desembarque: string | null
+          volta_embarque: string | null
+          volta_hora: string | null
+          volta_mensagem: string | null
+          volta_passageiros: number | null
+        }
+        Insert: {
+          cpf_cnpj: string
+          created_at?: string
+          desconto?: number
+          email: string
+          id?: string
+          ida_cupom?: string | null
+          ida_data?: string | null
+          ida_desembarque?: string | null
+          ida_embarque?: string | null
+          ida_hora?: string | null
+          ida_mensagem?: string | null
+          ida_passageiros?: number | null
+          metodo_pagamento?: string | null
+          motorista_id?: string | null
+          nome_completo: string
+          observacoes?: string | null
+          por_hora_cupom?: string | null
+          por_hora_data?: string | null
+          por_hora_endereco_inicio?: string | null
+          por_hora_hora?: string | null
+          por_hora_itinerario?: string | null
+          por_hora_passageiros?: number | null
+          por_hora_ponto_encerramento?: string | null
+          por_hora_qtd_horas?: number | null
+          quem_viaja?: string
+          status?: string
+          telefone: string
+          tipo_viagem?: string
+          updated_at?: string
+          user_id: string
+          valor_base?: number
+          valor_total?: number
+          veiculo_id?: string | null
+          volta_cupom?: string | null
+          volta_data?: string | null
+          volta_desembarque?: string | null
+          volta_embarque?: string | null
+          volta_hora?: string | null
+          volta_mensagem?: string | null
+          volta_passageiros?: number | null
+        }
+        Update: {
+          cpf_cnpj?: string
+          created_at?: string
+          desconto?: number
+          email?: string
+          id?: string
+          ida_cupom?: string | null
+          ida_data?: string | null
+          ida_desembarque?: string | null
+          ida_embarque?: string | null
+          ida_hora?: string | null
+          ida_mensagem?: string | null
+          ida_passageiros?: number | null
+          metodo_pagamento?: string | null
+          motorista_id?: string | null
+          nome_completo?: string
+          observacoes?: string | null
+          por_hora_cupom?: string | null
+          por_hora_data?: string | null
+          por_hora_endereco_inicio?: string | null
+          por_hora_hora?: string | null
+          por_hora_itinerario?: string | null
+          por_hora_passageiros?: number | null
+          por_hora_ponto_encerramento?: string | null
+          por_hora_qtd_horas?: number | null
+          quem_viaja?: string
+          status?: string
+          telefone?: string
+          tipo_viagem?: string
+          updated_at?: string
+          user_id?: string
+          valor_base?: number
+          valor_total?: number
+          veiculo_id?: string | null
+          volta_cupom?: string | null
+          volta_data?: string | null
+          volta_desembarque?: string | null
+          volta_embarque?: string | null
+          volta_hora?: string | null
+          volta_mensagem?: string | null
+          volta_passageiros?: number | null
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           id: string
