@@ -80,6 +80,39 @@ export type Database = {
         }
         Relationships: []
       }
+      contratos: {
+        Row: {
+          clausulas_adicionais: string
+          created_at: string
+          id: string
+          modelo_contrato: string
+          politica_cancelamento: string
+          tipo: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          clausulas_adicionais?: string
+          created_at?: string
+          id?: string
+          modelo_contrato?: string
+          politica_cancelamento?: string
+          tipo: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          clausulas_adicionais?: string
+          created_at?: string
+          id?: string
+          modelo_contrato?: string
+          politica_cancelamento?: string
+          tipo?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       reservas_grupos: {
         Row: {
           cpf_cnpj: string
