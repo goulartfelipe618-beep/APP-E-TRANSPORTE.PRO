@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, Plus, Link2, Copy, ArrowLeft, Sparkles, Save } from "lucide-react";
+import { RefreshCw, Plus, Link2, Copy, ArrowLeft, Sparkles, Save, Code2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { toast } from "sonner";
+import FerramentasDevDialog from "@/components/automacoes/FerramentasDevDialog";
 
 interface Automacao {
   id: string;
@@ -98,6 +99,7 @@ function FieldMappingList({
 
 export default function SistemaAutomacoesPage() {
   const [open, setOpen] = useState(false);
+  const [devToolsOpen, setDevToolsOpen] = useState(false);
   const [novoNome, setNovoNome] = useState("");
   const [novoTipo, setNovoTipo] = useState("");
   const [automacoes, setAutomacoes] = useState<Automacao[]>([]);
@@ -156,6 +158,19 @@ export default function SistemaAutomacoesPage() {
     toast.success("Mapeamento salvo com sucesso!");
   };
 
+  const handleTestSubmit = (payload: Record<string, string>) => {
+    if (!selected) return;
+    const newTest: WebhookTest = {
+      id: crypto.randomUUID(),
+      payload,
+      receivedAt: new Date().toLocaleString("pt-BR"),
+    };
+    const updated = { ...selected, testes: [...selected.testes, newTest] };
+    setAutomacoes((prev) => prev.map((a) => (a.id === selected.id ? updated : a)));
+    setSelected(updated);
+    toast.success("Teste recebido com sucesso! Verifique a aba 'Testes Recebidos'.");
+  };
+
   // Detail view
   if (selected) {
     const isTransfer = selected.tipo === "transfer";
@@ -170,9 +185,14 @@ export default function SistemaAutomacoesPage() {
           <span className="text-sm">Voltar</span>
         </button>
 
-        <div>
-          <h1 className="text-2xl font-bold text-foreground uppercase">{selected.tipoLabel}</h1>
-          <p className="text-muted-foreground">Configure o webhook e mapeamento de campos.</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-foreground uppercase">{selected.tipoLabel}</h1>
+            <p className="text-muted-foreground">Configure o webhook e mapeamento de campos.</p>
+          </div>
+          <Button variant="outline" onClick={() => setDevToolsOpen(true)}>
+            <Code2 className="h-4 w-4 mr-2" /> Ferramentas do Desenvolvedor
+          </Button>
         </div>
 
         {/* Webhook URL card */}
@@ -229,18 +249,29 @@ export default function SistemaAutomacoesPage() {
 
             {selected.testes.length === 0 ? (
               <p className="text-sm text-muted-foreground">
-                Nenhum teste recebido. Desative o webhook e envie uma requisição POST para a URL acima.
+                Nenhum teste recebido. Clique em "Ferramentas do Desenvolvedor" para enviar um teste ou envie uma requisição POST para a URL acima.
               </p>
             ) : (
-              <div className="space-y-2">
+              <div className="space-y-2 max-h-[50vh] overflow-y-auto">
                 {selected.testes.map((t) => (
-                  <button
+                  <details
                     key={t.id}
                     className="w-full text-left rounded-lg border border-border p-3 text-sm hover:bg-muted/50 transition-colors"
                   >
-                    <p className="font-medium text-foreground">Teste #{t.id.slice(0, 6)}</p>
-                    <p className="text-xs text-muted-foreground">{t.receivedAt}</p>
-                  </button>
+                    <summary className="cursor-pointer">
+                      <span className="font-medium text-foreground">Teste #{t.id.slice(0, 6)}</span>
+                      <span className="text-xs text-muted-foreground ml-2">{t.receivedAt}</span>
+                    </summary>
+                    <div className="mt-2 space-y-1 border-t border-border pt-2">
+                      {Object.entries(t.payload).map(([key, value]) => (
+                        <div key={key} className="flex items-center gap-2">
+                          <code className="text-xs bg-muted px-1.5 py-0.5 rounded font-mono text-primary">{key}</code>
+                          <span className="text-xs text-muted-foreground">→</span>
+                          <span className="text-xs text-foreground truncate">{value || "(vazio)"}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </details>
                 ))}
               </div>
             )}
@@ -299,6 +330,12 @@ export default function SistemaAutomacoesPage() {
             )}
           </div>
         </div>
+        <FerramentasDevDialog
+          open={devToolsOpen}
+          onOpenChange={setDevToolsOpen}
+          tipo={selected.tipo}
+          onSubmit={handleTestSubmit}
+        />
       </div>
     );
   }
