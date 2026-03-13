@@ -30,12 +30,6 @@ const veiculoLabel: Record<string, string> = {
   onibus: "Ônibus",
 };
 
-function generateCSVContent(r: ReservaGrupo) {
-  const headers = "Cliente,Email,WhatsApp,Veículo,Passageiros,Embarque,Destino,Data,Valor,Status";
-  const row = `"${r.nome_completo}","${r.email}","${r.whatsapp}","${r.tipo_veiculo || ""}","${r.num_passageiros || ""}","${r.embarque || ""}","${r.destino || ""}","${r.data_ida || ""}","${r.valor_total}","${r.status}"`;
-  return `${headers}\n${row}`;
-}
-
 export default function GruposReservasPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [reservas, setReservas] = useState<ReservaGrupo[]>([]);
