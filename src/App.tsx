@@ -30,6 +30,9 @@ import GooglePage from "./pages/dashboard/GooglePage";
 import EmailBusinessPage from "./pages/dashboard/EmailBusinessPage";
 import WebsitePage from "./pages/dashboard/WebsitePage";
 import AnotacoesPage from "./pages/dashboard/AnotacoesPage";
+import SistemaConfiguracoesPage from "./pages/dashboard/SistemaConfiguracoes";
+import SistemaAutomacoesPage from "./pages/dashboard/SistemaAutomacoes";
+import SistemaComunicadorPage from "./pages/dashboard/SistemaComunicador";
 
 const queryClient = new QueryClient();
 
@@ -66,6 +69,9 @@ const App = () => (
             <Route path="email-business" element={<EmailBusinessPage />} />
             <Route path="website" element={<WebsitePage />} />
             <Route path="anotacoes" element={<AnotacoesPage />} />
+            <Route path="sistema/configuracoes" element={<SistemaConfiguracoesPage />} />
+            <Route path="sistema/automacoes" element={<SistemaAutomacoesPage />} />
+            <Route path="sistema/comunicador" element={<SistemaComunicadorPage />} />
           </Route>
           <Route path="*" element={<NotFound />} />
         </Routes>

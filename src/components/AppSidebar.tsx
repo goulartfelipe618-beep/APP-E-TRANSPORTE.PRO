@@ -96,7 +96,11 @@ const menuStructure = [
       {
         title: "Sistema",
         icon: Settings,
-        children: [],
+        children: [
+          { title: "Configurações", url: "/dashboard/sistema/configuracoes", icon: Settings },
+          { title: "Automações", url: "/dashboard/sistema/automacoes", icon: Globe },
+          { title: "Comunicador", url: "/dashboard/sistema/comunicador", icon: Monitor },
+        ],
       },
       { title: "Anotações", url: "/dashboard/anotacoes", icon: StickyNote },
     ],
