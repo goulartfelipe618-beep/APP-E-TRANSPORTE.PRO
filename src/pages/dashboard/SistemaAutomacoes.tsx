@@ -10,6 +10,7 @@ import {
 import {
   Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { toast } from "sonner";
 
 interface Automacao {
@@ -19,6 +20,7 @@ interface Automacao {
   tipoLabel: string;
   webhookEnabled: boolean;
   testes: WebhookTest[];
+  mappings: Record<string, Record<string, string>>;
 }
 
 interface WebhookTest {
@@ -30,8 +32,67 @@ interface WebhookTest {
 const tipoLabels: Record<string, string> = {
   transfer: "Transfer Executivo",
   motorista: "Solicitação Motorista",
-  grupo: "Grupos e Excursões",
+  grupo: "Solicitação de Grupo",
 };
+
+// Fields per category
+const grupoFields = [
+  "Tipo de Veículo", "Número de Passageiros", "Endereço de Embarque", "Destino",
+  "Data de Ida", "Hora de Ida", "Data de Retorno", "Hora de Retorno",
+  "Observações", "Cupom de Desconto", "Nome do Cliente", "E-mail do Cliente",
+  "WhatsApp do Cliente", "Como nos encontrou",
+];
+
+const motoristaFields = [
+  "Nome do Cliente", "E-mail do Cliente", "WhatsApp do Cliente",
+  "Tipo de Veículo", "Data", "Hora", "Endereço de Embarque", "Destino",
+  "Observações", "Cupom de Desconto", "Como nos encontrou",
+];
+
+const transferSomenteIdaFields = [
+  "Tipo de Viagem", "Nome do Cliente", "Telefone do Cliente", "E-mail do Cliente",
+  "Origem / Como encontrou", "Passageiros (Ida)", "Embarque (Ida)", "Destino (Ida)",
+  "Data (Ida)", "Hora (Ida)", "Mensagem (Ida)", "Cupom (Ida)",
+];
+
+const transferIdaVoltaFields = [
+  "Tipo de Viagem", "Nome do Cliente", "Telefone do Cliente", "E-mail do Cliente",
+  "Origem / Como encontrou", "Passageiros (Ida)", "Embarque (Ida)", "Destino (Ida)",
+  "Data (Ida)", "Hora (Ida)", "Mensagem (Ida)", "Cupom (Ida)",
+  "Passageiros (Volta)", "Embarque (Volta)", "Destino (Volta)",
+  "Data (Volta)", "Hora (Volta)", "Mensagem (Volta)", "Cupom (Volta)",
+];
+
+const transferPorHoraFields = [
+  "Tipo de Viagem", "Nome do Cliente", "Telefone do Cliente", "E-mail do Cliente",
+  "Origem / Como encontrou", "Passageiros", "Endereço de Início", "Data", "Hora",
+  "Qtd. Horas", "Ponto de Encerramento", "Itinerário / Mensagem", "Cupom",
+];
+
+function FieldMappingList({
+  fields,
+  mappings,
+  onUpdate,
+}: {
+  fields: string[];
+  mappings: Record<string, string>;
+  onUpdate: (field: string, value: string) => void;
+}) {
+  return (
+    <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
+      {fields.map((field) => (
+        <div key={field} className="space-y-1">
+          <Label className="text-sm font-medium text-foreground">{field}</Label>
+          <Input
+            placeholder="Digite o caminho da variável (ex: nome, dados.email)"
+            value={mappings[field] || ""}
+            onChange={(e) => onUpdate(field, e.target.value)}
+          />
+        </div>
+      ))}
+    </div>
+  );
+}
 
 export default function SistemaAutomacoesPage() {
   const [open, setOpen] = useState(false);
@@ -39,8 +100,7 @@ export default function SistemaAutomacoesPage() {
   const [novoTipo, setNovoTipo] = useState("");
   const [automacoes, setAutomacoes] = useState<Automacao[]>([]);
   const [selected, setSelected] = useState<Automacao | null>(null);
-  const [selectedTest, setSelectedTest] = useState<WebhookTest | null>(null);
-  const [mappings, setMappings] = useState<Record<string, string>>({});
+  const [mappings, setMappings] = useState<Record<string, Record<string, string>>>({});
 
   const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID || "seu-projeto";
 
@@ -56,6 +116,7 @@ export default function SistemaAutomacoesPage() {
       tipoLabel: tipoLabels[novoTipo] || novoTipo,
       webhookEnabled: false,
       testes: [],
+      mappings: {},
     };
     setAutomacoes((prev) => [...prev, novo]);
     setNovoNome("");
@@ -82,12 +143,25 @@ export default function SistemaAutomacoesPage() {
     toast.success("URL copiada!");
   };
 
+  const updateMapping = (tab: string, field: string, value: string) => {
+    setMappings((prev) => ({
+      ...prev,
+      [tab]: { ...(prev[tab] || {}), [field]: value },
+    }));
+  };
+
+  const handleSave = () => {
+    toast.success("Mapeamento salvo com sucesso!");
+  };
+
   // Detail view
   if (selected) {
+    const isTransfer = selected.tipo === "transfer";
+
     return (
       <div className="space-y-6">
         <button
-          onClick={() => { setSelected(null); setSelectedTest(null); setMappings({}); }}
+          onClick={() => { setSelected(null); setMappings({}); }}
           className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
         >
           <ArrowLeft className="h-4 w-4" />
@@ -138,9 +212,9 @@ export default function SistemaAutomacoesPage() {
         </div>
 
         {/* Bottom two columns */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
           {/* Testes Recebidos */}
-          <div className="rounded-xl border border-border bg-card p-6">
+          <div className="lg:col-span-2 rounded-xl border border-border bg-card p-6">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <Sparkles className="h-4 w-4 text-primary" />
@@ -160,18 +234,7 @@ export default function SistemaAutomacoesPage() {
                 {selected.testes.map((t) => (
                   <button
                     key={t.id}
-                    onClick={() => {
-                      setSelectedTest(t);
-                      // Auto-populate mappings from payload keys
-                      const m: Record<string, string> = {};
-                      Object.keys(t.payload).forEach((k) => { m[k] = ""; });
-                      setMappings(m);
-                    }}
-                    className={`w-full text-left rounded-lg border p-3 text-sm transition-colors ${
-                      selectedTest?.id === t.id
-                        ? "border-primary bg-primary/5"
-                        : "border-border hover:bg-muted/50"
-                    }`}
+                    className="w-full text-left rounded-lg border border-border p-3 text-sm hover:bg-muted/50 transition-colors"
                   >
                     <p className="font-medium text-foreground">Teste #{t.id.slice(0, 6)}</p>
                     <p className="text-xs text-muted-foreground">{t.receivedAt}</p>
@@ -182,52 +245,55 @@ export default function SistemaAutomacoesPage() {
           </div>
 
           {/* Mapeamento de Campos */}
-          <div className="rounded-xl border border-border bg-card p-6">
+          <div className="lg:col-span-3 rounded-xl border border-border bg-card p-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-semibold text-foreground">Mapeamento de Campos</h3>
-              <Button
-                size="sm"
-                disabled={!selectedTest}
-                onClick={() => toast.success("Mapeamento salvo!")}
-              >
+              <Button size="sm" onClick={handleSave}>
                 <Save className="h-3.5 w-3.5 mr-1.5" /> Salvar
               </Button>
             </div>
 
-            {!selectedTest ? (
-              <p className="text-sm text-muted-foreground">
-                Selecione um teste recebido para visualizar as variáveis disponíveis e configurar o mapeamento.
-              </p>
+            {isTransfer ? (
+              <Tabs defaultValue="somente_ida">
+                <TabsList className="w-full grid grid-cols-3 mb-4">
+                  <TabsTrigger value="somente_ida">Somente Ida</TabsTrigger>
+                  <TabsTrigger value="ida_volta">Ida e Volta</TabsTrigger>
+                  <TabsTrigger value="por_hora">Por Hora</TabsTrigger>
+                </TabsList>
+                <TabsContent value="somente_ida">
+                  <FieldMappingList
+                    fields={transferSomenteIdaFields}
+                    mappings={mappings["somente_ida"] || {}}
+                    onUpdate={(f, v) => updateMapping("somente_ida", f, v)}
+                  />
+                </TabsContent>
+                <TabsContent value="ida_volta">
+                  <FieldMappingList
+                    fields={transferIdaVoltaFields}
+                    mappings={mappings["ida_volta"] || {}}
+                    onUpdate={(f, v) => updateMapping("ida_volta", f, v)}
+                  />
+                </TabsContent>
+                <TabsContent value="por_hora">
+                  <FieldMappingList
+                    fields={transferPorHoraFields}
+                    mappings={mappings["por_hora"] || {}}
+                    onUpdate={(f, v) => updateMapping("por_hora", f, v)}
+                  />
+                </TabsContent>
+              </Tabs>
+            ) : selected.tipo === "grupo" ? (
+              <FieldMappingList
+                fields={grupoFields}
+                mappings={mappings["default"] || {}}
+                onUpdate={(f, v) => updateMapping("default", f, v)}
+              />
             ) : (
-              <div className="space-y-3">
-                {Object.entries(selectedTest.payload).map(([key, value]) => (
-                  <div key={key} className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">
-                      {`{{${key}}}`} → <span className="text-foreground font-mono">{value}</span>
-                    </Label>
-                    <Select
-                      value={mappings[key] || ""}
-                      onValueChange={(v) => setMappings((prev) => ({ ...prev, [key]: v }))}
-                    >
-                      <SelectTrigger className="h-9">
-                        <SelectValue placeholder="Mapear para campo do sistema..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="nome">Nome</SelectItem>
-                        <SelectItem value="email">E-mail</SelectItem>
-                        <SelectItem value="telefone">Telefone</SelectItem>
-                        <SelectItem value="cpf">CPF</SelectItem>
-                        <SelectItem value="origem">Origem</SelectItem>
-                        <SelectItem value="destino">Destino</SelectItem>
-                        <SelectItem value="data">Data</SelectItem>
-                        <SelectItem value="horario">Horário</SelectItem>
-                        <SelectItem value="passageiros">Passageiros</SelectItem>
-                        <SelectItem value="observacoes">Observações</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                ))}
-              </div>
+              <FieldMappingList
+                fields={motoristaFields}
+                mappings={mappings["default"] || {}}
+                onUpdate={(f, v) => updateMapping("default", f, v)}
+              />
             )}
           </div>
         </div>
@@ -298,7 +364,7 @@ export default function SistemaAutomacoesPage() {
                     <SelectLabel>CATEGORIAS DO SISTEMA</SelectLabel>
                     <SelectItem value="transfer">Transfer Executivo</SelectItem>
                     <SelectItem value="motorista">Solicitação Motorista</SelectItem>
-                    <SelectItem value="grupo">Grupos e Excursões</SelectItem>
+                    <SelectItem value="grupo">Solicitação de Grupo</SelectItem>
                   </SelectGroup>
                 </SelectContent>
               </Select>
