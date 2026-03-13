@@ -7,6 +7,7 @@ import CriarReservaTransferDialog from "@/components/transfer/CriarReservaTransf
 import DetalhesReservaTransferSheet from "@/components/reservas/DetalhesReservaTransferSheet";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { generateTransferPDF } from "@/lib/pdfGenerator";
 
 interface Reserva {
   id: string;
@@ -27,12 +28,6 @@ const tipoLabel: Record<string, string> = {
   ida_volta: "Ida e Volta",
   por_hora: "Por Hora",
 };
-
-function generateCSVContent(r: Reserva) {
-  const headers = "Cliente,Email,Telefone,Tipo,Embarque,Desembarque,Data,Valor,Status";
-  const row = `"${r.nome_completo}","${r.email}","${r.telefone}","${tipoLabel[r.tipo_viagem] || r.tipo_viagem}","${r.ida_embarque || ""}","${r.ida_desembarque || ""}","${r.ida_data || ""}","${r.valor_total}","${r.status}"`;
-  return `${headers}\n${row}`;
-}
 
 export default function TransferReservasPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -65,15 +60,9 @@ export default function TransferReservasPage() {
     else toast.info("Telefone não disponível");
   };
 
-  const handleDownload = (r: Reserva) => {
-    const csv = generateCSVContent(r);
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `reserva-transfer-${r.nome_completo.replace(/\s/g, "_")}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+  const handleDownload = async (r: Reserva) => {
+    toast.info("Gerando PDF...");
+    await generateTransferPDF(r.id);
   };
 
   return (

@@ -7,6 +7,7 @@ import CriarReservaGrupoDialog from "@/components/grupos/CriarReservaGrupoDialog
 import DetalhesReservaGrupoSheet from "@/components/reservas/DetalhesReservaGrupoSheet";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { generateGrupoPDF } from "@/lib/pdfGenerator";
 
 interface ReservaGrupo {
   id: string;
@@ -28,12 +29,6 @@ const veiculoLabel: Record<string, string> = {
   micro_onibus: "Micro-ônibus",
   onibus: "Ônibus",
 };
-
-function generateCSVContent(r: ReservaGrupo) {
-  const headers = "Cliente,Email,WhatsApp,Veículo,Passageiros,Embarque,Destino,Data,Valor,Status";
-  const row = `"${r.nome_completo}","${r.email}","${r.whatsapp}","${r.tipo_veiculo || ""}","${r.num_passageiros || ""}","${r.embarque || ""}","${r.destino || ""}","${r.data_ida || ""}","${r.valor_total}","${r.status}"`;
-  return `${headers}\n${row}`;
-}
 
 export default function GruposReservasPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -66,15 +61,9 @@ export default function GruposReservasPage() {
     else toast.info("WhatsApp não disponível");
   };
 
-  const handleDownload = (r: ReservaGrupo) => {
-    const csv = generateCSVContent(r);
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `reserva-grupo-${r.nome_completo.replace(/\s/g, "_")}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+  const handleDownload = async (r: ReservaGrupo) => {
+    toast.info("Gerando PDF...");
+    await generateGrupoPDF(r.id);
   };
 
   return (
