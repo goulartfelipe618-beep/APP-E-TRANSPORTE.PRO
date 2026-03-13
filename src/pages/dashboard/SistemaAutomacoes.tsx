@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, Plus, Link2, Copy, ArrowLeft, Sparkles, Save } from "lucide-react";
+import { RefreshCw, Plus, Link2, Copy, ArrowLeft, Sparkles, Save, Code2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { toast } from "sonner";
+import FerramentasDevDialog from "@/components/automacoes/FerramentasDevDialog";
 
 interface Automacao {
   id: string;
