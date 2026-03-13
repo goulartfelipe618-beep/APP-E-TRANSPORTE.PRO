@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { RefreshCw, Plus, Filter, Building2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -5,8 +6,11 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import CriarNetworkDialog from "@/components/network/CriarNetworkDialog";
 
 export default function NetworkPage() {
+  const [dialogOpen, setDialogOpen] = useState(false);
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -20,7 +24,7 @@ export default function NetworkPage() {
           <Button variant="outline" size="icon">
             <RefreshCw className="h-4 w-4" />
           </Button>
-          <Button className="bg-primary text-primary-foreground">
+          <Button className="bg-primary text-primary-foreground" onClick={() => setDialogOpen(true)}>
             <Plus className="h-4 w-4 mr-2" /> Cadastrar Network
           </Button>
         </div>
@@ -75,6 +79,8 @@ export default function NetworkPage() {
           <p>Nenhuma empresa cadastrada</p>
         </div>
       </div>
+
+      <CriarNetworkDialog open={dialogOpen} onOpenChange={setDialogOpen} />
     </div>
   );
 }
