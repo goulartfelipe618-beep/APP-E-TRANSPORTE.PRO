@@ -6,6 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import DetalhesSolicitacaoTransferSheet from "@/components/solicitacoes/DetalhesSolicitacaoTransferSheet";
+import CriarReservaTransferDialog, { type TransferInitialData } from "@/components/transfer/CriarReservaTransferDialog";
 
 interface Solicitacao {
   id: string;
@@ -26,8 +27,10 @@ export default function TransferSolicitacoesPage() {
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Solicitacao | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [initialData, setInitialData] = useState<TransferInitialData | null>(null);
 
-  const fetch = useCallback(async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     const { data, error } = await supabase
       .from("solicitacoes_transfer")
@@ -38,7 +41,7 @@ export default function TransferSolicitacoesPage() {
     setLoading(false);
   }, []);
 
-  useEffect(() => { fetch(); }, [fetch]);
+  useEffect(() => { fetchData(); }, [fetchData]);
 
   const handleVisualizar = (s: Solicitacao) => {
     setSelected(s);
@@ -46,10 +49,29 @@ export default function TransferSolicitacoesPage() {
   };
 
   const handleConverter = async (s: Solicitacao) => {
-    // Update status to convertida
-    const { error } = await supabase.from("solicitacoes_transfer").update({ status: "convertida" }).eq("id", s.id);
-    if (error) toast.error("Erro ao converter");
-    else { toast.success("Solicitação convertida! Crie a reserva na aba Reservas."); setSheetOpen(false); fetch(); }
+    // Close the details sheet and open the reservation dialog pre-filled
+    setSheetOpen(false);
+    setInitialData({
+      nome_completo: s.nome_cliente,
+      contato: s.contato || undefined,
+      tipo: s.tipo || undefined,
+      embarque: s.embarque || undefined,
+      desembarque: s.desembarque || undefined,
+      data_viagem: s.data_viagem || undefined,
+      num_passageiros: s.num_passageiros,
+      mensagem: s.mensagem || undefined,
+      solicitacao_id: s.id,
+    });
+    setDialogOpen(true);
+  };
+
+  const handleReservaCriada = async () => {
+    // Mark solicitação as convertida
+    if (initialData?.solicitacao_id) {
+      await supabase.from("solicitacoes_transfer").update({ status: "convertida" }).eq("id", initialData.solicitacao_id);
+    }
+    setInitialData(null);
+    fetchData();
   };
 
   const handleComunicar = (s: Solicitacao) => {
@@ -66,7 +88,7 @@ export default function TransferSolicitacoesPage() {
           <p className="text-muted-foreground">Registros recebidos via webhook do site ({solicitacoes.length})</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="icon" onClick={fetch}><RefreshCw className="h-4 w-4" /></Button>
+          <Button variant="outline" size="icon" onClick={fetchData}><RefreshCw className="h-4 w-4" /></Button>
           <Button variant="outline"><Download className="h-4 w-4 mr-2" /> Exportar CSV</Button>
         </div>
       </div>
@@ -125,6 +147,13 @@ export default function TransferSolicitacoesPage() {
         onOpenChange={setSheetOpen}
         onConverter={handleConverter}
         onComunicar={handleComunicar}
+      />
+
+      <CriarReservaTransferDialog
+        open={dialogOpen}
+        onOpenChange={(open) => { setDialogOpen(open); if (!open) setInitialData(null); }}
+        onCreated={handleReservaCriada}
+        initialData={initialData}
       />
     </div>
   );
