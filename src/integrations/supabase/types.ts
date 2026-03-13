@@ -41,6 +41,45 @@ export type Database = {
         }
         Relationships: []
       }
+      configuracoes: {
+        Row: {
+          created_at: string
+          email: string | null
+          fonte_global: string | null
+          id: string
+          logo_url: string | null
+          nome_completo: string | null
+          nome_projeto: string | null
+          telefone: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          fonte_global?: string | null
+          id?: string
+          logo_url?: string | null
+          nome_completo?: string | null
+          nome_projeto?: string | null
+          telefone?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          fonte_global?: string | null
+          id?: string
+          logo_url?: string | null
+          nome_completo?: string | null
+          nome_projeto?: string | null
+          telefone?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
