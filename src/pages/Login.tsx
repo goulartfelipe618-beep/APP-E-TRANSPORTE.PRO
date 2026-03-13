@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Mail, Lock, Key, RefreshCw, LogIn } from "lucide-react";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/integrations/supabase/client";
 import luxuryCar from "@/assets/luxury-car.jpg";
 
 function generateCaptcha(length = 6): string {
