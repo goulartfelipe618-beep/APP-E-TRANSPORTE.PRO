@@ -158,6 +158,19 @@ export default function SistemaAutomacoesPage() {
     toast.success("Mapeamento salvo com sucesso!");
   };
 
+  const handleTestSubmit = (payload: Record<string, string>) => {
+    if (!selected) return;
+    const newTest: WebhookTest = {
+      id: crypto.randomUUID(),
+      payload,
+      receivedAt: new Date().toLocaleString("pt-BR"),
+    };
+    const updated = { ...selected, testes: [...selected.testes, newTest] };
+    setAutomacoes((prev) => prev.map((a) => (a.id === selected.id ? updated : a)));
+    setSelected(updated);
+    toast.success("Teste recebido com sucesso! Verifique a aba 'Testes Recebidos'.");
+  };
+
   // Detail view
   if (selected) {
     const isTransfer = selected.tipo === "transfer";
