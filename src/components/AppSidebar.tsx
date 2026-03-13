@@ -59,7 +59,6 @@ const menuStructure = [
           { title: "Cadastros", url: "/dashboard/motoristas/cadastros", icon: UserCheck },
           { title: "Parcerias", url: "/dashboard/motoristas/parcerias", icon: Handshake },
           { title: "Solicitações", url: "/dashboard/motoristas/solicitacoes", icon: ClipboardList },
-          { title: "Agendamentos", url: "/dashboard/motoristas/agendamentos", icon: CalendarDays },
         ],
       },
       { title: "Veículos", url: "/dashboard/veiculos", icon: Car },
