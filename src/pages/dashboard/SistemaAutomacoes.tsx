@@ -297,133 +297,112 @@ export default function SistemaAutomacoesPage() {
           </div>
         </div>
 
-        {/* Testes Recebidos — only when webhook is disabled */}
-        {!selected.ativo && (
-          <div className="rounded-xl border border-border bg-card p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <FlaskConical className="h-4 w-4 text-primary" />
-                <h3 className="font-semibold text-foreground">Testes Recebidos</h3>
-                <Badge variant="secondary">{testes.length}</Badge>
-              </div>
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={() => fetchTestes(selected.id)}>
-                  <RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Atualizar
-                </Button>
-                {testes.length > 0 && (
-                  <Button variant="outline" size="sm" onClick={() => clearAllTestes(selected.id)}>
-                    <Trash2 className="h-3.5 w-3.5 mr-1.5" /> Limpar Tudo
+        {/* Side-by-side: Testes (left) + Mapeamento (right) when disabled */}
+        <div className={!selected.ativo ? "grid grid-cols-1 lg:grid-cols-2 gap-6 items-start" : ""}>
+          {!selected.ativo && (
+            <div className="rounded-xl border border-border bg-card p-6 flex flex-col">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <FlaskConical className="h-4 w-4 text-primary" />
+                  <h3 className="font-semibold text-foreground">Testes Recebidos</h3>
+                  <Badge variant="secondary">{testes.length}</Badge>
+                </div>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={() => fetchTestes(selected.id)}>
+                    <RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Atualizar
                   </Button>
+                  {testes.length > 0 && (
+                    <Button variant="outline" size="sm" onClick={() => clearAllTestes(selected.id)}>
+                      <Trash2 className="h-3.5 w-3.5 mr-1.5" /> Limpar
+                    </Button>
+                  )}
+                </div>
+              </div>
+              <div className="flex-1 overflow-y-auto max-h-[65vh] space-y-3">
+                {testes.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">Nenhum teste recebido. Envie um POST para a URL do webhook enquanto desativado.</p>
+                ) : (
+                  <>
+                    <div className="flex flex-col gap-1.5">
+                      {testes.map((t, idx) => (
+                        <Button
+                          key={t.id}
+                          variant={selectedTeste?.id === t.id ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setSelectedTeste(selectedTeste?.id === t.id ? null : t)}
+                          className="justify-start gap-2 w-full"
+                        >
+                          <Eye className="h-3 w-3 shrink-0" />
+                          <span>Teste {testes.length - idx}</span>
+                          <span className="text-xs opacity-70 ml-auto">
+                            {new Date(t.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                          </span>
+                        </Button>
+                      ))}
+                    </div>
+                    {selectedTeste && (
+                      <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs font-medium text-muted-foreground">
+                            Recebido em {new Date(selectedTeste.created_at).toLocaleString("pt-BR")}
+                          </p>
+                          <div className="flex gap-1">
+                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => {
+                              navigator.clipboard.writeText(JSON.stringify(selectedTeste.payload, null, 2));
+                              toast.success("JSON copiado!");
+                            }}>
+                              <Copy className="h-3 w-3" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => deleteTeste(selectedTeste.id)}>
+                              <Trash2 className="h-3 w-3 text-destructive" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setSelectedTeste(null)}>
+                              <X className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </div>
+                        <pre className="text-xs font-mono bg-background rounded p-3 overflow-x-auto max-h-[300px] overflow-y-auto whitespace-pre-wrap">
+                          {JSON.stringify(selectedTeste.payload, null, 2)}
+                        </pre>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             </div>
+          )}
 
-            {testes.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                Nenhum teste recebido. Envie um POST para a URL do webhook enquanto ele estiver desativado para ver os dados aqui.
-              </p>
+          {/* Mapeamento de Campos */}
+          <div className="rounded-xl border border-border bg-card p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold text-foreground">Mapeamento de Campos</h3>
+              <Button size="sm" onClick={handleSaveMappings}>
+                <Save className="h-3.5 w-3.5 mr-1.5" /> Salvar
+              </Button>
+            </div>
+            {isTransfer ? (
+              <Tabs defaultValue="somente_ida">
+                <TabsList className="w-full grid grid-cols-3 mb-4">
+                  <TabsTrigger value="somente_ida">Somente Ida</TabsTrigger>
+                  <TabsTrigger value="ida_volta">Ida e Volta</TabsTrigger>
+                  <TabsTrigger value="por_hora">Por Hora</TabsTrigger>
+                </TabsList>
+                <TabsContent value="somente_ida">
+                  <FieldMappingList fields={transferSomenteIdaFields} mappings={mappings["somente_ida"] || {}} onUpdate={(f, v) => updateMapping("somente_ida", f, v)} />
+                </TabsContent>
+                <TabsContent value="ida_volta">
+                  <FieldMappingList fields={transferIdaVoltaFields} mappings={mappings["ida_volta"] || {}} onUpdate={(f, v) => updateMapping("ida_volta", f, v)} />
+                </TabsContent>
+                <TabsContent value="por_hora">
+                  <FieldMappingList fields={transferPorHoraFields} mappings={mappings["por_hora"] || {}} onUpdate={(f, v) => updateMapping("por_hora", f, v)} />
+                </TabsContent>
+              </Tabs>
+            ) : selected.tipo === "grupo" ? (
+              <FieldMappingList fields={grupoFields} mappings={mappings["default"] || {}} onUpdate={(f, v) => updateMapping("default", f, v)} />
             ) : (
-              <div className="space-y-3">
-                <div className="flex flex-wrap gap-2">
-                  {testes.map((t, idx) => (
-                    <Button
-                      key={t.id}
-                      variant={selectedTeste?.id === t.id ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => setSelectedTeste(selectedTeste?.id === t.id ? null : t)}
-                      className="gap-1.5"
-                    >
-                      <Eye className="h-3 w-3" />
-                      Teste {testes.length - idx}
-                      <span className="text-xs opacity-70">
-                        {new Date(t.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
-                      </span>
-                    </Button>
-                  ))}
-                </div>
-
-                {selectedTeste && (
-                  <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <p className="text-xs font-medium text-muted-foreground">
-                        Recebido em {new Date(selectedTeste.created_at).toLocaleString("pt-BR")}
-                      </p>
-                      <div className="flex gap-1">
-                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => {
-                          navigator.clipboard.writeText(JSON.stringify(selectedTeste.payload, null, 2));
-                          toast.success("JSON copiado!");
-                        }}>
-                          <Copy className="h-3 w-3" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => deleteTeste(selectedTeste.id)}>
-                          <Trash2 className="h-3 w-3 text-destructive" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setSelectedTeste(null)}>
-                          <X className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    </div>
-                    <pre className="text-xs font-mono bg-background rounded p-3 overflow-x-auto max-h-[300px] overflow-y-auto whitespace-pre-wrap">
-                      {JSON.stringify(selectedTeste.payload, null, 2)}
-                    </pre>
-                  </div>
-                )}
-              </div>
+              <FieldMappingList fields={motoristaFields} mappings={mappings["default"] || {}} onUpdate={(f, v) => updateMapping("default", f, v)} />
             )}
           </div>
-        )}
-
-        {/* Mapeamento de Campos */}
-        <div className="rounded-xl border border-border bg-card p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-foreground">Mapeamento de Campos</h3>
-            <Button size="sm" onClick={handleSaveMappings}>
-              <Save className="h-3.5 w-3.5 mr-1.5" /> Salvar
-            </Button>
-          </div>
-
-          {isTransfer ? (
-            <Tabs defaultValue="somente_ida">
-              <TabsList className="w-full grid grid-cols-3 mb-4">
-                <TabsTrigger value="somente_ida">Somente Ida</TabsTrigger>
-                <TabsTrigger value="ida_volta">Ida e Volta</TabsTrigger>
-                <TabsTrigger value="por_hora">Por Hora</TabsTrigger>
-              </TabsList>
-              <TabsContent value="somente_ida">
-                <FieldMappingList
-                  fields={transferSomenteIdaFields}
-                  mappings={mappings["somente_ida"] || {}}
-                  onUpdate={(f, v) => updateMapping("somente_ida", f, v)}
-                />
-              </TabsContent>
-              <TabsContent value="ida_volta">
-                <FieldMappingList
-                  fields={transferIdaVoltaFields}
-                  mappings={mappings["ida_volta"] || {}}
-                  onUpdate={(f, v) => updateMapping("ida_volta", f, v)}
-                />
-              </TabsContent>
-              <TabsContent value="por_hora">
-                <FieldMappingList
-                  fields={transferPorHoraFields}
-                  mappings={mappings["por_hora"] || {}}
-                  onUpdate={(f, v) => updateMapping("por_hora", f, v)}
-                />
-              </TabsContent>
-            </Tabs>
-          ) : selected.tipo === "grupo" ? (
-            <FieldMappingList
-              fields={grupoFields}
-              mappings={mappings["default"] || {}}
-              onUpdate={(f, v) => updateMapping("default", f, v)}
-            />
-          ) : (
-            <FieldMappingList
-              fields={motoristaFields}
-              mappings={mappings["default"] || {}}
-              onUpdate={(f, v) => updateMapping("default", f, v)}
-            />
-          )}
         </div>
 
         <FerramentasDevDialog
