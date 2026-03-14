@@ -62,12 +62,13 @@ const features = [
 ];
 
 export default function WebsitePage() {
-  const [selectedTemplate, setSelectedTemplate] = useState<string | null>("eco1");
+  const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   const [step, setStep] = useState<"gallery" | "briefing" | "servico_ativo">("gallery");
   const [briefingStep, setBriefingStep] = useState(1);
   const [heroIndex, setHeroIndex] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [servicoAtivo, setServicoAtivo] = useState<any>(null);
+  const [dbTemplates, setDbTemplates] = useState<TemplateDB[]>([]);
 
   // Briefing form state
   const [domain, setDomain] = useState("");
