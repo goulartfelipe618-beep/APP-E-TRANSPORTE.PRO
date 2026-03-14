@@ -50,7 +50,6 @@ const App = () => (
           <Route path="/login" element={<Login />} />
           <Route path="/dashboard" element={<ProtectedRoute><DashboardLayout /></ProtectedRoute>}>
             <Route index element={<HomePage />} />
-            <Route path="slides" element={<SlidesPage />} />
             <Route path="metricas" element={<MetricasPage />} />
             <Route path="abrangencia" element={<PlaceholderPage />} />
             <Route path="transfer/solicitacoes" element={<TransferSolicitacoesPage />} />
