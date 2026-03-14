@@ -242,7 +242,7 @@ export default function SistemaAutomacoesPage() {
     return (
       <div className="space-y-6">
         <button
-          onClick={() => { setSelected(null); setMappings({}); }}
+          onClick={() => { setSelected(null); setMappings({}); setTestes([]); setSelectedTeste(null); }}
           className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
         >
           <ArrowLeft className="h-4 w-4" />
