@@ -13,12 +13,32 @@ import { toast } from "sonner";
 export interface TransferInitialData {
   nome_completo?: string;
   contato?: string;
+  email?: string;
   tipo?: string;
   embarque?: string;
   desembarque?: string;
   data_viagem?: string;
+  hora_viagem?: string;
   num_passageiros?: number | null;
   mensagem?: string;
+  cupom?: string;
+  // Volta
+  volta_embarque?: string;
+  volta_desembarque?: string;
+  volta_data?: string;
+  volta_hora?: string;
+  volta_passageiros?: number | null;
+  volta_mensagem?: string;
+  volta_cupom?: string;
+  // Por hora
+  por_hora_endereco_inicio?: string;
+  por_hora_ponto_encerramento?: string;
+  por_hora_data?: string;
+  por_hora_hora?: string;
+  por_hora_passageiros?: number | null;
+  por_hora_qtd_horas?: number | null;
+  por_hora_cupom?: string;
+  por_hora_itinerario?: string;
   solicitacao_id?: string;
 }
 
