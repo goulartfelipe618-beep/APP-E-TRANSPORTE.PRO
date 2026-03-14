@@ -34,6 +34,7 @@ const usuariosChildren = [
 
 const networkItem = { title: "Network", url: "/admin/network", icon: Building2 };
 const solicitacoesItem = { title: "Solicitações Serviços", url: "/admin/solicitacoes-servicos", icon: ClipboardList };
+const templatesItem = { title: "Templates", url: "/admin/templates", icon: LayoutTemplate };
 
 export function AdminSidebar() {
   const { state } = useSidebar();
