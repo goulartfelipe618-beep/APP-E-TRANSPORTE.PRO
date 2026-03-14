@@ -120,19 +120,24 @@ export function AppSidebar() {
   useEffect(() => {
     const handler = () => {
       const aceito = localStorage.getItem("network_nacional_aceito") === "sim";
+      const highlightShown = localStorage.getItem("network_highlight_shown") === "sim";
       setNetworkAceito(aceito);
-      // Show highlight only when just accepted
-      if (aceito && !networkAceito) {
+      if (aceito && !highlightShown) {
         setShowNetworkHighlight(true);
       }
     };
+    const dismissHandler = () => {
+      setShowNetworkHighlight(false);
+    };
     window.addEventListener("network-status-changed", handler);
+    window.addEventListener("network-highlight-dismissed", dismissHandler);
     window.addEventListener("storage", handler);
     return () => {
       window.removeEventListener("network-status-changed", handler);
+      window.removeEventListener("network-highlight-dismissed", dismissHandler);
       window.removeEventListener("storage", handler);
     };
-  }, [networkAceito]);
+  }, []);
 
   const isActive = (url: string) => location.pathname === url;
   const isGroupActive = (children: { url: string }[]) =>
