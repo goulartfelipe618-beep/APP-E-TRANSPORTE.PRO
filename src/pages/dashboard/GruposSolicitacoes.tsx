@@ -7,21 +7,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import DetalhesSolicitacaoGrupoSheet from "@/components/solicitacoes/DetalhesSolicitacaoGrupoSheet";
 import CriarReservaGrupoDialog, { type GrupoInitialData } from "@/components/grupos/CriarReservaGrupoDialog";
+import { Tables } from "@/integrations/supabase/types";
 
-interface Solicitacao {
-  id: string;
-  nome_cliente: string;
-  whatsapp: string | null;
-  tipo_veiculo: string | null;
-  embarque: string | null;
-  destino: string | null;
-  data_ida: string | null;
-  num_passageiros: number | null;
-  mensagem: string | null;
-  status: string;
-  created_at: string;
-}
-
+type Solicitacao = Tables<"solicitacoes_grupos">;
 export default function GruposSolicitacoesPage() {
   const [solicitacoes, setSolicitacoes] = useState<Solicitacao[]>([]);
   const [loading, setLoading] = useState(true);

@@ -7,21 +7,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import DetalhesSolicitacaoTransferSheet from "@/components/solicitacoes/DetalhesSolicitacaoTransferSheet";
 import CriarReservaTransferDialog, { type TransferInitialData } from "@/components/transfer/CriarReservaTransferDialog";
+import { Tables } from "@/integrations/supabase/types";
 
-interface Solicitacao {
-  id: string;
-  nome_cliente: string;
-  contato: string | null;
-  tipo: string | null;
-  embarque: string | null;
-  desembarque: string | null;
-  data_viagem: string | null;
-  num_passageiros: number | null;
-  mensagem: string | null;
-  status: string;
-  created_at: string;
-}
-
+type Solicitacao = Tables<"solicitacoes_transfer">;
 export default function TransferSolicitacoesPage() {
   const [solicitacoes, setSolicitacoes] = useState<Solicitacao[]>([]);
   const [loading, setLoading] = useState(true);
