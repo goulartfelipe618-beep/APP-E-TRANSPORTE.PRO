@@ -74,6 +74,54 @@ export type Database = {
         }
         Relationships: []
       }
+      cabecalho_contratual: {
+        Row: {
+          cnpj: string
+          created_at: string
+          email_oficial: string
+          endereco_sede: string
+          id: string
+          logo_contratual_url: string | null
+          nome: string
+          razao_social: string
+          representante_legal: string | null
+          telefone: string
+          updated_at: string
+          user_id: string
+          whatsapp: string
+        }
+        Insert: {
+          cnpj?: string
+          created_at?: string
+          email_oficial?: string
+          endereco_sede?: string
+          id?: string
+          logo_contratual_url?: string | null
+          nome?: string
+          razao_social?: string
+          representante_legal?: string | null
+          telefone?: string
+          updated_at?: string
+          user_id: string
+          whatsapp?: string
+        }
+        Update: {
+          cnpj?: string
+          created_at?: string
+          email_oficial?: string
+          endereco_sede?: string
+          id?: string
+          logo_contratual_url?: string | null
+          nome?: string
+          razao_social?: string
+          representante_legal?: string | null
+          telefone?: string
+          updated_at?: string
+          user_id?: string
+          whatsapp?: string
+        }
+        Relationships: []
+      }
       configuracoes: {
         Row: {
           created_at: string
