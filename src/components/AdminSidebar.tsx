@@ -1,5 +1,5 @@
 import {
-  Home, SlidersHorizontal, LogOut, Shield, BarChart3, MapPin,
+  Home, SlidersHorizontal, LogOut, Shield, BarChart3, MapPin, FileText, ChevronDown,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -7,20 +7,34 @@ import { supabase } from "@/integrations/supabase/client";
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent,
   SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem,
+  SidebarMenuSub, SidebarMenuSubItem, SidebarMenuSubButton,
   SidebarFooter, useSidebar,
 } from "@/components/ui/sidebar";
+import {
+  Collapsible, CollapsibleContent, CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { cn } from "@/lib/utils";
 
-const menuItems = [
+const simpleItems = [
   { title: "Home", url: "/admin", icon: Home },
   { title: "Métricas", url: "/admin/metricas", icon: BarChart3 },
   { title: "Abrangência", url: "/admin/abrangencia", icon: MapPin },
   { title: "Slides", url: "/admin/slides", icon: SlidersHorizontal },
 ];
 
+const contratoChildren = [
+  { title: "Transfer", url: "/admin/contrato/transfer", icon: FileText },
+  { title: "Táxi", url: "/admin/contrato/taxi", icon: FileText },
+];
+
 export function AdminSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
+  const location = useLocation();
   const navigate = useNavigate();
+
+  const isActive = (url: string) => location.pathname === url;
+  const contratoActive = contratoChildren.some((c) => isActive(c.url));
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -46,7 +60,7 @@ export function AdminSidebar() {
           <SidebarGroupLabel>Menu</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {menuItems.map((item) => (
+              {simpleItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
                     <NavLink to={item.url} end className="hover:bg-muted/50" activeClassName="bg-muted text-primary font-medium">
@@ -56,6 +70,35 @@ export function AdminSidebar() {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
+
+              {/* Contrato collapsible */}
+              <Collapsible defaultOpen={contratoActive}>
+                <SidebarMenuItem>
+                  <CollapsibleTrigger asChild>
+                    <SidebarMenuButton className={cn("w-full justify-between", contratoActive && "text-primary")}>
+                      <span className="flex items-center gap-2">
+                        <FileText className="h-4 w-4" />
+                        {!collapsed && <span>Contrato</span>}
+                      </span>
+                      {!collapsed && <ChevronDown className="h-4 w-4 transition-transform group-data-[state=open]:rotate-180" />}
+                    </SidebarMenuButton>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <SidebarMenuSub>
+                      {contratoChildren.map((child) => (
+                        <SidebarMenuSubItem key={child.url}>
+                          <SidebarMenuSubButton asChild>
+                            <NavLink to={child.url} end className="text-sm" activeClassName="text-primary font-medium">
+                              <child.icon className="h-3.5 w-3.5 mr-2" />
+                              {child.title}
+                            </NavLink>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                      ))}
+                    </SidebarMenuSub>
+                  </CollapsibleContent>
+                </SidebarMenuItem>
+              </Collapsible>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
