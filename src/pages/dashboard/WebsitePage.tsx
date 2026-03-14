@@ -448,23 +448,37 @@ export default function WebsitePage() {
 
       {/* Template Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-        {templates.map(t => {
+        {dbTemplates.map(t => {
           const isSelected = selectedTemplate === t.id;
           return (
             <div key={t.id} className="flex flex-col">
-              {/* Preview card */}
-              <div className={cn("rounded-xl h-44 p-5 flex flex-col justify-end relative overflow-hidden border", t.style, isSelected ? "ring-2 ring-primary" : "border-border")}>
-                <p className="text-xs font-bold whitespace-pre-line leading-tight">{t.headline}</p>
+              {/* Preview card with scroll-on-hover */}
+              <div className={cn("rounded-xl h-48 relative overflow-hidden border bg-muted group cursor-pointer", isSelected ? "ring-2 ring-primary" : "border-border")}
+                onClick={() => setSelectedTemplate(t.id)}>
+                {t.imagem_url ? (
+                  <img
+                    src={t.imagem_url}
+                    alt={t.nome}
+                    className="w-full object-cover object-top transition-transform duration-[3s] ease-linear group-hover:translate-y-[calc(-100%+12rem)]"
+                    style={{ minHeight: "200%" }}
+                  />
+                ) : (
+                  <div className="h-full flex items-center justify-center text-muted-foreground">Sem imagem</div>
+                )}
                 {isSelected && (
-                  <div className="absolute top-3 right-3 w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center">
+                  <div className="absolute top-3 right-3 w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center z-10">
                     <Check className="h-3.5 w-3.5" />
                   </div>
                 )}
               </div>
-              <p className="font-semibold text-foreground mt-3 text-sm">{t.name}</p>
-              <Button variant="outline" size="sm" className="mt-2 w-full gap-2">
-                <Eye className="h-4 w-4" /> Ver Modelo
-              </Button>
+              <p className="font-semibold text-foreground mt-3 text-sm">{t.nome}</p>
+              {t.link_modelo && (
+                <a href={t.link_modelo} target="_blank" rel="noopener noreferrer">
+                  <Button variant="outline" size="sm" className="mt-2 w-full gap-2">
+                    <Eye className="h-4 w-4" /> Ver Modelo
+                  </Button>
+                </a>
+              )}
               {isSelected ? (
                 <Button size="sm" className="mt-2 w-full gap-2 bg-primary text-primary-foreground">
                   <Check className="h-4 w-4" /> Selecionado
@@ -478,6 +492,12 @@ export default function WebsitePage() {
           );
         })}
       </div>
+
+      {dbTemplates.length === 0 && (
+        <div className="text-center py-12 text-muted-foreground">
+          Nenhum template disponível no momento.
+        </div>
+      )}
 
       {/* Floating CTA */}
       {selectedTemplate && (
