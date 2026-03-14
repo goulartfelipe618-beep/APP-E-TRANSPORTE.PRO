@@ -38,6 +38,7 @@ import AdminLayout from "./components/AdminLayout";
 import ProtectedAdminRoute from "./components/ProtectedAdminRoute";
 import AdminHomePage from "./pages/admin/AdminHome";
 import AdminSlidesPage from "./pages/admin/SlidesPage";
+import AdminMetricasPage from "./pages/admin/AdminMetricas";
 import { ConfiguracoesProvider } from "./contexts/ConfiguracoesContext";
 
 const queryClient = new QueryClient();
@@ -83,6 +84,7 @@ const App = () => (
           </Route>
           <Route path="/admin" element={<ProtectedAdminRoute><AdminLayout /></ProtectedAdminRoute>}>
             <Route index element={<AdminHomePage />} />
+            <Route path="metricas" element={<AdminMetricasPage />} />
             <Route path="slides" element={<AdminSlidesPage />} />
           </Route>
           <Route path="*" element={<NotFound />} />
