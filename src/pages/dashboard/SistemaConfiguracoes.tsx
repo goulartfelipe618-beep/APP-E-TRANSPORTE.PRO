@@ -19,6 +19,7 @@ const FONT_OPTIONS = [
 export default function SistemaConfiguracoesPage() {
   const { config, refreshConfig } = useConfiguracoes();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const logoContratualRef = useRef<HTMLInputElement>(null);
 
   // Profile
   const [profileEditing, setProfileEditing] = useState(true);
@@ -31,6 +32,19 @@ export default function SistemaConfiguracoesPage() {
   const [fonteGlobal, setFonteGlobal] = useState("montserrat");
   const [logoUrl, setLogoUrl] = useState("");
   const [uploading, setUploading] = useState(false);
+
+  // Informações Contratuais
+  const [contratualEditing, setContratualEditing] = useState(true);
+  const [contratualSaved, setContratualSaved] = useState(false);
+  const [razaoSocial, setRazaoSocial] = useState("");
+  const [cnpj, setCnpj] = useState("");
+  const [enderecoSede, setEnderecoSede] = useState("");
+  const [representanteLegal, setRepresentanteLegal] = useState("");
+  const [logoContratualUrl, setLogoContratualUrl] = useState("");
+  const [telefoneContratual, setTelefoneContratual] = useState("");
+  const [whatsappContratual, setWhatsappContratual] = useState("");
+  const [emailOficial, setEmailOficial] = useState("");
+  const [uploadingLogoContratual, setUploadingLogoContratual] = useState("");
 
   useEffect(() => {
     loadSettings();
