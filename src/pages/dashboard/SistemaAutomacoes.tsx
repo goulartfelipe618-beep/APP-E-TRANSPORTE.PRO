@@ -504,6 +504,7 @@ export default function SistemaAutomacoesPage() {
                         }
                         setSelected(a);
                         setMappings(m);
+                        fetchTestes(a.id);
                       }}>
                         Configurar
                       </Button>
