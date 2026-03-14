@@ -1,33 +1,30 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, Plus, Link2, Copy, ArrowLeft, Sparkles, Save, Code2 } from "lucide-react";
+import { RefreshCw, Plus, Link2, Copy, ArrowLeft, Sparkles, Save, Code2, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from "@/components/ui/dialog";
 import {
   Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 import FerramentasDevDialog from "@/components/automacoes/FerramentasDevDialog";
 
 interface Automacao {
   id: string;
+  user_id: string;
   nome: string;
   tipo: string;
-  tipoLabel: string;
-  webhookEnabled: boolean;
-  testes: WebhookTest[];
+  ativo: boolean;
   mappings: Record<string, Record<string, string>>;
-}
-
-interface WebhookTest {
-  id: string;
-  payload: Record<string, string>;
-  receivedAt: string;
+  created_at: string;
 }
 
 const tipoLabels: Record<string, string> = {
@@ -105,45 +102,77 @@ export default function SistemaAutomacoesPage() {
   const [automacoes, setAutomacoes] = useState<Automacao[]>([]);
   const [selected, setSelected] = useState<Automacao | null>(null);
   const [mappings, setMappings] = useState<Record<string, Record<string, string>>>({});
+  const [loading, setLoading] = useState(true);
 
   const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID || "seu-projeto";
 
-  const handleCreate = () => {
+  const fetchAutomacoes = useCallback(async () => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from("automacoes")
+      .select("*")
+      .order("created_at", { ascending: false });
+    if (error) toast.error("Erro ao carregar automações");
+    else setAutomacoes((data || []).map((a: any) => ({
+      ...a,
+      mappings: typeof a.mappings === "object" ? a.mappings : {},
+    })));
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { fetchAutomacoes(); }, [fetchAutomacoes]);
+
+  const handleCreate = async () => {
     if (!novoNome || !novoTipo) {
       toast.error("Preencha todos os campos.");
       return;
     }
-    const novo: Automacao = {
-      id: crypto.randomUUID(),
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) { toast.error("Não logado"); return; }
+
+    const { error } = await supabase.from("automacoes").insert({
+      user_id: user.id,
       nome: novoNome,
       tipo: novoTipo,
-      tipoLabel: tipoLabels[novoTipo] || novoTipo,
-      webhookEnabled: false,
-      testes: [],
+      ativo: false,
       mappings: {},
-    };
-    setAutomacoes((prev) => [...prev, novo]);
-    setNovoNome("");
-    setNovoTipo("");
-    setOpen(false);
-    toast.success("Automação criada com sucesso!");
-  };
+    });
 
-  const toggleWebhook = (id: string) => {
-    setAutomacoes((prev) =>
-      prev.map((a) => (a.id === id ? { ...a, webhookEnabled: !a.webhookEnabled } : a))
-    );
-    if (selected) {
-      setSelected({ ...selected, webhookEnabled: !selected.webhookEnabled });
+    if (error) toast.error("Erro ao criar: " + error.message);
+    else {
+      toast.success("Automação criada com sucesso!");
+      setNovoNome("");
+      setNovoTipo("");
+      setOpen(false);
+      fetchAutomacoes();
     }
   };
 
-  const webhookUrl = selected
-    ? `https://${projectId}.supabase.co/functions/v1/webhook-solicitacao?automacao_id=${selected.id}`
-    : "";
+  const toggleWebhook = async (automacao: Automacao) => {
+    const newAtivo = !automacao.ativo;
+    const { error } = await supabase
+      .from("automacoes")
+      .update({ ativo: newAtivo, updated_at: new Date().toISOString() })
+      .eq("id", automacao.id);
+    if (error) toast.error("Erro ao atualizar");
+    else {
+      toast.success(newAtivo ? "Webhook ativado!" : "Webhook desativado!");
+      setAutomacoes((prev) => prev.map((a) => a.id === automacao.id ? { ...a, ativo: newAtivo } : a));
+      if (selected?.id === automacao.id) setSelected({ ...selected, ativo: newAtivo });
+    }
+  };
 
-  const copyUrl = () => {
-    navigator.clipboard.writeText(webhookUrl);
+  const handleDelete = async (id: string) => {
+    const { error } = await supabase.from("automacoes").delete().eq("id", id);
+    if (error) toast.error("Erro ao excluir");
+    else { toast.success("Automação excluída"); fetchAutomacoes(); }
+  };
+
+  const getWebhookUrl = (id: string) =>
+    `https://${projectId}.supabase.co/functions/v1/webhook-solicitacao?automacao_id=${id}`;
+
+  const copyUrl = (id: string) => {
+    navigator.clipboard.writeText(getWebhookUrl(id));
     toast.success("URL copiada!");
   };
 
@@ -154,26 +183,25 @@ export default function SistemaAutomacoesPage() {
     }));
   };
 
-  const handleSave = () => {
-    toast.success("Mapeamento salvo com sucesso!");
+  const handleSaveMappings = async () => {
+    if (!selected) return;
+    const { error } = await supabase
+      .from("automacoes")
+      .update({ mappings, updated_at: new Date().toISOString() })
+      .eq("id", selected.id);
+    if (error) toast.error("Erro ao salvar");
+    else toast.success("Mapeamento salvo com sucesso!");
   };
 
   const handleTestSubmit = (payload: Record<string, string>) => {
     if (!selected) return;
-    const newTest: WebhookTest = {
-      id: crypto.randomUUID(),
-      payload,
-      receivedAt: new Date().toLocaleString("pt-BR"),
-    };
-    const updated = { ...selected, testes: [...selected.testes, newTest] };
-    setAutomacoes((prev) => prev.map((a) => (a.id === selected.id ? updated : a)));
-    setSelected(updated);
-    toast.success("Teste recebido com sucesso! Verifique a aba 'Testes Recebidos'.");
+    toast.success("Teste enviado! Verifique as Solicitações correspondentes.");
   };
 
   // Detail view
   if (selected) {
     const isTransfer = selected.tipo === "transfer";
+    const webhookUrl = getWebhookUrl(selected.id);
 
     return (
       <div className="space-y-6">
@@ -187,7 +215,7 @@ export default function SistemaAutomacoesPage() {
 
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-foreground uppercase">{selected.tipoLabel}</h1>
+            <h1 className="text-2xl font-bold text-foreground uppercase">{tipoLabels[selected.tipo] || selected.tipo}</h1>
             <p className="text-muted-foreground">Configure o webhook e mapeamento de campos.</p>
           </div>
           <Button variant="outline" onClick={() => setDevToolsOpen(true)}>
@@ -205,7 +233,7 @@ export default function SistemaAutomacoesPage() {
               <p className="text-sm font-medium text-foreground">URL do Webhook:</p>
               <p className="text-xs text-muted-foreground break-all mt-1 font-mono">{webhookUrl}</p>
             </div>
-            <Button variant="outline" size="sm" onClick={copyUrl} className="shrink-0">
+            <Button variant="outline" size="sm" onClick={() => copyUrl(selected.id)} className="shrink-0">
               <Copy className="h-3.5 w-3.5 mr-1.5" /> Copiar
             </Button>
           </div>
@@ -217,119 +245,75 @@ export default function SistemaAutomacoesPage() {
               </div>
               <div>
                 <p className="text-sm font-medium text-foreground">
-                  Webhook {selected.webhookEnabled ? "Ativado" : "Desativado"}
+                  Webhook {selected.ativo ? "Ativado" : "Desativado"}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  {selected.webhookEnabled
-                    ? "Envios estão sendo processados em tempo real."
-                    : "Envios são salvos como testes para configurar o mapeamento."}
+                  {selected.ativo
+                    ? "Dados recebidos serão enviados para Solicitações automaticamente."
+                    : "Webhook desativado. Ative para começar a receber dados."}
                 </p>
               </div>
             </div>
             <Switch
-              checked={selected.webhookEnabled}
-              onCheckedChange={() => toggleWebhook(selected.id)}
+              checked={selected.ativo}
+              onCheckedChange={() => toggleWebhook(selected)}
             />
           </div>
         </div>
 
-        {/* Bottom two columns */}
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-          {/* Testes Recebidos */}
-          <div className="lg:col-span-2 rounded-xl border border-border bg-card p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <Sparkles className="h-4 w-4 text-primary" />
-                <h3 className="font-semibold text-foreground">Testes Recebidos</h3>
-              </div>
-              <Button variant="ghost" size="icon">
-                <RefreshCw className="h-4 w-4" />
-              </Button>
-            </div>
-
-            {selected.testes.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                Nenhum teste recebido. Clique em "Ferramentas do Desenvolvedor" para enviar um teste ou envie uma requisição POST para a URL acima.
-              </p>
-            ) : (
-              <div className="space-y-2 max-h-[50vh] overflow-y-auto">
-                {selected.testes.map((t) => (
-                  <details
-                    key={t.id}
-                    className="w-full text-left rounded-lg border border-border p-3 text-sm hover:bg-muted/50 transition-colors"
-                  >
-                    <summary className="cursor-pointer">
-                      <span className="font-medium text-foreground">Teste #{t.id.slice(0, 6)}</span>
-                      <span className="text-xs text-muted-foreground ml-2">{t.receivedAt}</span>
-                    </summary>
-                    <div className="mt-2 space-y-1 border-t border-border pt-2">
-                      {Object.entries(t.payload).map(([key, value]) => (
-                        <div key={key} className="flex items-center gap-2">
-                          <code className="text-xs bg-muted px-1.5 py-0.5 rounded font-mono text-primary">{key}</code>
-                          <span className="text-xs text-muted-foreground">→</span>
-                          <span className="text-xs text-foreground truncate">{value || "(vazio)"}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </details>
-                ))}
-              </div>
-            )}
+        {/* Mapeamento de Campos */}
+        <div className="rounded-xl border border-border bg-card p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-semibold text-foreground">Mapeamento de Campos</h3>
+            <Button size="sm" onClick={handleSaveMappings}>
+              <Save className="h-3.5 w-3.5 mr-1.5" /> Salvar
+            </Button>
           </div>
 
-          {/* Mapeamento de Campos */}
-          <div className="lg:col-span-3 rounded-xl border border-border bg-card p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold text-foreground">Mapeamento de Campos</h3>
-              <Button size="sm" onClick={handleSave}>
-                <Save className="h-3.5 w-3.5 mr-1.5" /> Salvar
-              </Button>
-            </div>
-
-            {isTransfer ? (
-              <Tabs defaultValue="somente_ida">
-                <TabsList className="w-full grid grid-cols-3 mb-4">
-                  <TabsTrigger value="somente_ida">Somente Ida</TabsTrigger>
-                  <TabsTrigger value="ida_volta">Ida e Volta</TabsTrigger>
-                  <TabsTrigger value="por_hora">Por Hora</TabsTrigger>
-                </TabsList>
-                <TabsContent value="somente_ida">
-                  <FieldMappingList
-                    fields={transferSomenteIdaFields}
-                    mappings={mappings["somente_ida"] || {}}
-                    onUpdate={(f, v) => updateMapping("somente_ida", f, v)}
-                  />
-                </TabsContent>
-                <TabsContent value="ida_volta">
-                  <FieldMappingList
-                    fields={transferIdaVoltaFields}
-                    mappings={mappings["ida_volta"] || {}}
-                    onUpdate={(f, v) => updateMapping("ida_volta", f, v)}
-                  />
-                </TabsContent>
-                <TabsContent value="por_hora">
-                  <FieldMappingList
-                    fields={transferPorHoraFields}
-                    mappings={mappings["por_hora"] || {}}
-                    onUpdate={(f, v) => updateMapping("por_hora", f, v)}
-                  />
-                </TabsContent>
-              </Tabs>
-            ) : selected.tipo === "grupo" ? (
-              <FieldMappingList
-                fields={grupoFields}
-                mappings={mappings["default"] || {}}
-                onUpdate={(f, v) => updateMapping("default", f, v)}
-              />
-            ) : (
-              <FieldMappingList
-                fields={motoristaFields}
-                mappings={mappings["default"] || {}}
-                onUpdate={(f, v) => updateMapping("default", f, v)}
-              />
-            )}
-          </div>
+          {isTransfer ? (
+            <Tabs defaultValue="somente_ida">
+              <TabsList className="w-full grid grid-cols-3 mb-4">
+                <TabsTrigger value="somente_ida">Somente Ida</TabsTrigger>
+                <TabsTrigger value="ida_volta">Ida e Volta</TabsTrigger>
+                <TabsTrigger value="por_hora">Por Hora</TabsTrigger>
+              </TabsList>
+              <TabsContent value="somente_ida">
+                <FieldMappingList
+                  fields={transferSomenteIdaFields}
+                  mappings={mappings["somente_ida"] || {}}
+                  onUpdate={(f, v) => updateMapping("somente_ida", f, v)}
+                />
+              </TabsContent>
+              <TabsContent value="ida_volta">
+                <FieldMappingList
+                  fields={transferIdaVoltaFields}
+                  mappings={mappings["ida_volta"] || {}}
+                  onUpdate={(f, v) => updateMapping("ida_volta", f, v)}
+                />
+              </TabsContent>
+              <TabsContent value="por_hora">
+                <FieldMappingList
+                  fields={transferPorHoraFields}
+                  mappings={mappings["por_hora"] || {}}
+                  onUpdate={(f, v) => updateMapping("por_hora", f, v)}
+                />
+              </TabsContent>
+            </Tabs>
+          ) : selected.tipo === "grupo" ? (
+            <FieldMappingList
+              fields={grupoFields}
+              mappings={mappings["default"] || {}}
+              onUpdate={(f, v) => updateMapping("default", f, v)}
+            />
+          ) : (
+            <FieldMappingList
+              fields={motoristaFields}
+              mappings={mappings["default"] || {}}
+              onUpdate={(f, v) => updateMapping("default", f, v)}
+            />
+          )}
         </div>
+
         <FerramentasDevDialog
           open={devToolsOpen}
           onOpenChange={setDevToolsOpen}
@@ -340,44 +324,74 @@ export default function SistemaAutomacoesPage() {
     );
   }
 
-  // List view
+  // List view — table format
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Automações</h1>
-          <p className="text-muted-foreground">Gerencie seus webhooks e mapeamentos de campos.</p>
+          <p className="text-muted-foreground">Gerencie seus webhooks e mapeamentos de campos ({automacoes.length})</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="icon"><RefreshCw className="h-4 w-4" /></Button>
+          <Button variant="outline" size="icon" onClick={fetchAutomacoes}><RefreshCw className="h-4 w-4" /></Button>
           <Button onClick={() => setOpen(true)}><Plus className="h-4 w-4 mr-2" /> Nova Automação</Button>
         </div>
       </div>
 
-      {automacoes.length === 0 ? (
-        <div className="rounded-xl border border-border bg-card p-6">
-          <p className="text-sm text-muted-foreground">Nenhuma automação cadastrada. Clique em "Nova Automação" para começar.</p>
-        </div>
-      ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {automacoes.map((a) => (
-            <button
-              key={a.id}
-              onClick={() => setSelected(a)}
-              className="rounded-xl border border-border bg-card p-5 text-left transition-colors hover:border-primary/50 hover:bg-card/80"
-            >
-              <p className="font-semibold text-foreground">{a.nome}</p>
-              <p className="text-xs text-muted-foreground mt-1">{a.tipoLabel}</p>
-              <div className="flex items-center gap-2 mt-3">
-                <span className={`h-2 w-2 rounded-full ${a.webhookEnabled ? "bg-green-500" : "bg-muted-foreground/40"}`} />
-                <span className="text-xs text-muted-foreground">
-                  {a.webhookEnabled ? "Ativo" : "Inativo"}
-                </span>
-              </div>
-            </button>
-          ))}
-        </div>
-      )}
+      <div className="rounded-xl border border-border bg-card overflow-hidden">
+        {loading ? (
+          <p className="text-sm text-muted-foreground p-6">Carregando...</p>
+        ) : automacoes.length === 0 ? (
+          <p className="text-sm text-muted-foreground p-6">Nenhuma automação cadastrada. Clique em "Nova Automação" para começar.</p>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Nome</TableHead>
+                <TableHead>Tipo</TableHead>
+                <TableHead>Webhook URL</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Ativar/Desativar</TableHead>
+                <TableHead className="w-[100px]">Ações</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {automacoes.map((a) => (
+                <TableRow key={a.id}>
+                  <TableCell className="font-medium">{a.nome}</TableCell>
+                  <TableCell><Badge variant="secondary">{tipoLabels[a.tipo] || a.tipo}</Badge></TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2 max-w-[280px]">
+                      <span className="text-xs font-mono text-muted-foreground truncate">{getWebhookUrl(a.id)}</span>
+                      <Button variant="ghost" size="icon" className="shrink-0 h-7 w-7" onClick={() => copyUrl(a.id)} title="Copiar URL">
+                        <Copy className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={a.ativo ? "default" : "outline"}>
+                      {a.ativo ? "Ativo" : "Inativo"}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <Switch checked={a.ativo} onCheckedChange={() => toggleWebhook(a)} />
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex gap-1">
+                      <Button variant="ghost" size="sm" onClick={() => { setSelected(a); setMappings(a.mappings || {}); }}>
+                        Configurar
+                      </Button>
+                      <Button variant="ghost" size="icon" onClick={() => handleDelete(a.id)}>
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </div>
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-lg">
