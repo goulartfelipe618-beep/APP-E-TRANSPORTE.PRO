@@ -263,8 +263,10 @@ export function AppSidebar() {
                                 e.preventDefault();
                                 e.stopPropagation();
                                 setShowNetworkHighlight(false);
+                                localStorage.setItem("network_highlight_shown", "sim");
+                                window.dispatchEvent(new Event("network-highlight-dismissed"));
                               }}
-                              className="w-full bg-primary text-white text-sm font-semibold py-2 rounded-lg hover:bg-primary/90 transition-colors"
+                              className="w-full bg-primary text-primary-foreground text-sm font-semibold py-2 rounded-lg hover:opacity-90 transition-opacity"
                             >
                               OK, Entendi!
                             </button>
