@@ -69,24 +69,70 @@ async function fetchContrato(tipo: "transfer" | "grupos") {
   return data;
 }
 
+async function fetchCabecalho() {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+  const { data } = await supabase
+    .from("cabecalho_contratual" as any)
+    .select("*")
+    .eq("user_id", user.id)
+    .maybeSingle();
+  return data as any;
+}
+
+function addCabecalhoHeader(doc: jsPDF, cab: any): number {
+  let y = 14;
+
+  // Logo
+  // We can't easily embed remote images in jsPDF without toDataURL, so we skip logo for now
+  // Company name
+  doc.setFontSize(14);
+  doc.setFont("helvetica", "bold");
+  doc.text(cab.razao_social || "", 14, y);
+  y += 6;
+
+  doc.setFontSize(8);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(80);
+
+  if (cab.cnpj) { doc.text(`CNPJ: ${cab.cnpj}`, 14, y); y += 4; }
+  if (cab.endereco_sede) { doc.text(`Endereço: ${cab.endereco_sede}`, 14, y); y += 4; }
+  if (cab.representante_legal) { doc.text(`Representante Legal: ${cab.representante_legal}`, 14, y); y += 4; }
+  if (cab.telefone || cab.whatsapp) { doc.text(`Tel: ${cab.telefone || ""} | WhatsApp: ${cab.whatsapp || ""}`, 14, y); y += 4; }
+  if (cab.email_oficial) { doc.text(`E-mail: ${cab.email_oficial}`, 14, y); y += 4; }
+
+  doc.setTextColor(0);
+  doc.setDrawColor(180);
+  doc.line(14, y, 196, y);
+  y += 6;
+  return y;
+}
+
 export async function generateTransferPDF(reservaId: string) {
   const { data: r } = await supabase.from("reservas_transfer").select("*").eq("id", reservaId).single();
   if (!r) return;
 
-  const contrato = await fetchContrato("transfer");
+  const [contrato, cabecalho] = await Promise.all([fetchContrato("transfer"), fetchCabecalho()]);
   const doc = new jsPDF();
 
-  // Header
-  doc.setFontSize(16);
+  let y = 20;
+
+  // Cabecalho contratual
+  if (cabecalho && cabecalho.razao_social) {
+    y = addCabecalhoHeader(doc, cabecalho);
+  }
+
+  // Title
+  doc.setFontSize(14);
   doc.setFont("helvetica", "bold");
-  doc.text("CONFIRMAÇÃO DE RESERVA — TRANSFER", 14, 20);
+  doc.text("CONFIRMAÇÃO DE RESERVA — TRANSFER", 14, y);
   doc.setFontSize(8);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(120);
-  doc.text(`Gerado em ${new Date().toLocaleString("pt-BR")}`, 14, 26);
+  y += 6;
+  doc.text(`Gerado em ${new Date().toLocaleString("pt-BR")}`, 14, y);
   doc.setTextColor(0);
-
-  let y = 34;
+  y += 8;
 
   // Client info
   y = addSection(doc, "DADOS DO CLIENTE", [
@@ -174,19 +220,25 @@ export async function generateGrupoPDF(reservaId: string) {
   const { data: r } = await supabase.from("reservas_grupos").select("*").eq("id", reservaId).single();
   if (!r) return;
 
-  const contrato = await fetchContrato("grupos");
+  const [contrato, cabecalho] = await Promise.all([fetchContrato("grupos"), fetchCabecalho()]);
   const doc = new jsPDF();
 
-  doc.setFontSize(16);
+  let y = 20;
+
+  if (cabecalho && cabecalho.razao_social) {
+    y = addCabecalhoHeader(doc, cabecalho);
+  }
+
+  doc.setFontSize(14);
   doc.setFont("helvetica", "bold");
-  doc.text("CONFIRMAÇÃO DE RESERVA — GRUPO", 14, 20);
+  doc.text("CONFIRMAÇÃO DE RESERVA — GRUPO", 14, y);
   doc.setFontSize(8);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(120);
-  doc.text(`Gerado em ${new Date().toLocaleString("pt-BR")}`, 14, 26);
+  y += 6;
+  doc.text(`Gerado em ${new Date().toLocaleString("pt-BR")}`, 14, y);
   doc.setTextColor(0);
-
-  let y = 34;
+  y += 8;
 
   y = addSection(doc, "DADOS DO CLIENTE", [
     { label: "Nome", value: r.nome_completo },
