@@ -234,6 +234,7 @@ export default function WebsitePage() {
 
   if (step === "briefing") {
     return (
+      <>
       {pendingBanner}
       <div className="space-y-6">
         <div>
