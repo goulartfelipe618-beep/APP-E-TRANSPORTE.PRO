@@ -644,6 +644,38 @@ export type Database = {
         }
         Relationships: []
       }
+      webhook_testes: {
+        Row: {
+          automacao_id: string
+          created_at: string
+          id: string
+          payload: Json
+          user_id: string
+        }
+        Insert: {
+          automacao_id: string
+          created_at?: string
+          id?: string
+          payload?: Json
+          user_id: string
+        }
+        Update: {
+          automacao_id?: string
+          created_at?: string
+          id?: string
+          payload?: Json
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "webhook_testes_automacao_id_fkey"
+            columns: ["automacao_id"]
+            isOneToOne: false
+            referencedRelation: "automacoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never

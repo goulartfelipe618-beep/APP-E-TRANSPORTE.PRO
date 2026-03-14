@@ -129,14 +129,31 @@ Deno.serve(async (req) => {
       );
     }
 
+    const body = await req.json();
+
+    // If automation is disabled, store as test entry
     if (!automacao.ativo) {
+      const { error: testError } = await supabase
+        .from("webhook_testes")
+        .insert({
+          automacao_id: automacaoId,
+          user_id: automacao.user_id,
+          payload: body,
+        });
+
+      if (testError) {
+        console.error("Test insert error:", testError);
+        return new Response(
+          JSON.stringify({ error: "Erro ao salvar teste", details: testError.message }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
       return new Response(
-        JSON.stringify({ error: "Automação desativada", received: true }),
+        JSON.stringify({ success: true, mode: "test", message: "Dados recebidos em modo de teste" }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
-
-    const body = await req.json();
     const tipo = automacao.tipo as string;
     const userId = automacao.user_id;
     const savedMappings = (automacao.mappings || {}) as Record<string, Record<string, string>>;
