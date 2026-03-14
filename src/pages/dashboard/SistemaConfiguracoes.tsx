@@ -26,6 +26,11 @@ export default function SistemaConfiguracoesPage() {
   const [nomeCompleto, setNomeCompleto] = useState("");
   const [telefone, setTelefone] = useState("");
   const [email, setEmail] = useState("");
+  const [cidade, setCidade] = useState("");
+  const [estado, setEstado] = useState("");
+  const [enderecoCompleto, setEnderecoCompleto] = useState("");
+  const [nomeEmpresa, setNomeEmpresa] = useState("");
+  const [cnpjPerfil, setCnpjPerfil] = useState("");
 
   // Global
   const [nomeProjeto, setNomeProjeto] = useState("");
