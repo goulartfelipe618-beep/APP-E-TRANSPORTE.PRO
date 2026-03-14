@@ -41,12 +41,17 @@ export default function GruposSolicitacoesPage() {
     setInitialData({
       nome_cliente: s.nome_cliente,
       whatsapp: s.whatsapp || undefined,
+      email: (s as any).email || undefined,
       tipo_veiculo: s.tipo_veiculo || undefined,
       embarque: s.embarque || undefined,
       destino: s.destino || undefined,
       data_ida: s.data_ida || undefined,
+      hora_ida: (s as any).hora_ida || undefined,
+      data_retorno: (s as any).data_retorno || undefined,
+      hora_retorno: (s as any).hora_retorno || undefined,
       num_passageiros: s.num_passageiros,
       mensagem: s.mensagem || undefined,
+      cupom: (s as any).cupom || undefined,
       solicitacao_id: s.id,
     });
     setDialogOpen(true);

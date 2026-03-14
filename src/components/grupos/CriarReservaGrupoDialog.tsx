@@ -13,12 +13,17 @@ import { toast } from "sonner";
 export interface GrupoInitialData {
   nome_cliente?: string;
   whatsapp?: string;
+  email?: string;
   tipo_veiculo?: string;
   embarque?: string;
   destino?: string;
   data_ida?: string;
+  hora_ida?: string;
+  data_retorno?: string;
+  hora_retorno?: string;
   num_passageiros?: number | null;
   mensagem?: string;
+  cupom?: string;
   solicitacao_id?: string;
 }
 
