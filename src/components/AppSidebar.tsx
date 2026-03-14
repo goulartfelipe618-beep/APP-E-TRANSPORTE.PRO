@@ -251,11 +251,11 @@ export function AppSidebar() {
                       {/* Tooltip pointing to Network */}
                       {isNetworkItem && showNetworkHighlight && !collapsed && (
                         <div className="absolute left-full top-1/2 -translate-y-1/2 ml-3 z-[70] animate-fade-in">
-                          <div className="relative bg-white text-gray-900 rounded-xl shadow-2xl px-5 py-4 w-64">
+                        <div className="relative bg-card text-card-foreground border border-border rounded-xl shadow-2xl px-5 py-4 w-64">
                             {/* Arrow pointing left */}
-                            <div className="absolute -left-2 top-1/2 -translate-y-1/2 w-0 h-0 border-t-8 border-b-8 border-r-8 border-t-transparent border-b-transparent border-r-white" />
+                            <div className="absolute -left-2 top-1/2 -translate-y-1/2 w-0 h-0 border-t-8 border-b-8 border-r-8 border-t-transparent border-b-transparent border-r-border" />
                             <p className="text-sm font-bold mb-1">🎉 Menu Network Liberado!</p>
-                            <p className="text-xs text-gray-600 mb-3">
+                            <p className="text-xs text-muted-foreground mb-3">
                               Agora você faz parte do Network Nacional. Acesse aqui para ver empresas atribuídas a você.
                             </p>
                             <button
