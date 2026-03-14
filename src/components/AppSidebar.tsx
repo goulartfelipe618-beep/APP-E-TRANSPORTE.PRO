@@ -156,7 +156,7 @@ export function AppSidebar() {
       </div>
 
       <SidebarContent>
-        {menuStructure.map((group) => (
+        {getMenuStructure(networkAceito).map((group) => (
           <SidebarGroup key={group.label}>
             <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
             <SidebarGroupContent>
