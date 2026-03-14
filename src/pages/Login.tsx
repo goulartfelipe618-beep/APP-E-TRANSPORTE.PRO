@@ -70,7 +70,14 @@ const Login = () => {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[hsl(var(--login-bg))] p-4">
+    <div className="relative flex min-h-screen items-center justify-center bg-[hsl(var(--login-bg))] p-4 overflow-hidden">
+      {/* Ambient background */}
+      <div className="pointer-events-none absolute inset-0">
+        <div className="absolute -top-1/3 -left-1/4 h-[700px] w-[700px] rounded-full bg-primary/5 blur-[120px]" />
+        <div className="absolute -bottom-1/4 -right-1/4 h-[600px] w-[600px] rounded-full bg-blue-500/5 blur-[100px]" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-[500px] w-[500px] rounded-full bg-amber-500/3 blur-[140px]" />
+        <div className="absolute inset-0" style={{ backgroundImage: 'radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px)', backgroundSize: '32px 32px' }} />
+      </div>
       <div className="w-full max-w-md">
         <div className="overflow-hidden rounded-2xl bg-[hsl(var(--login-card))] shadow-2xl">
           {/* Car Image */}
