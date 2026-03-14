@@ -1,6 +1,7 @@
 import {
-  Home, SlidersHorizontal, LogOut, Shield, BarChart3, MapPin, FileText, ChevronDown, Users, ClipboardList, Building2, LayoutTemplate,
+  Home, SlidersHorizontal, LogOut, Shield, BarChart3, MapPin, FileText, ChevronDown, Users, ClipboardList, Building2, LayoutTemplate, Bell, Moon, Sun,
 } from "lucide-react";
+import { useState, useEffect } from "react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -41,6 +42,16 @@ export function AdminSidebar() {
   const collapsed = state === "collapsed";
   const location = useLocation();
   const navigate = useNavigate();
+
+  const [darkMode, setDarkMode] = useState(() => document.documentElement.classList.contains("dark"));
+
+  useEffect(() => {
+    if (darkMode) {
+      document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+    }
+  }, [darkMode]);
 
   const isActive = (url: string) => location.pathname === url;
   const contratoActive = contratoChildren.some((c) => isActive(c.url));
@@ -176,6 +187,18 @@ export function AdminSidebar() {
 
       <SidebarFooter className="border-t border-border">
         <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton className="w-full">
+              <Bell className="h-4 w-4 mr-2" />
+              {!collapsed && <span>Notificações</span>}
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton className="w-full" onClick={() => setDarkMode(!darkMode)}>
+              {darkMode ? <Sun className="h-4 w-4 mr-2" /> : <Moon className="h-4 w-4 mr-2" />}
+              {!collapsed && <span>{darkMode ? "Modo Claro" : "Modo Escuro"}</span>}
+            </SidebarMenuButton>
+          </SidebarMenuItem>
           <SidebarMenuItem>
             <SidebarMenuButton className="w-full" onClick={handleLogout}>
               <LogOut className="h-4 w-4 mr-2" />
