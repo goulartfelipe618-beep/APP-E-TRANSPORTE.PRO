@@ -1,7 +1,9 @@
-import { ChevronLeft, ChevronRight, Mail, Globe, Search, ShoppingCart, Users, BarChart3, Car, ArrowLeftRight, Handshake } from "lucide-react";
+import { ChevronLeft, ChevronRight, Mail, Globe, Search, ShoppingCart, Users, BarChart3, Car, ArrowLeftRight, Handshake, ShieldCheck, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { useState, useEffect } from "react";
 import luxuryCar from "@/assets/luxury-car.jpg";
 import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 
 interface SlideData {
   id: string;
@@ -34,6 +36,8 @@ const tools = [
 export default function HomePage() {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [slides, setSlides] = useState<SlideData[]>(fallbackSlides);
+  const [networkAceito, setNetworkAceito] = useState<boolean | null>(null);
+  const [mostrarRegras, setMostrarRegras] = useState(false);
 
   useEffect(() => {
     const fetchSlides = async () => {
@@ -49,11 +53,34 @@ export default function HomePage() {
         setSlides(data as SlideData[]);
       }
     };
+
+    const checkNetworkStatus = () => {
+      const status = localStorage.getItem("network_nacional_aceito");
+      if (status === "sim") setNetworkAceito(true);
+      else if (status === "nao") setNetworkAceito(false);
+    };
+
     fetchSlides();
+    checkNetworkStatus();
   }, []);
 
   const prevSlide = () => setCurrentSlide((c) => (c > 0 ? c - 1 : slides.length - 1));
   const nextSlide = () => setCurrentSlide((c) => (c < slides.length - 1 ? c + 1 : 0));
+
+  const handleAceitarNetwork = () => {
+    setMostrarRegras(true);
+  };
+
+  const handleConfirmarRegras = () => {
+    localStorage.setItem("network_nacional_aceito", "sim");
+    setNetworkAceito(true);
+    setMostrarRegras(false);
+  };
+
+  const handleRecusarNetwork = () => {
+    localStorage.setItem("network_nacional_aceito", "nao");
+    setNetworkAceito(false);
+  };
 
   return (
     <div className="space-y-8">
@@ -90,6 +117,125 @@ export default function HomePage() {
           </>
         )}
       </div>
+
+      {/* Network Nacional - Termo */}
+      {networkAceito === null && !mostrarRegras && (
+        <div className="rounded-xl border-2 border-primary/50 bg-card p-6 space-y-4">
+          <div className="flex items-center gap-3">
+            <div className="p-3 rounded-xl bg-primary/10">
+              <ShieldCheck className="h-6 w-6 text-primary" />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-foreground">Network Nacional E-Transporte.pro</h3>
+              <p className="text-sm text-muted-foreground">Programa de atendimento corporativo nacional</p>
+            </div>
+          </div>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            Deseja fazer parte do sistema de <strong className="text-foreground">Network Nacional</strong> da E-Transporte.pro?
+            Ao participar, você poderá receber solicitações de atendimento corporativo de empresas parceiras em sua região.
+          </p>
+          <div className="flex gap-3">
+            <Button onClick={handleAceitarNetwork} className="bg-primary text-primary-foreground">
+              <CheckCircle2 className="h-4 w-4 mr-2" /> Sim, quero participar
+            </Button>
+            <Button variant="outline" onClick={handleRecusarNetwork}>
+              Não, obrigado
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Regras e Termos obrigatórios */}
+      {mostrarRegras && (
+        <div className="rounded-xl border-2 border-destructive/50 bg-card p-6 space-y-5">
+          <div className="flex items-center gap-3">
+            <div className="p-3 rounded-xl bg-destructive/10">
+              <AlertTriangle className="h-6 w-6 text-destructive" />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-foreground">Termos Obrigatórios — Network Nacional</h3>
+              <Badge variant="destructive" className="mt-1">Leitura obrigatória</Badge>
+            </div>
+          </div>
+
+          <div className="space-y-4 text-sm text-muted-foreground leading-relaxed border border-border rounded-lg p-4 bg-muted/30 max-h-80 overflow-y-auto">
+            <div>
+              <h4 className="font-bold text-foreground mb-1">📌 1. Obrigatoriedade de Atendimento</h4>
+              <p>
+                Todas as solicitações enviadas para você através do Network Nacional <strong className="text-foreground">deverão ser obrigatoriamente realizadas por você</strong>.
+                Caso não consiga realizar o atendimento pessoalmente, <strong className="text-foreground">deverá ser realizado por um parceiro seu</strong>, e você será o responsável integral por esse atendimento.
+              </p>
+            </div>
+
+            <div>
+              <h4 className="font-bold text-foreground mb-1">⚠️ 2. Penalização por Descumprimento</h4>
+              <p>
+                O não cumprimento de qualquer solicitação resultará em <strong className="text-destructive">perda imediata do acesso ao sistema</strong> e <strong className="text-destructive">quebra da relação com a E-Transporte.pro</strong>.
+                Não haverá tolerância para descumprimentos.
+              </p>
+            </div>
+
+            <div>
+              <h4 className="font-bold text-foreground mb-1">🎩 3. Atendimento Alto Padrão — INDISPENSÁVEL</h4>
+              <p>
+                O motorista que faz parte do Network Nacional <strong className="text-foreground">deve manter um atendimento de altíssimo padrão</strong> em todas as corridas.
+                Isso inclui: pontualidade, cordialidade, veículo limpo e em perfeitas condições, vestimenta adequada, discrição e profissionalismo absoluto.
+              </p>
+            </div>
+
+            <div>
+              <h4 className="font-bold text-destructive mb-1">🚫 4. PROIBIÇÃO TOTAL DE TROCA DE CONTATOS</h4>
+              <p className="text-foreground font-semibold">
+                É TOTALMENTE PROIBIDO que o motorista solicite, ofereça ou troque qualquer tipo de contato com o passageiro.
+              </p>
+              <p>
+                Isso inclui: número de telefone, WhatsApp, e-mail, redes sociais ou qualquer outro meio de comunicação direta.
+                O descumprimento desta regra resultará em <strong className="text-destructive">desligamento imediato do sistema sem possibilidade de retorno</strong>.
+              </p>
+            </div>
+
+            <div>
+              <h4 className="font-bold text-foreground mb-1">🤝 5. Representação da Marca</h4>
+              <p>
+                Ao aceitar este termo, você se torna um representante da E-Transporte.pro perante os clientes corporativos.
+                Qualquer conduta inadequada reflete diretamente na marca e será tratada com o máximo rigor.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex gap-3 pt-2">
+            <Button onClick={handleConfirmarRegras} className="bg-primary text-primary-foreground">
+              <CheckCircle2 className="h-4 w-4 mr-2" /> Li e aceito todos os termos
+            </Button>
+            <Button variant="outline" onClick={() => { setMostrarRegras(false); }}>
+              Voltar
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Status após aceite */}
+      {networkAceito === true && (
+        <div className="rounded-xl border border-primary/30 bg-primary/5 p-4 flex items-center gap-3">
+          <CheckCircle2 className="h-5 w-5 text-primary" />
+          <div>
+            <p className="text-sm font-semibold text-foreground">Você faz parte do Network Nacional E-Transporte.pro</p>
+            <p className="text-xs text-muted-foreground">Seus termos foram aceitos. Mantenha o padrão de excelência.</p>
+          </div>
+        </div>
+      )}
+
+      {networkAceito === false && (
+        <div className="rounded-xl border border-border bg-muted/30 p-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Users className="h-5 w-5 text-muted-foreground" />
+            <p className="text-sm text-muted-foreground">Você optou por não participar do Network Nacional.</p>
+          </div>
+          <Button variant="outline" size="sm" onClick={() => { setNetworkAceito(null); localStorage.removeItem("network_nacional_aceito"); }}>
+            Reconsiderar
+          </Button>
+        </div>
+      )}
 
       {/* Tools */}
       <div className="text-center">
