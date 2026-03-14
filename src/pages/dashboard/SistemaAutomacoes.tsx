@@ -130,6 +130,29 @@ export default function SistemaAutomacoesPage() {
 
   useEffect(() => { fetchAutomacoes(); }, [fetchAutomacoes]);
 
+  const fetchTestes = useCallback(async (automacaoId: string) => {
+    const { data, error } = await supabase
+      .from("webhook_testes")
+      .select("*")
+      .eq("automacao_id", automacaoId)
+      .order("created_at", { ascending: false });
+    if (!error) setTestes((data || []) as WebhookTeste[]);
+  }, []);
+
+  const deleteTeste = async (id: string) => {
+    await supabase.from("webhook_testes").delete().eq("id", id);
+    setTestes((prev) => prev.filter((t) => t.id !== id));
+    if (selectedTeste?.id === id) setSelectedTeste(null);
+    toast.success("Teste removido");
+  };
+
+  const clearAllTestes = async (automacaoId: string) => {
+    await supabase.from("webhook_testes").delete().eq("automacao_id", automacaoId);
+    setTestes([]);
+    setSelectedTeste(null);
+    toast.success("Todos os testes removidos");
+  };
+
   const handleCreate = async () => {
     if (!novoNome || !novoTipo) {
       toast.error("Preencha todos os campos.");
