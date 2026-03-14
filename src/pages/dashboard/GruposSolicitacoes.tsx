@@ -7,21 +7,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import DetalhesSolicitacaoGrupoSheet from "@/components/solicitacoes/DetalhesSolicitacaoGrupoSheet";
 import CriarReservaGrupoDialog, { type GrupoInitialData } from "@/components/grupos/CriarReservaGrupoDialog";
+import { Tables } from "@/integrations/supabase/types";
 
-interface Solicitacao {
-  id: string;
-  nome_cliente: string;
-  whatsapp: string | null;
-  tipo_veiculo: string | null;
-  embarque: string | null;
-  destino: string | null;
-  data_ida: string | null;
-  num_passageiros: number | null;
-  mensagem: string | null;
-  status: string;
-  created_at: string;
-}
-
+type Solicitacao = Tables<"solicitacoes_grupos">;
 export default function GruposSolicitacoesPage() {
   const [solicitacoes, setSolicitacoes] = useState<Solicitacao[]>([]);
   const [loading, setLoading] = useState(true);
@@ -53,12 +41,17 @@ export default function GruposSolicitacoesPage() {
     setInitialData({
       nome_cliente: s.nome_cliente,
       whatsapp: s.whatsapp || undefined,
+      email: (s as any).email || undefined,
       tipo_veiculo: s.tipo_veiculo || undefined,
       embarque: s.embarque || undefined,
       destino: s.destino || undefined,
       data_ida: s.data_ida || undefined,
+      hora_ida: (s as any).hora_ida || undefined,
+      data_retorno: (s as any).data_retorno || undefined,
+      hora_retorno: (s as any).hora_retorno || undefined,
       num_passageiros: s.num_passageiros,
       mensagem: s.mensagem || undefined,
+      cupom: (s as any).cupom || undefined,
       solicitacao_id: s.id,
     });
     setDialogOpen(true);

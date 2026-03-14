@@ -419,9 +419,14 @@ export type Database = {
       solicitacoes_grupos: {
         Row: {
           created_at: string
+          cupom: string | null
           data_ida: string | null
+          data_retorno: string | null
           destino: string | null
+          email: string | null
           embarque: string | null
+          hora_ida: string | null
+          hora_retorno: string | null
           id: string
           mensagem: string | null
           nome_cliente: string
@@ -434,9 +439,14 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          cupom?: string | null
           data_ida?: string | null
+          data_retorno?: string | null
           destino?: string | null
+          email?: string | null
           embarque?: string | null
+          hora_ida?: string | null
+          hora_retorno?: string | null
           id?: string
           mensagem?: string | null
           nome_cliente: string
@@ -449,9 +459,14 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          cupom?: string | null
           data_ida?: string | null
+          data_retorno?: string | null
           destino?: string | null
+          email?: string | null
           embarque?: string | null
+          hora_ida?: string | null
+          hora_retorno?: string | null
           id?: string
           mensagem?: string | null
           nome_cliente?: string
@@ -513,47 +528,101 @@ export type Database = {
         Row: {
           contato: string | null
           created_at: string
+          cupom: string | null
           data_viagem: string | null
           desembarque: string | null
+          email: string | null
           embarque: string | null
+          hora_viagem: string | null
           id: string
           mensagem: string | null
           nome_cliente: string
           num_passageiros: number | null
+          por_hora_cupom: string | null
+          por_hora_data: string | null
+          por_hora_endereco_inicio: string | null
+          por_hora_hora: string | null
+          por_hora_itinerario: string | null
+          por_hora_passageiros: number | null
+          por_hora_ponto_encerramento: string | null
+          por_hora_qtd_horas: number | null
           status: string
           tipo: string | null
           updated_at: string
           user_id: string
+          volta_cupom: string | null
+          volta_data: string | null
+          volta_desembarque: string | null
+          volta_embarque: string | null
+          volta_hora: string | null
+          volta_mensagem: string | null
+          volta_passageiros: number | null
         }
         Insert: {
           contato?: string | null
           created_at?: string
+          cupom?: string | null
           data_viagem?: string | null
           desembarque?: string | null
+          email?: string | null
           embarque?: string | null
+          hora_viagem?: string | null
           id?: string
           mensagem?: string | null
           nome_cliente: string
           num_passageiros?: number | null
+          por_hora_cupom?: string | null
+          por_hora_data?: string | null
+          por_hora_endereco_inicio?: string | null
+          por_hora_hora?: string | null
+          por_hora_itinerario?: string | null
+          por_hora_passageiros?: number | null
+          por_hora_ponto_encerramento?: string | null
+          por_hora_qtd_horas?: number | null
           status?: string
           tipo?: string | null
           updated_at?: string
           user_id: string
+          volta_cupom?: string | null
+          volta_data?: string | null
+          volta_desembarque?: string | null
+          volta_embarque?: string | null
+          volta_hora?: string | null
+          volta_mensagem?: string | null
+          volta_passageiros?: number | null
         }
         Update: {
           contato?: string | null
           created_at?: string
+          cupom?: string | null
           data_viagem?: string | null
           desembarque?: string | null
+          email?: string | null
           embarque?: string | null
+          hora_viagem?: string | null
           id?: string
           mensagem?: string | null
           nome_cliente?: string
           num_passageiros?: number | null
+          por_hora_cupom?: string | null
+          por_hora_data?: string | null
+          por_hora_endereco_inicio?: string | null
+          por_hora_hora?: string | null
+          por_hora_itinerario?: string | null
+          por_hora_passageiros?: number | null
+          por_hora_ponto_encerramento?: string | null
+          por_hora_qtd_horas?: number | null
           status?: string
           tipo?: string | null
           updated_at?: string
           user_id?: string
+          volta_cupom?: string | null
+          volta_data?: string | null
+          volta_desembarque?: string | null
+          volta_embarque?: string | null
+          volta_hora?: string | null
+          volta_mensagem?: string | null
+          volta_passageiros?: number | null
         }
         Relationships: []
       }

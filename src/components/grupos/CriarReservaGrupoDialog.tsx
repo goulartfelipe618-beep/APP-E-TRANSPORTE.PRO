@@ -13,12 +13,17 @@ import { toast } from "sonner";
 export interface GrupoInitialData {
   nome_cliente?: string;
   whatsapp?: string;
+  email?: string;
   tipo_veiculo?: string;
   embarque?: string;
   destino?: string;
   data_ida?: string;
+  hora_ida?: string;
+  data_retorno?: string;
+  hora_retorno?: string;
   num_passageiros?: number | null;
   mensagem?: string;
+  cupom?: string;
   solicitacao_id?: string;
 }
 
@@ -65,11 +70,16 @@ export default function CriarReservaGrupoDialog({ open, onOpenChange, onCreated,
     if (open && initialData) {
       setNomeCompleto(initialData.nome_cliente || "");
       setWhatsapp(initialData.whatsapp || "");
+      setEmail(initialData.email || "");
       setTipoVeiculo(initialData.tipo_veiculo || "");
       setEmbarque(initialData.embarque || "");
       setDestino(initialData.destino || "");
       setDataIda(initialData.data_ida || "");
+      setHoraIda(initialData.hora_ida || "");
+      setDataRetorno(initialData.data_retorno || "");
+      setHoraRetorno(initialData.hora_retorno || "");
       setNumPassageiros(initialData.num_passageiros?.toString() || "");
+      setCupom(initialData.cupom || "");
       setObservacoesViagem(initialData.mensagem || "");
     }
     if (open && !initialData) resetForm();
