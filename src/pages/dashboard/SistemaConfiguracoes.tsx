@@ -2,10 +2,11 @@ import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Car, User, Upload, Save, Key, Shield, RefreshCw, Type, Pencil, FileText } from "lucide-react";
+import { Car, User, Upload, Save, Key, Shield, RefreshCw, Type, Pencil, FileText, Users, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useConfiguracoes } from "@/contexts/ConfiguracoesContext";
+import { Badge } from "@/components/ui/badge";
 
 const FONT_OPTIONS = [
   { value: "montserrat", label: "Montserrat" },
@@ -15,6 +16,101 @@ const FONT_OPTIONS = [
   { value: "lato", label: "Lato" },
   { value: "poppins", label: "Poppins" },
 ];
+
+const COOLDOWN_DAYS = 60;
+
+function NetworkSection() {
+  const networkAceito = localStorage.getItem("network_nacional_aceito") === "sim";
+  const saida = localStorage.getItem("network_saida_data");
+  const [confirmando, setConfirmando] = useState(false);
+
+  if (!networkAceito && !saida) return null;
+
+  let diasRestantes = 0;
+  let emCooldown = false;
+  if (saida) {
+    const diff = Date.now() - new Date(saida).getTime();
+    const diasPassados = Math.floor(diff / (1000 * 60 * 60 * 24));
+    diasRestantes = Math.max(0, COOLDOWN_DAYS - diasPassados);
+    emCooldown = diasRestantes > 0;
+  }
+
+  const handleSair = () => {
+    localStorage.setItem("network_nacional_aceito", "nao");
+    localStorage.setItem("network_saida_data", new Date().toISOString());
+    localStorage.removeItem("network_highlight_shown");
+    window.dispatchEvent(new Event("network-status-changed"));
+    setConfirmando(false);
+    toast.success("Você saiu do Network Nacional. Poderá retornar após 60 dias.");
+    window.location.reload();
+  };
+
+  const handleVoltar = () => {
+    if (emCooldown) {
+      toast.error(`Você só poderá retornar ao Network em ${diasRestantes} dias.`);
+      return;
+    }
+    localStorage.removeItem("network_nacional_aceito");
+    localStorage.removeItem("network_saida_data");
+    localStorage.removeItem("network_highlight_shown");
+    window.dispatchEvent(new Event("network-status-changed"));
+    toast.success("Agora você pode aceitar os termos novamente na página Home.");
+    window.location.reload();
+  };
+
+  return (
+    <div className="rounded-xl border border-border bg-card p-6 max-w-2xl">
+      <div className="flex items-center gap-2 mb-1">
+        <Users className="h-5 w-5 text-foreground" />
+        <h3 className="font-semibold text-foreground">Network Nacional</h3>
+      </div>
+      <p className="text-sm text-muted-foreground mb-4">
+        Gerencie sua participação no Network Nacional E-Transporte.pro
+      </p>
+      {networkAceito ? (
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <Badge className="bg-primary/10 text-primary border-primary/20">Ativo</Badge>
+            <span className="text-sm text-muted-foreground">Você é membro do Network Nacional</span>
+          </div>
+          {!confirmando ? (
+            <Button variant="outline" className="border-destructive text-destructive hover:bg-destructive/10" onClick={() => setConfirmando(true)}>
+              <AlertTriangle className="h-4 w-4 mr-2" /> Sair do Network Nacional
+            </Button>
+          ) : (
+            <div className="rounded-lg border border-destructive/50 bg-destructive/5 p-4 space-y-3">
+              <p className="text-sm font-semibold text-destructive">⚠️ Tem certeza que deseja sair?</p>
+              <p className="text-xs text-muted-foreground">
+                Ao sair, você perderá acesso ao menu Network e às empresas atribuídas a você.
+                <strong className="text-foreground"> Você só poderá retornar após 60 dias corridos.</strong>
+              </p>
+              <div className="flex gap-2">
+                <Button variant="destructive" size="sm" onClick={handleSair}>Confirmar Saída</Button>
+                <Button variant="outline" size="sm" onClick={() => setConfirmando(false)}>Cancelar</Button>
+              </div>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <Badge variant="secondary">Inativo</Badge>
+            <span className="text-sm text-muted-foreground">Você não faz parte do Network</span>
+          </div>
+          {emCooldown ? (
+            <div className="rounded-lg border border-border bg-muted/30 p-4">
+              <p className="text-sm text-muted-foreground">
+                🕐 Você saiu do Network. Poderá solicitar retorno em <strong className="text-foreground">{diasRestantes} dias</strong>.
+              </p>
+            </div>
+          ) : (
+            <Button variant="outline" onClick={handleVoltar}>Solicitar Retorno ao Network</Button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function SistemaConfiguracoesPage() {
   const { config, refreshConfig } = useConfiguracoes();
@@ -376,7 +472,6 @@ export default function SistemaConfiguracoesPage() {
         </Button>
       </div>
 
-
       {/* Informações Contratuais */}
       <div className="rounded-xl border border-border bg-card p-6 max-w-2xl">
         <div className="flex items-center justify-between mb-1">
@@ -477,6 +572,9 @@ export default function SistemaConfiguracoesPage() {
           </div>
         </div>
       </div>
+
+      {/* Network Nacional */}
+      <NetworkSection />
 
       {/* Hard Refresh */}
       <div className="rounded-xl border border-border bg-card p-6 max-w-2xl">

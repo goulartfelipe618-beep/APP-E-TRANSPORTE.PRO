@@ -56,8 +56,24 @@ export default function HomePage() {
 
     const checkNetworkStatus = () => {
       const status = localStorage.getItem("network_nacional_aceito");
-      if (status === "sim") setNetworkAceito(true);
-      else if (status === "nao") setNetworkAceito(false);
+      const saida = localStorage.getItem("network_saida_data");
+      if (status === "sim") {
+        setNetworkAceito(true);
+      } else if (status === "nao") {
+        // Check if in 60-day cooldown — don't show the invite again
+        if (saida) {
+          const diff = Date.now() - new Date(saida).getTime();
+          const diasPassados = Math.floor(diff / (1000 * 60 * 60 * 24));
+          if (diasPassados < 60) {
+            setNetworkAceito(false);
+          } else {
+            // Cooldown expired, allow re-join
+            setNetworkAceito(null);
+          }
+        } else {
+          setNetworkAceito(false);
+        }
+      }
     };
 
     fetchSlides();
