@@ -13,30 +13,33 @@ const labelToColumn: Record<string, Record<string, string>> = {
     "Tipo de Viagem": "tipo",
     "Nome do Cliente": "nome_cliente",
     "Telefone do Cliente": "contato",
-    "E-mail do Cliente": "_email",
+    "E-mail do Cliente": "email",
     "Origem / Como encontrou": "_origem",
+    // Ida
     "Passageiros (Ida)": "num_passageiros",
     "Embarque (Ida)": "embarque",
     "Destino (Ida)": "desembarque",
     "Data (Ida)": "data_viagem",
-    "Hora (Ida)": "_hora_ida",
+    "Hora (Ida)": "hora_viagem",
     "Mensagem (Ida)": "mensagem",
-    "Cupom (Ida)": "_cupom_ida",
-    "Passageiros (Volta)": "_passageiros_volta",
-    "Embarque (Volta)": "_embarque_volta",
-    "Destino (Volta)": "_destino_volta",
-    "Data (Volta)": "_data_volta",
-    "Hora (Volta)": "_hora_volta",
-    "Mensagem (Volta)": "_mensagem_volta",
-    "Cupom (Volta)": "_cupom_volta",
-    "Passageiros": "num_passageiros",
-    "Endereço de Início": "embarque",
-    "Data": "data_viagem",
-    "Hora": "_hora",
-    "Qtd. Horas": "_qtd_horas",
-    "Ponto de Encerramento": "desembarque",
-    "Itinerário / Mensagem": "mensagem",
-    "Cupom": "_cupom",
+    "Cupom (Ida)": "cupom",
+    // Volta
+    "Passageiros (Volta)": "volta_passageiros",
+    "Embarque (Volta)": "volta_embarque",
+    "Destino (Volta)": "volta_desembarque",
+    "Data (Volta)": "volta_data",
+    "Hora (Volta)": "volta_hora",
+    "Mensagem (Volta)": "volta_mensagem",
+    "Cupom (Volta)": "volta_cupom",
+    // Por hora
+    "Passageiros": "por_hora_passageiros",
+    "Endereço de Início": "por_hora_endereco_inicio",
+    "Data": "por_hora_data",
+    "Hora": "por_hora_hora",
+    "Qtd. Horas": "por_hora_qtd_horas",
+    "Ponto de Encerramento": "por_hora_ponto_encerramento",
+    "Itinerário / Mensagem": "por_hora_itinerario",
+    "Cupom": "por_hora_cupom",
   },
   grupo: {
     "Tipo de Veículo": "tipo_veiculo",
@@ -44,13 +47,13 @@ const labelToColumn: Record<string, Record<string, string>> = {
     "Endereço de Embarque": "embarque",
     "Destino": "destino",
     "Data de Ida": "data_ida",
-    "Hora de Ida": "_hora_ida",
-    "Data de Retorno": "_data_retorno",
-    "Hora de Retorno": "_hora_retorno",
+    "Hora de Ida": "hora_ida",
+    "Data de Retorno": "data_retorno",
+    "Hora de Retorno": "hora_retorno",
     "Observações": "mensagem",
-    "Cupom de Desconto": "_cupom",
+    "Cupom de Desconto": "cupom",
     "Nome do Cliente": "nome_cliente",
-    "E-mail do Cliente": "_email",
+    "E-mail do Cliente": "email",
     "WhatsApp do Cliente": "whatsapp",
     "Como nos encontrou": "_origem",
   },
@@ -75,7 +78,6 @@ const labelToColumn: Record<string, Record<string, string>> = {
   },
 };
 
-// Resolve nested value from object using dot notation
 function resolveValue(obj: Record<string, any>, path: string): any {
   if (!path) return undefined;
   const parts = path.split(".");
@@ -143,7 +145,6 @@ Deno.serve(async (req) => {
     // Collect all mapping tabs into one flat map: dbColumn -> resolved value
     const resolvedData: Record<string, any> = {};
 
-    // Iterate all tabs in mappings (e.g., "default", "somente_ida", "ida_volta", "por_hora")
     for (const tabKey of Object.keys(savedMappings)) {
       const tabMappings = savedMappings[tabKey];
       if (!tabMappings || typeof tabMappings !== "object") continue;
@@ -151,11 +152,10 @@ Deno.serve(async (req) => {
       for (const [friendlyLabel, incomingPath] of Object.entries(tabMappings)) {
         if (!incomingPath) continue;
         const dbColumn = columnMap[friendlyLabel];
-        if (!dbColumn || dbColumn.startsWith("_")) continue; // skip unmapped or extra fields
+        if (!dbColumn || dbColumn.startsWith("_")) continue;
 
         const value = resolveValue(body, incomingPath);
         if (value !== undefined && value !== null && value !== "") {
-          // Don't overwrite if already set (first match wins)
           if (!resolvedData[dbColumn]) {
             resolvedData[dbColumn] = value;
           }
@@ -166,37 +166,76 @@ Deno.serve(async (req) => {
     let insertError;
 
     if (tipo === "transfer") {
+      const parseNum = (v: any) => v ? parseInt(String(v)) : null;
       const record: Record<string, any> = {
         user_id: userId,
         nome_cliente: resolvedData.nome_cliente || body.nome_completo || body.nome || "Sem nome",
         contato: resolvedData.contato || body.telefone || body.whatsapp || null,
+        email: resolvedData.email || body.email || null,
         tipo: resolvedData.tipo || body.tipo_viagem || null,
         embarque: resolvedData.embarque || body.embarque_ida || body.endereco_inicio || null,
         desembarque: resolvedData.desembarque || body.destino_ida || body.ponto_encerramento || null,
         data_viagem: resolvedData.data_viagem || body.data_ida || body.data || null,
-        num_passageiros: resolvedData.num_passageiros
-          ? parseInt(String(resolvedData.num_passageiros))
-          : (body.passageiros_ida ? parseInt(body.passageiros_ida) : null),
+        hora_viagem: resolvedData.hora_viagem || body.hora_ida || body.hora || null,
+        num_passageiros: parseNum(resolvedData.num_passageiros || body.passageiros_ida || body.passageiros),
         mensagem: resolvedData.mensagem || body.mensagem_ida || body.mensagem || null,
+        cupom: resolvedData.cupom || body.cupom_ida || body.cupom || null,
+        // Volta
+        volta_embarque: resolvedData.volta_embarque || body.embarque_volta || null,
+        volta_desembarque: resolvedData.volta_desembarque || body.destino_volta || null,
+        volta_data: resolvedData.volta_data || body.data_volta || null,
+        volta_hora: resolvedData.volta_hora || body.hora_volta || null,
+        volta_passageiros: parseNum(resolvedData.volta_passageiros || body.passageiros_volta),
+        volta_mensagem: resolvedData.volta_mensagem || body.mensagem_volta || null,
+        volta_cupom: resolvedData.volta_cupom || body.cupom_volta || null,
+        // Por hora
+        por_hora_endereco_inicio: resolvedData.por_hora_endereco_inicio || body.endereco_inicio || null,
+        por_hora_ponto_encerramento: resolvedData.por_hora_ponto_encerramento || body.ponto_encerramento || null,
+        por_hora_data: resolvedData.por_hora_data || null,
+        por_hora_hora: resolvedData.por_hora_hora || null,
+        por_hora_passageiros: parseNum(resolvedData.por_hora_passageiros),
+        por_hora_qtd_horas: parseNum(resolvedData.por_hora_qtd_horas || body.qtd_horas),
+        por_hora_cupom: resolvedData.por_hora_cupom || null,
+        por_hora_itinerario: resolvedData.por_hora_itinerario || body.itinerario || null,
         status: "pendente",
       };
+      // Remove null values to avoid inserting empty columns
+      for (const key of Object.keys(record)) {
+        if (record[key] === null || record[key] === undefined) delete record[key];
+      }
+      // Re-add required fields
+      record.user_id = userId;
+      record.status = "pendente";
+      record.nome_cliente = record.nome_cliente || "Sem nome";
+
       const { error } = await supabase.from("solicitacoes_transfer").insert(record);
       insertError = error;
     } else if (tipo === "grupo") {
+      const parseNum = (v: any) => v ? parseInt(String(v)) : null;
       const record: Record<string, any> = {
         user_id: userId,
         nome_cliente: resolvedData.nome_cliente || body.nome_completo || body.nome || "Sem nome",
         whatsapp: resolvedData.whatsapp || body.telefone || body.whatsapp || null,
+        email: resolvedData.email || body.email || null,
         tipo_veiculo: resolvedData.tipo_veiculo || body.tipo_veiculo || null,
         embarque: resolvedData.embarque || body.embarque || null,
         destino: resolvedData.destino || body.destino || null,
         data_ida: resolvedData.data_ida || body.data_ida || null,
-        num_passageiros: resolvedData.num_passageiros
-          ? parseInt(String(resolvedData.num_passageiros))
-          : (body.num_passageiros ? parseInt(body.num_passageiros) : null),
+        hora_ida: resolvedData.hora_ida || body.hora_ida || null,
+        data_retorno: resolvedData.data_retorno || body.data_retorno || null,
+        hora_retorno: resolvedData.hora_retorno || body.hora_retorno || null,
+        num_passageiros: parseNum(resolvedData.num_passageiros || body.num_passageiros),
         mensagem: resolvedData.mensagem || body.observacoes || body.mensagem || null,
+        cupom: resolvedData.cupom || body.cupom || null,
         status: "pendente",
       };
+      for (const key of Object.keys(record)) {
+        if (record[key] === null || record[key] === undefined) delete record[key];
+      }
+      record.user_id = userId;
+      record.status = "pendente";
+      record.nome_cliente = record.nome_cliente || "Sem nome";
+
       const { error } = await supabase.from("solicitacoes_grupos").insert(record);
       insertError = error;
     } else if (tipo === "motorista") {
