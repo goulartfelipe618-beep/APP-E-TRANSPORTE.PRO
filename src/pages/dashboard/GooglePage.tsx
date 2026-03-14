@@ -3,11 +3,14 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Plus, Search, ChevronLeft, ChevronRight, Shield, Building2, MapPin, Phone, Clock, Camera, ArrowLeft, ArrowRight, Send } from "lucide-react";
+import { Plus, Search, ChevronLeft, ChevronRight, Shield, Building2, MapPin, Phone, Clock, Camera, ArrowLeft, ArrowRight, Send, ExternalLink, Calendar, Info, CheckCircle2 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { useState } from "react";
+import { Badge } from "@/components/ui/badge";
+import { useState, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 const TABS = [
   { label: "Informações Básicas", icon: Building2 },
