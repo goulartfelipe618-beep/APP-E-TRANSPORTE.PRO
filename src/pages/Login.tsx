@@ -54,16 +54,18 @@ const Login = () => {
       return;
     }
 
-    // Check if user is admin_master
-    const { data: roleData } = await supabase
+    // Check user role to redirect appropriately
+    const { data: roles } = await supabase
       .from("user_roles")
       .select("role")
-      .eq("user_id", data.user.id)
-      .eq("role", "admin_master")
-      .maybeSingle();
+      .eq("user_id", data.user.id);
 
-    if (roleData) {
+    const userRoles = roles?.map((r) => r.role) || [];
+
+    if (userRoles.includes("admin_master")) {
       navigate("/admin");
+    } else if (userRoles.includes("admin_taxi")) {
+      navigate("/taxi");
     } else {
       navigate("/dashboard");
     }

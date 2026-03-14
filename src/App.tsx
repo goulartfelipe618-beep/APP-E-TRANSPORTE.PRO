@@ -6,7 +6,9 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
 import DashboardLayout from "./components/DashboardLayout";
+import TaxiDashboardLayout from "./components/TaxiDashboardLayout";
 import ProtectedRoute from "./components/ProtectedRoute";
+import ProtectedTaxiRoute from "./components/ProtectedTaxiRoute";
 import HomePage from "./pages/dashboard/Home";
 import MetricasPage from "./pages/dashboard/Metricas";
 import TransferSolicitacoesPage from "./pages/dashboard/TransferSolicitacoes";
@@ -51,6 +53,14 @@ import AdminAutomacoesPage from "./pages/admin/AdminAutomacoesPage";
 import SolicitarAcessoPage from "./pages/SolicitarAcesso";
 import { ConfiguracoesProvider } from "./contexts/ConfiguracoesContext";
 
+// Taxi pages
+import TaxiHome from "./pages/taxi/TaxiHome";
+import TaxiMetricas from "./pages/taxi/TaxiMetricas";
+import TaxiAbrangencia from "./pages/taxi/TaxiAbrangencia";
+import TaxiChamadas from "./pages/taxi/TaxiChamadas";
+import TaxiAtendimentos from "./pages/taxi/TaxiAtendimentos";
+import TaxiClientesCorridas from "./pages/taxi/TaxiClientesCorridas";
+
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -88,6 +98,19 @@ const App = () => (
             <Route path="google" element={<GooglePage />} />
             <Route path="email-business" element={<EmailBusinessPage />} />
             <Route path="website" element={<WebsitePage />} />
+            <Route path="anotacoes" element={<AnotacoesPage />} />
+            <Route path="sistema/configuracoes" element={<SistemaConfiguracoesPage />} />
+            <Route path="sistema/automacoes" element={<SistemaAutomacoesPage />} />
+            <Route path="sistema/comunicador" element={<SistemaComunicadorPage />} />
+          </Route>
+          {/* Taxi Dashboard */}
+          <Route path="/taxi" element={<ProtectedTaxiRoute><TaxiDashboardLayout /></ProtectedTaxiRoute>}>
+            <Route index element={<TaxiHome />} />
+            <Route path="metricas" element={<TaxiMetricas />} />
+            <Route path="abrangencia" element={<TaxiAbrangencia />} />
+            <Route path="chamadas" element={<TaxiChamadas />} />
+            <Route path="atendimentos" element={<TaxiAtendimentos />} />
+            <Route path="clientes-corridas" element={<TaxiClientesCorridas />} />
             <Route path="anotacoes" element={<AnotacoesPage />} />
             <Route path="sistema/configuracoes" element={<SistemaConfiguracoesPage />} />
             <Route path="sistema/automacoes" element={<SistemaAutomacoesPage />} />
