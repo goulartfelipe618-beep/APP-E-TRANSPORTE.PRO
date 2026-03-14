@@ -36,9 +36,64 @@ export default function GooglePage() {
   const [tabIndex, setTabIndex] = useState(0);
   const [descLen, setDescLen] = useState(0);
   const [serviceArea, setServiceArea] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [servicoAtivo, setServicoAtivo] = useState<any>(null);
+  // Form state
+  const [tipoEntidade, setTipoEntidade] = useState("motorista");
+  const [nomeEmpresa, setNomeEmpresa] = useState("");
+  const [categoriaPrincipal, setCategoriaPrincipal] = useState("");
+  const [categoriaSecundaria, setCategoriaSecundaria] = useState("");
+  const [descricao, setDescricao] = useState("");
+  const [areaAtendimento, setAreaAtendimento] = useState("");
+  const [cep, setCep] = useState("");
+  const [cidade, setCidade] = useState("");
+  const [estado, setEstado] = useState("");
+  const [telefone, setTelefone] = useState("");
+  const [whatsappG, setWhatsappG] = useState("");
+  const [websiteG, setWebsiteG] = useState("");
+  const [logoUrl, setLogoUrl] = useState("");
+  const [capaUrl, setCapaUrl] = useState("");
   const [schedule, setSchedule] = useState(
     DAYS.map((d) => ({ ...d, open: "08:00", close: "18:00", enabled: d.defaultOn }))
   );
+
+  useEffect(() => {
+    const checkServico = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data } = await (supabase.from("solicitacoes_servicos" as any).select("*").eq("user_id", user.id).eq("tipo_servico", "google").order("created_at", { ascending: false }).limit(1) as any);
+      if (data && data.length > 0) setServicoAtivo(data[0]);
+    };
+    checkServico();
+  }, []);
+
+  const handleSubmitGoogle = async () => {
+    setSubmitting(true);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) { toast.error("Não autenticado"); setSubmitting(false); return; }
+    const { error } = await (supabase.from("solicitacoes_servicos" as any).insert({
+      user_id: user.id,
+      tipo_servico: "google",
+      dados_solicitacao: {
+        tipo_entidade: tipoEntidade,
+        nome_empresa: nomeEmpresa,
+        categoria_principal: categoriaPrincipal,
+        categoria_secundaria: categoriaSecundaria,
+        descricao,
+        service_area: serviceArea,
+        area_atendimento: areaAtendimento,
+        cep, cidade, estado,
+        telefone, whatsapp: whatsappG, website: websiteG,
+        horarios: schedule,
+        logo_url: logoUrl,
+        capa_url: capaUrl,
+      },
+    } as any) as any);
+    setSubmitting(false);
+    if (error) { toast.error("Erro: " + error.message); return; }
+    toast.success("Solicitação de Google Business enviada com sucesso!");
+    setOpen(false);
+  };
 
   const slides = [
     { title: "Coloque Sua Empresa no Google", description: "Crie seu perfil no Google Business Profile e apareça nas buscas quando clientes procurarem por transporte executivo na sua região." },
