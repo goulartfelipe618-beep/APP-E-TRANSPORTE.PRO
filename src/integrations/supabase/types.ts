@@ -416,6 +416,42 @@ export type Database = {
         }
         Relationships: []
       }
+      slides: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          id: string
+          imagem_url: string
+          ordem: number
+          subtitulo: string
+          titulo: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          id?: string
+          imagem_url?: string
+          ordem?: number
+          subtitulo?: string
+          titulo?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          id?: string
+          imagem_url?: string
+          ordem?: number
+          subtitulo?: string
+          titulo?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       solicitacoes_grupos: {
         Row: {
           created_at: string

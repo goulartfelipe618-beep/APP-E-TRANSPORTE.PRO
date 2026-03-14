@@ -3,7 +3,7 @@ import {
   FileText, BookOpen, Map, Users, UserCheck, Handshake,
   ClipboardList, CalendarDays, Car, Megaphone, BarChart3,
   Globe, Search, Mail, Monitor, Settings, StickyNote,
-  Bell, Moon, LogOut,
+  Bell, Moon, LogOut, SlidersHorizontal,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -30,6 +30,7 @@ const menuStructure = [
         icon: LayoutDashboard,
         children: [
           { title: "Home", url: "/dashboard", icon: Home },
+          { title: "Slides", url: "/dashboard/slides", icon: SlidersHorizontal },
           { title: "Métricas", url: "/dashboard/metricas", icon: Activity },
           { title: "Abrangência", url: "/dashboard/abrangencia", icon: MapPin },
         ],

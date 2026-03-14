@@ -34,6 +34,7 @@ import AnotacoesPage from "./pages/dashboard/AnotacoesPage";
 import SistemaConfiguracoesPage from "./pages/dashboard/SistemaConfiguracoes";
 import SistemaAutomacoesPage from "./pages/dashboard/SistemaAutomacoes";
 import SistemaComunicadorPage from "./pages/dashboard/SistemaComunicador";
+import SlidesPage from "./pages/dashboard/SlidesPage";
 import { ConfiguracoesProvider } from "./contexts/ConfiguracoesContext";
 
 const queryClient = new QueryClient();
@@ -50,6 +51,7 @@ const App = () => (
           <Route path="/login" element={<Login />} />
           <Route path="/dashboard" element={<ProtectedRoute><DashboardLayout /></ProtectedRoute>}>
             <Route index element={<HomePage />} />
+            <Route path="slides" element={<SlidesPage />} />
             <Route path="metricas" element={<MetricasPage />} />
             <Route path="abrangencia" element={<PlaceholderPage />} />
             <Route path="transfer/solicitacoes" element={<TransferSolicitacoesPage />} />
