@@ -47,6 +47,7 @@ import AdminUsuariosSolicitacoesPage from "./pages/admin/AdminUsuariosSolicitaco
 import AdminNetworkPage from "./pages/admin/AdminNetworkPage";
 import AdminSolicitacoesServicos from "./pages/admin/AdminSolicitacoesServicos";
 import AdminTemplatesPage from "./pages/admin/AdminTemplatesPage";
+import AdminAutomacoesPage from "./pages/admin/AdminAutomacoesPage";
 import SolicitarAcessoPage from "./pages/SolicitarAcesso";
 import { ConfiguracoesProvider } from "./contexts/ConfiguracoesContext";
 
