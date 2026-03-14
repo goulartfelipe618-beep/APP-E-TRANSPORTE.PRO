@@ -27,6 +27,13 @@ interface Automacao {
   created_at: string;
 }
 
+interface WebhookTeste {
+  id: string;
+  automacao_id: string;
+  payload: Record<string, any>;
+  created_at: string;
+}
+
 const tipoLabels: Record<string, string> = {
   transfer: "Transfer Executivo",
   motorista: "Solicitação Motorista",
