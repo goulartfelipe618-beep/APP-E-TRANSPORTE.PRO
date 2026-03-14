@@ -225,19 +225,47 @@ export function AppSidebar() {
                   }
 
                   const url = (item as { url: string }).url;
+                  const isNetworkItem = item.title === "Network";
                   return (
-                    <SidebarMenuItem key={item.title}>
+                    <SidebarMenuItem key={item.title} className="relative">
                       <SidebarMenuButton asChild>
                         <NavLink
                           to={url}
                           end
-                          className="hover:bg-muted/50"
+                          className={cn(
+                            "hover:bg-muted/50",
+                            isNetworkItem && showNetworkHighlight && "relative z-[60] bg-primary/20 ring-2 ring-primary rounded-md animate-pulse"
+                          )}
                           activeClassName="bg-muted text-primary font-medium"
+                          id={isNetworkItem ? "network-menu-item" : undefined}
                         >
                           <item.icon className="h-4 w-4 mr-2" />
                           {!collapsed && <span>{item.title}</span>}
                         </NavLink>
                       </SidebarMenuButton>
+                      {/* Tooltip pointing to Network */}
+                      {isNetworkItem && showNetworkHighlight && !collapsed && (
+                        <div className="absolute left-full top-1/2 -translate-y-1/2 ml-3 z-[70] animate-fade-in">
+                          <div className="relative bg-white text-gray-900 rounded-xl shadow-2xl px-5 py-4 w-64">
+                            {/* Arrow pointing left */}
+                            <div className="absolute -left-2 top-1/2 -translate-y-1/2 w-0 h-0 border-t-8 border-b-8 border-r-8 border-t-transparent border-b-transparent border-r-white" />
+                            <p className="text-sm font-bold mb-1">🎉 Menu Network Liberado!</p>
+                            <p className="text-xs text-gray-600 mb-3">
+                              Agora você faz parte do Network Nacional. Acesse aqui para ver empresas atribuídas a você.
+                            </p>
+                            <button
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setShowNetworkHighlight(false);
+                              }}
+                              className="w-full bg-primary text-white text-sm font-semibold py-2 rounded-lg hover:bg-primary/90 transition-colors"
+                            >
+                              OK, Entendi!
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </SidebarMenuItem>
                   );
                 })}
