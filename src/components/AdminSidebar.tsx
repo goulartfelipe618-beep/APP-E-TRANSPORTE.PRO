@@ -109,6 +109,16 @@ export function AdminSidebar() {
                 </SidebarMenuItem>
               </Collapsible>
 
+              {/* Network */}
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
+                  <NavLink to={networkItem.url} end className="hover:bg-muted/50" activeClassName="bg-muted text-primary font-medium">
+                    <networkItem.icon className="h-4 w-4 mr-2" />
+                    {!collapsed && <span>{networkItem.title}</span>}
+                  </NavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+
               {/* Usuários collapsible */}
               <Collapsible defaultOpen={usuariosActive}>
                 <SidebarMenuItem>
