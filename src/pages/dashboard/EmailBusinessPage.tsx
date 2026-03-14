@@ -40,6 +40,8 @@ function fmt(v: number) {
 
 export default function EmailBusinessPage() {
   const [currentSlide, setCurrentSlide] = useState(0);
+  const [submitting, setSubmitting] = useState(false);
+  const [servicoAtivo, setServicoAtivo] = useState<any>(null);
 
   // wizard state
   const [wizardActive, setWizardActive] = useState(false);
