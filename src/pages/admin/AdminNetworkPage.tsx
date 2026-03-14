@@ -1,12 +1,15 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, Plus, Filter, Building2, Trash2 } from "lucide-react";
+import { RefreshCw, Plus, Filter, Building2, Trash2, UserPlus, Check } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+} from "@/components/ui/dialog";
 import CriarNetworkDialog from "@/components/network/CriarNetworkDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -25,6 +28,12 @@ interface NetworkItem {
   motorista_atribuido_id: string | null;
 }
 
+interface DriverItem {
+  id: string;
+  email: string;
+  role: string;
+}
+
 export default function AdminNetworkPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [data, setData] = useState<NetworkItem[]>([]);
@@ -34,6 +43,13 @@ export default function AdminNetworkPage() {
   const [filtroEstado, setFiltroEstado] = useState("all");
   const [filtroCidade, setFiltroCidade] = useState("");
 
+  // Assign driver state
+  const [assignDialogOpen, setAssignDialogOpen] = useState(false);
+  const [selectedNetworkId, setSelectedNetworkId] = useState<string | null>(null);
+  const [selectedDriverId, setSelectedDriverId] = useState("");
+  const [drivers, setDrivers] = useState<DriverItem[]>([]);
+  const [assigning, setAssigning] = useState(false);
+
   const fetchData = async () => {
     setLoading(true);
     const { data: rows, error } = await (supabase.from("network" as any).select("*") as any);
@@ -42,12 +58,44 @@ export default function AdminNetworkPage() {
     setLoading(false);
   };
 
-  useEffect(() => { fetchData(); }, []);
+  const fetchDrivers = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
+    const res = await fetch(
+      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-users?action=list`,
+      { headers: { Authorization: `Bearer ${session.access_token}` } }
+    );
+    const list = await res.json();
+    if (Array.isArray(list)) {
+      setDrivers(list.filter((u: DriverItem) => u.role === "admin_transfer"));
+    }
+  };
+
+  useEffect(() => { fetchData(); fetchDrivers(); }, []);
 
   const handleDelete = async (id: string) => {
     const { error } = await (supabase.from("network" as any).delete().eq("id", id) as any);
     if (error) toast.error("Erro ao excluir");
     else { toast.success("Removido!"); fetchData(); }
+  };
+
+  const openAssignDialog = (networkId: string, currentDriverId: string | null) => {
+    setSelectedNetworkId(networkId);
+    setSelectedDriverId(currentDriverId || "");
+    setAssignDialogOpen(true);
+  };
+
+  const handleAssign = async () => {
+    if (!selectedNetworkId) return;
+    setAssigning(true);
+    const { error } = await (supabase.from("network" as any)
+      .update({ motorista_atribuido_id: selectedDriverId || null } as any)
+      .eq("id", selectedNetworkId) as any);
+    setAssigning(false);
+    if (error) { toast.error("Erro ao atribuir: " + error.message); return; }
+    toast.success(selectedDriverId ? "Motorista atribuído com sucesso!" : "Atribuição removida!");
+    setAssignDialogOpen(false);
+    fetchData();
   };
 
   const filtered = data.filter((item) => {
@@ -62,6 +110,11 @@ export default function AdminNetworkPage() {
   const estados = [...new Set(data.map((d) => d.estado).filter(Boolean))];
   const statuses = [...new Set(data.map((d) => d.status_contato).filter(Boolean))];
 
+  const getDriverEmail = (driverId: string | null) => {
+    if (!driverId) return null;
+    return drivers.find((d) => d.id === driverId)?.email || driverId;
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -72,7 +125,7 @@ export default function AdminNetworkPage() {
           <p className="text-muted-foreground">Empresas da E-Transporte.pro que podem ser atribuídas a motoristas cadastrados</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="icon" onClick={fetchData}>
+          <Button variant="outline" size="icon" onClick={() => { fetchData(); fetchDrivers(); }}>
             <RefreshCw className="h-4 w-4" />
           </Button>
           <Button className="bg-primary text-primary-foreground" onClick={() => setDialogOpen(true)}>
@@ -144,6 +197,7 @@ export default function AdminNetworkPage() {
                   <TableHead>Contato</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Potencial</TableHead>
+                  <TableHead>Atribuído a</TableHead>
                   <TableHead></TableHead>
                 </TableRow>
               </TableHeader>
@@ -157,9 +211,24 @@ export default function AdminNetworkPage() {
                     <TableCell><Badge variant="outline">{item.status_contato}</Badge></TableCell>
                     <TableCell><Badge variant="secondary">{item.potencial_negocio}</Badge></TableCell>
                     <TableCell>
-                      <Button variant="ghost" size="icon" onClick={() => handleDelete(item.id)}>
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
+                      {item.motorista_atribuido_id ? (
+                        <Badge className="bg-primary/10 text-primary border-primary/20">
+                          <Check className="h-3 w-3 mr-1" />
+                          {getDriverEmail(item.motorista_atribuido_id)?.split("@")[0]}
+                        </Badge>
+                      ) : (
+                        <span className="text-muted-foreground text-xs">Não atribuído</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1">
+                        <Button variant="ghost" size="icon" onClick={() => openAssignDialog(item.id, item.motorista_atribuido_id)} title="Atribuir motorista">
+                          <UserPlus className="h-4 w-4 text-primary" />
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => handleDelete(item.id)}>
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -170,6 +239,37 @@ export default function AdminNetworkPage() {
       </div>
 
       <CriarNetworkDialog open={dialogOpen} onOpenChange={setDialogOpen} onSaved={fetchData} />
+
+      {/* Dialog Atribuir Motorista */}
+      <Dialog open={assignDialogOpen} onOpenChange={setAssignDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserPlus className="h-5 w-5" /> Atribuir Motorista
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Selecione um motorista executivo para receber esta empresa no painel dele.
+            </p>
+            <Select value={selectedDriverId} onValueChange={setSelectedDriverId}>
+              <SelectTrigger><SelectValue placeholder="Selecione um motorista" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Nenhum (remover atribuição)</SelectItem>
+                {drivers.map((d) => (
+                  <SelectItem key={d.id} value={d.id}>{d.email}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAssignDialogOpen(false)}>Cancelar</Button>
+            <Button onClick={handleAssign} disabled={assigning}>
+              {assigning ? "Salvando..." : "Confirmar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
