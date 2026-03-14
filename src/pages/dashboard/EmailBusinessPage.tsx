@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -6,6 +6,9 @@ import {
   Globe, Star, User, CheckCircle2, Mail, Minus, Plus,
   ArrowLeft, ArrowRight, ChevronLeft, ChevronRight, Sparkles, FileText,
 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import { ExternalLink, Calendar, Info } from "lucide-react";
 
 /* ── data ── */
 const slides = [
@@ -36,6 +39,8 @@ function fmt(v: number) {
 
 export default function EmailBusinessPage() {
   const [currentSlide, setCurrentSlide] = useState(0);
+  const [submitting, setSubmitting] = useState(false);
+  const [servicoAtivo, setServicoAtivo] = useState<any>(null);
 
   // wizard state
   const [wizardActive, setWizardActive] = useState(false);
@@ -59,10 +64,100 @@ export default function EmailBusinessPage() {
   const totalAnual = totalMensal * 12;
   const emailPrincipal = `${emailPrefix}@${domain || "seudominio"}`;
 
+  useEffect(() => {
+    const checkServico = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data } = await (supabase.from("solicitacoes_servicos" as any).select("*").eq("user_id", user.id).eq("tipo_servico", "email").order("created_at", { ascending: false }).limit(1) as any);
+      if (data && data.length > 0) {
+        setServicoAtivo(data[0]);
+      }
+    };
+    checkServico();
+  }, []);
+
+  const handleSubmitEmail = async () => {
+    setSubmitting(true);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) { toast.error("Não autenticado"); setSubmitting(false); return; }
+    const { error } = await (supabase.from("solicitacoes_servicos" as any).insert({
+      user_id: user.id,
+      tipo_servico: "email",
+      dados_solicitacao: {
+        dominio: domain,
+        tipo_dominio: domainOption,
+        plano: plan.name,
+        contas: accounts[selectedPlan],
+        valor_mensal: totalMensal,
+        valor_anual: totalAnual,
+        email_principal: emailPrincipal,
+        nome_completo: nomeCompleto,
+        nome_empresa: nomeEmpresa,
+      },
+    } as any) as any);
+    setSubmitting(false);
+    if (error) { toast.error("Erro: " + error.message); return; }
+    toast.success("Solicitação de e-mail enviada com sucesso!");
+    setWizardActive(false);
+  };
+
+  // Active service view
+  if (servicoAtivo?.status === "concluido") {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
+            <CheckCircle2 className="h-6 w-6 text-primary" /> E-mail Business — Serviço Ativo
+          </h1>
+          <p className="text-muted-foreground">Seu e-mail profissional está configurado.</p>
+        </div>
+        <div className="rounded-xl border border-primary/30 bg-card p-6 space-y-4">
+          {servicoAtivo.link_acesso && (
+            <div className="space-y-1">
+              <p className="text-sm text-muted-foreground">Link de Acesso</p>
+              <a href={servicoAtivo.link_acesso} target="_blank" rel="noopener noreferrer" className="text-primary font-medium flex items-center gap-1 hover:underline">
+                <ExternalLink className="h-4 w-4" /> {servicoAtivo.link_acesso}
+              </a>
+            </div>
+          )}
+          {servicoAtivo.data_expiracao && (
+            <div className="space-y-1">
+              <p className="text-sm text-muted-foreground">Válido até</p>
+              <p className="text-foreground font-medium flex items-center gap-1"><Calendar className="h-4 w-4" /> {new Date(servicoAtivo.data_expiracao).toLocaleDateString("pt-BR")}</p>
+            </div>
+          )}
+          {servicoAtivo.instrucoes_acesso && (
+            <div className="space-y-1">
+              <p className="text-sm text-muted-foreground">Instruções</p>
+              <p className="text-foreground whitespace-pre-wrap">{servicoAtivo.instrucoes_acesso}</p>
+            </div>
+          )}
+          {servicoAtivo.como_usar && (
+            <div className="space-y-1">
+              <p className="text-sm text-muted-foreground">Como Usar</p>
+              <p className="text-foreground whitespace-pre-wrap">{servicoAtivo.como_usar}</p>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  const pendingBanner = servicoAtivo && (servicoAtivo.status === "pendente" || servicoAtivo.status === "em_andamento") ? (
+    <div className="rounded-xl border border-yellow-500/30 bg-yellow-500/10 p-4 flex items-center gap-3 mb-6">
+      <Info className="h-5 w-5 text-yellow-600" />
+      <div>
+        <p className="text-sm font-semibold text-foreground">Solicitação em análise</p>
+        <p className="text-xs text-muted-foreground">Status: <Badge variant="outline">{servicoAtivo.status === "pendente" ? "Pendente" : "Em andamento"}</Badge></p>
+      </div>
+    </div>
+  ) : null;
+
   /* ── Landing Page ── */
   if (!wizardActive) {
     return (
       <div className="space-y-8">
+        {pendingBanner}
         {/* Carousel */}
         <div className="relative rounded-xl overflow-hidden bg-gradient-to-br from-slate-800 to-slate-900 h-80 flex items-center">
           <Button variant="ghost" size="icon" className="absolute left-2 z-10 bg-background/20 hover:bg-background/40 text-primary-foreground rounded-full" onClick={() => setCurrentSlide((p) => (p === 0 ? slides.length - 1 : p - 1))}><ChevronLeft className="h-5 w-5" /></Button>
@@ -115,6 +210,7 @@ export default function EmailBusinessPage() {
   /* ── Wizard ── */
   return (
     <div className="max-w-3xl mx-auto space-y-8">
+      {pendingBanner}
       {/* Stepper */}
       <div className="flex items-center justify-center gap-0">
         {STEPS.map((label, i) => (
@@ -349,8 +445,8 @@ export default function EmailBusinessPage() {
               Próximo <ArrowRight className="h-4 w-4 ml-2" />
             </Button>
           ) : (
-            <Button onClick={() => { /* submit */ }}>
-              <CheckCircle2 className="h-4 w-4 mr-2" /> Enviar Solicitação
+            <Button onClick={handleSubmitEmail} disabled={submitting}>
+              <CheckCircle2 className="h-4 w-4 mr-2" /> {submitting ? "Enviando..." : "Enviar Solicitação"}
             </Button>
           )}
         </div>

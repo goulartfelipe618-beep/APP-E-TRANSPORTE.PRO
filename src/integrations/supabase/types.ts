@@ -689,6 +689,51 @@ export type Database = {
         }
         Relationships: []
       }
+      solicitacoes_servicos: {
+        Row: {
+          como_usar: string | null
+          created_at: string
+          dados_solicitacao: Json
+          data_expiracao: string | null
+          id: string
+          instrucoes_acesso: string | null
+          link_acesso: string | null
+          observacoes_admin: string | null
+          status: string
+          tipo_servico: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          como_usar?: string | null
+          created_at?: string
+          dados_solicitacao?: Json
+          data_expiracao?: string | null
+          id?: string
+          instrucoes_acesso?: string | null
+          link_acesso?: string | null
+          observacoes_admin?: string | null
+          status?: string
+          tipo_servico: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          como_usar?: string | null
+          created_at?: string
+          dados_solicitacao?: Json
+          data_expiracao?: string | null
+          id?: string
+          instrucoes_acesso?: string | null
+          link_acesso?: string | null
+          observacoes_admin?: string | null
+          status?: string
+          tipo_servico?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       solicitacoes_transfer: {
         Row: {
           contato: string | null
