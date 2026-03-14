@@ -512,12 +512,42 @@ export async function generateGrupoPDF(reservaId: string) {
 
   y = addTwoColumnFields(doc, detailsLeft, detailsRight, y);
 
-  // ── Contract text ──
-  if (contrato) {
-    y += 2;
-    if (contrato.modelo_contrato) y = addContractText(doc, "CONTRATO", contrato.modelo_contrato, y);
-    if (contrato.politica_cancelamento) y = addContractText(doc, "POLÍTICA DE CANCELAMENTO", contrato.politica_cancelamento, y);
-    if (contrato.clausulas_adicionais) y = addContractText(doc, "CLÁUSULAS ADICIONAIS", contrato.clausulas_adicionais, y);
+  // ── Contract text (always starts on a NEW page) ──
+  if (contrato && (contrato.modelo_contrato || contrato.politica_cancelamento || contrato.clausulas_adicionais)) {
+    doc.addPage();
+    let cy = 20;
+
+    // Re-add company header on contract page
+    if (cabecalho && cabecalho.razao_social) {
+      cy = addHeader(doc, cabecalho, "Contrato de Prestação de Serviço", numReserva, r.id);
+    } else {
+      doc.setFontSize(16);
+      doc.setFont("helvetica", "bold");
+      doc.text("Contrato de Prestação de Serviço", MARGIN, cy);
+      cy += 10;
+    }
+
+    if (contrato.modelo_contrato) cy = addContractText(doc, "CONTRATO", contrato.modelo_contrato, cy);
+    if (contrato.politica_cancelamento) cy = addContractText(doc, "POLÍTICA DE CANCELAMENTO", contrato.politica_cancelamento, cy);
+    if (contrato.clausulas_adicionais) cy = addContractText(doc, "CLÁUSULAS ADICIONAIS", contrato.clausulas_adicionais, cy);
+
+    // Signature area
+    cy = checkPage(doc, cy, 40);
+    cy += 10;
+    doc.setDrawColor(0);
+    doc.line(MARGIN, cy, MARGIN + 70, cy);
+    doc.line(PAGE_W - MARGIN - 70, cy, PAGE_W - MARGIN, cy);
+    cy += 5;
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "normal");
+    doc.text("Contratante", MARGIN + 20, cy);
+    doc.text("Contratado", PAGE_W - MARGIN - 50, cy);
+    cy += 4;
+    doc.setFontSize(7);
+    doc.setTextColor(100);
+    doc.text(r.nome_completo, MARGIN, cy);
+    if (cabecalho?.razao_social) doc.text(cabecalho.razao_social, PAGE_W - MARGIN - 70, cy);
+    doc.setTextColor(0);
   }
 
   // ── Footer ──
