@@ -42,7 +42,7 @@ export default function GruposReservasPage() {
     setLoading(true);
     const { data, error } = await supabase
       .from("reservas_grupos")
-      .select("id, nome_completo, email, whatsapp, tipo_veiculo, num_passageiros, embarque, destino, data_ida, valor_total, status, created_at")
+      .select("id, numero_reserva, nome_completo, email, whatsapp, tipo_veiculo, num_passageiros, embarque, destino, data_ida, valor_total, status, created_at")
       .order("created_at", { ascending: false });
     if (error) toast.error("Erro ao carregar reservas de grupos");
     else setReservas(data || []);
