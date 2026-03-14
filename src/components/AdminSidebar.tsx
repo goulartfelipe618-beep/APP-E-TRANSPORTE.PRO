@@ -27,6 +27,11 @@ const contratoChildren = [
   { title: "Táxi", url: "/admin/contrato/taxi", icon: FileText },
 ];
 
+const usuariosChildren = [
+  { title: "Cadastrados", url: "/admin/usuarios/cadastrados", icon: Users },
+  { title: "Solicitações", url: "/admin/usuarios/solicitacoes", icon: ClipboardList },
+];
+
 export function AdminSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
