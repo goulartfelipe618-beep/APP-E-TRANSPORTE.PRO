@@ -74,6 +74,33 @@ export type Database = {
         }
         Relationships: []
       }
+      automacoes_campos_config: {
+        Row: {
+          campos: Json
+          categoria: string
+          created_at: string
+          id: string
+          subcategoria: string
+          updated_at: string
+        }
+        Insert: {
+          campos?: Json
+          categoria: string
+          created_at?: string
+          id?: string
+          subcategoria?: string
+          updated_at?: string
+        }
+        Update: {
+          campos?: Json
+          categoria?: string
+          created_at?: string
+          id?: string
+          subcategoria?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       cabecalho_contratual: {
         Row: {
           cnpj: string

@@ -40,41 +40,36 @@ const tipoLabels: Record<string, string> = {
   grupo: "Solicitação de Grupo",
 };
 
-// Fields per category
-const grupoFields = [
-  "Tipo de Veículo", "Número de Passageiros", "Endereço de Embarque", "Destino",
-  "Data de Ida", "Hora de Ida", "Data de Retorno", "Hora de Retorno",
-  "Observações", "Cupom de Desconto", "Nome do Cliente", "E-mail do Cliente",
-  "WhatsApp do Cliente", "Como nos encontrou",
-];
+// Fallback fields (used if DB config not loaded yet)
+const fallbackFields: Record<string, Record<string, string[]>> = {};
 
-const motoristaFields = [
-  "Nome Completo", "E-mail", "Telefone / WhatsApp", "CPF", "Data de Nascimento",
-  "Endereço Completo", "Cidade", "Estado",
-  "Número da CNH", "Categoria da CNH", "Possui Veículo (sim/não)",
-  "Marca do Veículo", "Modelo do Veículo", "Ano do Veículo", "Placa do Veículo",
-  "Experiência", "Mensagem / Observações",
-];
+function useCamposConfig() {
+  const [camposConfig, setCamposConfig] = useState<Record<string, Record<string, string[]>>>({});
+  const [loaded, setLoaded] = useState(false);
 
-const transferSomenteIdaFields = [
-  "Tipo de Viagem", "Nome do Cliente", "Telefone do Cliente", "E-mail do Cliente",
-  "Origem / Como encontrou", "Passageiros (Ida)", "Embarque (Ida)", "Destino (Ida)",
-  "Data (Ida)", "Hora (Ida)", "Mensagem (Ida)", "Cupom (Ida)",
-];
+  useEffect(() => {
+    (async () => {
+      const { data, error } = await supabase
+        .from("automacoes_campos_config" as any)
+        .select("*") as any;
+      if (!error && data) {
+        const config: Record<string, Record<string, string[]>> = {};
+        for (const row of data) {
+          if (!config[row.categoria]) config[row.categoria] = {};
+          config[row.categoria][row.subcategoria] = Array.isArray(row.campos) ? row.campos : [];
+        }
+        setCamposConfig(config);
+      }
+      setLoaded(true);
+    })();
+  }, []);
 
-const transferIdaVoltaFields = [
-  "Tipo de Viagem", "Nome do Cliente", "Telefone do Cliente", "E-mail do Cliente",
-  "Origem / Como encontrou", "Passageiros (Ida)", "Embarque (Ida)", "Destino (Ida)",
-  "Data (Ida)", "Hora (Ida)", "Mensagem (Ida)", "Cupom (Ida)",
-  "Passageiros (Volta)", "Embarque (Volta)", "Destino (Volta)",
-  "Data (Volta)", "Hora (Volta)", "Mensagem (Volta)", "Cupom (Volta)",
-];
+  const getFields = (categoria: string, subcategoria: string): string[] => {
+    return camposConfig[categoria]?.[subcategoria] || [];
+  };
 
-const transferPorHoraFields = [
-  "Tipo de Viagem", "Nome do Cliente", "Telefone do Cliente", "E-mail do Cliente",
-  "Origem / Como encontrou", "Passageiros", "Endereço de Início", "Data", "Hora",
-  "Qtd. Horas", "Ponto de Encerramento", "Itinerário / Mensagem", "Cupom",
-];
+  return { camposConfig, getFields, loaded };
+}
 
 function FieldMappingList({
   fields,
@@ -102,6 +97,7 @@ function FieldMappingList({
 }
 
 export default function SistemaAutomacoesPage() {
+  const { getFields, loaded: camposLoaded } = useCamposConfig();
   const [open, setOpen] = useState(false);
   const [devToolsOpen, setDevToolsOpen] = useState(false);
   const [novoNome, setNovoNome] = useState("");
@@ -388,19 +384,19 @@ export default function SistemaAutomacoesPage() {
                   <TabsTrigger value="por_hora">Por Hora</TabsTrigger>
                 </TabsList>
                 <TabsContent value="somente_ida">
-                  <FieldMappingList fields={transferSomenteIdaFields} mappings={mappings["somente_ida"] || {}} onUpdate={(f, v) => updateMapping("somente_ida", f, v)} />
+                  <FieldMappingList fields={getFields("transfer", "somente_ida")} mappings={mappings["somente_ida"] || {}} onUpdate={(f, v) => updateMapping("somente_ida", f, v)} />
                 </TabsContent>
                 <TabsContent value="ida_volta">
-                  <FieldMappingList fields={transferIdaVoltaFields} mappings={mappings["ida_volta"] || {}} onUpdate={(f, v) => updateMapping("ida_volta", f, v)} />
+                  <FieldMappingList fields={getFields("transfer", "ida_volta")} mappings={mappings["ida_volta"] || {}} onUpdate={(f, v) => updateMapping("ida_volta", f, v)} />
                 </TabsContent>
                 <TabsContent value="por_hora">
-                  <FieldMappingList fields={transferPorHoraFields} mappings={mappings["por_hora"] || {}} onUpdate={(f, v) => updateMapping("por_hora", f, v)} />
+                  <FieldMappingList fields={getFields("transfer", "por_hora")} mappings={mappings["por_hora"] || {}} onUpdate={(f, v) => updateMapping("por_hora", f, v)} />
                 </TabsContent>
               </Tabs>
             ) : selected.tipo === "grupo" ? (
-              <FieldMappingList fields={grupoFields} mappings={mappings["default"] || {}} onUpdate={(f, v) => updateMapping("default", f, v)} />
+              <FieldMappingList fields={getFields("grupo", "default")} mappings={mappings["default"] || {}} onUpdate={(f, v) => updateMapping("default", f, v)} />
             ) : (
-              <FieldMappingList fields={motoristaFields} mappings={mappings["default"] || {}} onUpdate={(f, v) => updateMapping("default", f, v)} />
+              <FieldMappingList fields={getFields("motorista", "default")} mappings={mappings["default"] || {}} onUpdate={(f, v) => updateMapping("default", f, v)} />
             )}
           </div>
         </div>
