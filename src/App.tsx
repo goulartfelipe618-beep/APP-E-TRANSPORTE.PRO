@@ -40,6 +40,8 @@ import AdminHomePage from "./pages/admin/AdminHome";
 import AdminSlidesPage from "./pages/admin/SlidesPage";
 import AdminMetricasPage from "./pages/admin/AdminMetricas";
 import AdminAbrangenciaPage from "./pages/admin/AdminAbrangencia";
+import AdminContratoTransferPage from "./pages/admin/AdminContratoTransfer";
+import AdminContratoTaxiPage from "./pages/admin/AdminContratoTaxi";
 import { ConfiguracoesProvider } from "./contexts/ConfiguracoesContext";
 
 const queryClient = new QueryClient();
