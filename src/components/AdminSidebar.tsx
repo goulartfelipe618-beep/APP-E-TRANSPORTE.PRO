@@ -1,5 +1,5 @@
 import {
-  Home, SlidersHorizontal, LogOut, Shield, BarChart3, MapPin, FileText, ChevronDown, Users, ClipboardList, Building2,
+  Home, SlidersHorizontal, LogOut, Shield, BarChart3, MapPin, FileText, ChevronDown, Users, ClipboardList, Building2, LayoutTemplate,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -34,6 +34,7 @@ const usuariosChildren = [
 
 const networkItem = { title: "Network", url: "/admin/network", icon: Building2 };
 const solicitacoesItem = { title: "Solicitações Serviços", url: "/admin/solicitacoes-servicos", icon: ClipboardList };
+const templatesItem = { title: "Templates", url: "/admin/templates", icon: LayoutTemplate };
 
 export function AdminSidebar() {
   const { state } = useSidebar();
@@ -148,6 +149,16 @@ export function AdminSidebar() {
                   </CollapsibleContent>
                 </SidebarMenuItem>
               </Collapsible>
+
+              {/* Templates */}
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
+                  <NavLink to={templatesItem.url} end className="hover:bg-muted/50" activeClassName="bg-muted text-primary font-medium">
+                    <templatesItem.icon className="h-4 w-4 mr-2" />
+                    {!collapsed && <span>{templatesItem.title}</span>}
+                  </NavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
 
               {/* Solicitações Serviços */}
               <SidebarMenuItem>
