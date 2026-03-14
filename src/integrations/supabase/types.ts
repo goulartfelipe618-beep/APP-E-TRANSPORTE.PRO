@@ -212,6 +212,7 @@ export type Database = {
           nome_completo: string
           nome_motorista: string | null
           num_passageiros: number | null
+          numero_reserva: number
           observacoes_viagem: string | null
           status: string
           telefone_motorista: string | null
@@ -240,6 +241,7 @@ export type Database = {
           nome_completo: string
           nome_motorista?: string | null
           num_passageiros?: number | null
+          numero_reserva?: number
           observacoes_viagem?: string | null
           status?: string
           telefone_motorista?: string | null
@@ -268,6 +270,7 @@ export type Database = {
           nome_completo?: string
           nome_motorista?: string | null
           num_passageiros?: number | null
+          numero_reserva?: number
           observacoes_viagem?: string | null
           status?: string
           telefone_motorista?: string | null
@@ -298,6 +301,7 @@ export type Database = {
           metodo_pagamento: string | null
           motorista_id: string | null
           nome_completo: string
+          numero_reserva: number
           observacoes: string | null
           por_hora_cupom: string | null
           por_hora_data: string | null
@@ -340,6 +344,7 @@ export type Database = {
           metodo_pagamento?: string | null
           motorista_id?: string | null
           nome_completo: string
+          numero_reserva?: number
           observacoes?: string | null
           por_hora_cupom?: string | null
           por_hora_data?: string | null
@@ -382,6 +387,7 @@ export type Database = {
           metodo_pagamento?: string | null
           motorista_id?: string | null
           nome_completo?: string
+          numero_reserva?: number
           observacoes?: string | null
           por_hora_cupom?: string | null
           por_hora_data?: string | null

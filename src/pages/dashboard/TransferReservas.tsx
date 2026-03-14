@@ -11,6 +11,7 @@ import { generateTransferPDF } from "@/lib/pdfGenerator";
 
 interface Reserva {
   id: string;
+  numero_reserva: number;
   nome_completo: string;
   email: string;
   telefone: string;
@@ -40,7 +41,7 @@ export default function TransferReservasPage() {
     setLoading(true);
     const { data, error } = await supabase
       .from("reservas_transfer")
-      .select("id, nome_completo, email, telefone, tipo_viagem, valor_total, status, created_at, ida_embarque, ida_desembarque, ida_data")
+      .select("id, numero_reserva, nome_completo, email, telefone, tipo_viagem, valor_total, status, created_at, ida_embarque, ida_desembarque, ida_data")
       .order("created_at", { ascending: false });
     if (error) toast.error("Erro ao carregar reservas");
     else setReservas(data || []);
@@ -89,6 +90,7 @@ export default function TransferReservasPage() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead>Nº</TableHead>
                 <TableHead>Cliente</TableHead>
                 <TableHead>Contato</TableHead>
                 <TableHead>Tipo</TableHead>
@@ -102,6 +104,7 @@ export default function TransferReservasPage() {
             <TableBody>
               {reservas.map((r) => (
                 <TableRow key={r.id}>
+                  <TableCell className="font-mono text-sm text-muted-foreground">#{r.numero_reserva}</TableCell>
                   <TableCell className="font-medium">{r.nome_completo}</TableCell>
                   <TableCell>
                     <div className="text-sm">{r.telefone}</div>

@@ -11,6 +11,7 @@ import { generateGrupoPDF } from "@/lib/pdfGenerator";
 
 interface ReservaGrupo {
   id: string;
+  numero_reserva: number;
   nome_completo: string;
   email: string;
   whatsapp: string;
@@ -41,7 +42,7 @@ export default function GruposReservasPage() {
     setLoading(true);
     const { data, error } = await supabase
       .from("reservas_grupos")
-      .select("id, nome_completo, email, whatsapp, tipo_veiculo, num_passageiros, embarque, destino, data_ida, valor_total, status, created_at")
+      .select("id, numero_reserva, nome_completo, email, whatsapp, tipo_veiculo, num_passageiros, embarque, destino, data_ida, valor_total, status, created_at")
       .order("created_at", { ascending: false });
     if (error) toast.error("Erro ao carregar reservas de grupos");
     else setReservas(data || []);
@@ -90,6 +91,7 @@ export default function GruposReservasPage() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead>Nº</TableHead>
                 <TableHead>Cliente</TableHead>
                 <TableHead>Contato</TableHead>
                 <TableHead>Veículo</TableHead>
@@ -104,6 +106,7 @@ export default function GruposReservasPage() {
             <TableBody>
               {reservas.map((r) => (
                 <TableRow key={r.id}>
+                  <TableCell className="font-mono text-sm text-muted-foreground">#{r.numero_reserva}</TableCell>
                   <TableCell className="font-medium">{r.nome_completo}</TableCell>
                   <TableCell>
                     <div className="text-sm">{r.whatsapp}</div>
