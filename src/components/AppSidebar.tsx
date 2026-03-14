@@ -30,6 +30,7 @@ const menuStructure = [
         icon: LayoutDashboard,
         children: [
           { title: "Home", url: "/dashboard", icon: Home },
+          { title: "Slides", url: "/dashboard/slides", icon: SlidersHorizontal },
           { title: "Métricas", url: "/dashboard/metricas", icon: Activity },
           { title: "Abrangência", url: "/dashboard/abrangencia", icon: MapPin },
         ],
