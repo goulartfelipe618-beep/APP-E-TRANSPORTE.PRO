@@ -13,6 +13,7 @@ import {
 const menuItems = [
   { title: "Home", url: "/admin", icon: Home },
   { title: "Métricas", url: "/admin/metricas", icon: BarChart3 },
+  { title: "Abrangência", url: "/admin/abrangencia", icon: MapPin },
   { title: "Slides", url: "/admin/slides", icon: SlidersHorizontal },
 ];
 
