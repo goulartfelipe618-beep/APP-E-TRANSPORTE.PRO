@@ -70,11 +70,16 @@ export default function CriarReservaGrupoDialog({ open, onOpenChange, onCreated,
     if (open && initialData) {
       setNomeCompleto(initialData.nome_cliente || "");
       setWhatsapp(initialData.whatsapp || "");
+      setEmail(initialData.email || "");
       setTipoVeiculo(initialData.tipo_veiculo || "");
       setEmbarque(initialData.embarque || "");
       setDestino(initialData.destino || "");
       setDataIda(initialData.data_ida || "");
+      setHoraIda(initialData.hora_ida || "");
+      setDataRetorno(initialData.data_retorno || "");
+      setHoraRetorno(initialData.hora_retorno || "");
       setNumPassageiros(initialData.num_passageiros?.toString() || "");
+      setCupom(initialData.cupom || "");
       setObservacoesViagem(initialData.mensagem || "");
     }
     if (open && !initialData) resetForm();
