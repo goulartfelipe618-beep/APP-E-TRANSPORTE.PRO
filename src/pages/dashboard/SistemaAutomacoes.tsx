@@ -40,41 +40,36 @@ const tipoLabels: Record<string, string> = {
   grupo: "Solicitação de Grupo",
 };
 
-// Fields per category
-const grupoFields = [
-  "Tipo de Veículo", "Número de Passageiros", "Endereço de Embarque", "Destino",
-  "Data de Ida", "Hora de Ida", "Data de Retorno", "Hora de Retorno",
-  "Observações", "Cupom de Desconto", "Nome do Cliente", "E-mail do Cliente",
-  "WhatsApp do Cliente", "Como nos encontrou",
-];
+// Fallback fields (used if DB config not loaded yet)
+const fallbackFields: Record<string, Record<string, string[]>> = {};
 
-const motoristaFields = [
-  "Nome Completo", "E-mail", "Telefone / WhatsApp", "CPF", "Data de Nascimento",
-  "Endereço Completo", "Cidade", "Estado",
-  "Número da CNH", "Categoria da CNH", "Possui Veículo (sim/não)",
-  "Marca do Veículo", "Modelo do Veículo", "Ano do Veículo", "Placa do Veículo",
-  "Experiência", "Mensagem / Observações",
-];
+function useCamposConfig() {
+  const [camposConfig, setCamposConfig] = useState<Record<string, Record<string, string[]>>>({});
+  const [loaded, setLoaded] = useState(false);
 
-const transferSomenteIdaFields = [
-  "Tipo de Viagem", "Nome do Cliente", "Telefone do Cliente", "E-mail do Cliente",
-  "Origem / Como encontrou", "Passageiros (Ida)", "Embarque (Ida)", "Destino (Ida)",
-  "Data (Ida)", "Hora (Ida)", "Mensagem (Ida)", "Cupom (Ida)",
-];
+  useEffect(() => {
+    (async () => {
+      const { data, error } = await supabase
+        .from("automacoes_campos_config" as any)
+        .select("*") as any;
+      if (!error && data) {
+        const config: Record<string, Record<string, string[]>> = {};
+        for (const row of data) {
+          if (!config[row.categoria]) config[row.categoria] = {};
+          config[row.categoria][row.subcategoria] = Array.isArray(row.campos) ? row.campos : [];
+        }
+        setCamposConfig(config);
+      }
+      setLoaded(true);
+    })();
+  }, []);
 
-const transferIdaVoltaFields = [
-  "Tipo de Viagem", "Nome do Cliente", "Telefone do Cliente", "E-mail do Cliente",
-  "Origem / Como encontrou", "Passageiros (Ida)", "Embarque (Ida)", "Destino (Ida)",
-  "Data (Ida)", "Hora (Ida)", "Mensagem (Ida)", "Cupom (Ida)",
-  "Passageiros (Volta)", "Embarque (Volta)", "Destino (Volta)",
-  "Data (Volta)", "Hora (Volta)", "Mensagem (Volta)", "Cupom (Volta)",
-];
+  const getFields = (categoria: string, subcategoria: string): string[] => {
+    return camposConfig[categoria]?.[subcategoria] || [];
+  };
 
-const transferPorHoraFields = [
-  "Tipo de Viagem", "Nome do Cliente", "Telefone do Cliente", "E-mail do Cliente",
-  "Origem / Como encontrou", "Passageiros", "Endereço de Início", "Data", "Hora",
-  "Qtd. Horas", "Ponto de Encerramento", "Itinerário / Mensagem", "Cupom",
-];
+  return { camposConfig, getFields, loaded };
+}
 
 function FieldMappingList({
   fields,
