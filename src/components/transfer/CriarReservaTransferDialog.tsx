@@ -102,13 +102,35 @@ export default function CriarReservaTransferDialog({ open, onOpenChange, onCreat
     if (open && initialData) {
       setNomeCompleto(initialData.nome_completo || "");
       setTelefone(initialData.contato || "");
+      setEmail(initialData.email || "");
       setIdaEmbarque(initialData.embarque || "");
       setIdaDesembarque(initialData.desembarque || "");
       setIdaData(initialData.data_viagem || "");
+      setIdaHora(initialData.hora_viagem || "");
       setIdaPassageiros(initialData.num_passageiros?.toString() || "");
+      setIdaCupom(initialData.cupom || "");
+      setIdaMensagem(initialData.mensagem || "");
       setObservacoes(initialData.mensagem || "");
+      // Volta
+      setVoltaEmbarque(initialData.volta_embarque || "");
+      setVoltaDesembarque(initialData.volta_desembarque || "");
+      setVoltaData(initialData.volta_data || "");
+      setVoltaHora(initialData.volta_hora || "");
+      setVoltaPassageiros(initialData.volta_passageiros?.toString() || "");
+      setVoltaCupom(initialData.volta_cupom || "");
+      setVoltaMensagem(initialData.volta_mensagem || "");
+      // Por hora
+      setPorHoraEnderecoInicio(initialData.por_hora_endereco_inicio || "");
+      setPorHoraPontoEncerramento(initialData.por_hora_ponto_encerramento || "");
+      setPorHoraData(initialData.por_hora_data || "");
+      setPorHoraHora(initialData.por_hora_hora || "");
+      setPorHoraPassageiros(initialData.por_hora_passageiros?.toString() || "");
+      setPorHoraQtdHoras(initialData.por_hora_qtd_horas?.toString() || "");
+      setPorHoraCupom(initialData.por_hora_cupom || "");
+      setPorHoraItinerario(initialData.por_hora_itinerario || "");
+
       if (initialData.tipo) {
-        const tipoMap: Record<string, TipoViagem> = { ida: "somente_ida", ida_volta: "ida_volta", por_hora: "por_hora" };
+        const tipoMap: Record<string, TipoViagem> = { ida: "somente_ida", somente_ida: "somente_ida", ida_volta: "ida_volta", por_hora: "por_hora" };
         setTipoViagem(tipoMap[initialData.tipo] || "somente_ida");
       }
     }
