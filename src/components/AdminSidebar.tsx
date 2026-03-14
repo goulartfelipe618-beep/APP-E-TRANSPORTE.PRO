@@ -40,6 +40,7 @@ export function AdminSidebar() {
 
   const isActive = (url: string) => location.pathname === url;
   const contratoActive = contratoChildren.some((c) => isActive(c.url));
+  const usuariosActive = usuariosChildren.some((c) => isActive(c.url));
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
