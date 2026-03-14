@@ -331,8 +331,8 @@ export default function GooglePage() {
               <ArrowLeft className="h-4 w-4 mr-2" /> Anterior
             </Button>
             {isLast ? (
-              <Button className="bg-green-600 hover:bg-green-700 text-white">
-                <Send className="h-4 w-4 mr-2" /> Salvar Perfil
+              <Button className="bg-primary text-primary-foreground" onClick={handleSubmitGoogle} disabled={submitting}>
+                <Send className="h-4 w-4 mr-2" /> {submitting ? "Enviando..." : "Enviar Solicitação"}
               </Button>
             ) : (
               <Button onClick={() => setTabIndex((t) => t + 1)}>
