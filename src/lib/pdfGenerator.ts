@@ -129,10 +129,10 @@ export async function generateTransferPDF(reservaId: string) {
   doc.setFontSize(8);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(120);
-  doc.text(`Gerado em ${new Date().toLocaleString("pt-BR")}`, 14, 26);
+  y += 6;
+  doc.text(`Gerado em ${new Date().toLocaleString("pt-BR")}`, 14, y);
   doc.setTextColor(0);
-
-  let y = 34;
+  y += 8;
 
   // Client info
   y = addSection(doc, "DADOS DO CLIENTE", [
