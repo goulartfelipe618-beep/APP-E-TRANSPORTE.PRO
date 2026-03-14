@@ -11,6 +11,7 @@ import { generateTransferPDF } from "@/lib/pdfGenerator";
 
 interface Reserva {
   id: string;
+  numero_reserva: number;
   nome_completo: string;
   email: string;
   telefone: string;
