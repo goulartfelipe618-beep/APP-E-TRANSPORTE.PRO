@@ -417,6 +417,7 @@ export default function WebsitePage() {
   // Gallery view
   return (
     <div className="space-y-6">
+      {pendingBanner}
       {/* Hero Carousel */}
       <div className="relative rounded-xl overflow-hidden h-72 bg-gradient-to-r from-neutral-900 to-neutral-700">
         <div className="absolute inset-0 flex flex-col justify-end p-8">
