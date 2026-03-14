@@ -33,6 +33,7 @@ const usuariosChildren = [
 ];
 
 const networkItem = { title: "Network", url: "/admin/network", icon: Building2 };
+const solicitacoesItem = { title: "Solicitações Serviços", url: "/admin/solicitacoes-servicos", icon: ClipboardList };
 
 export function AdminSidebar() {
   const { state } = useSidebar();
