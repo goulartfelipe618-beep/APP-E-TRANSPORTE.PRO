@@ -26,23 +26,14 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { ExternalLink, CheckCircle2, Calendar, Info } from "lucide-react";
 
-// Template data
-const templates = [
-  { id: "dark1", name: "Executive Dark 1", category: "dark", headline: "Transporte Executivo\nde Alto Padrão", style: "bg-gradient-to-br from-neutral-900 to-neutral-800 text-amber-400" },
-  { id: "dark3", name: "Executive Dark 3", category: "dark", headline: "CONTROLE\nABSOLUTO\nEM CADA\nTRAJETO", style: "bg-gradient-to-br from-neutral-900 to-neutral-700 text-white" },
-  { id: "dark2", name: "Executive Dark 2", category: "dark", headline: "PRECISÃO\nINDUSTRIAL\nEM CADA OPERAÇÃO", style: "bg-gradient-to-br from-neutral-900 to-neutral-800 text-amber-500" },
-  { id: "eco1", name: "Executive Ecological 1", category: "eco", headline: "Transporte Executivo\nque Respeita o Planeta", style: "bg-gradient-to-br from-green-900 to-emerald-800 text-white" },
-  { id: "eco2", name: "Executive Ecological 2", category: "eco", headline: "Viagens\ntranquilas,\nnaturalmente.", style: "bg-gradient-to-br from-emerald-800 to-green-700 text-white" },
-  { id: "cream2", name: "Executive Cream 2", category: "cream", headline: "Segurança,\npontualidade\ne estilo", style: "bg-gradient-to-br from-stone-200 to-stone-100 text-stone-800" },
-  { id: "cream3", name: "Executive Cream 3", category: "cream", headline: "Cada detalhe\npensado para\nvocê", style: "bg-gradient-to-br from-stone-100 to-amber-50 text-stone-800" },
-  { id: "cream1", name: "Executive Cream 1", category: "cream", headline: "Silêncio.\nBem-estar.\nMovimento.", style: "bg-gradient-to-br from-stone-800 to-stone-700 text-white" },
-  { id: "cream4", name: "Executive Cream 4", category: "cream", headline: "Seu momento\nde serenidade\ncomeça aqui", style: "bg-gradient-to-br from-stone-300 to-stone-200 text-stone-800" },
-  { id: "cream5", name: "Executive Cream 5", category: "cream", headline: "Luxo é não\nprecisar\ndizer nada", style: "bg-gradient-to-br from-stone-700 to-stone-600 text-white" },
-  { id: "summer", name: "Executive Summer", category: "summer", headline: "Seu verão\nmerece um\ntransfer premium", style: "bg-gradient-to-br from-red-600 to-orange-500 text-white" },
-  { id: "system1", name: "Executive System 1", category: "system", headline: "Transporte Executivo\nBlindado e Pontual", style: "bg-gradient-to-br from-neutral-800 to-neutral-700 text-white" },
-  { id: "system", name: "Executive System", category: "system", headline: "Transporte Executivo de Alto\nPadrão", style: "bg-gradient-to-br from-blue-900 to-blue-800 text-white" },
-  { id: "flora", name: "Executivo Flora", category: "flora", headline: "Tradição &\nPontualidade\nem Cada Trajeto", style: "bg-gradient-to-br from-stone-100 to-stone-50 text-stone-800" },
-];
+interface TemplateDB {
+  id: string;
+  nome: string;
+  imagem_url: string;
+  link_modelo: string;
+  ordem: number;
+  ativo: boolean;
+}
 
 const heroSlides = [
   { title: "Crie Seu Site Profissional", desc: "Tenha presença online com um site exclusivo para transporte executivo. Design premium e responsivo." },
