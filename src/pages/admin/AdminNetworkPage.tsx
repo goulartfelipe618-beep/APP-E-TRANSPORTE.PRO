@@ -22,9 +22,10 @@ interface NetworkItem {
   nome_contato: string;
   email_corporativo: string;
   telefone_direto: string;
+  motorista_atribuido_id: string | null;
 }
 
-export default function NetworkPage() {
+export default function AdminNetworkPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [data, setData] = useState<NetworkItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -36,8 +37,8 @@ export default function NetworkPage() {
   const fetchData = async () => {
     setLoading(true);
     const { data: rows, error } = await (supabase.from("network" as any).select("*") as any);
-    if (error) { toast.error("Erro ao carregar networks"); }
-    else { setData(rows || []); }
+    if (error) toast.error("Erro ao carregar networks");
+    else setData(rows || []);
     setLoading(false);
   };
 
@@ -66,9 +67,9 @@ export default function NetworkPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-            <span className="text-primary">⊕</span> Network
+            <span className="text-primary">⊕</span> Network — Admin Master
           </h1>
-          <p className="text-muted-foreground">Gerencie sua rede de parceiros e conexões corporativas</p>
+          <p className="text-muted-foreground">Empresas da E-Transporte.pro que podem ser atribuídas a motoristas cadastrados</p>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="icon" onClick={fetchData}>
@@ -124,7 +125,7 @@ export default function NetworkPage() {
 
       <div className="rounded-xl border border-border bg-card p-6">
         <h3 className="font-semibold text-foreground mb-3 flex items-center gap-2">
-          <Building2 className="h-4 w-4" /> Empresas Cadastradas
+          <Building2 className="h-4 w-4" /> Empresas da E-Transporte.pro
           <Badge variant="secondary" className="ml-2">{filtered.length} registros</Badge>
         </h3>
         {filtered.length === 0 ? (

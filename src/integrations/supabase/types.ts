@@ -209,6 +209,78 @@ export type Database = {
         }
         Relationships: []
       }
+      network: {
+        Row: {
+          cargo_funcao: string | null
+          categoria: string
+          cidade: string | null
+          cnpj: string | null
+          created_at: string
+          email_corporativo: string | null
+          endereco: string | null
+          estado: string | null
+          id: string
+          motorista_atribuido_id: string | null
+          nome_contato: string | null
+          nome_empresa: string
+          observacoes: string | null
+          potencial_negocio: string
+          responsavel: string | null
+          status_contato: string
+          telefone_direto: string | null
+          tipo_empresa: string | null
+          updated_at: string
+          user_id: string
+          website: string | null
+        }
+        Insert: {
+          cargo_funcao?: string | null
+          categoria?: string
+          cidade?: string | null
+          cnpj?: string | null
+          created_at?: string
+          email_corporativo?: string | null
+          endereco?: string | null
+          estado?: string | null
+          id?: string
+          motorista_atribuido_id?: string | null
+          nome_contato?: string | null
+          nome_empresa: string
+          observacoes?: string | null
+          potencial_negocio?: string
+          responsavel?: string | null
+          status_contato?: string
+          telefone_direto?: string | null
+          tipo_empresa?: string | null
+          updated_at?: string
+          user_id: string
+          website?: string | null
+        }
+        Update: {
+          cargo_funcao?: string | null
+          categoria?: string
+          cidade?: string | null
+          cnpj?: string | null
+          created_at?: string
+          email_corporativo?: string | null
+          endereco?: string | null
+          estado?: string | null
+          id?: string
+          motorista_atribuido_id?: string | null
+          nome_contato?: string | null
+          nome_empresa?: string
+          observacoes?: string | null
+          potencial_negocio?: string
+          responsavel?: string | null
+          status_contato?: string
+          telefone_direto?: string | null
+          tipo_empresa?: string | null
+          updated_at?: string
+          user_id?: string
+          website?: string | null
+        }
+        Relationships: []
+      }
       reservas_grupos: {
         Row: {
           cpf_cnpj: string

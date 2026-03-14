@@ -1,5 +1,5 @@
 import {
-  Home, SlidersHorizontal, LogOut, Shield, BarChart3, MapPin, FileText, ChevronDown, Users, ClipboardList,
+  Home, SlidersHorizontal, LogOut, Shield, BarChart3, MapPin, FileText, ChevronDown, Users, ClipboardList, Building2,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -32,6 +32,8 @@ const usuariosChildren = [
   { title: "Solicitações", url: "/admin/usuarios/solicitacoes", icon: ClipboardList },
 ];
 
+const networkItem = { title: "Network", url: "/admin/network", icon: Building2 };
+
 export function AdminSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
@@ -41,6 +43,7 @@ export function AdminSidebar() {
   const isActive = (url: string) => location.pathname === url;
   const contratoActive = contratoChildren.some((c) => isActive(c.url));
   const usuariosActive = usuariosChildren.some((c) => isActive(c.url));
+  const networkActive = isActive(networkItem.url);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -105,6 +108,16 @@ export function AdminSidebar() {
                   </CollapsibleContent>
                 </SidebarMenuItem>
               </Collapsible>
+
+              {/* Network */}
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
+                  <NavLink to={networkItem.url} end className="hover:bg-muted/50" activeClassName="bg-muted text-primary font-medium">
+                    <networkItem.icon className="h-4 w-4 mr-2" />
+                    {!collapsed && <span>{networkItem.title}</span>}
+                  </NavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
 
               {/* Usuários collapsible */}
               <Collapsible defaultOpen={usuariosActive}>
