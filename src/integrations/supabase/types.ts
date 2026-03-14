@@ -467,6 +467,48 @@ export type Database = {
         }
         Relationships: []
       }
+      solicitacoes_acesso: {
+        Row: {
+          cidade: string | null
+          created_at: string
+          email: string
+          estado: string | null
+          id: string
+          mensagem: string | null
+          nome_completo: string
+          status: string
+          telefone: string
+          tipo_interesse: string
+          updated_at: string
+        }
+        Insert: {
+          cidade?: string | null
+          created_at?: string
+          email: string
+          estado?: string | null
+          id?: string
+          mensagem?: string | null
+          nome_completo: string
+          status?: string
+          telefone: string
+          tipo_interesse?: string
+          updated_at?: string
+        }
+        Update: {
+          cidade?: string | null
+          created_at?: string
+          email?: string
+          estado?: string | null
+          id?: string
+          mensagem?: string | null
+          nome_completo?: string
+          status?: string
+          telefone?: string
+          tipo_interesse?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       solicitacoes_grupos: {
         Row: {
           created_at: string

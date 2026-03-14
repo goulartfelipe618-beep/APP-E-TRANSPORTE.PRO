@@ -44,6 +44,7 @@ import AdminContratoTransferPage from "./pages/admin/AdminContratoTransfer";
 import AdminContratoTaxiPage from "./pages/admin/AdminContratoTaxi";
 import AdminUsuariosCadastradosPage from "./pages/admin/AdminUsuariosCadastrados";
 import AdminUsuariosSolicitacoesPage from "./pages/admin/AdminUsuariosSolicitacoes";
+import SolicitarAcessoPage from "./pages/SolicitarAcesso";
 import { ConfiguracoesProvider } from "./contexts/ConfiguracoesContext";
 
 const queryClient = new QueryClient();
@@ -57,6 +58,7 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Navigate to="/login" replace />} />
+          <Route path="/solicitar-acesso" element={<SolicitarAcessoPage />} />
           <Route path="/login" element={<Login />} />
           <Route path="/dashboard" element={<ProtectedRoute><DashboardLayout /></ProtectedRoute>}>
             <Route index element={<HomePage />} />
