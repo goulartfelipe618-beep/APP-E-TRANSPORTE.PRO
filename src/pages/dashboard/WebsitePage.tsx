@@ -100,7 +100,16 @@ export default function WebsitePage() {
     setSelectedFeatures(prev => prev.includes(id) ? prev.filter(f => f !== id) : [...prev, id]);
   };
 
-  const selectedTemplateName = templates.find(t => t.id === selectedTemplate)?.name || "";
+  const selectedTemplateName = dbTemplates.find(t => t.id === selectedTemplate)?.nome || "";
+
+  // Fetch templates from DB
+  useEffect(() => {
+    const fetchTemplates = async () => {
+      const { data } = await (supabase.from("templates_website" as any).select("*").eq("ativo", true).order("ordem", { ascending: true }) as any);
+      if (data) setDbTemplates(data);
+    };
+    fetchTemplates();
+  }, []);
 
   // Check for existing active service
   useEffect(() => {
