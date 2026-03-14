@@ -1,22 +1,11 @@
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
 import { MessageSquare, Download } from "lucide-react";
+import { Tables } from "@/integrations/supabase/types";
 
-interface ReservaGrupo {
-  id: string;
-  nome_completo: string;
-  email: string;
-  whatsapp: string;
-  tipo_veiculo: string | null;
-  num_passageiros: number | null;
-  embarque: string | null;
-  destino: string | null;
-  data_ida: string | null;
-  valor_total: number;
-  status: string;
-  created_at: string;
-}
+type ReservaGrupo = Tables<"reservas_grupos">;
 
 const veiculoLabel: Record<string, string> = {
   van: "Van",
@@ -35,42 +24,102 @@ interface Props {
 export default function DetalhesReservaGrupoSheet({ reserva, open, onOpenChange, onComunicar, onDownload }: Props) {
   if (!reserva) return null;
 
+  const r = reserva;
+  const formatDate = (d: string | null) => d ? new Date(d).toLocaleDateString("pt-BR") : null;
+  const formatCurrency = (v: number) => Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="sm:max-w-lg overflow-y-auto">
         <SheetHeader>
           <SheetTitle>Detalhes da Reserva de Grupo</SheetTitle>
+          <p className="text-sm text-muted-foreground">Reserva #{r.numero_reserva}</p>
         </SheetHeader>
 
-        <div className="space-y-4 mt-6">
-          <div className="grid grid-cols-2 gap-4">
-            <Field label="Cliente" value={reserva.nome_completo} />
-            <Field label="WhatsApp" value={reserva.whatsapp} />
-            <Field label="Email" value={reserva.email} />
-            <Field label="Veículo" value={reserva.tipo_veiculo ? veiculoLabel[reserva.tipo_veiculo] || reserva.tipo_veiculo : null} />
-            <Field label="Passageiros" value={reserva.num_passageiros?.toString()} />
-            <Field label="Embarque" value={reserva.embarque} />
-            <Field label="Destino" value={reserva.destino} />
-            <Field label="Data Ida" value={reserva.data_ida ? new Date(reserva.data_ida).toLocaleDateString("pt-BR") : null} />
-            <Field label="Valor Total" value={Number(reserva.valor_total).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} />
-            <Field label="Status" value={<Badge variant="outline">{reserva.status}</Badge>} />
-          </div>
+        <div className="space-y-5 mt-6">
+          {/* Cliente */}
+          <Section title="Informações do Cliente">
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Cliente" value={r.nome_completo} />
+              <Field label="CPF/CNPJ" value={r.cpf_cnpj} />
+              <Field label="WhatsApp" value={r.whatsapp} />
+              <Field label="Email" value={r.email} />
+            </div>
+          </Section>
 
-          <div className="text-xs text-muted-foreground">
-            Criada em {new Date(reserva.created_at).toLocaleString("pt-BR")}
+          <Separator />
+
+          {/* Viagem */}
+          <Section title="Detalhes da Viagem">
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Veículo" value={r.tipo_veiculo ? veiculoLabel[r.tipo_veiculo] || r.tipo_veiculo : null} />
+              <Field label="Passageiros" value={r.num_passageiros?.toString()} />
+              <Field label="Embarque" value={r.embarque} />
+              <Field label="Destino" value={r.destino} />
+              <Field label="Data Ida" value={formatDate(r.data_ida)} />
+              <Field label="Hora Ida" value={r.hora_ida} />
+              <Field label="Data Retorno" value={formatDate(r.data_retorno)} />
+              <Field label="Hora Retorno" value={r.hora_retorno} />
+              <Field label="Status" value={<Badge variant="outline">{r.status}</Badge>} />
+              <Field label="Cupom" value={r.cupom} />
+            </div>
+          </Section>
+
+          <Separator />
+
+          {/* Motorista */}
+          <Section title="Motorista">
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Nome Motorista" value={r.nome_motorista} />
+              <Field label="Telefone Motorista" value={r.telefone_motorista} />
+            </div>
+          </Section>
+
+          <Separator />
+
+          {/* Valores */}
+          <Section title="Valores e Pagamento">
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Valor Base" value={formatCurrency(r.valor_base)} />
+              <Field label="Desconto" value={`${Number(r.desconto)}%`} />
+              <Field label="Método de Pagamento" value={r.metodo_pagamento} />
+              <Field label="Valor Total" value={<span className="text-base font-bold text-primary">{formatCurrency(r.valor_total)}</span>} />
+            </div>
+          </Section>
+
+          {r.observacoes_viagem && (
+            <>
+              <Separator />
+              <Section title="Observações">
+                <p className="text-sm bg-muted/50 rounded-lg p-3">{r.observacoes_viagem}</p>
+              </Section>
+            </>
+          )}
+
+          <div className="text-xs text-muted-foreground pt-2">
+            Criada em {new Date(r.created_at).toLocaleString("pt-BR")}
           </div>
 
           <div className="flex gap-2 pt-4 border-t border-border">
-            <Button variant="outline" onClick={() => onComunicar(reserva)} className="flex-1">
+            <Button variant="outline" onClick={() => onComunicar(r)} className="flex-1">
               <MessageSquare className="h-4 w-4 mr-2" /> Comunicar
             </Button>
-            <Button variant="outline" onClick={() => onDownload(reserva)} className="flex-1">
+            <Button variant="outline" onClick={() => onDownload(r)} className="flex-1">
               <Download className="h-4 w-4 mr-2" /> Download
             </Button>
           </div>
         </div>
       </SheetContent>
     </Sheet>
+  );
+}
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-3">
+      <h3 className="text-sm font-semibold text-foreground">{title}</h3>
+      {children}
+    </div>
   );
 }
 

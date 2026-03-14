@@ -8,22 +8,9 @@ import DetalhesReservaGrupoSheet from "@/components/reservas/DetalhesReservaGrup
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { generateGrupoPDF } from "@/lib/pdfGenerator";
+import { Tables } from "@/integrations/supabase/types";
 
-interface ReservaGrupo {
-  id: string;
-  numero_reserva: number;
-  nome_completo: string;
-  email: string;
-  whatsapp: string;
-  tipo_veiculo: string | null;
-  num_passageiros: number | null;
-  embarque: string | null;
-  destino: string | null;
-  data_ida: string | null;
-  valor_total: number;
-  status: string;
-  created_at: string;
-}
+type ReservaGrupo = Tables<"reservas_grupos">;
 
 const veiculoLabel: Record<string, string> = {
   van: "Van",
@@ -42,13 +29,12 @@ export default function GruposReservasPage() {
     setLoading(true);
     const { data, error } = await supabase
       .from("reservas_grupos")
-      .select("id, numero_reserva, nome_completo, email, whatsapp, tipo_veiculo, num_passageiros, embarque, destino, data_ida, valor_total, status, created_at")
+      .select("*")
       .order("created_at", { ascending: false });
     if (error) toast.error("Erro ao carregar reservas de grupos");
     else setReservas(data || []);
     setLoading(false);
   }, []);
-
   useEffect(() => { fetchReservas(); }, [fetchReservas]);
 
   const handleDelete = async (id: string) => {

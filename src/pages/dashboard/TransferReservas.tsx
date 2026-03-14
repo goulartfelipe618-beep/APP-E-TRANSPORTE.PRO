@@ -8,21 +8,9 @@ import DetalhesReservaTransferSheet from "@/components/reservas/DetalhesReservaT
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { generateTransferPDF } from "@/lib/pdfGenerator";
+import { Tables } from "@/integrations/supabase/types";
 
-interface Reserva {
-  id: string;
-  numero_reserva: number;
-  nome_completo: string;
-  email: string;
-  telefone: string;
-  tipo_viagem: string;
-  valor_total: number;
-  status: string;
-  created_at: string;
-  ida_embarque: string | null;
-  ida_desembarque: string | null;
-  ida_data: string | null;
-}
+type Reserva = Tables<"reservas_transfer">;
 
 const tipoLabel: Record<string, string> = {
   somente_ida: "Somente Ida",
@@ -41,13 +29,12 @@ export default function TransferReservasPage() {
     setLoading(true);
     const { data, error } = await supabase
       .from("reservas_transfer")
-      .select("id, numero_reserva, nome_completo, email, telefone, tipo_viagem, valor_total, status, created_at, ida_embarque, ida_desembarque, ida_data")
+      .select("*")
       .order("created_at", { ascending: false });
     if (error) toast.error("Erro ao carregar reservas");
     else setReservas(data || []);
     setLoading(false);
   }, []);
-
   useEffect(() => { fetchReservas(); }, [fetchReservas]);
 
   const handleDelete = async (id: string) => {
