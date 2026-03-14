@@ -138,7 +138,20 @@ export default function SistemaConfiguracoesPage() {
   };
 
   const handleSaveProfile = async () => {
-    const ok = await upsertField({ nome_completo: nomeCompleto, telefone, email });
+    if (!nomeCompleto.trim() || !email.trim() || !telefone.trim() || !cidade.trim() || !nomeEmpresa.trim() || !cnpjPerfil.trim()) {
+      toast.error("Todos os campos do perfil são obrigatórios!");
+      return;
+    }
+    const ok = await upsertField({
+      nome_completo: nomeCompleto,
+      telefone,
+      email,
+      cidade,
+      estado,
+      endereco_completo: enderecoCompleto,
+      nome_empresa: nomeEmpresa,
+      cnpj: cnpjPerfil,
+    });
     if (ok) {
       toast.success("Perfil salvo");
       setProfileEditing(false);
