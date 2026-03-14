@@ -26,6 +26,11 @@ export default function SistemaConfiguracoesPage() {
   const [nomeCompleto, setNomeCompleto] = useState("");
   const [telefone, setTelefone] = useState("");
   const [email, setEmail] = useState("");
+  const [cidade, setCidade] = useState("");
+  const [estado, setEstado] = useState("");
+  const [enderecoCompleto, setEnderecoCompleto] = useState("");
+  const [nomeEmpresa, setNomeEmpresa] = useState("");
+  const [cnpjPerfil, setCnpjPerfil] = useState("");
 
   // Global
   const [nomeProjeto, setNomeProjeto] = useState("");
@@ -89,10 +94,15 @@ export default function SistemaConfiguracoesPage() {
       setNomeCompleto(d.nome_completo || "");
       setTelefone(d.telefone || "");
       setEmail(d.email || "");
+      setCidade(d.cidade || "");
+      setEstado(d.estado || "");
+      setEnderecoCompleto(d.endereco_completo || "");
+      setNomeEmpresa(d.nome_empresa || "");
+      setCnpjPerfil(d.cnpj || "");
       setNomeProjeto(d.nome_projeto || "E-Transporte.pro");
       setFonteGlobal(d.fonte_global || "montserrat");
       setLogoUrl(d.logo_url || "");
-      if (d.nome_completo || d.telefone || d.email) {
+      if (d.nome_completo && d.telefone && d.email && d.cidade && d.nome_empresa && d.cnpj) {
         setProfileEditing(false);
       }
     } else {
@@ -128,7 +138,20 @@ export default function SistemaConfiguracoesPage() {
   };
 
   const handleSaveProfile = async () => {
-    const ok = await upsertField({ nome_completo: nomeCompleto, telefone, email });
+    if (!nomeCompleto.trim() || !email.trim() || !telefone.trim() || !cidade.trim() || !nomeEmpresa.trim() || !cnpjPerfil.trim()) {
+      toast.error("Todos os campos do perfil são obrigatórios!");
+      return;
+    }
+    const ok = await upsertField({
+      nome_completo: nomeCompleto,
+      telefone,
+      email,
+      cidade,
+      estado,
+      endereco_completo: enderecoCompleto,
+      nome_empresa: nomeEmpresa,
+      cnpj: cnpjPerfil,
+    });
     if (ok) {
       toast.success("Perfil salvo");
       setProfileEditing(false);
@@ -248,33 +271,39 @@ export default function SistemaConfiguracoesPage() {
         <div className={`space-y-4 ${!profileEditing ? "opacity-60 pointer-events-none" : ""}`}>
           <div>
             <label className="text-sm font-medium text-foreground">Nome Completo *</label>
-            <Input
-              placeholder="Seu nome completo"
-              className="mt-1"
-              value={nomeCompleto}
-              onChange={e => setNomeCompleto(e.target.value)}
-              disabled={!profileEditing}
-            />
-          </div>
-          <div>
-            <label className="text-sm font-medium text-foreground">Telefone *</label>
-            <Input
-              placeholder="(00) 00000-0000"
-              className="mt-1"
-              value={telefone}
-              onChange={e => setTelefone(e.target.value)}
-              disabled={!profileEditing}
-            />
+            <Input placeholder="Seu nome completo" className="mt-1" value={nomeCompleto} onChange={e => setNomeCompleto(e.target.value)} disabled={!profileEditing} />
           </div>
           <div>
             <label className="text-sm font-medium text-foreground">E-mail *</label>
-            <Input
-              placeholder="seu@email.com"
-              className="mt-1"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              disabled={!profileEditing}
-            />
+            <Input placeholder="seu@email.com" className="mt-1" value={email} onChange={e => setEmail(e.target.value)} disabled={!profileEditing} />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="text-sm font-medium text-foreground">Telefone *</label>
+              <Input placeholder="(00) 00000-0000" className="mt-1" value={telefone} onChange={e => setTelefone(e.target.value)} disabled={!profileEditing} />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-foreground">Nome da Empresa *</label>
+              <Input placeholder="Sua empresa" className="mt-1" value={nomeEmpresa} onChange={e => setNomeEmpresa(e.target.value)} disabled={!profileEditing} />
+            </div>
+          </div>
+          <div>
+            <label className="text-sm font-medium text-foreground">CNPJ *</label>
+            <Input placeholder="00.000.000/0000-00" className="mt-1" value={cnpjPerfil} onChange={e => setCnpjPerfil(e.target.value)} disabled={!profileEditing} />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="text-sm font-medium text-foreground">Cidade *</label>
+              <Input placeholder="Ex: São Paulo" className="mt-1" value={cidade} onChange={e => setCidade(e.target.value)} disabled={!profileEditing} />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-foreground">Estado</label>
+              <Input placeholder="Ex: SP" className="mt-1" value={estado} onChange={e => setEstado(e.target.value)} disabled={!profileEditing} />
+            </div>
+          </div>
+          <div>
+            <label className="text-sm font-medium text-foreground">Endereço Completo</label>
+            <Input placeholder="Rua, número, bairro, CEP" className="mt-1" value={enderecoCompleto} onChange={e => setEnderecoCompleto(e.target.value)} disabled={!profileEditing} />
           </div>
         </div>
         {profileEditing && (

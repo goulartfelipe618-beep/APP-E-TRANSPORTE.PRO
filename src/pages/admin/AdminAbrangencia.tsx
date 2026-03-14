@@ -13,7 +13,6 @@ L.Icon.Default.mergeOptions({
   shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png",
 });
 
-// Known Brazilian cities → approximate coordinates
 const cityCoords: Record<string, [number, number]> = {
   "são paulo": [-23.5505, -46.6333],
   "rio de janeiro": [-22.9068, -43.1729],
@@ -60,7 +59,6 @@ const cityCoords: Record<string, [number, number]> = {
 function findCoords(city: string): [number, number] | null {
   const normalized = city.toLowerCase().trim();
   if (cityCoords[normalized]) return cityCoords[normalized];
-  // Partial match
   for (const [key, coords] of Object.entries(cityCoords)) {
     if (normalized.includes(key) || key.includes(normalized)) return coords;
   }
@@ -70,6 +68,8 @@ function findCoords(city: string): [number, number] | null {
 interface MotoristaPin {
   nome: string;
   cidade: string;
+  estado: string;
+  nomeEmpresa: string;
   coords: [number, number];
 }
 
@@ -77,30 +77,41 @@ export default function AdminAbrangencia() {
   const [pins, setPins] = useState<MotoristaPin[]>([]);
   const [loading, setLoading] = useState(true);
   const [citySummary, setCitySummary] = useState<{ cidade: string; count: number }[]>([]);
+  const [totalMotoristas, setTotalMotoristas] = useState(0);
 
   useEffect(() => {
-    const fetch = async () => {
+    const fetchData = async () => {
+      // Fetch from configuracoes - actual registered motoristas with profile data
       const { data } = await supabase
-        .from("solicitacoes_motoristas")
-        .select("nome, cidade");
+        .from("configuracoes")
+        .select("nome_completo, cidade, estado, nome_empresa") as any;
 
       if (!data) { setLoading(false); return; }
 
       const mapped: MotoristaPin[] = [];
       const counts: Record<string, number> = {};
+      let total = 0;
 
-      for (const m of data) {
-        const cidade = m.cidade?.trim() || "Não informado";
+      for (const m of data as any[]) {
+        const cidade = m.cidade?.trim();
+        if (!cidade) continue; // Skip motoristas without city set
+        total++;
         counts[cidade] = (counts[cidade] || 0) + 1;
         const coords = findCoords(cidade);
         if (coords) {
-          // Add small random offset to avoid overlapping pins
           const offset = () => (Math.random() - 0.5) * 0.02;
-          mapped.push({ nome: m.nome, cidade, coords: [coords[0] + offset(), coords[1] + offset()] });
+          mapped.push({
+            nome: m.nome_completo || "Sem nome",
+            cidade,
+            estado: m.estado || "",
+            nomeEmpresa: m.nome_empresa || "",
+            coords: [coords[0] + offset(), coords[1] + offset()],
+          });
         }
       }
 
       setPins(mapped);
+      setTotalMotoristas(total);
       setCitySummary(
         Object.entries(counts)
           .map(([cidade, count]) => ({ cidade, count }))
@@ -108,7 +119,7 @@ export default function AdminAbrangencia() {
       );
       setLoading(false);
     };
-    fetch();
+    fetchData();
   }, []);
 
   if (loading) {
@@ -126,7 +137,9 @@ export default function AdminAbrangencia() {
           <MapPin className="h-6 w-6 text-primary" />
           Abrangência — Motoristas Cadastrados
         </h1>
-        <p className="text-muted-foreground mt-1">Visualize no mapa onde estão os motoristas registrados na plataforma.</p>
+        <p className="text-muted-foreground mt-1">
+          Mostra apenas motoristas com perfil 100% completo (nome, e-mail, telefone, cidade, empresa e CNPJ).
+        </p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -145,8 +158,11 @@ export default function AdminAbrangencia() {
             {pins.map((pin, i) => (
               <Marker key={i} position={pin.coords}>
                 <Popup>
-                  <strong>{pin.nome}</strong><br />
-                  📍 {pin.cidade}
+                  <div className="text-sm">
+                    <strong>{pin.nome}</strong><br />
+                    🏢 {pin.nomeEmpresa}<br />
+                    📍 {pin.cidade}{pin.estado ? ` - ${pin.estado}` : ""}
+                  </div>
                 </Popup>
               </Marker>
             ))}
@@ -157,7 +173,7 @@ export default function AdminAbrangencia() {
         <div className="rounded-xl border border-border bg-card p-5">
           <h3 className="font-semibold text-foreground mb-4">Motoristas por Cidade</h3>
           {citySummary.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Nenhum motorista cadastrado ainda.</p>
+            <p className="text-sm text-muted-foreground">Nenhum motorista com perfil completo ainda.</p>
           ) : (
             <div className="space-y-3 max-h-[420px] overflow-y-auto pr-2">
               {citySummary.map((item, i) => {
@@ -179,7 +195,10 @@ export default function AdminAbrangencia() {
           )}
           <div className="mt-4 pt-4 border-t border-border">
             <p className="text-sm text-muted-foreground">
-              Total: <span className="font-semibold text-foreground">{pins.length}</span> motoristas no mapa
+              Total no mapa: <span className="font-semibold text-foreground">{pins.length}</span> motoristas
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Total com cidade: <span className="font-semibold text-foreground">{totalMotoristas}</span>
             </p>
             <p className="text-sm text-muted-foreground">
               Cidades: <span className="font-semibold text-foreground">{citySummary.length}</span>

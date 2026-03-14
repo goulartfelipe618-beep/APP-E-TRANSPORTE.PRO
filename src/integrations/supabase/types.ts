@@ -124,36 +124,51 @@ export type Database = {
       }
       configuracoes: {
         Row: {
+          cidade: string | null
+          cnpj: string | null
           created_at: string
           email: string | null
+          endereco_completo: string | null
+          estado: string | null
           fonte_global: string | null
           id: string
           logo_url: string | null
           nome_completo: string | null
+          nome_empresa: string | null
           nome_projeto: string | null
           telefone: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
+          cidade?: string | null
+          cnpj?: string | null
           created_at?: string
           email?: string | null
+          endereco_completo?: string | null
+          estado?: string | null
           fonte_global?: string | null
           id?: string
           logo_url?: string | null
           nome_completo?: string | null
+          nome_empresa?: string | null
           nome_projeto?: string | null
           telefone?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
+          cidade?: string | null
+          cnpj?: string | null
           created_at?: string
           email?: string | null
+          endereco_completo?: string | null
+          estado?: string | null
           fonte_global?: string | null
           id?: string
           logo_url?: string | null
           nome_completo?: string | null
+          nome_empresa?: string | null
           nome_projeto?: string | null
           telefone?: string | null
           updated_at?: string
