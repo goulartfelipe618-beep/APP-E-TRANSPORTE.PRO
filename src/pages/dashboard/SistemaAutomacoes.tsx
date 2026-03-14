@@ -383,7 +383,21 @@ export default function SistemaAutomacoesPage() {
                   </TableCell>
                   <TableCell>
                     <div className="flex gap-1">
-                      <Button variant="ghost" size="sm" onClick={() => { setSelected(a); setMappings(a.mappings || {}); }}>
+                      <Button variant="ghost" size="sm" onClick={() => {
+                        const m = (a.mappings && typeof a.mappings === "object") ? a.mappings : {};
+                        // Ensure default tab exists for grupo/motorista
+                        if (a.tipo !== "transfer" && !m["default"]) {
+                          m["default"] = {};
+                        }
+                        // Ensure transfer tabs exist
+                        if (a.tipo === "transfer") {
+                          if (!m["somente_ida"]) m["somente_ida"] = {};
+                          if (!m["ida_volta"]) m["ida_volta"] = {};
+                          if (!m["por_hora"]) m["por_hora"] = {};
+                        }
+                        setSelected(a);
+                        setMappings(m);
+                      }}>
                         Configurar
                       </Button>
                       <Button variant="ghost" size="icon" onClick={() => handleDelete(a.id)}>
