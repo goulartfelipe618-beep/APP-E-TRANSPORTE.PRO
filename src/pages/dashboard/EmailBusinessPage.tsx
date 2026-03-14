@@ -6,6 +6,10 @@ import {
   Globe, Star, User, CheckCircle2, Mail, Minus, Plus,
   ArrowLeft, ArrowRight, ChevronLeft, ChevronRight, Sparkles, FileText,
 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
+import { ExternalLink, Calendar, Info } from "lucide-react";
 
 /* ── data ── */
 const slides = [
