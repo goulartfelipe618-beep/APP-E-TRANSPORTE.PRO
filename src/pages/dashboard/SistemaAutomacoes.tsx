@@ -321,17 +321,17 @@ export default function SistemaAutomacoesPage() {
 
           <div className="flex items-center justify-between border-t border-border pt-4">
             <div className="flex items-center gap-3">
-              <div className="rounded-full bg-muted p-2">
-                <RefreshCw className="h-4 w-4 text-muted-foreground" />
+              <div className={`rounded-full p-2 ${selected.ativo ? "bg-green-500/10" : "bg-muted"}`}>
+                <RefreshCw className={`h-4 w-4 ${selected.ativo ? "text-green-500" : "text-muted-foreground"}`} />
               </div>
               <div>
                 <p className="text-sm font-medium text-foreground">
-                  Webhook {selected.ativo ? "Ativado" : "Desativado"}
+                  {selected.ativo ? "🟢 Webhook Ativado — Modo Produção" : "🔴 Webhook Desativado — Modo Teste"}
                 </p>
                 <p className="text-xs text-muted-foreground">
                   {selected.ativo
-                    ? "Dados recebidos serão enviados para Solicitações automaticamente."
-                    : "Webhook desativado. Ative para começar a receber dados."}
+                    ? `Dados recebidos serão encaminhados automaticamente para o menu Solicitações de ${tipoLabels[selected.tipo] || selected.tipo}. Testes NÃO serão armazenados.`
+                    : "Envie um POST para a URL acima para receber testes. Configure o mapeamento antes de ativar."}
                 </p>
               </div>
             </div>
