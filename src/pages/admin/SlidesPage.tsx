@@ -106,6 +106,7 @@ export default function SlidesPage() {
         subtitulo: form.subtitulo,
         imagem_url: form.imagem_url,
         mostrar_texto: form.mostrar_texto,
+        link_url: form.link_url,
         ordem: maxOrdem,
         pagina: paginaSelecionada,
       });
