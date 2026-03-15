@@ -93,6 +93,7 @@ export default function SlidesPage() {
         subtitulo: form.subtitulo,
         imagem_url: form.imagem_url,
         mostrar_texto: form.mostrar_texto,
+        link_url: form.link_url,
         updated_at: new Date().toISOString(),
       }).eq("id", editing.id);
       if (error) { toast.error("Erro ao atualizar"); return; }
