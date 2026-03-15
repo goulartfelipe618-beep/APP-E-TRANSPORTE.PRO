@@ -438,37 +438,39 @@ export default function SistemaAutomacoesPage() {
             </div>
           )}
 
-          {/* Mapeamento de Campos */}
-          <div className="rounded-xl border border-border bg-card p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold text-foreground">Mapeamento de Campos</h3>
-              <Button size="sm" onClick={handleSaveMappings}>
-                <Save className="h-3.5 w-3.5 mr-1.5" /> Salvar
-              </Button>
+          {/* Mapeamento de Campos - only when disabled */}
+          {!selected.ativo && (
+            <div className="rounded-xl border border-border bg-card p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-semibold text-foreground">Mapeamento de Campos</h3>
+                <Button size="sm" onClick={handleSaveMappings}>
+                  <Save className="h-3.5 w-3.5 mr-1.5" /> Salvar
+                </Button>
+              </div>
+              {isTransfer ? (
+                <Tabs defaultValue="somente_ida">
+                  <TabsList className="w-full grid grid-cols-3 mb-4">
+                    <TabsTrigger value="somente_ida">Somente Ida</TabsTrigger>
+                    <TabsTrigger value="ida_volta">Ida e Volta</TabsTrigger>
+                    <TabsTrigger value="por_hora">Por Hora</TabsTrigger>
+                  </TabsList>
+                  <TabsContent value="somente_ida">
+                    <FieldMappingList fields={getFields("transfer", "somente_ida")} mappings={mappings["somente_ida"] || {}} onUpdate={(f, v) => updateMapping("somente_ida", f, v)} availableVars={selectedTeste ? extractPayloadKeys(selectedTeste.payload) : []} testPayload={selectedTeste?.payload || null} />
+                  </TabsContent>
+                  <TabsContent value="ida_volta">
+                    <FieldMappingList fields={getFields("transfer", "ida_volta")} mappings={mappings["ida_volta"] || {}} onUpdate={(f, v) => updateMapping("ida_volta", f, v)} availableVars={selectedTeste ? extractPayloadKeys(selectedTeste.payload) : []} testPayload={selectedTeste?.payload || null} />
+                  </TabsContent>
+                  <TabsContent value="por_hora">
+                    <FieldMappingList fields={getFields("transfer", "por_hora")} mappings={mappings["por_hora"] || {}} onUpdate={(f, v) => updateMapping("por_hora", f, v)} availableVars={selectedTeste ? extractPayloadKeys(selectedTeste.payload) : []} testPayload={selectedTeste?.payload || null} />
+                  </TabsContent>
+                </Tabs>
+              ) : selected.tipo === "grupo" ? (
+                <FieldMappingList fields={getFields("grupo", "default")} mappings={mappings["default"] || {}} onUpdate={(f, v) => updateMapping("default", f, v)} availableVars={selectedTeste ? extractPayloadKeys(selectedTeste.payload) : []} testPayload={selectedTeste?.payload || null} />
+              ) : (
+                <FieldMappingList fields={getFields("motorista", "default")} mappings={mappings["default"] || {}} onUpdate={(f, v) => updateMapping("default", f, v)} availableVars={selectedTeste ? extractPayloadKeys(selectedTeste.payload) : []} testPayload={selectedTeste?.payload || null} />
+              )}
             </div>
-            {isTransfer ? (
-              <Tabs defaultValue="somente_ida">
-                <TabsList className="w-full grid grid-cols-3 mb-4">
-                  <TabsTrigger value="somente_ida">Somente Ida</TabsTrigger>
-                  <TabsTrigger value="ida_volta">Ida e Volta</TabsTrigger>
-                  <TabsTrigger value="por_hora">Por Hora</TabsTrigger>
-                </TabsList>
-                <TabsContent value="somente_ida">
-                  <FieldMappingList fields={getFields("transfer", "somente_ida")} mappings={mappings["somente_ida"] || {}} onUpdate={(f, v) => updateMapping("somente_ida", f, v)} availableVars={selectedTeste ? extractPayloadKeys(selectedTeste.payload) : []} testPayload={selectedTeste?.payload || null} />
-                </TabsContent>
-                <TabsContent value="ida_volta">
-                  <FieldMappingList fields={getFields("transfer", "ida_volta")} mappings={mappings["ida_volta"] || {}} onUpdate={(f, v) => updateMapping("ida_volta", f, v)} availableVars={selectedTeste ? extractPayloadKeys(selectedTeste.payload) : []} testPayload={selectedTeste?.payload || null} />
-                </TabsContent>
-                <TabsContent value="por_hora">
-                  <FieldMappingList fields={getFields("transfer", "por_hora")} mappings={mappings["por_hora"] || {}} onUpdate={(f, v) => updateMapping("por_hora", f, v)} availableVars={selectedTeste ? extractPayloadKeys(selectedTeste.payload) : []} testPayload={selectedTeste?.payload || null} />
-                </TabsContent>
-              </Tabs>
-            ) : selected.tipo === "grupo" ? (
-              <FieldMappingList fields={getFields("grupo", "default")} mappings={mappings["default"] || {}} onUpdate={(f, v) => updateMapping("default", f, v)} availableVars={selectedTeste ? extractPayloadKeys(selectedTeste.payload) : []} testPayload={selectedTeste?.payload || null} />
-            ) : (
-              <FieldMappingList fields={getFields("motorista", "default")} mappings={mappings["default"] || {}} onUpdate={(f, v) => updateMapping("default", f, v)} availableVars={selectedTeste ? extractPayloadKeys(selectedTeste.payload) : []} testPayload={selectedTeste?.payload || null} />
-            )}
-          </div>
+          )}
         </div>
 
         <FerramentasDevDialog
