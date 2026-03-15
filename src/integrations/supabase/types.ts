@@ -149,6 +149,57 @@ export type Database = {
         }
         Relationships: []
       }
+      chamadas_taxi: {
+        Row: {
+          created_at: string
+          data_corrida: string | null
+          destino: string | null
+          hora_corrida: string | null
+          id: string
+          nome_cliente: string
+          numero_atendimento: number
+          observacoes: string | null
+          origem: string | null
+          qtd_passageiros: number | null
+          status: string
+          telefone: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          data_corrida?: string | null
+          destino?: string | null
+          hora_corrida?: string | null
+          id?: string
+          nome_cliente: string
+          numero_atendimento?: never
+          observacoes?: string | null
+          origem?: string | null
+          qtd_passageiros?: number | null
+          status?: string
+          telefone: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          data_corrida?: string | null
+          destino?: string | null
+          hora_corrida?: string | null
+          id?: string
+          nome_cliente?: string
+          numero_atendimento?: never
+          observacoes?: string | null
+          origem?: string | null
+          qtd_passageiros?: number | null
+          status?: string
+          telefone?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       configuracoes: {
         Row: {
           cidade: string | null

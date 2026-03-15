@@ -37,8 +37,8 @@ const menuStructure = [
         icon: Car,
         children: [
           { title: "Chamadas", url: "/taxi/chamadas", icon: Phone },
-          { title: "Atendimentos Confirmados", url: "/taxi/atendimentos", icon: CheckCircle },
-          { title: "Clientes / Corridas", url: "/taxi/clientes-corridas", icon: Users },
+          { title: "Atendimentos", url: "/taxi/atendimentos", icon: CheckCircle },
+          { title: "Clientes", url: "/taxi/clientes", icon: Users },
         ],
       },
     ],

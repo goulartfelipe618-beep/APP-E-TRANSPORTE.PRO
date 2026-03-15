@@ -59,7 +59,7 @@ import TaxiMetricas from "./pages/taxi/TaxiMetricas";
 import TaxiAbrangencia from "./pages/taxi/TaxiAbrangencia";
 import TaxiChamadas from "./pages/taxi/TaxiChamadas";
 import TaxiAtendimentos from "./pages/taxi/TaxiAtendimentos";
-import TaxiClientesCorridas from "./pages/taxi/TaxiClientesCorridas";
+import TaxiClientes from "./pages/taxi/TaxiClientes";
 
 const queryClient = new QueryClient();
 
@@ -110,7 +110,7 @@ const App = () => (
             <Route path="abrangencia" element={<TaxiAbrangencia />} />
             <Route path="chamadas" element={<TaxiChamadas />} />
             <Route path="atendimentos" element={<TaxiAtendimentos />} />
-            <Route path="clientes-corridas" element={<TaxiClientesCorridas />} />
+            <Route path="clientes" element={<TaxiClientes />} />
             <Route path="anotacoes" element={<AnotacoesPage />} />
             <Route path="sistema/configuracoes" element={<SistemaConfiguracoesPage />} />
             <Route path="sistema/automacoes" element={<SistemaAutomacoesPage />} />
