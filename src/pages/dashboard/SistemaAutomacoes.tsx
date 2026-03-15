@@ -440,19 +440,19 @@ export default function SistemaAutomacoesPage() {
                   <TabsTrigger value="por_hora">Por Hora</TabsTrigger>
                 </TabsList>
                 <TabsContent value="somente_ida">
-                  <FieldMappingList fields={getFields("transfer", "somente_ida")} mappings={mappings["somente_ida"] || {}} onUpdate={(f, v) => updateMapping("somente_ida", f, v)} />
+                  <FieldMappingList fields={getFields("transfer", "somente_ida")} mappings={mappings["somente_ida"] || {}} onUpdate={(f, v) => updateMapping("somente_ida", f, v)} availableVars={selectedTeste ? extractPayloadKeys(selectedTeste.payload) : []} testPayload={selectedTeste?.payload || null} />
                 </TabsContent>
                 <TabsContent value="ida_volta">
-                  <FieldMappingList fields={getFields("transfer", "ida_volta")} mappings={mappings["ida_volta"] || {}} onUpdate={(f, v) => updateMapping("ida_volta", f, v)} />
+                  <FieldMappingList fields={getFields("transfer", "ida_volta")} mappings={mappings["ida_volta"] || {}} onUpdate={(f, v) => updateMapping("ida_volta", f, v)} availableVars={selectedTeste ? extractPayloadKeys(selectedTeste.payload) : []} testPayload={selectedTeste?.payload || null} />
                 </TabsContent>
                 <TabsContent value="por_hora">
-                  <FieldMappingList fields={getFields("transfer", "por_hora")} mappings={mappings["por_hora"] || {}} onUpdate={(f, v) => updateMapping("por_hora", f, v)} />
+                  <FieldMappingList fields={getFields("transfer", "por_hora")} mappings={mappings["por_hora"] || {}} onUpdate={(f, v) => updateMapping("por_hora", f, v)} availableVars={selectedTeste ? extractPayloadKeys(selectedTeste.payload) : []} testPayload={selectedTeste?.payload || null} />
                 </TabsContent>
               </Tabs>
             ) : selected.tipo === "grupo" ? (
-              <FieldMappingList fields={getFields("grupo", "default")} mappings={mappings["default"] || {}} onUpdate={(f, v) => updateMapping("default", f, v)} />
+              <FieldMappingList fields={getFields("grupo", "default")} mappings={mappings["default"] || {}} onUpdate={(f, v) => updateMapping("default", f, v)} availableVars={selectedTeste ? extractPayloadKeys(selectedTeste.payload) : []} testPayload={selectedTeste?.payload || null} />
             ) : (
-              <FieldMappingList fields={getFields("motorista", "default")} mappings={mappings["default"] || {}} onUpdate={(f, v) => updateMapping("default", f, v)} />
+              <FieldMappingList fields={getFields("motorista", "default")} mappings={mappings["default"] || {}} onUpdate={(f, v) => updateMapping("default", f, v)} availableVars={selectedTeste ? extractPayloadKeys(selectedTeste.payload) : []} testPayload={selectedTeste?.payload || null} />
             )}
           </div>
         </div>
