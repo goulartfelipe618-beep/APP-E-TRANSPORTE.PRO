@@ -153,17 +153,14 @@ export default function GooglePage() {
     <div className="space-y-6">
       {pendingBanner}
       {/* Carousel */}
-      <div className="relative rounded-xl overflow-hidden bg-gradient-to-r from-primary/80 to-primary h-80 flex items-center">
-        <Button variant="ghost" size="icon" className="absolute left-2 z-10 bg-background/30 hover:bg-background/50 text-primary-foreground" onClick={() => setCurrentSlide((p) => (p === 0 ? slides.length - 1 : p - 1))}><ChevronLeft className="h-5 w-5" /></Button>
-        <div className="px-12 max-w-2xl">
-          <h2 className="text-2xl font-bold text-primary-foreground mb-2">{slides[currentSlide].title}</h2>
-          <p className="text-primary-foreground/80">{slides[currentSlide].description}</p>
-        </div>
-        <Button variant="ghost" size="icon" className="absolute right-2 z-10 bg-background/30 hover:bg-background/50 text-primary-foreground" onClick={() => setCurrentSlide((p) => (p === slides.length - 1 ? 0 : p + 1))}><ChevronRight className="h-5 w-5" /></Button>
-        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
-          {slides.map((_, i) => (<button key={i} className={`w-2.5 h-2.5 rounded-full transition-colors ${i === currentSlide ? "bg-primary-foreground" : "bg-primary-foreground/40"}`} onClick={() => setCurrentSlide(i)} />))}
-        </div>
-      </div>
+      <SlideCarousel
+        pagina="google"
+        fallbackSlides={[
+          { titulo: "Coloque Sua Empresa no Google", subtitulo: "Crie seu perfil no Google Business Profile e apareça nas buscas quando clientes procurarem por transporte executivo na sua região." },
+          { titulo: "Perfil Verificado no Google", subtitulo: "Motoristas com perfil verificado passam mais confiança. Hotéis e empresas encontram você diretamente no Google Maps." },
+          { titulo: "Aumente Sua Visibilidade", subtitulo: "Destaque-se nos resultados de busca com avaliações positivas e informações completas do seu serviço." },
+        ]}
+      />
 
       {/* Header */}
       <div className="flex items-center justify-between">
