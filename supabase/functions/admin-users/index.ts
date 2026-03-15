@@ -11,7 +11,6 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Verify the caller is admin_master
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
       return new Response(JSON.stringify({ error: "Não autorizado" }), { status: 401, headers: corsHeaders });
@@ -28,7 +27,6 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "Não autorizado" }), { status: 401, headers: corsHeaders });
     }
 
-    // Check admin_master role
     const supabaseAdmin = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
@@ -48,7 +46,7 @@ Deno.serve(async (req) => {
     const url = new URL(req.url);
     const action = url.searchParams.get("action");
 
-    // LIST USERS (exclude admin_master)
+    // LIST USERS - optimized: fetch roles then batch auth users
     if (req.method === "GET" && action === "list") {
       const { data: roles } = await supabaseAdmin
         .from("user_roles")
@@ -59,22 +57,19 @@ Deno.serve(async (req) => {
         return new Response(JSON.stringify([]), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
-      const userIds = roles.map((r: any) => r.user_id);
+      // Fetch all auth users in one call instead of N calls
+      const { data: listData } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 });
+      const authUsers = listData?.users || [];
 
-      // Get auth users
-      const users: any[] = [];
-      for (const uid of userIds) {
-        const { data } = await supabaseAdmin.auth.admin.getUserById(uid);
-        if (data?.user) {
-          const role = roles.find((r: any) => r.user_id === uid);
-          users.push({
-            id: data.user.id,
-            email: data.user.email,
-            created_at: data.user.created_at,
-            role: role?.role || "sem_role",
-          });
-        }
-      }
+      const roleMap = new Map(roles.map((r: any) => [r.user_id, r.role]));
+      const users = authUsers
+        .filter((u: any) => roleMap.has(u.id))
+        .map((u: any) => ({
+          id: u.id,
+          email: u.email,
+          created_at: u.created_at,
+          role: roleMap.get(u.id) || "sem_role",
+        }));
 
       return new Response(JSON.stringify(users), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
@@ -89,7 +84,7 @@ Deno.serve(async (req) => {
       }
 
       if (!["admin_transfer", "admin_taxi"].includes(role)) {
-        return new Response(JSON.stringify({ error: "Função inválida. Use admin_transfer ou admin_taxi" }), { status: 400, headers: corsHeaders });
+        return new Response(JSON.stringify({ error: "Função inválida" }), { status: 400, headers: corsHeaders });
       }
 
       const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
@@ -102,7 +97,6 @@ Deno.serve(async (req) => {
         return new Response(JSON.stringify({ error: createError.message }), { status: 400, headers: corsHeaders });
       }
 
-      // Assign role
       const { error: roleError } = await supabaseAdmin.from("user_roles").insert({
         user_id: newUser.user.id,
         role,
@@ -115,7 +109,7 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ success: true, user_id: newUser.user.id }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // DELETE USER
+    // DELETE USER - cascade delete all user data then hard-delete auth user
     if (req.method === "POST" && action === "delete") {
       const body = await req.json();
       const { user_id } = body;
@@ -136,8 +130,40 @@ Deno.serve(async (req) => {
         return new Response(JSON.stringify({ error: "Não é possível excluir um admin master" }), { status: 403, headers: corsHeaders });
       }
 
+      // Delete ALL user data from every table that has user_id
+      const tablesToClean = [
+        "anotacoes",
+        "automacoes",
+        "cabecalho_contratual",
+        "chamadas_taxi",
+        "configuracoes",
+        "contratos",
+        "network",
+        "reservas_grupos",
+        "reservas_transfer",
+        "solicitacoes_grupos",
+        "solicitacoes_motoristas",
+        "solicitacoes_servicos",
+        "solicitacoes_transfer",
+        "webhook_testes",
+      ];
+
+      // Delete all user data in parallel
+      await Promise.all(
+        tablesToClean.map((table) =>
+          supabaseAdmin.from(table).delete().eq("user_id", user_id)
+        )
+      );
+
+      // Delete role
       await supabaseAdmin.from("user_roles").delete().eq("user_id", user_id);
-      await supabaseAdmin.auth.admin.deleteUser(user_id);
+
+      // Hard-delete auth user (not soft delete) so email can be reused
+      const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(user_id);
+
+      if (deleteError) {
+        return new Response(JSON.stringify({ error: deleteError.message }), { status: 400, headers: corsHeaders });
+      }
 
       return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
