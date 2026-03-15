@@ -59,7 +59,7 @@ import TaxiMetricas from "./pages/taxi/TaxiMetricas";
 import TaxiAbrangencia from "./pages/taxi/TaxiAbrangencia";
 import TaxiChamadas from "./pages/taxi/TaxiChamadas";
 import TaxiAtendimentos from "./pages/taxi/TaxiAtendimentos";
-import TaxiClientesCorridas from "./pages/taxi/TaxiClientesCorridas";
+import TaxiClientes from "./pages/taxi/TaxiClientes";
 
 const queryClient = new QueryClient();
 
