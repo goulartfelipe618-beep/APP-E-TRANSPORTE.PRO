@@ -7,6 +7,7 @@ interface SlideData {
   titulo: string;
   subtitulo: string;
   imagem_url: string;
+  mostrar_texto: boolean;
 }
 
 interface SlideCarouselProps {
