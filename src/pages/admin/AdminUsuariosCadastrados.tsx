@@ -84,7 +84,11 @@ export default function AdminUsuariosCadastrados() {
   };
 
   const handleDelete = async (userId: string) => {
-    if (!confirm("Tem certeza que deseja excluir este usuário?")) return;
+    if (!confirm("Tem certeza que deseja excluir este usuário? Todos os dados do painel dele serão apagados permanentemente.")) return;
+    
+    // Optimistic: remove from UI immediately
+    setUsers((prev) => prev.filter((u) => u.id !== userId));
+    
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return;
 
@@ -102,9 +106,9 @@ export default function AdminUsuariosCadastrados() {
     const data = await res.json();
     if (data.error) {
       toast.error(data.error);
+      fetchUsers(); // Revert on error
     } else {
-      toast.success("Usuário excluído!");
-      fetchUsers();
+      toast.success("Usuário e todos os dados excluídos com sucesso!");
     }
   };
 
