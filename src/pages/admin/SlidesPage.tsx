@@ -61,7 +61,7 @@ export default function SlidesPage() {
 
   const openEdit = (s: Slide) => {
     setEditing(s);
-    setForm({ titulo: s.titulo, subtitulo: s.subtitulo, imagem_url: s.imagem_url, mostrar_texto: s.mostrar_texto });
+    setForm({ titulo: s.titulo, subtitulo: s.subtitulo, imagem_url: s.imagem_url, mostrar_texto: s.mostrar_texto, link_url: (s as any).link_url || "" });
     setDialogOpen(true);
   };
 
