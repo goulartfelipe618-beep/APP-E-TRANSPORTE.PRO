@@ -71,25 +71,74 @@ function useCamposConfig() {
   return { camposConfig, getFields, loaded };
 }
 
+// Extracts all leaf keys from a nested object as dot-notation paths
+function extractPayloadKeys(obj: Record<string, any>, prefix = ""): string[] {
+  const keys: string[] = [];
+  for (const [key, value] of Object.entries(obj)) {
+    const path = prefix ? `${prefix}.${key}` : key;
+    if (value && typeof value === "object" && !Array.isArray(value)) {
+      keys.push(...extractPayloadKeys(value, path));
+    } else {
+      keys.push(path);
+    }
+  }
+  return keys;
+}
+
+function resolveValue(obj: Record<string, any>, path: string): any {
+  const parts = path.split(".");
+  let current: any = obj;
+  for (const part of parts) {
+    if (current == null) return undefined;
+    current = current[part];
+  }
+  return current;
+}
+
 function FieldMappingList({
   fields,
   mappings,
   onUpdate,
+  availableVars,
+  testPayload,
 }: {
   fields: string[];
   mappings: Record<string, string>;
   onUpdate: (field: string, value: string) => void;
+  availableVars: string[];
+  testPayload: Record<string, any> | null;
 }) {
   return (
     <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
       {fields.map((field) => (
         <div key={field} className="space-y-1">
           <Label className="text-sm font-medium text-foreground">{field}</Label>
-          <Input
-            placeholder="Digite o caminho da variável (ex: nome, dados.email)"
-            value={mappings[field] || ""}
-            onChange={(e) => onUpdate(field, e.target.value)}
-          />
+          {availableVars.length > 0 ? (
+            <Select value={mappings[field] || ""} onValueChange={(val) => onUpdate(field, val === "__clear__" ? "" : val)}>
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione a variável..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__clear__">— Nenhuma —</SelectItem>
+                {availableVars.map((v) => (
+                  <SelectItem key={v} value={v}>
+                    <span className="font-mono text-xs">{v}</span>
+                    {testPayload && (
+                      <span className="ml-2 text-muted-foreground text-xs">
+                        = {String(resolveValue(testPayload, v) ?? "").substring(0, 40)}
+                      </span>
+                    )}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : (
+            <Input
+              placeholder="Receba um teste primeiro para selecionar variáveis"
+              value={mappings[field] || ""}
+              onChange={(e) => onUpdate(field, e.target.value)}
+            />
+          )}
         </div>
       ))}
     </div>
@@ -337,7 +386,7 @@ export default function SistemaAutomacoesPage() {
                       ))}
                     </div>
                     {selectedTeste && (
-                      <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-2">
+                      <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-3">
                         <div className="flex items-center justify-between">
                           <p className="text-xs font-medium text-muted-foreground">
                             Recebido em {new Date(selectedTeste.created_at).toLocaleString("pt-BR")}
@@ -357,9 +406,16 @@ export default function SistemaAutomacoesPage() {
                             </Button>
                           </div>
                         </div>
-                        <pre className="text-xs font-mono bg-background rounded p-3 overflow-x-auto max-h-[300px] overflow-y-auto whitespace-pre-wrap">
-                          {JSON.stringify(selectedTeste.payload, null, 2)}
-                        </pre>
+                        <p className="text-xs text-muted-foreground">Variáveis recebidas:</p>
+                        <div className="flex flex-wrap gap-2 max-h-[300px] overflow-y-auto">
+                          {extractPayloadKeys(selectedTeste.payload).map((key) => (
+                            <div key={key} className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-2.5 py-1.5 text-xs">
+                              <span className="font-mono font-semibold text-primary">{key}</span>
+                              <span className="text-muted-foreground">=</span>
+                              <span className="text-foreground max-w-[120px] truncate">{String(resolveValue(selectedTeste.payload, key) ?? "")}</span>
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     )}
                   </>
@@ -384,19 +440,19 @@ export default function SistemaAutomacoesPage() {
                   <TabsTrigger value="por_hora">Por Hora</TabsTrigger>
                 </TabsList>
                 <TabsContent value="somente_ida">
-                  <FieldMappingList fields={getFields("transfer", "somente_ida")} mappings={mappings["somente_ida"] || {}} onUpdate={(f, v) => updateMapping("somente_ida", f, v)} />
+                  <FieldMappingList fields={getFields("transfer", "somente_ida")} mappings={mappings["somente_ida"] || {}} onUpdate={(f, v) => updateMapping("somente_ida", f, v)} availableVars={selectedTeste ? extractPayloadKeys(selectedTeste.payload) : []} testPayload={selectedTeste?.payload || null} />
                 </TabsContent>
                 <TabsContent value="ida_volta">
-                  <FieldMappingList fields={getFields("transfer", "ida_volta")} mappings={mappings["ida_volta"] || {}} onUpdate={(f, v) => updateMapping("ida_volta", f, v)} />
+                  <FieldMappingList fields={getFields("transfer", "ida_volta")} mappings={mappings["ida_volta"] || {}} onUpdate={(f, v) => updateMapping("ida_volta", f, v)} availableVars={selectedTeste ? extractPayloadKeys(selectedTeste.payload) : []} testPayload={selectedTeste?.payload || null} />
                 </TabsContent>
                 <TabsContent value="por_hora">
-                  <FieldMappingList fields={getFields("transfer", "por_hora")} mappings={mappings["por_hora"] || {}} onUpdate={(f, v) => updateMapping("por_hora", f, v)} />
+                  <FieldMappingList fields={getFields("transfer", "por_hora")} mappings={mappings["por_hora"] || {}} onUpdate={(f, v) => updateMapping("por_hora", f, v)} availableVars={selectedTeste ? extractPayloadKeys(selectedTeste.payload) : []} testPayload={selectedTeste?.payload || null} />
                 </TabsContent>
               </Tabs>
             ) : selected.tipo === "grupo" ? (
-              <FieldMappingList fields={getFields("grupo", "default")} mappings={mappings["default"] || {}} onUpdate={(f, v) => updateMapping("default", f, v)} />
+              <FieldMappingList fields={getFields("grupo", "default")} mappings={mappings["default"] || {}} onUpdate={(f, v) => updateMapping("default", f, v)} availableVars={selectedTeste ? extractPayloadKeys(selectedTeste.payload) : []} testPayload={selectedTeste?.payload || null} />
             ) : (
-              <FieldMappingList fields={getFields("motorista", "default")} mappings={mappings["default"] || {}} onUpdate={(f, v) => updateMapping("default", f, v)} />
+              <FieldMappingList fields={getFields("motorista", "default")} mappings={mappings["default"] || {}} onUpdate={(f, v) => updateMapping("default", f, v)} availableVars={selectedTeste ? extractPayloadKeys(selectedTeste.payload) : []} testPayload={selectedTeste?.payload || null} />
             )}
           </div>
         </div>
