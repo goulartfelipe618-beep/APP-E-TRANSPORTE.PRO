@@ -49,6 +49,17 @@ export default function SlideCarousel({ pagina, fallbackSlides }: SlideCarouselP
   const currentSlideData = displaySlides[currentSlide];
   const hasImage = !!currentSlideData?.imagem_url;
   const showText = currentSlideData?.mostrar_texto && (currentSlideData.titulo || currentSlideData.subtitulo);
+  const linkUrl = currentSlideData?.link_url;
+
+  const imageElement = hasImage ? (
+    <img
+      src={displaySlides[currentSlide].imagem_url}
+      alt={displaySlides[currentSlide].titulo || "Slide"}
+      className="w-full h-auto block"
+    />
+  ) : (
+    <div className="h-72 bg-gradient-to-r from-primary/80 to-primary" />
+  );
 
   return (
     <div className="relative rounded-xl overflow-hidden w-full">
