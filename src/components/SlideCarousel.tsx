@@ -63,15 +63,12 @@ export default function SlideCarousel({ pagina, fallbackSlides }: SlideCarouselP
 
   return (
     <div className="relative rounded-xl overflow-hidden w-full">
-      {hasImage ? (
-        /* Imagem no tamanho original — sem corte, sem altura fixa */
-        <img
-          src={displaySlides[currentSlide].imagem_url}
-          alt={displaySlides[currentSlide].titulo || "Slide"}
-          className="w-full h-auto block"
-        />
+      {linkUrl ? (
+        <a href={linkUrl} target="_blank" rel="noopener noreferrer" className="block cursor-pointer">
+          {imageElement}
+        </a>
       ) : (
-        <div className="h-72 bg-gradient-to-r from-primary/80 to-primary" />
+        imageElement
       )}
 
       {/* Overlay com texto — só aparece se mostrar_texto estiver ativo */}
