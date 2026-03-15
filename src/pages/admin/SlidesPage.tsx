@@ -17,8 +17,16 @@ interface Slide {
   imagem_url: string;
   ordem: number;
   ativo: boolean;
+  pagina: string;
   created_at: string;
 }
+
+const PAGINAS = [
+  { value: "home", label: "Home" },
+  { value: "google", label: "Google" },
+  { value: "email_business", label: "E-mail Business" },
+  { value: "website", label: "Website" },
+];
 
 export default function SlidesPage() {
   const [slides, setSlides] = useState<Slide[]>([]);
@@ -27,6 +35,7 @@ export default function SlidesPage() {
   const [editing, setEditing] = useState<Slide | null>(null);
   const [form, setForm] = useState({ titulo: "", subtitulo: "", imagem_url: "" });
   const [uploading, setUploading] = useState(false);
+  const [paginaSelecionada, setPaginaSelecionada] = useState("home");
 
   const fetchSlides = async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -35,12 +44,13 @@ export default function SlidesPage() {
       .from("slides")
       .select("*")
       .eq("user_id", user.id)
+      .eq("pagina", paginaSelecionada)
       .order("ordem", { ascending: true });
     setSlides((data as Slide[]) || []);
     setLoading(false);
   };
 
-  useEffect(() => { fetchSlides(); }, []);
+  useEffect(() => { setLoading(true); fetchSlides(); }, [paginaSelecionada]);
 
   const openCreate = () => {
     setEditing(null);
@@ -94,6 +104,7 @@ export default function SlidesPage() {
         subtitulo: form.subtitulo,
         imagem_url: form.imagem_url,
         ordem: maxOrdem,
+        pagina: paginaSelecionada,
       });
       if (error) { toast.error("Erro ao criar slide"); return; }
       toast.success("Slide criado!");
@@ -126,14 +137,32 @@ export default function SlidesPage() {
     fetchSlides();
   };
 
+  const paginaAtual = PAGINAS.find((p) => p.value === paginaSelecionada);
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Gerenciar Slides</h1>
-          <p className="text-muted-foreground text-sm">Controle os slides exibidos nas páginas Home, Google, E-mail Business e Website.</p>
+          <p className="text-muted-foreground text-sm">
+            Editando slides da página: <span className="font-semibold text-primary">{paginaAtual?.label}</span>
+          </p>
         </div>
         <Button onClick={openCreate}><Plus className="h-4 w-4 mr-2" /> Novo Slide</Button>
+      </div>
+
+      {/* Page selector tabs */}
+      <div className="flex gap-2 flex-wrap">
+        {PAGINAS.map((p) => (
+          <Button
+            key={p.value}
+            variant={paginaSelecionada === p.value ? "default" : "outline"}
+            size="sm"
+            onClick={() => setPaginaSelecionada(p.value)}
+          >
+            {p.label}
+          </Button>
+        ))}
       </div>
 
       <div className="rounded-xl border border-border bg-card">
@@ -152,7 +181,7 @@ export default function SlidesPage() {
             {loading ? (
               <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">Carregando...</TableCell></TableRow>
             ) : slides.length === 0 ? (
-              <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">Nenhum slide cadastrado. Clique em "Novo Slide" para começar.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">Nenhum slide cadastrado para "{paginaAtual?.label}". Clique em "Novo Slide" para começar.</TableCell></TableRow>
             ) : slides.map((s, i) => (
               <TableRow key={s.id}>
                 <TableCell>
@@ -186,7 +215,7 @@ export default function SlidesPage() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>{editing ? "Editar Slide" : "Novo Slide"}</DialogTitle>
+            <DialogTitle>{editing ? "Editar Slide" : `Novo Slide — ${paginaAtual?.label}`}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div>
