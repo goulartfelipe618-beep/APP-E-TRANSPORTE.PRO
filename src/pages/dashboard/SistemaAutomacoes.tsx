@@ -450,22 +450,49 @@ export default function SistemaAutomacoesPage() {
                 </Button>
               </div>
               {isTransfer ? (
-                <Tabs defaultValue="somente_ida">
-                  <TabsList className="w-full grid grid-cols-3 mb-4">
-                    <TabsTrigger value="somente_ida">Somente Ida</TabsTrigger>
-                    <TabsTrigger value="ida_volta">Ida e Volta</TabsTrigger>
-                    <TabsTrigger value="por_hora">Por Hora</TabsTrigger>
-                  </TabsList>
-                  <TabsContent value="somente_ida">
-                    <FieldMappingList fields={getFields("transfer", "somente_ida")} mappings={mappings["somente_ida"] || {}} onUpdate={(f, v) => updateMapping("somente_ida", f, v)} availableVars={selectedTeste ? extractPayloadKeys(selectedTeste.payload) : []} testPayload={selectedTeste?.payload || null} />
-                  </TabsContent>
-                  <TabsContent value="ida_volta">
-                    <FieldMappingList fields={getFields("transfer", "ida_volta")} mappings={mappings["ida_volta"] || {}} onUpdate={(f, v) => updateMapping("ida_volta", f, v)} availableVars={selectedTeste ? extractPayloadKeys(selectedTeste.payload) : []} testPayload={selectedTeste?.payload || null} />
-                  </TabsContent>
-                  <TabsContent value="por_hora">
-                    <FieldMappingList fields={getFields("transfer", "por_hora")} mappings={mappings["por_hora"] || {}} onUpdate={(f, v) => updateMapping("por_hora", f, v)} availableVars={selectedTeste ? extractPayloadKeys(selectedTeste.payload) : []} testPayload={selectedTeste?.payload || null} />
-                  </TabsContent>
-                </Tabs>
+                <div className="space-y-6">
+                  {([
+                    { key: "somente_ida", label: "Somente Ida" },
+                    { key: "ida_volta", label: "Ida e Volta" },
+                    { key: "por_hora", label: "Por Hora" },
+                  ] as const).map(({ key, label }) => {
+                    const selectedTesteForContainer = testes.find(t => t.id === containerTestes[key]) || null;
+                    const availableVars = selectedTesteForContainer ? extractPayloadKeys(selectedTesteForContainer.payload) : [];
+                    return (
+                      <div key={key} className="rounded-lg border border-border bg-muted/10 p-4 space-y-4">
+                        <div className="flex items-center justify-between">
+                          <h4 className="text-sm font-semibold text-foreground uppercase">{label}</h4>
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Qual teste usar de referência?</Label>
+                          <Select
+                            value={containerTestes[key] || ""}
+                            onValueChange={(val) => setContainerTestes(prev => ({ ...prev, [key]: val === "__none__" ? "" : val }))}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Selecione um teste..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="__none__">— Nenhum —</SelectItem>
+                              {testes.map((t, idx) => (
+                                <SelectItem key={t.id} value={t.id}>
+                                  Teste {testes.length - idx} — {new Date(t.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <FieldMappingList
+                          fields={getFields("transfer", key)}
+                          mappings={mappings[key] || {}}
+                          onUpdate={(f, v) => updateMapping(key, f, v)}
+                          availableVars={availableVars}
+                          testPayload={selectedTesteForContainer?.payload || null}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
               ) : selected.tipo === "grupo" ? (
                 <FieldMappingList fields={getFields("grupo", "default")} mappings={mappings["default"] || {}} onUpdate={(f, v) => updateMapping("default", f, v)} availableVars={selectedTeste ? extractPayloadKeys(selectedTeste.payload) : []} testPayload={selectedTeste?.payload || null} />
               ) : (
