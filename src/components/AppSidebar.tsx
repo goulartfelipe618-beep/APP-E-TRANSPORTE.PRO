@@ -77,14 +77,7 @@ const getMenuStructure = (showNetwork: boolean) => [
           { title: "Leads", url: "/dashboard/campanhas/leads", icon: UserCheck },
         ],
       },
-      {
-        title: "Marketing",
-        icon: BarChart3,
-        children: [
-          { title: "Receptivos", url: "/dashboard/marketing/receptivos", icon: MapPin },
-          { title: "QR Code", url: "/dashboard/marketing/qrcode", icon: Search },
-        ],
-      },
+      { title: "QR Codes", url: "/dashboard/marketing/qrcode", icon: Search },
       ...(showNetwork ? [{ title: "Network", url: "/dashboard/network", icon: Globe }] : []),
       { title: "Google", url: "/dashboard/google", icon: Search },
       { title: "E-mail Business", url: "/dashboard/email-business", icon: Mail },
