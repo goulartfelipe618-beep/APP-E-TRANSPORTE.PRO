@@ -40,11 +40,6 @@ interface TemplateDB {
   ativo: boolean;
 }
 
-const heroSlides = [
-  { title: "Crie Seu Site Profissional", desc: "Tenha presença online com um site exclusivo para transporte executivo. Design premium e responsivo." },
-  { title: "Templates Exclusivos", desc: "Escolha entre diversos modelos desenvolvidos especialmente para o segmento de transporte executivo." },
-  { title: "100% Personalizado", desc: "Cores, textos e funcionalidades sob medida para sua empresa." },
-];
 
 const serviceTypes = [
   { id: "transfer", label: "Transfer Executivo" },
