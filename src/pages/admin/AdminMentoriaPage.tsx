@@ -169,12 +169,9 @@ export default function AdminMentoriaPage() {
                 <label className="text-sm font-medium text-foreground flex items-center gap-2">
                   <ImageIcon className="h-4 w-4" /> Imagem de Capa *
                 </label>
-                <div className="flex gap-2 mt-1">
-                  <Input value={form.imagem_url} onChange={(e) => setForm({ ...form, imagem_url: e.target.value })} placeholder="URL ou faça upload" className="flex-1" />
-                  <Button type="button" variant="outline" size="icon" onClick={() => imageInputRef.current?.click()} disabled={uploadingImage}>
-                    {uploadingImage ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-                  </Button>
-                </div>
+                <Button type="button" variant="outline" className="w-full mt-1 gap-2" onClick={() => imageInputRef.current?.click()} disabled={uploadingImage}>
+                  {uploadingImage ? <><Loader2 className="h-4 w-4 animate-spin" /> Enviando...</> : <><Upload className="h-4 w-4" /> {form.imagem_url ? "Trocar Imagem" : "Fazer Upload da Imagem"}</>}
+                </Button>
                 <input ref={imageInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
                 {form.imagem_url && (
                   <img src={form.imagem_url} alt="Preview" className="mt-2 rounded-lg max-h-32 object-cover border border-border" />
