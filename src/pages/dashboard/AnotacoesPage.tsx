@@ -26,7 +26,6 @@ export default function AnotacoesPage() {
   const [conteudo, setConteudo] = useState("");
 
   const fetchAnotacoes = async () => {
-    setLoading(true);
     const { data, error } = await supabase
       .from("anotacoes" as any)
       .select("*")

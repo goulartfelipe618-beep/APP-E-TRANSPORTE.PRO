@@ -19,7 +19,6 @@ export default function TransferSolicitacoesPage() {
   const [initialData, setInitialData] = useState<TransferInitialData | null>(null);
 
   const fetchData = useCallback(async () => {
-    setLoading(true);
     const { data, error } = await supabase
       .from("solicitacoes_transfer")
       .select("*")

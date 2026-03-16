@@ -40,7 +40,6 @@ export default function MotoristaSolicitacoesPage() {
   const [initialData, setInitialData] = useState<MotoristaInitialData | null>(null);
 
   const fetchData = useCallback(async () => {
-    setLoading(true);
     const { data, error } = await supabase
       .from("solicitacoes_motoristas")
       .select("*")

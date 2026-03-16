@@ -19,7 +19,6 @@ export default function GruposSolicitacoesPage() {
   const [initialData, setInitialData] = useState<GrupoInitialData | null>(null);
 
   const fetchData = useCallback(async () => {
-    setLoading(true);
     const { data, error } = await supabase
       .from("solicitacoes_grupos")
       .select("*")

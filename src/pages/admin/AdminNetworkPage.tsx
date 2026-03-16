@@ -51,7 +51,6 @@ export default function AdminNetworkPage() {
   const [assigning, setAssigning] = useState(false);
 
   const fetchData = async () => {
-    setLoading(true);
     const { data: rows, error } = await (supabase.from("network" as any).select("*") as any);
     if (error) toast.error("Erro ao carregar networks");
     else setData(rows || []);

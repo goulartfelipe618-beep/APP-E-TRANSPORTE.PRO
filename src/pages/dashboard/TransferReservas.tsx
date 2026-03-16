@@ -26,7 +26,6 @@ export default function TransferReservasPage() {
   const [sheetOpen, setSheetOpen] = useState(false);
 
   const fetchReservas = useCallback(async () => {
-    setLoading(true);
     const { data, error } = await supabase
       .from("reservas_transfer")
       .select("*")

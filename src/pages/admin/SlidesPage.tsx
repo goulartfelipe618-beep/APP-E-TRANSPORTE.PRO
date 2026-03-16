@@ -51,7 +51,7 @@ export default function SlidesPage() {
     setLoading(false);
   };
 
-  useEffect(() => { setLoading(true); fetchSlides(); }, [paginaSelecionada]);
+  useEffect(() => { fetchSlides(); }, [paginaSelecionada]);
 
   const openCreate = () => {
     setEditing(null);

@@ -47,7 +47,6 @@ export default function AdminUsuariosSolicitacoes() {
   const [selected, setSelected] = useState<SolicitacaoAcesso | null>(null);
 
   const fetchSolicitacoes = async () => {
-    setLoading(true);
     const { data, error } = await supabase
       .from("solicitacoes_acesso")
       .select("*")

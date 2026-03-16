@@ -68,7 +68,6 @@ export default function AdminSolicitacoesServicos() {
   const [editStatus, setEditStatus] = useState("");
 
   const fetchData = async () => {
-    setLoading(true);
     const { data: rows, error } = await (supabase.from("solicitacoes_servicos" as any).select("*").order("created_at", { ascending: false }) as any);
     if (error) toast.error("Erro ao carregar");
     else setData(rows || []);

@@ -47,7 +47,6 @@ export default function AdminAutomacoesPage() {
   const [activeCategoria, setActiveCategoria] = useState("transfer");
 
   const fetchConfigs = async () => {
-    setLoading(true);
     const { data, error } = await supabase
       .from("automacoes_campos_config" as any)
       .select("*")

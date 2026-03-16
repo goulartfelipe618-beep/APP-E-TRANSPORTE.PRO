@@ -34,7 +34,6 @@ export default function AdminUsuariosCadastrados() {
   const [creating, setCreating] = useState(false);
 
   const fetchUsers = async () => {
-    setLoading(true);
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return;
 

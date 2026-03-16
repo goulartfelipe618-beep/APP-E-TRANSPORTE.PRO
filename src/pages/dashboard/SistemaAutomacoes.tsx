@@ -164,7 +164,6 @@ export default function SistemaAutomacoesPage() {
   const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID || "seu-projeto";
 
   const fetchAutomacoes = useCallback(async () => {
-    setLoading(true);
     const { data, error } = await supabase
       .from("automacoes")
       .select("*")

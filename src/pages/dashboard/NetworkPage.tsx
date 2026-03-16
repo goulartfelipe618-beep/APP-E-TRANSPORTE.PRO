@@ -38,7 +38,6 @@ export default function NetworkPage() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   const fetchData = async () => {
-    setLoading(true);
     const { data: { user } } = await supabase.auth.getUser();
     if (user) setCurrentUserId(user.id);
     const { data: rows, error } = await (supabase.from("network" as any).select("*") as any);
