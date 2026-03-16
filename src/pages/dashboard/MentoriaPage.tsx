@@ -26,6 +26,8 @@ export default function MentoriaPage() {
   const [selectedCard, setSelectedCard] = useState<MentoriaCard | null>(null);
   const [progresso, setProgresso] = useState<Record<string, boolean>>({});
   const [userId, setUserId] = useState<string | null>(null);
+  const [showAllSobre, setShowAllSobre] = useState(false);
+  const [showAllConteudo, setShowAllConteudo] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
