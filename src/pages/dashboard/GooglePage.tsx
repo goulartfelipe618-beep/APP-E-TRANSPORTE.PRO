@@ -951,7 +951,6 @@ export default function GooglePage() {
             </div>
           </div>
         </div>
-      </div>
     );
   }
 
