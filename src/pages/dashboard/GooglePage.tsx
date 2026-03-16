@@ -947,6 +947,8 @@ export default function GooglePage() {
                     </div>
                   </Card>
                 </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
