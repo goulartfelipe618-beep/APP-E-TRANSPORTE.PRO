@@ -147,7 +147,7 @@ export default function AdminMentoriaPage() {
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="sobre_sistema">Sobre o Sistema (cards pequenos 1080×760)</SelectItem>
-                    <SelectItem value="conteudo">Conteúdo (cards grandes 1080×1920)</SelectItem>
+                    <SelectItem value="conteudo">Conteúdo (cards grandes 1080×1350)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
