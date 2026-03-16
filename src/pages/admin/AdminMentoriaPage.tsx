@@ -183,12 +183,9 @@ export default function AdminMentoriaPage() {
                 <label className="text-sm font-medium text-foreground flex items-center gap-2">
                   <Video className="h-4 w-4" /> Vídeo do Conteúdo
                 </label>
-                <div className="flex gap-2 mt-1">
-                  <Input value={form.video_url} onChange={(e) => setForm({ ...form, video_url: e.target.value })} placeholder="URL ou faça upload" className="flex-1" />
-                  <Button type="button" variant="outline" size="icon" onClick={() => videoInputRef.current?.click()} disabled={uploadingVideo}>
-                    {uploadingVideo ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-                  </Button>
-                </div>
+                <Button type="button" variant="outline" className="w-full mt-1 gap-2" onClick={() => videoInputRef.current?.click()} disabled={uploadingVideo}>
+                  {uploadingVideo ? <><Loader2 className="h-4 w-4 animate-spin" /> Enviando vídeo...</> : <><Upload className="h-4 w-4" /> {form.video_url ? "Trocar Vídeo" : "Fazer Upload do Vídeo"}</>}
+                </Button>
                 <input ref={videoInputRef} type="file" accept="video/*" className="hidden" onChange={handleVideoUpload} />
                 {form.video_url && (
                   <p className="text-xs text-emerald-500 mt-1">✅ Vídeo carregado</p>
