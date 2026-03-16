@@ -293,7 +293,7 @@ export default function EmailBusinessPage() {
               <Input
                 placeholder="suaempresa.com.br"
                 value={domain}
-                onChange={(e) => setDomain(e.target.value)}
+                onChange={(e) => { setDomain(e.target.value); resetDomainCheck(); }}
               />
               <p className="text-xs text-muted-foreground mt-1">
                 {domainOption === "new"
@@ -303,9 +303,25 @@ export default function EmailBusinessPage() {
             </div>
 
             {domainOption === "new" && (
-              <Button variant="outline" className="gap-2">
-                <Globe className="h-4 w-4" /> Pesquisar Domínio
-              </Button>
+              <div className="space-y-3">
+                <Button variant="outline" className="gap-2" onClick={handleCheckDomain} disabled={checkingDomain || !domain.trim()}>
+                  <Globe className="h-4 w-4" /> {checkingDomain ? "Verificando..." : "Pesquisar Domínio"}
+                </Button>
+
+                {domainChecked && domainAvailable === true && (
+                  <div className="rounded-lg border border-green-500/30 bg-green-500/10 p-3 flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-green-500" />
+                    <span className="text-sm text-green-400 font-medium">{domainMessage || "Domínio disponível!"}</span>
+                  </div>
+                )}
+
+                {domainChecked && domainAvailable === false && (
+                  <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 flex items-center gap-2">
+                    <Info className="h-4 w-4 text-destructive" />
+                    <span className="text-sm text-destructive font-medium">{domainMessage || "Domínio indisponível."}</span>
+                  </div>
+                )}
+              </div>
             )}
           </div>
         )}
