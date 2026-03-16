@@ -102,7 +102,37 @@ export default function HomePage() {
         }]}
       />
 
-      {/* Network Nacional - Termo */}
+      {/* Primeiros Passos */}
+      {configCompleta === false && (
+        <div className="rounded-xl border-2 border-amber-500/50 bg-card p-6 space-y-4">
+          <div className="flex items-center gap-3">
+            <div className="p-3 rounded-xl bg-amber-500/10">
+              <Settings className="h-6 w-6 text-amber-500" />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-foreground">Primeiros Passos</h3>
+              <p className="text-sm text-muted-foreground">Complete as etapas abaixo para começar a usar a plataforma</p>
+            </div>
+          </div>
+          <div className="space-y-3">
+            <div
+              className="flex items-center gap-3 p-3 rounded-lg border border-amber-500/30 bg-amber-500/5 cursor-pointer hover:bg-amber-500/10 transition-colors"
+              onClick={() => setActivePage("sistema_configuracoes")}
+            >
+              <div className="p-1.5 rounded-full border-2 border-amber-500">
+                <CircleDot className="h-4 w-4 text-amber-500" />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-foreground">Preencha suas Configurações</p>
+                <p className="text-xs text-muted-foreground">Acesse Sistema → Configurações e preencha todos os campos obrigatórios (nome, empresa, CNPJ, telefone, e-mail, endereço, cidade e estado).</p>
+              </div>
+              <Badge variant="outline" className="text-amber-500 border-amber-500/50">Pendente</Badge>
+            </div>
+          </div>
+        </div>
+      )}
+
+
       {networkAceito === null && !mostrarRegras && (
         <div className="rounded-xl border-2 border-primary/50 bg-card p-6 space-y-4">
           <div className="flex items-center gap-3">
