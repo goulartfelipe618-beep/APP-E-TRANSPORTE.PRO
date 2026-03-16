@@ -275,12 +275,12 @@ export default function EmailBusinessPage() {
             <div>
               <p className="text-sm font-medium text-foreground mb-3">Você já tem um domínio?</p>
               <div className="flex gap-6">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input type="radio" name="domain" checked={domainOption === "new"} onChange={() => setDomainOption("new")} className="accent-primary" />
+              <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="radio" name="domain" checked={domainOption === "new"} onChange={() => { setDomainOption("new"); resetDomainCheck(); }} className="accent-primary" />
                   <span className="text-sm text-foreground">Quero registrar um novo</span>
                 </label>
                 <label className="flex items-center gap-2 cursor-pointer">
-                  <input type="radio" name="domain" checked={domainOption === "existing"} onChange={() => setDomainOption("existing")} className="accent-primary" />
+                  <input type="radio" name="domain" checked={domainOption === "existing"} onChange={() => { setDomainOption("existing"); resetDomainCheck(); }} className="accent-primary" />
                   <span className="text-sm text-foreground">Já tenho um domínio</span>
                 </label>
               </div>
