@@ -77,6 +77,7 @@ const getMenuStructure = (showNetwork: boolean) => [
           { title: "Leads", page: "campanhas/leads", icon: UserCheck },
         ],
       },
+      { title: "Receptivos", page: "marketing/receptivos", icon: Globe },
       { title: "QR Codes", page: "marketing/qrcode", icon: Search },
       ...(showNetwork ? [{ title: "Network", page: "network", icon: Globe }] : []),
       { title: "Google", page: "google", icon: Search },
