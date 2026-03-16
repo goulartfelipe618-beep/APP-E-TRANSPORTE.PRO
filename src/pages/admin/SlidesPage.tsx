@@ -29,6 +29,7 @@ const PAGINAS = [
   { value: "email_business", label: "E-mail Business" },
   { value: "website", label: "Website" },
   { value: "disparador", label: "Disparador" },
+  { value: "mentoria", label: "Mentoria" },
 ];
 
 export default function SlidesPage() {
