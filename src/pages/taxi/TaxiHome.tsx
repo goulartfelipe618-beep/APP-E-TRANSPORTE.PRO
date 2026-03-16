@@ -1,5 +1,6 @@
 import { Car, Phone, CheckCircle, Users } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import SlideCarousel from "@/components/SlideCarousel";
 
 export default function TaxiHome() {
   const cards = [
@@ -11,6 +12,8 @@ export default function TaxiHome() {
 
   return (
     <div className="space-y-6">
+      <SlideCarousel pagina="home_taxi" />
+
       <h1 className="text-2xl font-bold text-foreground">Painel do Taxista</h1>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {cards.map((card) => (
