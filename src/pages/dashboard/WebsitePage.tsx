@@ -484,6 +484,24 @@ export default function WebsitePage() {
             <ArrowLeft className="h-4 w-4 mr-2" /> Voltar
           </Button>
           <Button onClick={() => {
+            if (briefingStep === 1) {
+              if (!domain.trim() || !domain.includes(".")) {
+                toast.error("Informe um domínio válido (ex: suaempresa.com.br)");
+                return;
+              }
+              if (!hasDomain) {
+                if (!domainResult || domainResult.available !== true) {
+                  toast.error("Pesquise a disponibilidade do domínio antes de continuar.");
+                  return;
+                }
+              }
+            }
+            if (briefingStep === 2) {
+              if (!companyName.trim()) { toast.error("Preencha o nome da empresa."); return; }
+              if (!city.trim()) { toast.error("Preencha a cidade principal."); return; }
+              if (!whatsapp.trim()) { toast.error("Preencha o WhatsApp."); return; }
+              if (!email.trim()) { toast.error("Preencha o e-mail profissional."); return; }
+            }
             if (briefingStep < 3) setBriefingStep(s => s + 1);
             else handleSubmitSolicitacao();
           }} className="bg-primary text-primary-foreground" disabled={submitting}>
