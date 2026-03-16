@@ -4,7 +4,8 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import {
   Globe, Star, User, CheckCircle2, Mail, Minus, Plus,
-  ArrowLeft, ArrowRight, Sparkles, FileText,
+  ArrowLeft, ArrowRight, Sparkles, FileText, Loader2,
+  CheckCircle, XCircle,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
