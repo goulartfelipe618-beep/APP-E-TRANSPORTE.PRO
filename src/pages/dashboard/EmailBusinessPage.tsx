@@ -516,7 +516,13 @@ export default function EmailBusinessPage() {
               Próximo <ArrowRight className="h-4 w-4 ml-2" />
             </Button>
           ) : (
-            <Button onClick={handleSubmitEmail} disabled={submitting}>
+            <Button onClick={() => {
+              if (!domain.trim() || !nomeCompleto.trim() || !nomeEmpresa.trim() || !emailPrefix.trim()) {
+                toast.error("Preencha todos os campos obrigatórios antes de enviar.");
+                return;
+              }
+              handleSubmitEmail();
+            }} disabled={submitting}>
               <CheckCircle2 className="h-4 w-4 mr-2" /> {submitting ? "Enviando..." : "Enviar Solicitação"}
             </Button>
           )}
