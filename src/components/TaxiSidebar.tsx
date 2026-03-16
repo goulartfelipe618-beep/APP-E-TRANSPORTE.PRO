@@ -56,6 +56,7 @@ const menuStructure = [
         ],
       },
       { title: "Anotações", page: "anotacoes", icon: StickyNote },
+      { title: "Tickets", page: "tickets", icon: ClipboardList },
     ],
   },
 ];
