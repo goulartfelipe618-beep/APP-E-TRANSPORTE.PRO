@@ -3,7 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
   AlertTriangle, Send, MessageSquare, ListChecks, MousePointerClick,
-  Smartphone, ShieldAlert, CheckCircle2, XCircle, Zap, ArrowRight,
+  Smartphone, ShieldAlert, XCircle, Zap,
 } from "lucide-react";
 
 const STEPS = [
@@ -132,73 +132,6 @@ export default function DisparadorPage() {
         </div>
       </div>
 
-      {/* Example message formats */}
-      <div className="space-y-4">
-        <h2 className="text-xl font-bold text-foreground">Exemplos de formatos que convertem</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Button message example */}
-          <Card>
-            <CardContent className="p-5 space-y-3">
-              <Badge variant="default">Mensagem com Botões</Badge>
-              <div className="bg-muted rounded-xl p-4 space-y-3">
-                <p className="text-sm text-foreground">
-                  🚗 Olá! Somos a <strong>Drive Premium</strong>, especialistas em transfer executivo.
-                </p>
-                <p className="text-sm text-foreground">
-                  Precisando de transporte com conforto e pontualidade?
-                </p>
-                <div className="space-y-2">
-                  <div className="bg-primary text-primary-foreground text-center py-2 rounded-lg text-sm font-medium">
-                    ✅ Quero um orçamento
-                  </div>
-                  <div className="bg-secondary text-secondary-foreground text-center py-2 rounded-lg text-sm font-medium">
-                    📋 Ver tabela de preços
-                  </div>
-                  <div className="bg-secondary text-secondary-foreground text-center py-2 rounded-lg text-sm font-medium">
-                    📞 Falar com atendente
-                  </div>
-                </div>
-              </div>
-              <p className="text-xs text-muted-foreground flex items-center gap-1">
-                <CheckCircle2 className="h-3 w-3 text-primary" /> Taxa de resposta: ~45%
-              </p>
-            </CardContent>
-          </Card>
-
-          {/* List message example */}
-          <Card>
-            <CardContent className="p-5 space-y-3">
-              <Badge variant="secondary">Mensagem com Menu Lista</Badge>
-              <div className="bg-muted rounded-xl p-4 space-y-3">
-                <p className="text-sm text-foreground">
-                  📋 Selecione o serviço que deseja:
-                </p>
-                <div className="border border-border rounded-lg divide-y divide-border">
-                  <div className="px-3 py-2 flex items-center justify-between">
-                    <span className="text-sm">🏨 Transfer Aeroporto</span>
-                    <ArrowRight className="h-3 w-3 text-muted-foreground" />
-                  </div>
-                  <div className="px-3 py-2 flex items-center justify-between">
-                    <span className="text-sm">👥 Viagem em Grupo</span>
-                    <ArrowRight className="h-3 w-3 text-muted-foreground" />
-                  </div>
-                  <div className="px-3 py-2 flex items-center justify-between">
-                    <span className="text-sm">⏰ Motorista por Hora</span>
-                    <ArrowRight className="h-3 w-3 text-muted-foreground" />
-                  </div>
-                  <div className="px-3 py-2 flex items-center justify-between">
-                    <span className="text-sm">🎉 Evento Especial</span>
-                    <ArrowRight className="h-3 w-3 text-muted-foreground" />
-                  </div>
-                </div>
-              </div>
-              <p className="text-xs text-muted-foreground flex items-center gap-1">
-                <CheckCircle2 className="h-3 w-3 text-primary" /> Taxa de resposta: ~55%
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
 
       {/* CTA */}
       <Card className="border-primary/30 bg-gradient-to-r from-primary/5 to-primary/10">
