@@ -528,7 +528,7 @@ export default function WebsitePage() {
                   <img
                     src={t.imagem_url}
                     alt={t.nome}
-                    className="w-full object-cover object-top transition-transform duration-[3s] ease-linear group-hover:translate-y-[calc(-100%+12rem)]"
+                    className="w-full object-cover object-top transition-transform duration-[8s] ease-[cubic-bezier(0.25,0.1,0.25,1)] group-hover:translate-y-[calc(-100%+12rem)]"
                     style={{ minHeight: "200%" }}
                   />
                 ) : (
