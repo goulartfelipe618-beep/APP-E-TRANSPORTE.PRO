@@ -295,10 +295,12 @@ export type Database = {
           id: string
           imagem_url: string
           link_url: string | null
+          materiais: string | null
           ordem: number
           tipo: string
           titulo: string
           updated_at: string
+          video_url: string | null
         }
         Insert: {
           ativo?: boolean
@@ -307,10 +309,12 @@ export type Database = {
           id?: string
           imagem_url?: string
           link_url?: string | null
+          materiais?: string | null
           ordem?: number
           tipo?: string
           titulo?: string
           updated_at?: string
+          video_url?: string | null
         }
         Update: {
           ativo?: boolean
@@ -319,12 +323,49 @@ export type Database = {
           id?: string
           imagem_url?: string
           link_url?: string | null
+          materiais?: string | null
           ordem?: number
           tipo?: string
           titulo?: string
           updated_at?: string
+          video_url?: string | null
         }
         Relationships: []
+      }
+      mentoria_progresso: {
+        Row: {
+          card_id: string
+          concluido: boolean
+          concluido_em: string | null
+          created_at: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          card_id: string
+          concluido?: boolean
+          concluido_em?: string | null
+          created_at?: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          card_id?: string
+          concluido?: boolean
+          concluido_em?: string | null
+          created_at?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mentoria_progresso_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "mentoria_cards"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       network: {
         Row: {
