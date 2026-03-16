@@ -42,6 +42,10 @@ export default function EmailBusinessPage() {
   // step 1 – domain
   const [domainOption, setDomainOption] = useState<"new" | "existing">("new");
   const [domain, setDomain] = useState("");
+  const [domainChecked, setDomainChecked] = useState(false);
+  const [domainAvailable, setDomainAvailable] = useState<boolean | null>(null);
+  const [checkingDomain, setCheckingDomain] = useState(false);
+  const [domainMessage, setDomainMessage] = useState("");
 
   // step 2 – plan
   const [selectedPlan, setSelectedPlan] = useState(1);
@@ -56,6 +60,47 @@ export default function EmailBusinessPage() {
   const totalMensal = plan.unitPrice * accounts[selectedPlan];
   const totalAnual = totalMensal * 12;
   const emailPrincipal = `${emailPrefix}@${domain || "seudominio"}`;
+
+  const resetDomainCheck = () => {
+    setDomainChecked(false);
+    setDomainAvailable(null);
+    setDomainMessage("");
+  };
+
+  const handleCheckDomain = async () => {
+    if (!domain.trim() || !domain.includes(".")) {
+      toast.error("Informe um domínio válido (ex: suaempresa.com.br)");
+      return;
+    }
+    setCheckingDomain(true);
+    setDomainChecked(false);
+    setDomainAvailable(null);
+    try {
+      const { data, error } = await supabase.functions.invoke("check-domain", {
+        body: { domain: domain.trim() },
+      });
+      if (error) throw error;
+      setDomainChecked(true);
+      setDomainAvailable(data.available === true);
+      setDomainMessage(data.message || "");
+      if (data.available) {
+        toast.success("Domínio disponível!");
+      } else {
+        toast.error(data.message || "Domínio indisponível");
+      }
+    } catch (err: any) {
+      toast.error("Erro ao verificar domínio: " + (err.message || ""));
+    } finally {
+      setCheckingDomain(false);
+    }
+  };
+
+  const canAdvanceFromDomain = () => {
+    if (!domain.trim() || !domain.includes(".")) return false;
+    if (domainOption === "existing") return true;
+    // new domain: must have checked and be available
+    return domainChecked && domainAvailable === true;
+  };
 
   useEffect(() => {
     const checkServico = async () => {
@@ -230,12 +275,12 @@ export default function EmailBusinessPage() {
             <div>
               <p className="text-sm font-medium text-foreground mb-3">Você já tem um domínio?</p>
               <div className="flex gap-6">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input type="radio" name="domain" checked={domainOption === "new"} onChange={() => setDomainOption("new")} className="accent-primary" />
+              <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="radio" name="domain" checked={domainOption === "new"} onChange={() => { setDomainOption("new"); resetDomainCheck(); }} className="accent-primary" />
                   <span className="text-sm text-foreground">Quero registrar um novo</span>
                 </label>
                 <label className="flex items-center gap-2 cursor-pointer">
-                  <input type="radio" name="domain" checked={domainOption === "existing"} onChange={() => setDomainOption("existing")} className="accent-primary" />
+                  <input type="radio" name="domain" checked={domainOption === "existing"} onChange={() => { setDomainOption("existing"); resetDomainCheck(); }} className="accent-primary" />
                   <span className="text-sm text-foreground">Já tenho um domínio</span>
                 </label>
               </div>
@@ -248,7 +293,7 @@ export default function EmailBusinessPage() {
               <Input
                 placeholder="suaempresa.com.br"
                 value={domain}
-                onChange={(e) => setDomain(e.target.value)}
+                onChange={(e) => { setDomain(e.target.value); resetDomainCheck(); }}
               />
               <p className="text-xs text-muted-foreground mt-1">
                 {domainOption === "new"
@@ -258,9 +303,25 @@ export default function EmailBusinessPage() {
             </div>
 
             {domainOption === "new" && (
-              <Button variant="outline" className="gap-2">
-                <Globe className="h-4 w-4" /> Pesquisar Domínio
-              </Button>
+              <div className="space-y-3">
+                <Button variant="outline" className="gap-2" onClick={handleCheckDomain} disabled={checkingDomain || !domain.trim()}>
+                  <Globe className="h-4 w-4" /> {checkingDomain ? "Verificando..." : "Pesquisar Domínio"}
+                </Button>
+
+                {domainChecked && domainAvailable === true && (
+                  <div className="rounded-lg border border-green-500/30 bg-green-500/10 p-3 flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-green-500" />
+                    <span className="text-sm text-green-400 font-medium">{domainMessage || "Domínio disponível!"}</span>
+                  </div>
+                )}
+
+                {domainChecked && domainAvailable === false && (
+                  <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 flex items-center gap-2">
+                    <Info className="h-4 w-4 text-destructive" />
+                    <span className="text-sm text-destructive font-medium">{domainMessage || "Domínio indisponível."}</span>
+                  </div>
+                )}
+              </div>
             )}
           </div>
         )}
@@ -431,7 +492,22 @@ export default function EmailBusinessPage() {
             <ArrowLeft className="h-4 w-4 mr-2" /> Voltar
           </Button>
           {step < 3 ? (
-            <Button onClick={() => setStep((s) => s + 1)}>
+            <Button
+              onClick={() => {
+                if (step === 0 && !canAdvanceFromDomain()) {
+                  if (domainOption === "new" && !domainChecked) {
+                    toast.error("Pesquise a disponibilidade do domínio antes de continuar.");
+                  } else if (domainOption === "new" && !domainAvailable) {
+                    toast.error("Domínio indisponível. Escolha outro domínio.");
+                  } else {
+                    toast.error("Informe um domínio válido.");
+                  }
+                  return;
+                }
+                setStep((s) => s + 1);
+              }}
+              variant={step === 0 && !canAdvanceFromDomain() ? "outline" : "default"}
+            >
               Próximo <ArrowRight className="h-4 w-4 ml-2" />
             </Button>
           ) : (
