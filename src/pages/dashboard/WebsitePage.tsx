@@ -499,11 +499,21 @@ export default function WebsitePage() {
             if (briefingStep === 2) {
               if (!companyName.trim()) { toast.error("Preencha o nome da empresa."); return; }
               if (!city.trim()) { toast.error("Preencha a cidade principal."); return; }
+              if (!region.trim()) { toast.error("Preencha a região atendida."); return; }
+              if (!fleet.trim()) { toast.error("Preencha a frota."); return; }
               if (!whatsapp.trim()) { toast.error("Preencha o WhatsApp."); return; }
               if (!email.trim()) { toast.error("Preencha o e-mail profissional."); return; }
+              if (selectedServices.length === 0) { toast.error("Selecione pelo menos um tipo de serviço."); return; }
             }
-            if (briefingStep < 3) setBriefingStep(s => s + 1);
-            else handleSubmitSolicitacao();
+            if (briefingStep === 3) {
+              if (!domain.trim() || !companyName.trim() || !whatsapp.trim() || !email.trim()) {
+                toast.error("Preencha todos os campos obrigatórios antes de enviar.");
+                return;
+              }
+              handleSubmitSolicitacao();
+              return;
+            }
+            setBriefingStep(s => s + 1);
           }} className="bg-primary text-primary-foreground" disabled={submitting}>
             {briefingStep < 3 ? "Próximo" : (submitting ? "Enviando..." : "Revisar e Enviar")} <ArrowRight className="h-4 w-4 ml-2" />
           </Button>
