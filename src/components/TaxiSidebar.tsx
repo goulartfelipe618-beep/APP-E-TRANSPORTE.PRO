@@ -1,7 +1,7 @@
 import {
   LayoutDashboard, Home, Activity, MapPin, Car,
   Phone, CheckCircle, Users, Settings, StickyNote,
-  Bell, Moon, LogOut, Globe, Monitor,
+  Bell, Moon, LogOut, Globe, Monitor, ClipboardList,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -56,6 +56,7 @@ const menuStructure = [
         ],
       },
       { title: "Anotações", page: "anotacoes", icon: StickyNote },
+      { title: "Tickets", page: "tickets", icon: ClipboardList },
     ],
   },
 ];

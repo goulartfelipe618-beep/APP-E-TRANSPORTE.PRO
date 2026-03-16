@@ -13,6 +13,7 @@ import AnotacoesPage from "@/pages/dashboard/AnotacoesPage";
 import SistemaConfiguracoesPage from "@/pages/dashboard/SistemaConfiguracoes";
 import SistemaAutomacoesPage from "@/pages/dashboard/SistemaAutomacoes";
 import SistemaComunicadorPage from "@/pages/dashboard/SistemaComunicador";
+import TicketsPage from "@/pages/dashboard/TicketsPage";
 
 const PAGE_MAP: Record<string, React.ComponentType> = {
   home: TaxiHome,
@@ -25,6 +26,7 @@ const PAGE_MAP: Record<string, React.ComponentType> = {
   "sistema/configuracoes": SistemaConfiguracoesPage,
   "sistema/automacoes": SistemaAutomacoesPage,
   "sistema/comunicador": SistemaComunicadorPage,
+  tickets: TicketsPage,
 };
 
 function TaxiContent() {

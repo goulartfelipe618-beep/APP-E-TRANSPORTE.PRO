@@ -956,6 +956,42 @@ export type Database = {
         }
         Relationships: []
       }
+      tickets: {
+        Row: {
+          assunto: string
+          created_at: string
+          descricao: string
+          id: string
+          resposta_admin: string | null
+          status: string
+          tipo: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          assunto: string
+          created_at?: string
+          descricao?: string
+          id?: string
+          resposta_admin?: string | null
+          status?: string
+          tipo?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          assunto?: string
+          created_at?: string
+          descricao?: string
+          id?: string
+          resposta_admin?: string | null
+          status?: string
+          tipo?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           id: string

@@ -17,6 +17,7 @@ import AdminAutomacoesPage from "@/pages/admin/AdminAutomacoesPage";
 import AnotacoesPage from "@/pages/dashboard/AnotacoesPage";
 import SistemaConfiguracoesPage from "@/pages/dashboard/SistemaConfiguracoes";
 import SistemaComunicadorPage from "@/pages/dashboard/SistemaComunicador";
+import AdminTicketsPage from "@/pages/admin/AdminTicketsPage";
 
 const PAGE_MAP: Record<string, React.ComponentType> = {
   home: AdminHomePage,
@@ -34,6 +35,7 @@ const PAGE_MAP: Record<string, React.ComponentType> = {
   "sistema/automacoes": AdminAutomacoesPage,
   "sistema/comunicador": SistemaComunicadorPage,
   "sistema/anotacoes": AnotacoesPage,
+  tickets: AdminTicketsPage,
 };
 
 function AdminContent() {

@@ -97,6 +97,7 @@ const getMenuStructure = (showNetwork: boolean) => [
         ],
       },
       { title: "Anotações", page: "anotacoes", icon: StickyNote },
+      { title: "Tickets", page: "tickets", icon: ClipboardList },
     ],
   },
 ];

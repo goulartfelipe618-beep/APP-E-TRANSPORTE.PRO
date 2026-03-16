@@ -168,6 +168,16 @@ export function AdminSidebar() {
                 </SidebarMenuButton>
               </SidebarMenuItem>
 
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  onClick={() => setActivePage("tickets")}
+                  className={cn("cursor-pointer", isActive("tickets") && "bg-muted text-primary font-medium")}
+                >
+                  <ClipboardList className="h-4 w-4 mr-2" />
+                  {!collapsed && <span>Tickets</span>}
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+
               {renderCollapsible("Sistema", Settings, sistemaChildren, sistemaActive)}
             </SidebarMenu>
           </SidebarGroupContent>
