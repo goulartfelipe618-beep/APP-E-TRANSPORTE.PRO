@@ -61,6 +61,47 @@ export default function EmailBusinessPage() {
   const totalAnual = totalMensal * 12;
   const emailPrincipal = `${emailPrefix}@${domain || "seudominio"}`;
 
+  const resetDomainCheck = () => {
+    setDomainChecked(false);
+    setDomainAvailable(null);
+    setDomainMessage("");
+  };
+
+  const handleCheckDomain = async () => {
+    if (!domain.trim() || !domain.includes(".")) {
+      toast.error("Informe um domínio válido (ex: suaempresa.com.br)");
+      return;
+    }
+    setCheckingDomain(true);
+    setDomainChecked(false);
+    setDomainAvailable(null);
+    try {
+      const { data, error } = await supabase.functions.invoke("check-domain", {
+        body: { domain: domain.trim() },
+      });
+      if (error) throw error;
+      setDomainChecked(true);
+      setDomainAvailable(data.available === true);
+      setDomainMessage(data.message || "");
+      if (data.available) {
+        toast.success("Domínio disponível!");
+      } else {
+        toast.error(data.message || "Domínio indisponível");
+      }
+    } catch (err: any) {
+      toast.error("Erro ao verificar domínio: " + (err.message || ""));
+    } finally {
+      setCheckingDomain(false);
+    }
+  };
+
+  const canAdvanceFromDomain = () => {
+    if (!domain.trim() || !domain.includes(".")) return false;
+    if (domainOption === "existing") return true;
+    // new domain: must have checked and be available
+    return domainChecked && domainAvailable === true;
+  };
+
   useEffect(() => {
     const checkServico = async () => {
       const { data: { user } } = await supabase.auth.getUser();
