@@ -1,4 +1,5 @@
 import { useState, useEffect, lazy, Suspense } from "react";
+import PageLoader from "@/components/PageLoader";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { Shield } from "lucide-react";
