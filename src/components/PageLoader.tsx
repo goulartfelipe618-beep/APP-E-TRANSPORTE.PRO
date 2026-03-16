@@ -16,14 +16,18 @@ export default function PageLoader({ children, pageKey }: PageLoaderProps) {
     return () => clearTimeout(timer);
   }, [pageKey]);
 
-  if (loading) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
-        <Loader2 className="h-10 w-10 animate-spin text-primary" />
-        <p className="text-lg font-bold text-foreground tracking-wide">E-transporte.pro</p>
+  return (
+    <div className="relative min-h-[60vh]">
+      {/* Children always mounted (hidden while loading) so data fetches in parallel */}
+      <div className={loading ? "invisible absolute inset-0" : ""}>
+        {children}
       </div>
-    );
-  }
-
-  return <>{children}</>;
+      {loading && (
+        <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+          <Loader2 className="h-10 w-10 animate-spin text-primary" />
+          <p className="text-lg font-bold text-foreground tracking-wide">E-transporte.pro</p>
+        </div>
+      )}
+    </div>
+  );
 }
