@@ -1,4 +1,5 @@
 import { useState, useEffect, lazy, Suspense } from "react";
+import PageLoader from "@/components/PageLoader";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { Shield } from "lucide-react";
@@ -102,7 +103,9 @@ function DashboardContent() {
           </div>
         </header>
         <main className="flex-1 bg-background p-6 overflow-auto">
-          <PageComponent key={activePage} />
+          <PageLoader pageKey={activePage}>
+            <PageComponent key={activePage} />
+          </PageLoader>
         </main>
       </div>
       {showOverlay && (

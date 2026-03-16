@@ -1,4 +1,5 @@
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import PageLoader from "@/components/PageLoader";
 import { TaxiSidebar } from "@/components/TaxiSidebar";
 import { Car } from "lucide-react";
 import { ActivePageProvider, useActivePage } from "@/contexts/ActivePageContext";
@@ -45,7 +46,9 @@ function TaxiContent() {
           </div>
         </header>
         <main className="flex-1 bg-background p-6 overflow-auto">
-          <PageComponent key={activePage} />
+          <PageLoader pageKey={activePage}>
+            <PageComponent key={activePage} />
+          </PageLoader>
         </main>
       </div>
     </div>
