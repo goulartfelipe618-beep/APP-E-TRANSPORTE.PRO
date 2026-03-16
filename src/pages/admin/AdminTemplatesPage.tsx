@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,12 +7,9 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
+  Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table";
-import { Plus, Pencil, Trash2, ExternalLink, Eye, ImageIcon } from "lucide-react";
+import { Plus, Pencil, Trash2, Eye, ImageIcon, Upload, X } from "lucide-react";
 
 interface Template {
   id: string;
@@ -29,10 +26,14 @@ export default function AdminTemplatesPage() {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Form
   const [nome, setNome] = useState("");
   const [imagemUrl, setImagemUrl] = useState("");
+  const [imagemFile, setImagemFile] = useState<File | null>(null);
+  const [imagemPreview, setImagemPreview] = useState("");
   const [linkModelo, setLinkModelo] = useState("");
   const [ordem, setOrdem] = useState(0);
   const [ativo, setAtivo] = useState(true);
@@ -51,6 +52,8 @@ export default function AdminTemplatesPage() {
   const resetForm = () => {
     setNome("");
     setImagemUrl("");
+    setImagemFile(null);
+    setImagemPreview("");
     setLinkModelo("");
     setOrdem(0);
     setAtivo(true);
@@ -66,29 +69,81 @@ export default function AdminTemplatesPage() {
     setEditingId(t.id);
     setNome(t.nome);
     setImagemUrl(t.imagem_url);
+    setImagemPreview(t.imagem_url);
+    setImagemFile(null);
     setLinkModelo(t.link_modelo || "");
     setOrdem(t.ordem);
     setAtivo(t.ativo);
     setDialogOpen(true);
   };
 
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      toast.error("Selecione apenas arquivos de imagem");
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("Imagem deve ter no máximo 10MB");
+      return;
+    }
+
+    setImagemFile(file);
+    setImagemPreview(URL.createObjectURL(file));
+  };
+
+  const uploadImage = async (file: File): Promise<string | null> => {
+    const ext = file.name.split(".").pop();
+    const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${ext}`;
+    const filePath = `templates/${fileName}`;
+
+    const { error } = await supabase.storage
+      .from("templates")
+      .upload(filePath, file, { cacheControl: "3600", upsert: false });
+
+    if (error) {
+      toast.error("Erro ao fazer upload: " + error.message);
+      return null;
+    }
+
+    const { data: publicData } = supabase.storage
+      .from("templates")
+      .getPublicUrl(filePath);
+
+    return publicData.publicUrl;
+  };
+
   const handleSave = async () => {
     if (!nome.trim()) { toast.error("Nome é obrigatório"); return; }
-    if (!imagemUrl.trim()) { toast.error("URL da imagem é obrigatória"); return; }
+    if (!imagemFile && !imagemUrl) { toast.error("Imagem é obrigatória"); return; }
+
+    setUploading(true);
+
+    let finalImageUrl = imagemUrl;
+
+    if (imagemFile) {
+      const url = await uploadImage(imagemFile);
+      if (!url) { setUploading(false); return; }
+      finalImageUrl = url;
+    }
 
     if (editingId) {
       const { error } = await (supabase.from("templates_website" as any).update({
-        nome, imagem_url: imagemUrl, link_modelo: linkModelo, ordem, ativo, updated_at: new Date().toISOString(),
+        nome, imagem_url: finalImageUrl, link_modelo: linkModelo, ordem, ativo, updated_at: new Date().toISOString(),
       } as any).eq("id", editingId) as any);
-      if (error) { toast.error("Erro: " + error.message); return; }
+      if (error) { toast.error("Erro: " + error.message); setUploading(false); return; }
       toast.success("Template atualizado!");
     } else {
       const { error } = await (supabase.from("templates_website" as any).insert({
-        nome, imagem_url: imagemUrl, link_modelo: linkModelo, ordem, ativo,
+        nome, imagem_url: finalImageUrl, link_modelo: linkModelo, ordem, ativo,
       } as any) as any);
-      if (error) { toast.error("Erro: " + error.message); return; }
+      if (error) { toast.error("Erro: " + error.message); setUploading(false); return; }
       toast.success("Template criado!");
     }
+    setUploading(false);
     setDialogOpen(false);
     resetForm();
     fetchTemplates();
@@ -106,6 +161,13 @@ export default function AdminTemplatesPage() {
     const { error } = await (supabase.from("templates_website" as any).update({ ativo: !t.ativo } as any).eq("id", t.id) as any);
     if (error) { toast.error("Erro: " + error.message); return; }
     fetchTemplates();
+  };
+
+  const removeImage = () => {
+    setImagemFile(null);
+    setImagemPreview("");
+    setImagemUrl("");
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   return (
@@ -187,11 +249,46 @@ export default function AdminTemplatesPage() {
               <label className="text-sm font-medium text-foreground">Nome do modelo <span className="text-destructive">*</span></label>
               <Input value={nome} onChange={e => setNome(e.target.value)} placeholder="Executive Dark Premium" className="mt-1" />
             </div>
+
+            {/* File Upload */}
             <div>
-              <label className="text-sm font-medium text-foreground">URL da imagem (screenshot longo) <span className="text-destructive">*</span></label>
-              <Input value={imagemUrl} onChange={e => setImagemUrl(e.target.value)} placeholder="https://..." className="mt-1" />
+              <label className="text-sm font-medium text-foreground">Imagem (screenshot longo) <span className="text-destructive">*</span></label>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleFileSelect}
+                className="hidden"
+              />
+              {imagemPreview ? (
+                <div className="mt-2 relative rounded-lg border border-border overflow-hidden h-32 group">
+                  <img
+                    src={imagemPreview}
+                    alt="Preview"
+                    className="w-full object-cover object-top transition-transform duration-[3s] ease-linear group-hover:translate-y-[calc(-100%+8rem)]"
+                    style={{ minHeight: "200%" }}
+                  />
+                  <button
+                    type="button"
+                    onClick={removeImage}
+                    className="absolute top-2 right-2 bg-background/80 rounded-full p-1 hover:bg-destructive hover:text-destructive-foreground transition-colors"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              ) : (
+                <div
+                  onClick={() => fileInputRef.current?.click()}
+                  className="mt-2 border-2 border-dashed border-border rounded-lg p-8 flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-primary/50 transition-colors"
+                >
+                  <Upload className="h-8 w-8 text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground">Clique para selecionar uma imagem</p>
+                  <p className="text-xs text-muted-foreground/70">PNG, JPG ou WEBP • Máx 10MB</p>
+                </div>
+              )}
               <p className="text-xs text-muted-foreground mt-1">Use uma imagem alta (full-page screenshot) para o efeito de scroll ao passar o mouse.</p>
             </div>
+
             <div>
               <label className="text-sm font-medium text-foreground">Link para ver o modelo</label>
               <Input value={linkModelo} onChange={e => setLinkModelo(e.target.value)} placeholder="https://exemplo.com" className="mt-1" />
@@ -206,17 +303,9 @@ export default function AdminTemplatesPage() {
                 <span className="text-sm text-foreground">Ativo</span>
               </div>
             </div>
-            {imagemUrl && (
-              <div className="rounded-lg border border-border overflow-hidden h-32 group">
-                <img
-                  src={imagemUrl}
-                  alt="Preview"
-                  className="w-full object-cover object-top transition-transform duration-[3s] ease-linear group-hover:translate-y-[calc(-100%+8rem)]"
-                  style={{ minHeight: "200%" }}
-                />
-              </div>
-            )}
-            <Button onClick={handleSave} className="w-full">{editingId ? "Salvar Alterações" : "Criar Template"}</Button>
+            <Button onClick={handleSave} className="w-full" disabled={uploading}>
+              {uploading ? "Enviando..." : editingId ? "Salvar Alterações" : "Criar Template"}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
