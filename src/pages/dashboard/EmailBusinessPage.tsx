@@ -244,7 +244,7 @@ export default function EmailBusinessPage() {
 
   /* ── Wizard ── */
   return (
-    <div className="max-w-3xl mx-auto space-y-8">
+    <div className="space-y-8">
       {pendingBanner}
       {/* Stepper */}
       <div className="flex items-center justify-center gap-0">
