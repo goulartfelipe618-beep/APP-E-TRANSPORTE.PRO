@@ -26,6 +26,8 @@ export default function MentoriaPage() {
   const [selectedCard, setSelectedCard] = useState<MentoriaCard | null>(null);
   const [progresso, setProgresso] = useState<Record<string, boolean>>({});
   const [userId, setUserId] = useState<string | null>(null);
+  const [showAllSobre, setShowAllSobre] = useState(false);
+  const [showAllConteudo, setShowAllConteudo] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
@@ -90,7 +92,6 @@ export default function MentoriaPage() {
           <ArrowLeft className="h-4 w-4" /> Voltar para Mentoria
         </Button>
 
-        {/* Video Player */}
         <div className="w-full rounded-xl overflow-hidden bg-black shadow-2xl">
           {selectedCard.video_url ? (
             <video
@@ -108,7 +109,6 @@ export default function MentoriaPage() {
           )}
         </div>
 
-        {/* Title + Completed badge */}
         <div className="flex items-start justify-between gap-4">
           <div className="space-y-2 flex-1">
             <h1 className="text-2xl font-bold text-foreground">{selectedCard.titulo}</h1>
@@ -125,7 +125,6 @@ export default function MentoriaPage() {
           )}
         </div>
 
-        {/* Description */}
         {selectedCard.descricao && (
           <div className="bg-muted/50 rounded-lg p-5 border border-border">
             <h3 className="text-sm font-semibold text-foreground mb-2">Descrição</h3>
@@ -133,7 +132,6 @@ export default function MentoriaPage() {
           </div>
         )}
 
-        {/* Materials */}
         {selectedCard.materiais && (
           <div className="bg-muted/50 rounded-lg p-5 border border-border">
             <h3 className="text-sm font-semibold text-foreground mb-2 flex items-center gap-2">
@@ -166,8 +164,8 @@ export default function MentoriaPage() {
           <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
             <BookOpen className="h-5 w-5 text-primary" /> Sobre o Sistema
           </h2>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-            {sobreCards.map((card, index) => (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-5">
+            {(showAllSobre ? sobreCards : sobreCards.slice(0, 4)).map((card, index) => (
               <button key={card.id} onClick={() => openCard(card)} className="group block text-left w-full">
                 <Card className="overflow-hidden border-border hover:border-primary/50 transition-all duration-300 hover:-translate-y-1 relative">
                   {progresso[card.id] && (
@@ -177,7 +175,7 @@ export default function MentoriaPage() {
                       </Badge>
                     </div>
                   )}
-                  <div style={{ aspectRatio: "1080/760" }}>
+                  <div style={{ aspectRatio: "16/10" }}>
                     <img src={card.imagem_url} alt={card.titulo} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
                   </div>
                   <div className="p-3 space-y-1">
@@ -189,6 +187,13 @@ export default function MentoriaPage() {
               </button>
             ))}
           </div>
+          {sobreCards.length > 4 && (
+            <div className="flex justify-center">
+              <Button variant="outline" onClick={() => setShowAllSobre(!showAllSobre)}>
+                {showAllSobre ? "Ver menos" : "VER TUDO!"}
+              </Button>
+            </div>
+          )}
         </section>
       )}
 
@@ -198,8 +203,8 @@ export default function MentoriaPage() {
           <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
             <GraduationCap className="h-5 w-5 text-primary" /> Conteúdos
           </h2>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-            {conteudoCards.map((card, index) => (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-5">
+            {(showAllConteudo ? conteudoCards : conteudoCards.slice(0, 4)).map((card, index) => (
               <button key={card.id} onClick={() => openCard(card)} className="group block text-left w-full">
                 <Card className="overflow-hidden border-border hover:border-primary/50 transition-all duration-300 hover:-translate-y-1 relative">
                   {progresso[card.id] && (
@@ -209,7 +214,7 @@ export default function MentoriaPage() {
                       </Badge>
                     </div>
                   )}
-                  <div style={{ aspectRatio: "1080/1920" }}>
+                  <div style={{ aspectRatio: "16/10" }}>
                     <img src={card.imagem_url} alt={card.titulo} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
                   </div>
                   <div className="p-3 space-y-1">
@@ -221,6 +226,13 @@ export default function MentoriaPage() {
               </button>
             ))}
           </div>
+          {conteudoCards.length > 4 && (
+            <div className="flex justify-center">
+              <Button variant="outline" onClick={() => setShowAllConteudo(!showAllConteudo)}>
+                {showAllConteudo ? "Ver menos" : "VER TUDO!"}
+              </Button>
+            </div>
+          )}
         </section>
       )}
 
