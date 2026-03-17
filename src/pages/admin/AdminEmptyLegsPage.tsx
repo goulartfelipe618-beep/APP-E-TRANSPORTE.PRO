@@ -259,7 +259,7 @@ export default function AdminEmptyLegsPage() {
               <div><strong>Destino:</strong> {detalhesItem.destino || "—"}</div>
               <div><strong>Data/Hora:</strong> {formatDate(detalhesItem.data_hora)}</div>
               <div><strong>Observações:</strong> {detalhesItem.observacoes || "—"}</div>
-              <div><strong>Expiração:</strong> {detalhesItem.data_expiracao ? formatDate(detalhesItem.data_expiracao) : "Sem expiração"}</div>
+              <div><strong>Expiração (data do voo):</strong> {detalhesItem.data_hora ? formatDate(detalhesItem.data_hora) : "Sem data"}</div>
               <div><strong>Editado por:</strong> {detalhesItem.editado_por || "—"}</div>
               <div><strong>Recebido em:</strong> {formatDate(detalhesItem.created_at)}</div>
               <div><strong>Atualizado em:</strong> {formatDate(detalhesItem.updated_at)}</div>
