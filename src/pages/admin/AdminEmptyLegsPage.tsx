@@ -232,9 +232,11 @@ export default function AdminEmptyLegsPage() {
                           )}
                         </>
                       )}
-                      <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => setDeleteId(item.id)}>
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      {!expired && (
+                        <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => setDeleteId(item.id)}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </CardContent>
