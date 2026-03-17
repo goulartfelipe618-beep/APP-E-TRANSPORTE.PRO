@@ -19,6 +19,7 @@ import SistemaConfiguracoesPage from "@/pages/dashboard/SistemaConfiguracoes";
 import SistemaComunicadorPage from "@/pages/dashboard/SistemaComunicador";
 import AdminTicketsPage from "@/pages/admin/AdminTicketsPage";
 import AdminMentoriaPage from "@/pages/admin/AdminMentoriaPage";
+import EmptyLegsPage from "@/pages/dashboard/EmptyLegsPage";
 
 const PAGE_MAP: Record<string, React.ComponentType> = {
   home: AdminHomePage,
