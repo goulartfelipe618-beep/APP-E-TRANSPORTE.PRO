@@ -19,8 +19,8 @@ interface EmptyLag {
 }
 
 const isExpired = (item: EmptyLag) => {
-  if (!item.data_expiracao) return false;
-  return new Date(item.data_expiracao) < new Date();
+  if (!item.data_hora) return false;
+  return new Date(item.data_hora) < new Date();
 };
 
 export default function EmptyLegsPage() {
