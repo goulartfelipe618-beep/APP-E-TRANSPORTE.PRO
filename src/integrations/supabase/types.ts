@@ -439,6 +439,39 @@ export type Database = {
         }
         Relationships: []
       }
+      qr_codes: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          id: string
+          slug: string
+          titulo: string
+          updated_at: string
+          url_destino: string
+          user_id: string
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          id?: string
+          slug: string
+          titulo?: string
+          updated_at?: string
+          url_destino: string
+          user_id: string
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          id?: string
+          slug?: string
+          titulo?: string
+          updated_at?: string
+          url_destino?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       reservas_grupos: {
         Row: {
           cpf_cnpj: string
