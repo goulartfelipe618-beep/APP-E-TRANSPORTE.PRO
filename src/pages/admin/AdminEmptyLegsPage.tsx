@@ -99,12 +99,13 @@ export default function AdminEmptyLegsPage() {
   const handleSaveEdit = async () => {
     if (!editItem) return;
     const { data: { user } } = await supabase.auth.getUser();
+    const dataHora = editForm.data_hora || null;
     const { error } = await supabase.from("empty_lags").update({
       origem: editForm.origem,
       destino: editForm.destino,
-      data_hora: editForm.data_hora || null,
+      data_hora: dataHora,
+      data_expiracao: dataHora,
       observacoes: editForm.observacoes,
-      data_expiracao: editForm.data_expiracao || null,
       editado_por: user?.email || "admin",
       updated_at: new Date().toISOString(),
     }).eq("id", editItem.id);
