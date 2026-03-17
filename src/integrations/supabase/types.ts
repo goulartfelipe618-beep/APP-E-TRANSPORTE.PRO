@@ -290,6 +290,7 @@ export type Database = {
       empty_lags: {
         Row: {
           created_at: string
+          data_expiracao: string | null
           data_hora: string | null
           destino: string
           editado_por: string | null
@@ -301,6 +302,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          data_expiracao?: string | null
           data_hora?: string | null
           destino?: string
           editado_por?: string | null
@@ -312,6 +314,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          data_expiracao?: string | null
           data_hora?: string | null
           destino?: string
           editado_por?: string | null
