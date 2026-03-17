@@ -69,6 +69,7 @@ const PAGE_MAP: Record<string, React.ComponentType> = {
   tickets: TicketsPage,
   disparador: DisparadorPage,
   mentoria: MentoriaPage,
+  "empty-legs": EmptyLegsPage,
 };
 
 function DashboardContent() {

@@ -22,6 +22,7 @@ const simpleItems = [
   { title: "Abrangência", page: "abrangencia", icon: MapPin },
   { title: "Slides", page: "slides", icon: SlidersHorizontal },
   { title: "Mentoria", page: "mentoria", icon: GraduationCap },
+  { title: "Empty Legs", page: "empty-legs", icon: Plane },
 ];
 
 const contratoChildren = [

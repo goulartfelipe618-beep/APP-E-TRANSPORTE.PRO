@@ -30,6 +30,7 @@ const PAGINAS = [
   { value: "website", label: "Website" },
   { value: "disparador", label: "Disparador" },
   { value: "mentoria", label: "Mentoria" },
+  { value: "empty_legs", label: "Empty Legs" },
 ];
 
 export default function SlidesPage() {

@@ -1,25 +1,8 @@
-import { useState, useEffect } from "react";
-import { Plane, ExternalLink } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { Plane } from "lucide-react";
 import SlideCarousel from "@/components/SlideCarousel";
 import { Card, CardContent } from "@/components/ui/card";
 
 export default function EmptyLegsPage() {
-  const [slides, setSlides] = useState<any[]>([]);
-
-  useEffect(() => {
-    const fetchSlides = async () => {
-      const { data } = await supabase
-        .from("slides")
-        .select("*")
-        .eq("pagina", "empty_legs")
-        .eq("ativo", true)
-        .order("ordem", { ascending: true });
-      setSlides(data || []);
-    };
-    fetchSlides();
-  }, []);
-
   return (
     <div className="space-y-6">
       <div>
@@ -32,9 +15,7 @@ export default function EmptyLegsPage() {
         </p>
       </div>
 
-      {slides.length > 0 && (
-        <SlideCarousel slides={slides} />
-      )}
+      <SlideCarousel pagina="empty_legs" />
 
       <Card className="border-primary/20 bg-primary/5">
         <CardContent className="p-6 space-y-3">
