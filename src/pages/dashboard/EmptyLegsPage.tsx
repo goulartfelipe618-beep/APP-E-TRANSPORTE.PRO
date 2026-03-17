@@ -107,10 +107,10 @@ export default function EmptyLegsPage() {
                   {item.observacoes && (
                     <p className="text-sm text-muted-foreground">📝 {item.observacoes}</p>
                   )}
-                  {item.data_expiracao && (
+                  {item.data_hora && (
                     <p className={`text-xs flex items-center gap-1 ${expired ? "text-destructive" : "text-muted-foreground"}`}>
                       <Clock className="h-3 w-3" />
-                      {expired ? "Oferta expirada" : `Válido até ${formatDate(item.data_expiracao)}`}
+                      {expired ? "Oferta expirada — voo já partiu" : `Válido até ${formatDate(item.data_hora)}`}
                     </p>
                   )}
                 </CardContent>
