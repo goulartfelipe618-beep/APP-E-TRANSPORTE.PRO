@@ -191,10 +191,10 @@ export default function AdminEmptyLegsPage() {
                         <span className="text-xs text-muted-foreground">
                           Recebido em {formatDate(item.created_at)}
                         </span>
-                        {item.data_expiracao && (
+                        {item.data_hora && (
                           <span className={`text-xs flex items-center gap-1 ${expired ? "text-destructive" : "text-muted-foreground"}`}>
                             <Clock className="h-3 w-3" />
-                            Expira: {formatDate(item.data_expiracao)}
+                            {expired ? "Expirou" : "Expira"}: {formatDate(item.data_hora)}
                           </span>
                         )}
                       </div>
