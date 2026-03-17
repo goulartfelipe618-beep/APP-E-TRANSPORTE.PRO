@@ -287,6 +287,42 @@ export type Database = {
         }
         Relationships: []
       }
+      empty_lags: {
+        Row: {
+          created_at: string
+          data_hora: string | null
+          destino: string
+          editado_por: string | null
+          id: string
+          observacoes: string | null
+          origem: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          data_hora?: string | null
+          destino?: string
+          editado_por?: string | null
+          id?: string
+          observacoes?: string | null
+          origem?: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          data_hora?: string | null
+          destino?: string
+          editado_por?: string | null
+          id?: string
+          observacoes?: string | null
+          origem?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       mentoria_cards: {
         Row: {
           ativo: boolean
