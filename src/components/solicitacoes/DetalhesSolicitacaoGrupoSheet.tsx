@@ -32,7 +32,7 @@ export default function DetalhesSolicitacaoGrupoSheet({ solicitacao, open, onOpe
             <div className="grid grid-cols-2 gap-3">
               <Field label="Cliente" value={s.nome_cliente} />
               <Field label="WhatsApp" value={s.whatsapp} />
-              <Field label="Email" value={(s as any).email} />
+              <Field label="Email" value={s.email} />
               <Field label="Status" value={<Badge variant="outline">{s.status}</Badge>} />
             </div>
           </Section>
