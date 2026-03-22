@@ -1,11 +1,12 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Code2, Copy, FileText } from "lucide-react";
+import { Code2, Copy, FileText, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 interface FerramentasDevDialogProps {
   open: boolean;
@@ -22,75 +23,31 @@ interface FieldDoc {
   options?: string[];
 }
 
-const personalFields: FieldDoc[] = [
+// Fallback hardcoded personal fields (always included)
+const personalFieldsFallback: FieldDoc[] = [
   { variable: "nome_completo", label: "Nome Completo", type: "text", required: true },
   { variable: "telefone", label: "Número de Telefone", type: "text", required: true },
   { variable: "email", label: "E-mail", type: "email", required: true },
   { variable: "como_encontrou", label: "Por onde nos encontrou?", type: "select", options: ["Google", "Instagram", "Facebook", "Indicação", "Outro"] },
 ];
 
-const transferIdaDocs: FieldDoc[] = [
-  { variable: "tipo_viagem", label: "Tipo de Viagem", type: "select", required: true, options: ["Somente Ida", "Ida e Volta", "Por Hora"] },
-  { variable: "passageiros_ida", label: "Passageiros (Ida)", type: "number", required: true },
-  { variable: "embarque_ida", label: "Embarque (Ida)", type: "text", required: true },
-  { variable: "destino_ida", label: "Destino (Ida)", type: "text", required: true },
-  { variable: "data_ida", label: "Data (Ida)", type: "date", required: true },
-  { variable: "hora_ida", label: "Hora (Ida)", type: "time", required: true },
-  { variable: "mensagem_ida", label: "Mensagem (Ida)", type: "textarea" },
-  { variable: "cupom_ida", label: "Cupom (Ida)", type: "text" },
-];
+function fieldNameToDoc(name: string): FieldDoc {
+  const lower = name.toLowerCase();
+  let type = "text";
+  if (lower.includes("data") || lower.includes("nascimento")) type = "date";
+  else if (lower.includes("hora") || lower.includes("horário")) type = "time";
+  else if (lower.includes("email") || lower.includes("e-mail")) type = "email";
+  else if (lower.includes("passageiro") || lower.includes("qtd") || lower.includes("número") || lower.includes("ano")) type = "number";
+  else if (lower.includes("mensagem") || lower.includes("observ") || lower.includes("itinerário") || lower.includes("experiência")) type = "textarea";
 
-const transferVoltaDocs: FieldDoc[] = [
-  { variable: "passageiros_volta", label: "Passageiros (Volta)", type: "number", required: true },
-  { variable: "embarque_volta", label: "Embarque (Volta)", type: "text", required: true },
-  { variable: "destino_volta", label: "Destino (Volta)", type: "text", required: true },
-  { variable: "data_volta", label: "Data (Volta)", type: "date", required: true },
-  { variable: "hora_volta", label: "Hora (Volta)", type: "time", required: true },
-  { variable: "mensagem_volta", label: "Mensagem (Volta)", type: "textarea" },
-  { variable: "cupom_volta", label: "Cupom (Volta)", type: "text" },
-];
+  const variable = name
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_|_$/g, "");
 
-const transferPorHoraDocs: FieldDoc[] = [
-  { variable: "tipo_viagem", label: "Tipo de Viagem", type: "select", required: true, options: ["Somente Ida", "Ida e Volta", "Por Hora"] },
-  { variable: "passageiros", label: "Passageiros", type: "number", required: true },
-  { variable: "endereco_inicio", label: "Endereço de Início", type: "text", required: true },
-  { variable: "data", label: "Data", type: "date", required: true },
-  { variable: "hora", label: "Hora", type: "time", required: true },
-  { variable: "qtd_horas", label: "Qtd. Horas", type: "number", required: true },
-  { variable: "ponto_encerramento", label: "Ponto de Encerramento", type: "text" },
-  { variable: "itinerario_mensagem", label: "Itinerário / Mensagem", type: "textarea" },
-  { variable: "cupom", label: "Cupom", type: "text" },
-];
-
-const grupoDocs: FieldDoc[] = [
-  { variable: "tipo_veiculo", label: "Tipo de Veículo", type: "select", required: true, options: ["Van", "Micro-ônibus", "Ônibus"] },
-  { variable: "num_passageiros", label: "Número de Passageiros", type: "number", required: true },
-  { variable: "embarque", label: "Endereço de Embarque", type: "text", required: true },
-  { variable: "destino", label: "Destino", type: "text", required: true },
-  { variable: "data_ida", label: "Data de Ida", type: "date", required: true },
-  { variable: "hora_ida", label: "Hora de Ida", type: "time", required: true },
-  { variable: "data_retorno", label: "Data de Retorno", type: "date" },
-  { variable: "hora_retorno", label: "Hora de Retorno", type: "time" },
-  { variable: "observacoes", label: "Observações", type: "textarea" },
-  { variable: "cupom_desconto", label: "Cupom de Desconto", type: "text" },
-];
-
-const motoristaDocs: FieldDoc[] = [
-  { variable: "cpf", label: "CPF", type: "text", required: true },
-  { variable: "data_nascimento", label: "Data de Nascimento", type: "date", required: true },
-  { variable: "endereco_completo", label: "Endereço Completo", type: "text", required: true },
-  { variable: "cidade", label: "Cidade", type: "text", required: true },
-  { variable: "estado", label: "Estado", type: "text", required: true },
-  { variable: "numero_cnh", label: "Número da CNH", type: "text", required: true },
-  { variable: "categoria_cnh", label: "Categoria da CNH", type: "select", required: true, options: ["A", "B", "C", "D", "E", "AB", "AC", "AD", "AE"] },
-  { variable: "possui_veiculo", label: "Possui Veículo", type: "select", options: ["Sim", "Não"] },
-  { variable: "marca_veiculo", label: "Marca do Veículo", type: "text" },
-  { variable: "modelo_veiculo", label: "Modelo do Veículo", type: "text" },
-  { variable: "ano_veiculo", label: "Ano do Veículo", type: "text" },
-  { variable: "placa_veiculo", label: "Placa do Veículo", type: "text" },
-  { variable: "experiencia", label: "Experiência", type: "textarea" },
-  { variable: "mensagem_observacoes", label: "Mensagem / Observações", type: "textarea" },
-];
+  return { variable, label: name, type };
+}
 
 function FieldTable({ fields, sectionTitle }: { fields: FieldDoc[]; sectionTitle: string }) {
   return (
@@ -103,8 +60,6 @@ function FieldTable({ fields, sectionTitle }: { fields: FieldDoc[]; sectionTitle
               <th className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">Variável</th>
               <th className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">Campo</th>
               <th className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">Tipo</th>
-              <th className="text-center px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">Obrig.</th>
-              <th className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">Opções</th>
             </tr>
           </thead>
           <tbody>
@@ -115,8 +70,6 @@ function FieldTable({ fields, sectionTitle }: { fields: FieldDoc[]; sectionTitle
                 </td>
                 <td className="px-3 py-1.5 text-foreground">{f.label}</td>
                 <td className="px-3 py-1.5 text-muted-foreground">{f.type}</td>
-                <td className="px-3 py-1.5 text-center">{f.required ? "✓" : "—"}</td>
-                <td className="px-3 py-1.5 text-xs text-muted-foreground">{f.options?.join(", ") || "—"}</td>
               </tr>
             ))}
           </tbody>
@@ -139,16 +92,58 @@ function buildJsonExample(fields: FieldDoc[]): Record<string, string> {
   return obj;
 }
 
+function CopyJsonButton({
+  label, fields, onCopy, copied,
+}: {
+  label: string; fields: FieldDoc[];
+  onCopy: (label: string, fields: FieldDoc[]) => void; copied: string | null;
+}) {
+  return (
+    <Button variant="outline" size="sm" className="w-full" onClick={() => onCopy(label, fields)}>
+      <Copy className="h-3.5 w-3.5 mr-2" />
+      {copied === label ? "Copiado!" : `Copiar JSON de exemplo — ${label}`}
+    </Button>
+  );
+}
+
 export default function FerramentasDevDialog({ open, onOpenChange, tipo }: FerramentasDevDialogProps) {
   const [copiedSection, setCopiedSection] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [dynamicFields, setDynamicFields] = useState<Record<string, FieldDoc[]>>({});
+
+  // Fetch fields from automacoes_campos_config
+  useEffect(() => {
+    if (!open) return;
+    (async () => {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from("automacoes_campos_config" as any)
+        .select("*")
+        .eq("categoria", tipo) as any;
+
+      const result: Record<string, FieldDoc[]> = {};
+      if (!error && data) {
+        for (const row of data) {
+          const campos: string[] = Array.isArray(row.campos) ? row.campos : [];
+          result[row.subcategoria] = campos.filter(c => c.trim()).map(fieldNameToDoc);
+        }
+      }
+      setDynamicFields(result);
+      setLoading(false);
+    })();
+  }, [open, tipo]);
 
   const copyJson = (label: string, fields: FieldDoc[]) => {
-    const allFields = [...fields, ...personalFields];
+    const allFields = [...fields, ...personalFieldsFallback];
     const json = JSON.stringify(buildJsonExample(allFields), null, 2);
     navigator.clipboard.writeText(json);
     setCopiedSection(label);
     toast.success(`JSON de exemplo (${label}) copiado!`);
     setTimeout(() => setCopiedSection(null), 2000);
+  };
+
+  const getFieldsForSub = (sub: string): FieldDoc[] => {
+    return dynamicFields[sub] || [];
   };
 
   const renderTransfer = () => (
@@ -159,42 +154,59 @@ export default function FerramentasDevDialog({ open, onOpenChange, tipo }: Ferra
         <TabsTrigger value="por_hora">Por Hora</TabsTrigger>
       </TabsList>
 
-      <TabsContent value="somente_ida" className="space-y-4">
-        <FieldTable fields={transferIdaDocs} sectionTitle="Dados da Viagem — Somente Ida" />
-        <FieldTable fields={personalFields} sectionTitle="Informações Pessoais" />
-        <CopyJsonButton label="Somente Ida" fields={transferIdaDocs} onCopy={copyJson} copied={copiedSection} />
-      </TabsContent>
-
-      <TabsContent value="ida_volta" className="space-y-4">
-        <FieldTable fields={transferIdaDocs} sectionTitle="Dados da Ida" />
-        <FieldTable fields={transferVoltaDocs} sectionTitle="Dados da Volta" />
-        <FieldTable fields={personalFields} sectionTitle="Informações Pessoais" />
-        <CopyJsonButton label="Ida e Volta" fields={[...transferIdaDocs, ...transferVoltaDocs]} onCopy={copyJson} copied={copiedSection} />
-      </TabsContent>
-
-      <TabsContent value="por_hora" className="space-y-4">
-        <FieldTable fields={transferPorHoraDocs} sectionTitle="Dados da Viagem — Por Hora" />
-        <FieldTable fields={personalFields} sectionTitle="Informações Pessoais" />
-        <CopyJsonButton label="Por Hora" fields={transferPorHoraDocs} onCopy={copyJson} copied={copiedSection} />
-      </TabsContent>
+      {["somente_ida", "ida_volta", "por_hora"].map((sub) => {
+        const fields = getFieldsForSub(sub);
+        const label = sub === "somente_ida" ? "Somente Ida" : sub === "ida_volta" ? "Ida e Volta" : "Por Hora";
+        return (
+          <TabsContent key={sub} value={sub} className="space-y-4">
+            {fields.length > 0 ? (
+              <FieldTable fields={fields} sectionTitle={`Dados da Viagem — ${label}`} />
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                Nenhum campo configurado para "{label}". Configure os campos no menu Automações do painel administrativo.
+              </p>
+            )}
+            <FieldTable fields={personalFieldsFallback} sectionTitle="Informações Pessoais" />
+            <CopyJsonButton label={label} fields={fields} onCopy={copyJson} copied={copiedSection} />
+          </TabsContent>
+        );
+      })}
     </Tabs>
   );
 
-  const renderGrupo = () => (
-    <div className="space-y-4">
-      <FieldTable fields={grupoDocs} sectionTitle="Dados da Viagem em Grupo" />
-      <FieldTable fields={personalFields} sectionTitle="Informações Pessoais" />
-      <CopyJsonButton label="Grupo" fields={grupoDocs} onCopy={copyJson} copied={copiedSection} />
-    </div>
-  );
+  const renderGrupo = () => {
+    const fields = getFieldsForSub("default");
+    return (
+      <div className="space-y-4">
+        {fields.length > 0 ? (
+          <FieldTable fields={fields} sectionTitle="Dados da Viagem em Grupo" />
+        ) : (
+          <p className="text-sm text-muted-foreground text-center py-4">
+            Nenhum campo configurado. Configure os campos no menu Automações do painel administrativo.
+          </p>
+        )}
+        <FieldTable fields={personalFieldsFallback} sectionTitle="Informações Pessoais" />
+        <CopyJsonButton label="Grupo" fields={fields} onCopy={copyJson} copied={copiedSection} />
+      </div>
+    );
+  };
 
-  const renderMotorista = () => (
-    <div className="space-y-4">
-      <FieldTable fields={motoristaDocs} sectionTitle="Dados do Motorista" />
-      <FieldTable fields={personalFields} sectionTitle="Informações Pessoais" />
-      <CopyJsonButton label="Motorista" fields={motoristaDocs} onCopy={copyJson} copied={copiedSection} />
-    </div>
-  );
+  const renderMotorista = () => {
+    const fields = getFieldsForSub("default");
+    return (
+      <div className="space-y-4">
+        {fields.length > 0 ? (
+          <FieldTable fields={fields} sectionTitle="Dados do Motorista" />
+        ) : (
+          <p className="text-sm text-muted-foreground text-center py-4">
+            Nenhum campo configurado. Configure os campos no menu Automações do painel administrativo.
+          </p>
+        )}
+        <FieldTable fields={personalFieldsFallback} sectionTitle="Informações Pessoais" />
+        <CopyJsonButton label="Motorista" fields={fields} onCopy={copyJson} copied={copiedSection} />
+      </div>
+    );
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -205,7 +217,7 @@ export default function FerramentasDevDialog({ open, onOpenChange, tipo }: Ferra
             Ferramentas do Desenvolvedor
           </DialogTitle>
           <DialogDescription>
-            Documentação dos campos e variáveis necessárias para os formulários externos. Compartilhe com o desenvolvedor para que ele construa os formulários que enviarão dados para o webhook.
+            Documentação dos campos e variáveis necessárias para os formulários externos. Os campos são sincronizados automaticamente com as configurações definidas pelo administrador.
           </DialogDescription>
         </DialogHeader>
 
@@ -217,38 +229,22 @@ export default function FerramentasDevDialog({ open, onOpenChange, tipo }: Ferra
           <p className="text-muted-foreground text-xs leading-relaxed">
             O formulário externo deve enviar um <code className="bg-muted px-1 rounded font-mono">POST</code> para a URL do webhook com um JSON contendo as variáveis listadas abaixo. 
             Cada campo possui sua variável correspondente (coluna "Variável") que deve ser usada como chave no JSON. 
-            Após o envio, os dados aparecerão em "Testes Recebidos". Mapeie as variáveis no painel de "Mapeamento de Campos" e ative o webhook para que os envios futuros sejam direcionados automaticamente para as Solicitações.
+            Após o envio, os dados aparecerão em "Testes Recebidos". Mapeie as variáveis no painel de "Mapeamento de Campos" e ative o webhook.
           </p>
         </div>
 
-        {tipo === "transfer" && renderTransfer()}
-        {tipo === "grupo" && renderGrupo()}
-        {tipo === "motorista" && renderMotorista()}
+        {loading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          </div>
+        ) : (
+          <>
+            {tipo === "transfer" && renderTransfer()}
+            {tipo === "grupo" && renderGrupo()}
+            {tipo === "motorista" && renderMotorista()}
+          </>
+        )}
       </DialogContent>
     </Dialog>
-  );
-}
-
-function CopyJsonButton({
-  label,
-  fields,
-  onCopy,
-  copied,
-}: {
-  label: string;
-  fields: FieldDoc[];
-  onCopy: (label: string, fields: FieldDoc[]) => void;
-  copied: string | null;
-}) {
-  return (
-    <Button
-      variant="outline"
-      size="sm"
-      className="w-full"
-      onClick={() => onCopy(label, fields)}
-    >
-      <Copy className="h-3.5 w-3.5 mr-2" />
-      {copied === label ? "Copiado!" : `Copiar JSON de exemplo — ${label}`}
-    </Button>
   );
 }

@@ -7,6 +7,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import DetalhesSolicitacaoTransferSheet from "@/components/solicitacoes/DetalhesSolicitacaoTransferSheet";
 import CriarReservaTransferDialog, { type TransferInitialData } from "@/components/transfer/CriarReservaTransferDialog";
+import ComunicarDialog from "@/components/comunicar/ComunicarDialog";
+import { generateSolicitacaoTransferPDF } from "@/lib/pdfGenerator";
 import { Tables } from "@/integrations/supabase/types";
 
 type Solicitacao = Tables<"solicitacoes_transfer">;
@@ -17,6 +19,8 @@ export default function TransferSolicitacoesPage() {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [initialData, setInitialData] = useState<TransferInitialData | null>(null);
+  const [comunicarOpen, setComunicarOpen] = useState(false);
+  const [comunicarDados, setComunicarDados] = useState<Solicitacao | null>(null);
 
   const fetchData = useCallback(async () => {
     const { data, error } = await supabase
@@ -80,9 +84,8 @@ export default function TransferSolicitacoesPage() {
   };
 
   const handleComunicar = (s: Solicitacao) => {
-    const phone = s.contato?.replace(/\D/g, "");
-    if (phone) window.open(`https://wa.me/${phone}`, "_blank");
-    else toast.info("Contato não disponível");
+    setComunicarDados(s);
+    setComunicarOpen(true);
   };
 
   return (
@@ -160,6 +163,17 @@ export default function TransferSolicitacoesPage() {
         onCreated={handleReservaCriada}
         initialData={initialData}
       />
+
+      {comunicarDados && (
+        <ComunicarDialog
+          open={comunicarOpen}
+          onOpenChange={setComunicarOpen}
+          dados={comunicarDados}
+          telefone={comunicarDados.contato}
+          titulo="Comunicar — Solicitação Transfer"
+          onGerarPDF={() => generateSolicitacaoTransferPDF(comunicarDados)}
+        />
+      )}
     </div>
   );
 }

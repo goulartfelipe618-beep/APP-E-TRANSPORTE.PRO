@@ -621,3 +621,220 @@ export async function generateGrupoPDF(reservaId: string) {
 
   doc.save(`reserva-grupo-${numReserva}-${r.nome_completo.replace(/\s/g, "_")}.pdf`);
 }
+
+// ═══════════════════════════════════════════════════════════
+//  SOLICITAÇÃO TRANSFER PDF (simples — antes de converter)
+// ═══════════════════════════════════════════════════════════
+
+export async function generateSolicitacaoTransferPDF(solicitacao: Record<string, any>) {
+  const cabecalho = await fetchCabecalho();
+  const doc = new jsPDF();
+  const s = solicitacao;
+
+  let y = MARGIN;
+  y = addCompanyHeader(doc, cabecalho, y);
+
+  // Title
+  doc.setFontSize(FS.pageTitle);
+  doc.setFont("helvetica", "bold");
+  setColor(doc, CLR.dark);
+  doc.text("Solicitação de Transfer", MARGIN, y);
+  y += 7;
+  doc.setFontSize(FS.subtitle);
+  doc.setFont("helvetica", "normal");
+  setColor(doc, CLR.muted);
+  doc.text(`Recebida em ${new Date(s.created_at).toLocaleString("pt-BR")}`, MARGIN, y);
+  y += SP.sectionGap;
+
+  // Status badge
+  doc.setFontSize(FS.body);
+  doc.setFont("helvetica", "bold");
+  setColor(doc, CLR.dark);
+  doc.text(`Status: ${s.status?.toUpperCase() || "PENDENTE"}`, MARGIN, y);
+  y += SP.sectionGap;
+
+  // Client data
+  y = addSectionTitle(doc, "DADOS DO CLIENTE", y);
+  const clientFields = [
+    { l: "Nome:", v: s.nome_cliente || "—" },
+    { l: "Contato:", v: s.contato || "—" },
+    { l: "Email:", v: s.email || "—" },
+  ];
+  y = addFieldRows(doc, clientFields, MARGIN, y, 28);
+  y += 4;
+
+  // Trip details
+  const tipoLabel: Record<string, string> = { somente_ida: "Somente Ida", ida_volta: "Ida e Volta", por_hora: "Por Hora" };
+  y = addSectionTitle(doc, "DETALHES DA VIAGEM", y);
+
+  if (s.tipo !== "por_hora") {
+    const tripFields = [
+      { l: "Tipo:", v: tipoLabel[s.tipo] || s.tipo || "—" },
+      { l: "Embarque:", v: s.embarque || "—" },
+      { l: "Desembarque:", v: s.desembarque || "—" },
+      { l: "Data:", v: s.data_viagem ? new Date(s.data_viagem).toLocaleDateString("pt-BR") : "—" },
+      { l: "Hora:", v: s.hora_viagem || "—" },
+      { l: "Passageiros:", v: s.num_passageiros?.toString() || "—" },
+      { l: "Cupom:", v: s.cupom || "—" },
+    ];
+    y = addFieldRows(doc, tripFields, MARGIN, y, 28);
+  } else {
+    const phFields = [
+      { l: "Tipo:", v: "Por Hora" },
+      { l: "End. Início:", v: s.por_hora_endereco_inicio || "—" },
+      { l: "Encerramento:", v: s.por_hora_ponto_encerramento || "—" },
+      { l: "Data:", v: s.por_hora_data ? new Date(s.por_hora_data).toLocaleDateString("pt-BR") : "—" },
+      { l: "Hora:", v: s.por_hora_hora || "—" },
+      { l: "Passageiros:", v: s.por_hora_passageiros?.toString() || "—" },
+      { l: "Qtd. Horas:", v: s.por_hora_qtd_horas?.toString() || "—" },
+      { l: "Cupom:", v: s.por_hora_cupom || "—" },
+    ];
+    y = addFieldRows(doc, phFields, MARGIN, y, 28);
+  }
+  y += 4;
+
+  // Volta (if ida_volta)
+  if (s.tipo === "ida_volta") {
+    y = addSectionTitle(doc, "DADOS DA VOLTA", y);
+    const voltaFields = [
+      { l: "Embarque:", v: s.volta_embarque || "—" },
+      { l: "Desembarque:", v: s.volta_desembarque || "—" },
+      { l: "Data:", v: s.volta_data ? new Date(s.volta_data).toLocaleDateString("pt-BR") : "—" },
+      { l: "Hora:", v: s.volta_hora || "—" },
+      { l: "Passageiros:", v: s.volta_passageiros?.toString() || "—" },
+      { l: "Cupom:", v: s.volta_cupom || "—" },
+    ];
+    y = addFieldRows(doc, voltaFields, MARGIN, y, 28);
+    y += 4;
+  }
+
+  // Message
+  if (s.mensagem) {
+    y = addSectionTitle(doc, "MENSAGEM", y);
+    doc.setFontSize(FS.body);
+    doc.setFont("helvetica", "normal");
+    setColor(doc, CLR.body);
+    y = wrappedText(doc, s.mensagem, MARGIN, y, CONTENT_W, SP.paraLine);
+    y += SP.sectionGap;
+  }
+
+  addFooter(doc, cabecalho);
+  doc.save(`solicitacao-transfer-${s.nome_cliente?.replace(/\s/g, "_") || "sem-nome"}.pdf`);
+}
+
+// ═══════════════════════════════════════════════════════════
+//  SOLICITAÇÃO GRUPO PDF (simples — antes de converter)
+// ═══════════════════════════════════════════════════════════
+
+export async function generateSolicitacaoGrupoPDF(solicitacao: Record<string, any>) {
+  const cabecalho = await fetchCabecalho();
+  const doc = new jsPDF();
+  const s = solicitacao;
+
+  let y = MARGIN;
+  y = addCompanyHeader(doc, cabecalho, y);
+
+  doc.setFontSize(FS.pageTitle);
+  doc.setFont("helvetica", "bold");
+  setColor(doc, CLR.dark);
+  doc.text("Solicitação de Grupo", MARGIN, y);
+  y += 7;
+  doc.setFontSize(FS.subtitle);
+  doc.setFont("helvetica", "normal");
+  setColor(doc, CLR.muted);
+  doc.text(`Recebida em ${new Date(s.created_at).toLocaleString("pt-BR")}`, MARGIN, y);
+  y += SP.sectionGap;
+
+  doc.setFontSize(FS.body);
+  doc.setFont("helvetica", "bold");
+  setColor(doc, CLR.dark);
+  doc.text(`Status: ${s.status?.toUpperCase() || "PENDENTE"}`, MARGIN, y);
+  y += SP.sectionGap;
+
+  y = addSectionTitle(doc, "DADOS DO CLIENTE", y);
+  y = addFieldRows(doc, [
+    { l: "Nome:", v: s.nome_cliente || "—" },
+    { l: "WhatsApp:", v: s.whatsapp || "—" },
+    { l: "Email:", v: s.email || "—" },
+  ], MARGIN, y, 28);
+  y += 4;
+
+  y = addSectionTitle(doc, "DETALHES DA VIAGEM", y);
+  const veiculoLabel: Record<string, string> = { van: "Van", micro_onibus: "Micro-ônibus", onibus: "Ônibus" };
+  y = addFieldRows(doc, [
+    { l: "Veículo:", v: veiculoLabel[s.tipo_veiculo] || s.tipo_veiculo || "—" },
+    { l: "Passageiros:", v: s.num_passageiros?.toString() || "—" },
+    { l: "Embarque:", v: s.embarque || "—" },
+    { l: "Destino:", v: s.destino || "—" },
+    { l: "Data Ida:", v: s.data_ida ? new Date(s.data_ida).toLocaleDateString("pt-BR") : "—" },
+    { l: "Hora Ida:", v: s.hora_ida || "—" },
+    { l: "Data Retorno:", v: s.data_retorno ? new Date(s.data_retorno).toLocaleDateString("pt-BR") : "—" },
+    { l: "Hora Retorno:", v: s.hora_retorno || "—" },
+    { l: "Cupom:", v: s.cupom || "—" },
+  ], MARGIN, y, 32);
+  y += 4;
+
+  if (s.mensagem) {
+    y = addSectionTitle(doc, "MENSAGEM", y);
+    doc.setFontSize(FS.body);
+    doc.setFont("helvetica", "normal");
+    setColor(doc, CLR.body);
+    y = wrappedText(doc, s.mensagem, MARGIN, y, CONTENT_W, SP.paraLine);
+  }
+
+  addFooter(doc, cabecalho);
+  doc.save(`solicitacao-grupo-${s.nome_cliente?.replace(/\s/g, "_") || "sem-nome"}.pdf`);
+}
+
+// ═══════════════════════════════════════════════════════════
+//  SOLICITAÇÃO MOTORISTA PDF (simples)
+// ═══════════════════════════════════════════════════════════
+
+export async function generateSolicitacaoMotoristaPDF(solicitacao: Record<string, any>) {
+  const cabecalho = await fetchCabecalho();
+  const doc = new jsPDF();
+  const s = solicitacao;
+
+  let y = MARGIN;
+  y = addCompanyHeader(doc, cabecalho, y);
+
+  doc.setFontSize(FS.pageTitle);
+  doc.setFont("helvetica", "bold");
+  setColor(doc, CLR.dark);
+  doc.text("Solicitação de Motorista", MARGIN, y);
+  y += 7;
+  doc.setFontSize(FS.subtitle);
+  doc.setFont("helvetica", "normal");
+  setColor(doc, CLR.muted);
+  doc.text(`Recebida em ${new Date(s.created_at).toLocaleString("pt-BR")}`, MARGIN, y);
+  y += SP.sectionGap;
+
+  doc.setFontSize(FS.body);
+  doc.setFont("helvetica", "bold");
+  setColor(doc, CLR.dark);
+  doc.text(`Status: ${s.status?.toUpperCase() || "PENDENTE"}`, MARGIN, y);
+  y += SP.sectionGap;
+
+  y = addSectionTitle(doc, "DADOS DO MOTORISTA", y);
+  y = addFieldRows(doc, [
+    { l: "Nome:", v: s.nome || "—" },
+    { l: "Email:", v: s.email || "—" },
+    { l: "Telefone:", v: s.telefone || "—" },
+    { l: "CPF:", v: s.cpf || "—" },
+    { l: "CNH:", v: s.cnh || "—" },
+    { l: "Cidade:", v: s.cidade || "—" },
+  ], MARGIN, y, 24);
+  y += 4;
+
+  if (s.mensagem) {
+    y = addSectionTitle(doc, "MENSAGEM", y);
+    doc.setFontSize(FS.body);
+    doc.setFont("helvetica", "normal");
+    setColor(doc, CLR.body);
+    y = wrappedText(doc, s.mensagem, MARGIN, y, CONTENT_W, SP.paraLine);
+  }
+
+  addFooter(doc, cabecalho);
+  doc.save(`solicitacao-motorista-${s.nome?.replace(/\s/g, "_") || "sem-nome"}.pdf`);
+}
+

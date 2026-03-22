@@ -8,6 +8,7 @@ import DetalhesReservaTransferSheet from "@/components/reservas/DetalhesReservaT
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { generateTransferPDF } from "@/lib/pdfGenerator";
+import ComunicarDialog from "@/components/comunicar/ComunicarDialog";
 import { Tables } from "@/integrations/supabase/types";
 
 type Reserva = Tables<"reservas_transfer">;
@@ -24,6 +25,8 @@ export default function TransferReservasPage() {
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Reserva | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [comunicarOpen, setComunicarOpen] = useState(false);
+  const [comunicarDados, setComunicarDados] = useState<Reserva | null>(null);
 
   const fetchReservas = useCallback(async () => {
     const { data, error } = await supabase
@@ -42,9 +45,8 @@ export default function TransferReservasPage() {
   };
 
   const handleComunicar = (r: Reserva) => {
-    const phone = r.telefone?.replace(/\D/g, "");
-    if (phone) window.open(`https://wa.me/${phone}`, "_blank");
-    else toast.info("Telefone não disponível");
+    setComunicarDados(r);
+    setComunicarOpen(true);
   };
 
   const handleDownload = async (r: Reserva) => {
@@ -135,6 +137,17 @@ export default function TransferReservasPage() {
         onComunicar={handleComunicar}
         onDownload={handleDownload}
       />
+
+      {comunicarDados && (
+        <ComunicarDialog
+          open={comunicarOpen}
+          onOpenChange={setComunicarOpen}
+          dados={comunicarDados}
+          telefone={comunicarDados.telefone}
+          titulo="Comunicar — Reserva Transfer"
+          onGerarPDF={() => generateTransferPDF(comunicarDados.id)}
+        />
+      )}
     </div>
   );
 }

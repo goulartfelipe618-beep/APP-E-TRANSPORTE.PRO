@@ -8,6 +8,7 @@ import DetalhesReservaGrupoSheet from "@/components/reservas/DetalhesReservaGrup
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { generateGrupoPDF } from "@/lib/pdfGenerator";
+import ComunicarDialog from "@/components/comunicar/ComunicarDialog";
 import { Tables } from "@/integrations/supabase/types";
 
 type ReservaGrupo = Tables<"reservas_grupos">;
@@ -24,6 +25,8 @@ export default function GruposReservasPage() {
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<ReservaGrupo | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [comunicarOpen, setComunicarOpen] = useState(false);
+  const [comunicarDados, setComunicarDados] = useState<ReservaGrupo | null>(null);
 
   const fetchReservas = useCallback(async () => {
     const { data, error } = await supabase
@@ -42,9 +45,8 @@ export default function GruposReservasPage() {
   };
 
   const handleComunicar = (r: ReservaGrupo) => {
-    const phone = r.whatsapp?.replace(/\D/g, "");
-    if (phone) window.open(`https://wa.me/${phone}`, "_blank");
-    else toast.info("WhatsApp não disponível");
+    setComunicarDados(r);
+    setComunicarOpen(true);
   };
 
   const handleDownload = async (r: ReservaGrupo) => {
@@ -137,6 +139,17 @@ export default function GruposReservasPage() {
         onComunicar={handleComunicar}
         onDownload={handleDownload}
       />
+
+      {comunicarDados && (
+        <ComunicarDialog
+          open={comunicarOpen}
+          onOpenChange={setComunicarOpen}
+          dados={comunicarDados}
+          telefone={comunicarDados.whatsapp}
+          titulo="Comunicar — Reserva de Grupo"
+          onGerarPDF={() => generateGrupoPDF(comunicarDados.id)}
+        />
+      )}
     </div>
   );
 }

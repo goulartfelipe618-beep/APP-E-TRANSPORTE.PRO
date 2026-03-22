@@ -7,6 +7,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import DetalhesSolicitacaoGrupoSheet from "@/components/solicitacoes/DetalhesSolicitacaoGrupoSheet";
 import CriarReservaGrupoDialog, { type GrupoInitialData } from "@/components/grupos/CriarReservaGrupoDialog";
+import ComunicarDialog from "@/components/comunicar/ComunicarDialog";
+import { generateSolicitacaoGrupoPDF } from "@/lib/pdfGenerator";
 import { Tables } from "@/integrations/supabase/types";
 
 type Solicitacao = Tables<"solicitacoes_grupos">;
@@ -17,6 +19,8 @@ export default function GruposSolicitacoesPage() {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [initialData, setInitialData] = useState<GrupoInitialData | null>(null);
+  const [comunicarOpen, setComunicarOpen] = useState(false);
+  const [comunicarDados, setComunicarDados] = useState<Solicitacao | null>(null);
 
   const fetchData = useCallback(async () => {
     const { data, error } = await supabase
@@ -66,9 +70,8 @@ export default function GruposSolicitacoesPage() {
   };
 
   const handleComunicar = (s: Solicitacao) => {
-    const phone = s.whatsapp?.replace(/\D/g, "");
-    if (phone) window.open(`https://wa.me/${phone}`, "_blank");
-    else toast.info("WhatsApp não disponível");
+    setComunicarDados(s);
+    setComunicarOpen(true);
   };
 
   return (
@@ -146,6 +149,17 @@ export default function GruposSolicitacoesPage() {
         onCreated={handleReservaCriada}
         initialData={initialData}
       />
+
+      {comunicarDados && (
+        <ComunicarDialog
+          open={comunicarOpen}
+          onOpenChange={setComunicarOpen}
+          dados={comunicarDados}
+          telefone={comunicarDados.whatsapp}
+          titulo="Comunicar — Solicitação de Grupo"
+          onGerarPDF={() => generateSolicitacaoGrupoPDF(comunicarDados)}
+        />
+      )}
     </div>
   );
 }

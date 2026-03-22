@@ -7,6 +7,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import DetalhesSolicitacaoMotoristaSheet from "@/components/solicitacoes/DetalhesSolicitacaoMotoristaSheet";
 import CadastrarMotoristaDialog from "@/components/motoristas/CadastrarMotoristaDialog";
+import ComunicarDialog from "@/components/comunicar/ComunicarDialog";
+import { generateSolicitacaoMotoristaPDF } from "@/lib/pdfGenerator";
 
 interface Solicitacao {
   id: string;
@@ -38,6 +40,8 @@ export default function MotoristaSolicitacoesPage() {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [initialData, setInitialData] = useState<MotoristaInitialData | null>(null);
+  const [comunicarOpen, setComunicarOpen] = useState(false);
+  const [comunicarDados, setComunicarDados] = useState<Solicitacao | null>(null);
 
   const fetchData = useCallback(async () => {
     const { data, error } = await supabase
@@ -80,9 +84,8 @@ export default function MotoristaSolicitacoesPage() {
   };
 
   const handleComunicar = (s: Solicitacao) => {
-    const phone = s.telefone?.replace(/\D/g, "");
-    if (phone) window.open(`https://wa.me/${phone}`, "_blank");
-    else toast.info("Telefone não disponível");
+    setComunicarDados(s);
+    setComunicarOpen(true);
   };
 
   return (
@@ -160,6 +163,17 @@ export default function MotoristaSolicitacoesPage() {
         onCreated={handleCadastrado}
         initialData={initialData}
       />
+
+      {comunicarDados && (
+        <ComunicarDialog
+          open={comunicarOpen}
+          onOpenChange={setComunicarOpen}
+          dados={comunicarDados}
+          telefone={comunicarDados.telefone}
+          titulo="Comunicar — Solicitação de Motorista"
+          onGerarPDF={() => generateSolicitacaoMotoristaPDF(comunicarDados)}
+        />
+      )}
     </div>
   );
 }
