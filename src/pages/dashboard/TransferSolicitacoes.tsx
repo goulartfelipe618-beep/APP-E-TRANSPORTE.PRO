@@ -35,39 +35,39 @@ export default function TransferSolicitacoesPage() {
     setSheetOpen(true);
   };
 
-  const handleConverter = async (s: Solicitacao) => {
-    // Close the details sheet and open the reservation dialog pre-filled
-    setSheetOpen(false);
-    setInitialData({
+  const handleConverter = (s: Solicitacao) => {
+    const data: TransferInitialData = {
       nome_completo: s.nome_cliente,
       contato: s.contato || undefined,
-      email: (s as any).email || undefined,
+      email: s.email || undefined,
       tipo: s.tipo || undefined,
       embarque: s.embarque || undefined,
       desembarque: s.desembarque || undefined,
       data_viagem: s.data_viagem || undefined,
-      hora_viagem: (s as any).hora_viagem || undefined,
+      hora_viagem: s.hora_viagem || undefined,
       num_passageiros: s.num_passageiros,
       mensagem: s.mensagem || undefined,
-      cupom: (s as any).cupom || undefined,
-      volta_embarque: (s as any).volta_embarque || undefined,
-      volta_desembarque: (s as any).volta_desembarque || undefined,
-      volta_data: (s as any).volta_data || undefined,
-      volta_hora: (s as any).volta_hora || undefined,
-      volta_passageiros: (s as any).volta_passageiros || undefined,
-      volta_mensagem: (s as any).volta_mensagem || undefined,
-      volta_cupom: (s as any).volta_cupom || undefined,
-      por_hora_endereco_inicio: (s as any).por_hora_endereco_inicio || undefined,
-      por_hora_ponto_encerramento: (s as any).por_hora_ponto_encerramento || undefined,
-      por_hora_data: (s as any).por_hora_data || undefined,
-      por_hora_hora: (s as any).por_hora_hora || undefined,
-      por_hora_passageiros: (s as any).por_hora_passageiros || undefined,
-      por_hora_qtd_horas: (s as any).por_hora_qtd_horas || undefined,
-      por_hora_cupom: (s as any).por_hora_cupom || undefined,
-      por_hora_itinerario: (s as any).por_hora_itinerario || undefined,
+      cupom: s.cupom || undefined,
+      volta_embarque: s.volta_embarque || undefined,
+      volta_desembarque: s.volta_desembarque || undefined,
+      volta_data: s.volta_data || undefined,
+      volta_hora: s.volta_hora || undefined,
+      volta_passageiros: s.volta_passageiros || undefined,
+      volta_mensagem: s.volta_mensagem || undefined,
+      volta_cupom: s.volta_cupom || undefined,
+      por_hora_endereco_inicio: s.por_hora_endereco_inicio || undefined,
+      por_hora_ponto_encerramento: s.por_hora_ponto_encerramento || undefined,
+      por_hora_data: s.por_hora_data || undefined,
+      por_hora_hora: s.por_hora_hora || undefined,
+      por_hora_passageiros: s.por_hora_passageiros || undefined,
+      por_hora_qtd_horas: s.por_hora_qtd_horas || undefined,
+      por_hora_cupom: s.por_hora_cupom || undefined,
+      por_hora_itinerario: s.por_hora_itinerario || undefined,
       solicitacao_id: s.id,
-    });
-    setDialogOpen(true);
+    };
+    setInitialData(data);
+    setSheetOpen(false);
+    setTimeout(() => setDialogOpen(true), 350);
   };
 
   const handleReservaCriada = async () => {

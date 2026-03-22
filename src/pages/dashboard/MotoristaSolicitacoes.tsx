@@ -56,9 +56,8 @@ export default function MotoristaSolicitacoesPage() {
     setSheetOpen(true);
   };
 
-  const handleConverter = async (s: Solicitacao) => {
-    setSheetOpen(false);
-    setInitialData({
+  const handleConverter = (s: Solicitacao) => {
+    const data: MotoristaInitialData = {
       nome: s.nome,
       email: s.email || undefined,
       telefone: s.telefone || undefined,
@@ -66,8 +65,10 @@ export default function MotoristaSolicitacoesPage() {
       cnh: s.cnh || undefined,
       cidade: s.cidade || undefined,
       solicitacao_id: s.id,
-    });
-    setDialogOpen(true);
+    };
+    setInitialData(data);
+    setSheetOpen(false);
+    setTimeout(() => setDialogOpen(true), 350);
   };
 
   const handleCadastrado = async () => {

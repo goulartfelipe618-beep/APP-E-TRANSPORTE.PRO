@@ -35,25 +35,26 @@ export default function GruposSolicitacoesPage() {
     setSheetOpen(true);
   };
 
-  const handleConverter = async (s: Solicitacao) => {
-    setSheetOpen(false);
-    setInitialData({
+  const handleConverter = (s: Solicitacao) => {
+    const data: GrupoInitialData = {
       nome_cliente: s.nome_cliente,
       whatsapp: s.whatsapp || undefined,
-      email: (s as any).email || undefined,
+      email: s.email || undefined,
       tipo_veiculo: s.tipo_veiculo || undefined,
       embarque: s.embarque || undefined,
       destino: s.destino || undefined,
       data_ida: s.data_ida || undefined,
-      hora_ida: (s as any).hora_ida || undefined,
-      data_retorno: (s as any).data_retorno || undefined,
-      hora_retorno: (s as any).hora_retorno || undefined,
+      hora_ida: s.hora_ida || undefined,
+      data_retorno: s.data_retorno || undefined,
+      hora_retorno: s.hora_retorno || undefined,
       num_passageiros: s.num_passageiros,
       mensagem: s.mensagem || undefined,
-      cupom: (s as any).cupom || undefined,
+      cupom: s.cupom || undefined,
       solicitacao_id: s.id,
-    });
-    setDialogOpen(true);
+    };
+    setInitialData(data);
+    setSheetOpen(false);
+    setTimeout(() => setDialogOpen(true), 350);
   };
 
   const handleReservaCriada = async () => {

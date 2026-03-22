@@ -32,7 +32,7 @@ export default function DetalhesSolicitacaoGrupoSheet({ solicitacao, open, onOpe
             <div className="grid grid-cols-2 gap-3">
               <Field label="Cliente" value={s.nome_cliente} />
               <Field label="WhatsApp" value={s.whatsapp} />
-              <Field label="Email" value={(s as any).email} />
+              <Field label="Email" value={s.email} />
               <Field label="Status" value={<Badge variant="outline">{s.status}</Badge>} />
             </div>
           </Section>
@@ -46,10 +46,10 @@ export default function DetalhesSolicitacaoGrupoSheet({ solicitacao, open, onOpe
               <Field label="Embarque" value={s.embarque} />
               <Field label="Destino" value={s.destino} />
               <Field label="Data Ida" value={formatDate(s.data_ida)} />
-              <Field label="Hora Ida" value={(s as any).hora_ida} />
-              <Field label="Data Retorno" value={formatDate((s as any).data_retorno)} />
-              <Field label="Hora Retorno" value={(s as any).hora_retorno} />
-              <Field label="Cupom" value={(s as any).cupom} />
+               <Field label="Hora Ida" value={s.hora_ida} />
+               <Field label="Data Retorno" value={formatDate(s.data_retorno)} />
+               <Field label="Hora Retorno" value={s.hora_retorno} />
+               <Field label="Cupom" value={s.cupom} />
             </div>
           </Section>
 

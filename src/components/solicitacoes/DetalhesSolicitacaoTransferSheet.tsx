@@ -35,7 +35,7 @@ export default function DetalhesSolicitacaoTransferSheet({ solicitacao, open, on
             <div className="grid grid-cols-2 gap-3">
               <Field label="Cliente" value={s.nome_cliente} />
               <Field label="Contato" value={s.contato} />
-              <Field label="Email" value={(s as any).email} />
+              <Field label="Email" value={s.email} />
               <Field label="Tipo" value={s.tipo} />
               <Field label="Status" value={<Badge variant="outline">{s.status}</Badge>} />
             </div>
@@ -50,26 +50,26 @@ export default function DetalhesSolicitacaoTransferSheet({ solicitacao, open, on
                 <>
                   <Field label="Embarque" value={s.embarque} />
                   <Field label="Desembarque" value={s.desembarque} />
-                  <Field label="Data" value={formatDate(s.data_viagem)} />
-                  <Field label="Hora" value={(s as any).hora_viagem} />
-                  <Field label="Passageiros" value={s.num_passageiros?.toString()} />
-                  <Field label="Cupom" value={(s as any).cupom} />
+                   <Field label="Data" value={formatDate(s.data_viagem)} />
+                   <Field label="Hora" value={s.hora_viagem} />
+                   <Field label="Passageiros" value={s.num_passageiros?.toString()} />
+                   <Field label="Cupom" value={s.cupom} />
                 </>
               )}
               {isPorHora && (
                 <>
-                  <Field label="Endereço Início" value={(s as any).por_hora_endereco_inicio} />
-                  <Field label="Ponto Encerramento" value={(s as any).por_hora_ponto_encerramento} />
-                  <Field label="Data" value={formatDate((s as any).por_hora_data)} />
-                  <Field label="Hora" value={(s as any).por_hora_hora} />
-                  <Field label="Passageiros" value={(s as any).por_hora_passageiros?.toString()} />
-                  <Field label="Qtd. Horas" value={(s as any).por_hora_qtd_horas?.toString()} />
-                  <Field label="Cupom" value={(s as any).por_hora_cupom} />
+                   <Field label="Endereço Início" value={s.por_hora_endereco_inicio} />
+                   <Field label="Ponto Encerramento" value={s.por_hora_ponto_encerramento} />
+                   <Field label="Data" value={formatDate(s.por_hora_data)} />
+                   <Field label="Hora" value={s.por_hora_hora} />
+                   <Field label="Passageiros" value={s.por_hora_passageiros?.toString()} />
+                   <Field label="Qtd. Horas" value={s.por_hora_qtd_horas?.toString()} />
+                   <Field label="Cupom" value={s.por_hora_cupom} />
                 </>
               )}
             </div>
             {!isPorHora && s.mensagem && <Field label="Mensagem" value={s.mensagem} />}
-            {isPorHora && (s as any).por_hora_itinerario && <Field label="Itinerário" value={(s as any).por_hora_itinerario} />}
+            {isPorHora && s.por_hora_itinerario && <Field label="Itinerário" value={s.por_hora_itinerario} />}
           </Section>
 
           {/* Volta */}
@@ -78,14 +78,14 @@ export default function DetalhesSolicitacaoTransferSheet({ solicitacao, open, on
               <Separator />
               <Section title="⇆ Detalhes da Volta">
                 <div className="grid grid-cols-2 gap-3">
-                  <Field label="Embarque" value={(s as any).volta_embarque} />
-                  <Field label="Desembarque" value={(s as any).volta_desembarque} />
-                  <Field label="Data" value={formatDate((s as any).volta_data)} />
-                  <Field label="Hora" value={(s as any).volta_hora} />
-                  <Field label="Passageiros" value={(s as any).volta_passageiros?.toString()} />
-                  <Field label="Cupom" value={(s as any).volta_cupom} />
-                </div>
-                {(s as any).volta_mensagem && <Field label="Mensagem" value={(s as any).volta_mensagem} />}
+                   <Field label="Embarque" value={s.volta_embarque} />
+                   <Field label="Desembarque" value={s.volta_desembarque} />
+                   <Field label="Data" value={formatDate(s.volta_data)} />
+                   <Field label="Hora" value={s.volta_hora} />
+                   <Field label="Passageiros" value={s.volta_passageiros?.toString()} />
+                   <Field label="Cupom" value={s.volta_cupom} />
+                 </div>
+                 {s.volta_mensagem && <Field label="Mensagem" value={s.volta_mensagem} />}
               </Section>
             </>
           )}
