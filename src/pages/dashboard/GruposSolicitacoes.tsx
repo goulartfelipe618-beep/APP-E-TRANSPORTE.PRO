@@ -19,6 +19,8 @@ export default function GruposSolicitacoesPage() {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [initialData, setInitialData] = useState<GrupoInitialData | null>(null);
+  const [comunicarOpen, setComunicarOpen] = useState(false);
+  const [comunicarDados, setComunicarDados] = useState<Solicitacao | null>(null);
 
   const fetchData = useCallback(async () => {
     const { data, error } = await supabase
