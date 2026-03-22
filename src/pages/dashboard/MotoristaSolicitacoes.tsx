@@ -84,9 +84,8 @@ export default function MotoristaSolicitacoesPage() {
   };
 
   const handleComunicar = (s: Solicitacao) => {
-    const phone = s.telefone?.replace(/\D/g, "");
-    if (phone) window.open(`https://wa.me/${phone}`, "_blank");
-    else toast.info("Telefone não disponível");
+    setComunicarDados(s);
+    setComunicarOpen(true);
   };
 
   return (
