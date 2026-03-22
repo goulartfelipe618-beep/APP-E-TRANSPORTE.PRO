@@ -163,6 +163,17 @@ export default function MotoristaSolicitacoesPage() {
         onCreated={handleCadastrado}
         initialData={initialData}
       />
+
+      {comunicarDados && (
+        <ComunicarDialog
+          open={comunicarOpen}
+          onOpenChange={setComunicarOpen}
+          dados={comunicarDados}
+          telefone={comunicarDados.telefone}
+          titulo="Comunicar — Solicitação de Motorista"
+          onGerarPDF={() => generateSolicitacaoMotoristaPDF(comunicarDados)}
+        />
+      )}
     </div>
   );
 }
