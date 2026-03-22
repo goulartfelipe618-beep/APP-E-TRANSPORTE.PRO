@@ -35,7 +35,7 @@ export default function DetalhesSolicitacaoTransferSheet({ solicitacao, open, on
             <div className="grid grid-cols-2 gap-3">
               <Field label="Cliente" value={s.nome_cliente} />
               <Field label="Contato" value={s.contato} />
-              <Field label="Email" value={(s as any).email} />
+              <Field label="Email" value={s.email} />
               <Field label="Tipo" value={s.tipo} />
               <Field label="Status" value={<Badge variant="outline">{s.status}</Badge>} />
             </div>
