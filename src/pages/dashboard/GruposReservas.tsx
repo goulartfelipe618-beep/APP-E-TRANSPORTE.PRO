@@ -45,9 +45,8 @@ export default function GruposReservasPage() {
   };
 
   const handleComunicar = (r: ReservaGrupo) => {
-    const phone = r.whatsapp?.replace(/\D/g, "");
-    if (phone) window.open(`https://wa.me/${phone}`, "_blank");
-    else toast.info("WhatsApp não disponível");
+    setComunicarDados(r);
+    setComunicarOpen(true);
   };
 
   const handleDownload = async (r: ReservaGrupo) => {
