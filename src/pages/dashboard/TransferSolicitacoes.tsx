@@ -7,6 +7,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import DetalhesSolicitacaoTransferSheet from "@/components/solicitacoes/DetalhesSolicitacaoTransferSheet";
 import CriarReservaTransferDialog, { type TransferInitialData } from "@/components/transfer/CriarReservaTransferDialog";
+import ComunicarDialog from "@/components/comunicar/ComunicarDialog";
+import { generateSolicitacaoTransferPDF } from "@/lib/pdfGenerator";
 import { Tables } from "@/integrations/supabase/types";
 
 type Solicitacao = Tables<"solicitacoes_transfer">;
