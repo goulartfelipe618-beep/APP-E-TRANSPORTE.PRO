@@ -78,14 +78,14 @@ export default function DetalhesSolicitacaoTransferSheet({ solicitacao, open, on
               <Separator />
               <Section title="⇆ Detalhes da Volta">
                 <div className="grid grid-cols-2 gap-3">
-                  <Field label="Embarque" value={(s as any).volta_embarque} />
-                  <Field label="Desembarque" value={(s as any).volta_desembarque} />
-                  <Field label="Data" value={formatDate((s as any).volta_data)} />
-                  <Field label="Hora" value={(s as any).volta_hora} />
-                  <Field label="Passageiros" value={(s as any).volta_passageiros?.toString()} />
-                  <Field label="Cupom" value={(s as any).volta_cupom} />
-                </div>
-                {(s as any).volta_mensagem && <Field label="Mensagem" value={(s as any).volta_mensagem} />}
+                   <Field label="Embarque" value={s.volta_embarque} />
+                   <Field label="Desembarque" value={s.volta_desembarque} />
+                   <Field label="Data" value={formatDate(s.volta_data)} />
+                   <Field label="Hora" value={s.volta_hora} />
+                   <Field label="Passageiros" value={s.volta_passageiros?.toString()} />
+                   <Field label="Cupom" value={s.volta_cupom} />
+                 </div>
+                 {s.volta_mensagem && <Field label="Mensagem" value={s.volta_mensagem} />}
               </Section>
             </>
           )}

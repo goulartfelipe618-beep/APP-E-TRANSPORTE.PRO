@@ -46,10 +46,10 @@ export default function DetalhesSolicitacaoGrupoSheet({ solicitacao, open, onOpe
               <Field label="Embarque" value={s.embarque} />
               <Field label="Destino" value={s.destino} />
               <Field label="Data Ida" value={formatDate(s.data_ida)} />
-              <Field label="Hora Ida" value={(s as any).hora_ida} />
-              <Field label="Data Retorno" value={formatDate((s as any).data_retorno)} />
-              <Field label="Hora Retorno" value={(s as any).hora_retorno} />
-              <Field label="Cupom" value={(s as any).cupom} />
+               <Field label="Hora Ida" value={s.hora_ida} />
+               <Field label="Data Retorno" value={formatDate(s.data_retorno)} />
+               <Field label="Hora Retorno" value={s.hora_retorno} />
+               <Field label="Cupom" value={s.cupom} />
             </div>
           </Section>
 
