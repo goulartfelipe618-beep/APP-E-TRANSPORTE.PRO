@@ -8,6 +8,7 @@ import DetalhesReservaGrupoSheet from "@/components/reservas/DetalhesReservaGrup
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { generateGrupoPDF } from "@/lib/pdfGenerator";
+import ComunicarDialog from "@/components/comunicar/ComunicarDialog";
 import { Tables } from "@/integrations/supabase/types";
 
 type ReservaGrupo = Tables<"reservas_grupos">;
