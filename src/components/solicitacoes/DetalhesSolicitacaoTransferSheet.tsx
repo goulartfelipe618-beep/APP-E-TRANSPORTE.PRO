@@ -69,7 +69,7 @@ export default function DetalhesSolicitacaoTransferSheet({ solicitacao, open, on
               )}
             </div>
             {!isPorHora && s.mensagem && <Field label="Mensagem" value={s.mensagem} />}
-            {isPorHora && (s as any).por_hora_itinerario && <Field label="Itinerário" value={(s as any).por_hora_itinerario} />}
+            {isPorHora && s.por_hora_itinerario && <Field label="Itinerário" value={s.por_hora_itinerario} />}
           </Section>
 
           {/* Volta */}
