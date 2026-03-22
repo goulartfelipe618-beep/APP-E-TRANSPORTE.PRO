@@ -163,6 +163,17 @@ export default function TransferSolicitacoesPage() {
         onCreated={handleReservaCriada}
         initialData={initialData}
       />
+
+      {comunicarDados && (
+        <ComunicarDialog
+          open={comunicarOpen}
+          onOpenChange={setComunicarOpen}
+          dados={comunicarDados}
+          telefone={comunicarDados.contato}
+          titulo="Comunicar — Solicitação Transfer"
+          onGerarPDF={() => generateSolicitacaoTransferPDF(comunicarDados)}
+        />
+      )}
     </div>
   );
 }

@@ -70,9 +70,8 @@ export default function GruposSolicitacoesPage() {
   };
 
   const handleComunicar = (s: Solicitacao) => {
-    const phone = s.whatsapp?.replace(/\D/g, "");
-    if (phone) window.open(`https://wa.me/${phone}`, "_blank");
-    else toast.info("WhatsApp não disponível");
+    setComunicarDados(s);
+    setComunicarOpen(true);
   };
 
   return (
