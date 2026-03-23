@@ -16,6 +16,8 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { ExternalLink, CheckCircle2, Calendar, Info } from "lucide-react";
 import SlideCarousel from "@/components/SlideCarousel";
+import { useUserPlan } from "@/hooks/useUserPlan";
+import UpgradePlanDialog from "@/components/planos/UpgradePlanDialog";
 
 interface TemplateDB {
   id: string;
