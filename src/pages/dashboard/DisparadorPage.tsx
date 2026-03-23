@@ -62,6 +62,77 @@ const WARNINGS = [
 ];
 
 export default function DisparadorPage() {
+  const { hasPlan } = useUserPlan();
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
+  const [domainStep, setDomainStep] = useState(false);
+  const [domain, setDomain] = useState("");
+  const [checkingDomain, setCheckingDomain] = useState(false);
+  const [domainResult, setDomainResult] = useState<{ available: boolean | null; message: string } | null>(null);
+
+  const handleCheckDomain = async () => {
+    if (!domain.trim()) { toast.error("Informe um domínio"); return; }
+    setCheckingDomain(true); setDomainResult(null);
+    try {
+      const { data, error } = await supabase.functions.invoke("check-domain", { body: { domain: domain.trim() } });
+      if (error) throw error;
+      setDomainResult({ available: data.available, message: data.message });
+    } catch {
+      toast.error("Erro ao verificar domínio");
+      setDomainResult({ available: null, message: "Não foi possível verificar." });
+    }
+    setCheckingDomain(false);
+  };
+
+  const handleAccessDispatcher = () => {
+    if (!hasPlan("grow")) {
+      setUpgradeOpen(true);
+      return;
+    }
+    toast.info("Acessando disparador...");
+  };
+
+  // Domain step view
+  if (domainStep) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Disparador — Escolha seu domínio</h1>
+          <p className="text-sm text-muted-foreground">Verifique a disponibilidade do domínio para continuar.</p>
+        </div>
+        <div className="rounded-xl border border-border bg-card p-6 space-y-4">
+          <div>
+            <label className="text-sm font-medium text-foreground">Nome desejado para o domínio</label>
+            <Input value={domain} onChange={e => { setDomain(e.target.value); setDomainResult(null); }} placeholder="empresa.com.br" className="mt-1" />
+          </div>
+          <Button variant="outline" onClick={handleCheckDomain} disabled={checkingDomain || !domain.trim()}>
+            {checkingDomain ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Verificando...</> : <><Globe className="h-4 w-4 mr-2" /> Pesquisar Domínio</>}
+          </Button>
+          {domainResult && (
+            <div className={cn("rounded-lg border p-4 flex items-start gap-3",
+              domainResult.available === true && "border-green-500/30 bg-green-500/10",
+              domainResult.available === false && "border-destructive/30 bg-destructive/10",
+              domainResult.available === null && "border-border bg-muted/30",
+            )}>
+              {domainResult.available === true && <CheckCircle className="h-5 w-5 text-green-500 shrink-0 mt-0.5" />}
+              {domainResult.available === false && <XCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />}
+              <p className="text-sm font-semibold">{domainResult.message}</p>
+            </div>
+          )}
+          <div className="flex gap-3 pt-2">
+            <Button variant="outline" onClick={() => setDomainStep(false)}>Voltar</Button>
+            <Button onClick={() => {
+              if (!hasPlan("grow")) { setUpgradeOpen(true); return; }
+              toast.info("Prosseguindo...");
+            }}>
+              Próximo <ArrowRight className="h-4 w-4 ml-2" />
+            </Button>
+          </div>
+        </div>
+        <UpgradePlanDialog open={upgradeOpen} onOpenChange={setUpgradeOpen} requiredPlan="grow" />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8">
       <SlideCarousel pagina="disparador" />
