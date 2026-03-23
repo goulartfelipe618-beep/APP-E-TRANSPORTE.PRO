@@ -52,6 +52,8 @@ const MANAGEMENT_TABS = [
 ];
 
 export default function GooglePage() {
+  const { hasPlan } = useUserPlan();
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("info");
   const [submitting, setSubmitting] = useState(false);

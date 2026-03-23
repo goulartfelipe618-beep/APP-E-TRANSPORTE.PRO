@@ -685,6 +685,7 @@ export default function WebsitePage() {
           </Button>
         </div>
       )}
+      <UpgradePlanDialog open={upgradeOpen} onOpenChange={setUpgradeOpen} requiredPlan="rise" />
     </div>
   );
 }

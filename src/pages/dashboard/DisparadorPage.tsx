@@ -218,11 +218,15 @@ export default function DisparadorPage() {
           <Zap className="h-8 w-8 text-primary mx-auto" />
           <h3 className="text-lg font-bold text-foreground">Pronto para disparar?</h3>
           <p className="text-sm text-muted-foreground max-w-lg mx-auto">
-            O link de acesso ao Disparador será fornecido pelo administrador. Certifique-se de ter um
-            chip secundário em mãos antes de iniciar.
+            Certifique-se de ter um chip secundário em mãos antes de iniciar.
           </p>
+          <Button className="gap-2" onClick={() => setDomainStep(true)}>
+            <Send className="h-4 w-4" /> Acessar Disparador
+          </Button>
         </CardContent>
       </Card>
+
+      <UpgradePlanDialog open={upgradeOpen} onOpenChange={setUpgradeOpen} requiredPlan="grow" />
     </div>
   );
 }
