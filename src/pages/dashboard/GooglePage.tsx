@@ -1026,7 +1026,10 @@ export default function GooglePage() {
         <Building2 className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
         <p className="text-foreground font-medium mb-1">Nenhum perfil criado</p>
         <p className="text-sm text-muted-foreground mb-4">Crie seu perfil no Google Business para aparecer nas buscas.</p>
-        <Button onClick={() => { setCreateOpen(true); setCreateStep(0); }}>
+        <Button onClick={() => {
+          if (!hasPlan("apex")) { setUpgradeOpen(true); return; }
+          setCreateOpen(true); setCreateStep(0);
+        }}>
           <Plus className="h-4 w-4 mr-2" /> Criar Meu Perfil
         </Button>
       </div>
