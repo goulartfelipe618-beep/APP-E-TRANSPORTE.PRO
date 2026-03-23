@@ -619,6 +619,10 @@ export default function WebsitePage() {
               if (bs === 1 && !hasDomain && (!domainResult || domainResult.available !== true) && domain.trim()) {
                 toast.error("Pesquise a disponibilidade do domínio antes de continuar."); return;
               }
+              // Plan gate: after domain step, require Rise plan
+              if (bs === 1 && !hasPlan("rise")) {
+                setUpgradeOpen(true); return;
+              }
               if (bs === 2) {
                 if (!companyName.trim()) { toast.error("Preencha o nome da empresa."); return; }
                 if (!whatsapp.trim()) { toast.error("Preencha o WhatsApp."); return; }
