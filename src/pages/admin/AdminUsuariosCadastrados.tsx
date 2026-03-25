@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Plus, Trash2, Users, Search, RefreshCw, Crown } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { PLAN_LABELS, PLAN_COLORS, PlanType } from "@/hooks/useUserPlan";
+import { PLAN_LABELS, PLAN_COLORS, PlanType, PLANS_PAID_ORDER } from "@/hooks/useUserPlan";
 
 interface UserItem {
   id: string;
@@ -27,6 +27,14 @@ const roleLabels: Record<string, string> = {
 
 const PLANS: PlanType[] = ["free", "seed", "grow", "rise", "apex"];
 
+/** Headers exigidos pelo gateway do Supabase ao chamar Edge Functions pelo fetch */
+function edgeFunctionHeaders(accessToken: string): HeadersInit {
+  return {
+    Authorization: `Bearer ${accessToken}`,
+    apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string,
+  };
+}
+
 export default function AdminUsuariosCadastrados() {
   const [users, setUsers] = useState<UserItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -39,21 +47,34 @@ export default function AdminUsuariosCadastrados() {
   const [formEmail, setFormEmail] = useState("");
   const [formPassword, setFormPassword] = useState("");
   const [formRole, setFormRole] = useState("");
-  const [formPlano, setFormPlano] = useState<PlanType>("free");
+  const [formPlano, setFormPlano] = useState<PlanType>("seed");
   const [creating, setCreating] = useState(false);
   const [updatingPlan, setUpdatingPlan] = useState(false);
 
   const fetchUsers = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) return;
+    setLoading(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast.error("Sessão não encontrada. Faça login novamente.");
+        setUsers([]);
+        return;
+      }
 
-    const res = await fetch(
-      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-users?action=list`,
-      { headers: { Authorization: `Bearer ${session.access_token}` } }
-    );
-    const data = await res.json();
-    setUsers(Array.isArray(data) ? data : []);
-    setLoading(false);
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-users?action=list`,
+        { headers: edgeFunctionHeaders(session.access_token) }
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(typeof data?.error === "string" ? data.error : `Erro ao carregar usuários (${res.status})`);
+        setUsers([]);
+        return;
+      }
+      setUsers(Array.isArray(data) ? data : []);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => { fetchUsers(); }, []);
@@ -74,7 +95,7 @@ export default function AdminUsuariosCadastrados() {
       {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${session.access_token}`,
+          ...edgeFunctionHeaders(session.access_token),
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
@@ -94,7 +115,7 @@ export default function AdminUsuariosCadastrados() {
       setFormEmail("");
       setFormPassword("");
       setFormRole("");
-      setFormPlano("free");
+      setFormPlano("seed");
       fetchUsers();
     }
     setCreating(false);
@@ -113,7 +134,7 @@ export default function AdminUsuariosCadastrados() {
       {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${session.access_token}`,
+          ...edgeFunctionHeaders(session.access_token),
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ user_id: userId }),
@@ -145,7 +166,7 @@ export default function AdminUsuariosCadastrados() {
       {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${session.access_token}`,
+          ...edgeFunctionHeaders(session.access_token),
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ user_id: selectedUser.id, plano: selectedPlan }),
@@ -196,6 +217,7 @@ export default function AdminUsuariosCadastrados() {
             <SelectItem value="todos">Todos</SelectItem>
             <SelectItem value="admin_transfer">Motorista Executivo</SelectItem>
             <SelectItem value="admin_taxi">Taxista</SelectItem>
+            <SelectItem value="admin_master">Administrador Master</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -221,25 +243,44 @@ export default function AdminUsuariosCadastrados() {
               <TableRow key={u.id}>
                 <TableCell className="font-medium text-foreground">{u.email}</TableCell>
                 <TableCell>
-                  <Badge variant={u.role === "admin_transfer" ? "default" : "secondary"}>
+                  <Badge
+                    variant={
+                      u.role === "admin_transfer"
+                        ? "default"
+                        : u.role === "admin_master"
+                          ? "destructive"
+                          : "secondary"
+                    }
+                  >
                     {roleLabels[u.role] || u.role}
                   </Badge>
                 </TableCell>
                 <TableCell>
-                  <Badge variant="outline" className={PLAN_COLORS[(u.plano || "free") as PlanType]}>
-                    {PLAN_LABELS[(u.plano || "free") as PlanType]}
-                  </Badge>
+                  {u.role === "admin_master" || u.plano === "n/a" ? (
+                    <span className="text-sm text-muted-foreground">—</span>
+                  ) : (
+                    <Badge variant="outline" className={PLAN_COLORS[(u.plano || "free") as PlanType]}>
+                      {PLAN_LABELS[(u.plano || "free") as PlanType]}
+                    </Badge>
+                  )}
                 </TableCell>
                 <TableCell className="text-muted-foreground text-sm">
                   {new Date(u.created_at).toLocaleDateString("pt-BR")}
                 </TableCell>
                 <TableCell className="text-right flex items-center justify-end gap-1">
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={() => handleOpenPlanDialog(u)} title="Alterar plano">
-                    <Crown className="h-4 w-4" />
-                  </Button>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDelete(u.id)}>
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                  {u.role !== "admin_master" && (
+                    <>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={() => handleOpenPlanDialog(u)} title="Alterar plano">
+                        <Crown className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDelete(u.id)}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </>
+                  )}
+                  {u.role === "admin_master" && (
+                    <span className="text-xs text-muted-foreground pr-2">Protegido</span>
+                  )}
                 </TableCell>
               </TableRow>
             ))}
@@ -264,7 +305,11 @@ export default function AdminUsuariosCadastrados() {
             </div>
             <div>
               <Label>Tipo de Usuário *</Label>
-              <Select value={formRole} onValueChange={(v) => { setFormRole(v); if (v === "admin_master") setFormPlano("free"); }}>
+              <Select value={formRole} onValueChange={(v) => {
+                setFormRole(v);
+                if (v === "admin_master") setFormPlano("free");
+                if (v === "admin_transfer" || v === "admin_taxi") setFormPlano("seed");
+              }}>
                 <SelectTrigger><SelectValue placeholder="Selecione o tipo" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="admin_transfer">Motorista Executivo</SelectItem>
@@ -279,11 +324,9 @@ export default function AdminUsuariosCadastrados() {
                 <Select value={formPlano} onValueChange={(v) => setFormPlano(v as PlanType)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="free">FREE</SelectItem>
-                    <SelectItem value="seed">Seed</SelectItem>
-                    <SelectItem value="grow">Grow</SelectItem>
-                    <SelectItem value="rise">Rise</SelectItem>
-                    <SelectItem value="apex">Apex</SelectItem>
+                    {PLANS_PAID_ORDER.map((p) => (
+                      <SelectItem key={p} value={p}>{PLAN_LABELS[p]}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>

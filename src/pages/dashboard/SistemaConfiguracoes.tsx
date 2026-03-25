@@ -251,6 +251,7 @@ export default function SistemaConfiguracoesPage() {
     if (ok) {
       toast.success("Perfil salvo");
       setProfileEditing(false);
+      window.dispatchEvent(new Event("configuracoes-updated"));
     }
   };
 
@@ -323,6 +324,7 @@ export default function SistemaConfiguracoesPage() {
     toast.success("Cabeçalho 1 salvo com sucesso");
     setContratualEditing(false);
     setContratualSaved(true);
+    window.dispatchEvent(new Event("configuracoes-updated"));
   };
 
   const handleLogoContratualUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {

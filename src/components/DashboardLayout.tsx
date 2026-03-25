@@ -4,6 +4,7 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { Shield } from "lucide-react";
 import { ActivePageProvider, useActivePage } from "@/contexts/ActivePageContext";
+import FloatingSupportChat from "@/components/FloatingSupportChat"; // [CHAT-FLOATING-IMPLEMENTACAO]
 
 // Import all page components
 import HomePage from "@/pages/dashboard/Home";
@@ -37,9 +38,11 @@ import TicketsPage from "@/pages/dashboard/TicketsPage";
 import DisparadorPage from "@/pages/dashboard/DisparadorPage";
 import MentoriaPage from "@/pages/dashboard/MentoriaPage";
 import EmptyLegsPage from "@/pages/dashboard/EmptyLegsPage";
+import AtualizacoesPage from "@/pages/dashboard/AtualizacoesPage";
 
 const PAGE_MAP: Record<string, React.ComponentType> = {
   home: HomePage,
+  atualizacoes: AtualizacoesPage,
   metricas: MetricasPage,
   abrangencia: PlaceholderPage,
   "transfer/solicitacoes": TransferSolicitacoesPage,
@@ -124,6 +127,7 @@ function DashboardContent() {
           }}
         />
       )}
+      <FloatingSupportChat /> {/* [CHAT-FLOATING-IMPLEMENTACAO] */}
     </div>
   );
 }

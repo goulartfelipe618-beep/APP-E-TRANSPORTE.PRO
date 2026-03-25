@@ -17,7 +17,8 @@ const PLAN_ICONS: Record<string, any> = {
   apex: Crown,
 };
 
-const PLAN_DESCRIPTIONS: Record<string, string> = {
+const PLAN_DESCRIPTIONS: Partial<Record<PlanType, string>> = {
+  free: "Navegue por todos os menus com limitações nos fluxos premium.",
   seed: "Acesso a funcionalidades básicas para iniciar seu negócio.",
   grow: "Inclui ferramentas de disparo e comunicação avançada.",
   rise: "Acesso a websites profissionais e recursos de marketing.",
@@ -33,10 +34,13 @@ export default function UpgradePlanDialog({ open, onOpenChange, requiredPlan }: 
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Icon className="h-5 w-5 text-primary" />
-            Upgrade Necessário
+            Migrar de plano
           </DialogTitle>
           <DialogDescription>
-            Esta funcionalidade requer o plano <Badge variant="outline" className="ml-1 font-semibold">{PLAN_LABELS[requiredPlan]}</Badge>
+            Para continuar, é necessário o plano <Badge variant="outline" className="ml-1 font-semibold">{PLAN_LABELS[requiredPlan]}</Badge>
+            {requiredPlan === "rise" && " — inclui fluxo completo de website após o domínio."}
+            {requiredPlan === "grow" && " — libera o disparador de mensagens."}
+            {requiredPlan === "apex" && " — libera criação e gestão do perfil no Google."}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-2">
@@ -45,7 +49,7 @@ export default function UpgradePlanDialog({ open, onOpenChange, requiredPlan }: 
               <Icon className="h-7 w-7 text-primary" />
             </div>
             <h3 className="text-lg font-bold text-foreground">Plano {PLAN_LABELS[requiredPlan]}</h3>
-            <p className="text-sm text-muted-foreground">{PLAN_DESCRIPTIONS[requiredPlan]}</p>
+            <p className="text-sm text-muted-foreground">{PLAN_DESCRIPTIONS[requiredPlan] ?? "Entre em contato para mais detalhes."}</p>
           </div>
           <p className="text-sm text-muted-foreground text-center">
             Entre em contato com o administrador para fazer o upgrade do seu plano.

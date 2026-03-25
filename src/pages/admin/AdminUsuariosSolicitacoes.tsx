@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ClipboardList, Eye, Trash2, ExternalLink, Copy } from "lucide-react";
+import { ClipboardList, Eye, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -78,8 +78,6 @@ export default function AdminUsuariosSolicitacoes() {
 
   const filtered = filtroStatus === "todos" ? solicitacoes : solicitacoes.filter((s) => s.status === filtroStatus);
 
-  const formUrl = `${window.location.origin}/solicitar-acesso`;
-
   return (
     <div className="space-y-6">
       <div>
@@ -88,24 +86,6 @@ export default function AdminUsuariosSolicitacoes() {
           Solicitações de Acesso
         </h1>
         <p className="text-muted-foreground mt-1">Solicitações de motoristas que desejam conhecer ou adquirir o sistema.</p>
-      </div>
-
-      {/* Link do formulário público */}
-      <div className="rounded-xl border border-border bg-card p-4 flex flex-col sm:flex-row items-start sm:items-center gap-3">
-        <div className="flex-1">
-          <p className="text-sm font-medium text-foreground">Link do formulário público:</p>
-          <p className="text-xs text-muted-foreground break-all">{formUrl}</p>
-        </div>
-        <div className="flex gap-2">
-          <Button size="sm" variant="outline" onClick={() => { navigator.clipboard.writeText(formUrl); toast.success("Link copiado!"); }}>
-            <Copy className="h-3.5 w-3.5 mr-1" /> Copiar
-          </Button>
-          <Button size="sm" variant="outline" asChild>
-            <a href={formUrl} target="_blank" rel="noopener noreferrer">
-              <ExternalLink className="h-3.5 w-3.5 mr-1" /> Abrir
-            </a>
-          </Button>
-        </div>
       </div>
 
       {/* Filtros */}

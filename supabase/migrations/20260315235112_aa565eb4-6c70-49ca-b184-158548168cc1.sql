@@ -1,1 +1,0 @@
-ALTER TABLE public.slides ADD COLUMN mostrar_texto boolean NOT NULL DEFAULT false;

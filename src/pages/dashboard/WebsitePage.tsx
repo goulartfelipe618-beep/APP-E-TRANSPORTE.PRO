@@ -126,7 +126,7 @@ export default function WebsitePage() {
   const [submitting, setSubmitting] = useState(false);
   const [servicoAtivo, setServicoAtivo] = useState<any>(null);
   const [dbTemplates, setDbTemplates] = useState<TemplateDB[]>([]);
-  const { plano, hasPlan } = useUserPlan();
+  const { plano } = useUserPlan();
   const [upgradeOpen, setUpgradeOpen] = useState(false);
 
   // Step 1 - Domínio
@@ -616,12 +616,22 @@ export default function WebsitePage() {
             </Button>
             <span className="text-xs text-muted-foreground">{bs} de {STEPS.length}</span>
             <Button onClick={() => {
-              if (bs === 1 && !hasDomain && (!domainResult || domainResult.available !== true) && domain.trim()) {
-                toast.error("Pesquise a disponibilidade do domínio antes de continuar."); return;
-              }
-              // Plan gate: after domain step, require Rise plan
-              if (bs === 1 && !hasPlan("rise")) {
-                setUpgradeOpen(true); return;
+              // Plano FREE: após etapa domínio, exige verificação (novo domínio) e oferece upgrade Rise
+              if (bs === 1) {
+                if (!hasDomain) {
+                  if (!domain.trim()) {
+                    toast.error("Informe o domínio desejado.");
+                    return;
+                  }
+                  if (domainResult?.available !== true) {
+                    toast.error("Pesquise a disponibilidade do domínio e confirme que está disponível antes de continuar.");
+                    return;
+                  }
+                }
+                if (plano === "free") {
+                  setUpgradeOpen(true);
+                  return;
+                }
               }
               if (bs === 2) {
                 if (!companyName.trim()) { toast.error("Preencha o nome da empresa."); return; }

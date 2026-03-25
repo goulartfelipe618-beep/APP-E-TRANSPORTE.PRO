@@ -24,30 +24,52 @@ export default function HomePage() {
   const { setActivePage } = useActivePage();
   const [networkAceito, setNetworkAceito] = useState<boolean | null>(null);
   const [mostrarRegras, setMostrarRegras] = useState(false);
-  const [configCompleta, setConfigCompleta] = useState<boolean | null>(null);
+  const [primeirosPassosConcluidos, setPrimeirosPassosConcluidos] = useState<boolean | null>(null);
 
-  const CAMPOS_OBRIGATORIOS = ["nome_completo", "nome_empresa", "cnpj", "telefone", "email", "endereco_completo", "cidade", "estado"];
+  const CAMPOS_PERFIL_OBRIGATORIOS = ["nome_completo", "nome_empresa", "cnpj", "telefone", "email", "cidade"];
+  const CAMPOS_CONTRATUAIS_OBRIGATORIOS = ["razao_social", "cnpj", "endereco_sede", "telefone", "whatsapp", "email_oficial"];
 
-  useEffect(() => {
-    const checkConfig = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      const { data } = await supabase
+  const checkPrimeirosPassos = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { data: perfilData } = await supabase
         .from("configuracoes" as any)
         .select("*")
         .eq("user_id", user.id)
         .maybeSingle();
-      if (!data) {
-        setConfigCompleta(false);
-        return;
-      }
-      const d = data as any;
-      const allFilled = CAMPOS_OBRIGATORIOS.every(
-        (campo) => d[campo] && String(d[campo]).trim() !== ""
-      );
-      setConfigCompleta(allFilled);
+
+    const { data: contratualData } = await supabase
+      .from("cabecalho_contratual" as any)
+      .select("*")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    const perfil = (perfilData || {}) as any;
+    const contratual = (contratualData || {}) as any;
+
+    const perfilCompleto = CAMPOS_PERFIL_OBRIGATORIOS.every(
+      (campo) => perfil[campo] && String(perfil[campo]).trim() !== ""
+    );
+    const contratualCompleto = CAMPOS_CONTRATUAIS_OBRIGATORIOS.every(
+      (campo) => contratual[campo] && String(contratual[campo]).trim() !== ""
+    );
+
+    setPrimeirosPassosConcluidos(perfilCompleto && contratualCompleto);
+  };
+
+  useEffect(() => {
+    checkPrimeirosPassos();
+
+    const handleConfigUpdate = () => {
+      checkPrimeirosPassos();
     };
-    checkConfig();
+
+    window.addEventListener("configuracoes-updated", handleConfigUpdate);
+
+    return () => {
+      window.removeEventListener("configuracoes-updated", handleConfigUpdate);
+    };
   }, []);
 
   useEffect(() => {
@@ -103,7 +125,7 @@ export default function HomePage() {
       />
 
       {/* Primeiros Passos */}
-      {configCompleta === false && (
+      {primeirosPassosConcluidos === false && (
         <div className="rounded-xl border-2 border-amber-500/50 bg-card p-6 space-y-4">
           <div className="flex items-center gap-3">
             <div className="p-3 rounded-xl bg-amber-500/10">
@@ -117,7 +139,7 @@ export default function HomePage() {
           <div className="space-y-3">
             <div
               className="flex items-center gap-3 p-3 rounded-lg border border-amber-500/30 bg-amber-500/5 cursor-pointer hover:bg-amber-500/10 transition-colors"
-              onClick={() => setActivePage("sistema_configuracoes")}
+              onClick={() => setActivePage("sistema/configuracoes")}
             >
               <div className="p-1.5 rounded-full border-2 border-amber-500">
                 <CircleDot className="h-4 w-4 text-amber-500" />

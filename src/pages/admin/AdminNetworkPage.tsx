@@ -62,7 +62,12 @@ export default function AdminNetworkPage() {
     if (!session) return;
     const res = await fetch(
       `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-users?action=list`,
-      { headers: { Authorization: `Bearer ${session.access_token}` } }
+      {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string,
+        },
+      }
     );
     const list = await res.json();
     if (Array.isArray(list)) {

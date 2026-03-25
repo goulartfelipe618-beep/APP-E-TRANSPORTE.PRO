@@ -12,7 +12,7 @@ export default function PageLoader({ children, pageKey }: PageLoaderProps) {
 
   useEffect(() => {
     setLoading(true);
-    const timer = setTimeout(() => setLoading(false), 2000);
+    const timer = setTimeout(() => setLoading(false), 1500);
     return () => clearTimeout(timer);
   }, [pageKey]);
 

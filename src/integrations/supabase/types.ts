@@ -1111,6 +1111,7 @@ export type Database = {
       tickets: {
         Row: {
           assunto: string
+          codigo_ticket: number
           created_at: string
           descricao: string
           id: string
@@ -1122,6 +1123,7 @@ export type Database = {
         }
         Insert: {
           assunto: string
+          codigo_ticket?: number
           created_at?: string
           descricao?: string
           id?: string
@@ -1133,6 +1135,7 @@ export type Database = {
         }
         Update: {
           assunto?: string
+          codigo_ticket?: number
           created_at?: string
           descricao?: string
           id?: string

@@ -12,6 +12,7 @@ import { Plus, Ticket, Clock, CheckCircle, AlertCircle, MessageSquare } from "lu
 
 interface TicketRow {
   id: string;
+  codigo_ticket: number;
   tipo: string;
   assunto: string;
   descricao: string;
@@ -153,6 +154,7 @@ export default function TicketsPage() {
                       <CardTitle className="text-base">{t.assunto}</CardTitle>
                     </div>
                     <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="text-xs">#{t.codigo_ticket}</Badge>
                       <Badge variant="outline" className="text-xs capitalize">{t.tipo}</Badge>
                       <Badge variant={st.variant}>{st.label}</Badge>
                     </div>

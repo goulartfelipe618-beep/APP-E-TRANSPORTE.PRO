@@ -121,7 +121,18 @@ export default function DisparadorPage() {
           <div className="flex gap-3 pt-2">
             <Button variant="outline" onClick={() => setDomainStep(false)}>Voltar</Button>
             <Button onClick={() => {
-              if (!hasPlan("grow")) { setUpgradeOpen(true); return; }
+              if (!domain.trim()) {
+                toast.error("Informe um domínio.");
+                return;
+              }
+              if (domainResult?.available !== true) {
+                toast.error("Verifique a disponibilidade do domínio antes de continuar.");
+                return;
+              }
+              if (!hasPlan("grow")) {
+                setUpgradeOpen(true);
+                return;
+              }
               toast.info("Prosseguindo...");
             }}>
               Próximo <ArrowRight className="h-4 w-4 ml-2" />

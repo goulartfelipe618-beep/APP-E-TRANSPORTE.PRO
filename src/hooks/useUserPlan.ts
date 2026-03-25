@@ -5,6 +5,9 @@ export type PlanType = "free" | "seed" | "grow" | "rise" | "apex";
 
 const PLAN_ORDER: PlanType[] = ["free", "seed", "grow", "rise", "apex"];
 
+/** Planos pagos na ordem exibida ao criar motorista/taxista no admin */
+export const PLANS_PAID_ORDER: PlanType[] = ["seed", "grow", "rise", "apex"];
+
 export const PLAN_LABELS: Record<PlanType, string> = {
   free: "FREE",
   seed: "Seed",

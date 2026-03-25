@@ -1,1 +1,0 @@
-ALTER TABLE public.slides ADD COLUMN pagina text NOT NULL DEFAULT 'home';

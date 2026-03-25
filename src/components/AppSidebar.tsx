@@ -31,6 +31,7 @@ const getMenuStructure = (showNetwork: boolean) => [
         icon: LayoutDashboard,
         children: [
           { title: "Home", page: "home", icon: Home },
+          { title: "Atualizações", page: "atualizacoes", icon: Bell },
           { title: "Métricas", page: "metricas", icon: Activity },
           { title: "Abrangência", page: "abrangencia", icon: MapPin },
         ],

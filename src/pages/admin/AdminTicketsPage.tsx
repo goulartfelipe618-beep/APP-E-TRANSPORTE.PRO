@@ -11,6 +11,7 @@ import { Ticket, AlertCircle, Clock, CheckCircle, MessageSquare } from "lucide-r
 
 interface TicketRow {
   id: string;
+  codigo_ticket: number;
   tipo: string;
   assunto: string;
   descricao: string;
@@ -19,6 +20,7 @@ interface TicketRow {
   created_at: string;
   updated_at: string;
   user_id: string;
+  motorista_nome?: string;
 }
 
 const STATUS_OPTIONS = [
@@ -49,7 +51,31 @@ export default function AdminTicketsPage() {
       .from("tickets" as any)
       .select("*")
       .order("created_at", { ascending: false });
-    if (!error && data) setTickets(data as unknown as TicketRow[]);
+    if (!error && data) {
+      const baseTickets = data as unknown as TicketRow[];
+      const userIds = [...new Set(baseTickets.map((ticket) => ticket.user_id))];
+
+      let nomeByUserId: Record<string, string> = {};
+
+      if (userIds.length > 0) {
+        const { data: nomesData } = await supabase
+          .from("configuracoes" as any)
+          .select("user_id, nome_completo")
+          .in("user_id", userIds);
+
+        nomeByUserId = (nomesData || []).reduce((acc: Record<string, string>, row: any) => {
+          acc[row.user_id] = row.nome_completo || "Motorista sem nome";
+          return acc;
+        }, {});
+      }
+
+      const withDriverName = baseTickets.map((ticket) => ({
+        ...ticket,
+        motorista_nome: nomeByUserId[ticket.user_id] || "Motorista sem nome",
+      }));
+
+      setTickets(withDriverName);
+    }
     setLoading(false);
   };
 
@@ -140,6 +166,7 @@ export default function AdminTicketsPage() {
                   <div className="flex items-start justify-between">
                     <CardTitle className="text-base">{t.assunto}</CardTitle>
                     <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="text-xs">#{t.codigo_ticket}</Badge>
                       <Badge variant="outline" className="text-xs capitalize">{t.tipo}</Badge>
                       <Badge variant={st.variant}>{st.label}</Badge>
                     </div>
@@ -147,6 +174,7 @@ export default function AdminTicketsPage() {
                 </CardHeader>
                 <CardContent>
                   <p className="text-sm text-muted-foreground line-clamp-2">{t.descricao || "Sem descrição"}</p>
+                  <p className="text-xs text-muted-foreground mt-2">Motorista: {t.motorista_nome || "Motorista sem nome"}</p>
                   <p className="text-xs text-muted-foreground mt-2">
                     {new Date(t.created_at).toLocaleDateString("pt-BR")} às {new Date(t.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
                   </p>
@@ -166,10 +194,15 @@ export default function AdminTicketsPage() {
               </SheetHeader>
               <div className="space-y-4 mt-4">
                 <div className="flex gap-2">
+                  <Badge variant="outline">#{selected.codigo_ticket}</Badge>
                   <Badge variant="outline" className="capitalize">{selected.tipo}</Badge>
                   <Badge variant={STATUS_MAP[selected.status]?.variant || "default"}>
                     {STATUS_MAP[selected.status]?.label || selected.status}
                   </Badge>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-foreground mb-1">Motorista</p>
+                  <p className="text-sm text-muted-foreground">{selected.motorista_nome || "Motorista sem nome"}</p>
                 </div>
                 <div>
                   <p className="text-sm font-medium text-foreground mb-1">Descrição</p>

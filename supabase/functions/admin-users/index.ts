@@ -46,21 +46,38 @@ Deno.serve(async (req) => {
     const url = new URL(req.url);
     const action = url.searchParams.get("action");
 
-    // LIST USERS
+    // LIST USERS (inclui admin_master para aparecer no painel Cadastrados)
     if (req.method === "GET" && action === "list") {
       const { data: roles } = await supabaseAdmin
         .from("user_roles")
-        .select("user_id, role")
-        .neq("role", "admin_master");
+        .select("user_id, role");
 
       if (!roles || roles.length === 0) {
         return new Response(JSON.stringify([]), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
-      const { data: listData } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 });
-      const authUsers = listData?.users || [];
+      // Paginar até trazer todos (listUsers retorna por página; sem isso parte some da lista)
+      const authUsers: any[] = [];
+      let page = 1;
+      const perPage = 1000;
+      while (true) {
+        const { data: listData, error: listErr } = await supabaseAdmin.auth.admin.listUsers({
+          page,
+          perPage,
+        });
+        if (listErr) {
+          return new Response(
+            JSON.stringify({ error: listErr.message || "Erro ao listar usuários Auth" }),
+            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        const batch = listData?.users || [];
+        authUsers.push(...batch);
+        if (batch.length < perPage) break;
+        page += 1;
+      }
 
-      // Fetch plans
+      // Fetch plans (admin_master não usa plano de assinatura)
       const userIds = roles.map((r: any) => r.user_id);
       const { data: plans } = await supabaseAdmin
         .from("user_plans")
@@ -72,13 +89,18 @@ Deno.serve(async (req) => {
 
       const users = authUsers
         .filter((u: any) => roleMap.has(u.id))
-        .map((u: any) => ({
-          id: u.id,
-          email: u.email,
-          created_at: u.created_at,
-          role: roleMap.get(u.id) || "sem_role",
-          plano: planMap.get(u.id) || "free",
-        }));
+        .map((u: any) => {
+          const role = roleMap.get(u.id) || "sem_role";
+          const plano =
+            role === "admin_master" ? "n/a" : (planMap.get(u.id) || "free");
+          return {
+            id: u.id,
+            email: u.email,
+            created_at: u.created_at,
+            role,
+            plano,
+          };
+        });
 
       return new Response(JSON.stringify(users), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
@@ -117,7 +139,11 @@ Deno.serve(async (req) => {
 
       // Create plan record (only for non-admin_master)
       if (role !== "admin_master") {
-        const userPlano = plano || "free";
+        const paidPlans = ["seed", "grow", "rise", "apex"];
+        const userPlano =
+          role === "admin_transfer" || role === "admin_taxi"
+            ? paidPlans.includes(plano) ? plano : "seed"
+            : plano || "free";
         await supabaseAdmin.from("user_plans").insert({
           user_id: newUser.user.id,
           plano: userPlano,

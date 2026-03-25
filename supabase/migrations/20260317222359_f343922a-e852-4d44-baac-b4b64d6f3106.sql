@@ -1,1 +1,0 @@
-ALTER TABLE public.empty_lags ADD COLUMN data_expiracao TIMESTAMP WITH TIME ZONE DEFAULT NULL;

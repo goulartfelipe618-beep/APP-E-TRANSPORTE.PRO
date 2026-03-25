@@ -3,6 +3,7 @@ import PageLoader from "@/components/PageLoader";
 import { TaxiSidebar } from "@/components/TaxiSidebar";
 import { Car } from "lucide-react";
 import { ActivePageProvider, useActivePage } from "@/contexts/ActivePageContext";
+import FloatingSupportChat from "@/components/FloatingSupportChat"; // [CHAT-FLOATING-IMPLEMENTACAO]
 
 import TaxiHome from "@/pages/taxi/TaxiHome";
 import TaxiMetricas from "@/pages/taxi/TaxiMetricas";
@@ -51,6 +52,7 @@ function TaxiContent() {
           </PageLoader>
         </main>
       </div>
+      <FloatingSupportChat /> {/* [CHAT-FLOATING-IMPLEMENTACAO] */}
     </div>
   );
 }
