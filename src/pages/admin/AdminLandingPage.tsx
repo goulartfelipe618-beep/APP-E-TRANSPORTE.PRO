@@ -70,10 +70,15 @@ export default function AdminLandingPage() {
       const rows = (solicitacoes || []) as SolicitacaoMotorista[];
       const leadUserIds = [...new Set(rows.map((r) => r.lead_user_id).filter(Boolean))] as string[];
 
-      const { data: plans, error: plansErr } = await supabase
-        .from("user_plans")
-        .select("user_id,plano")
-        .in("user_id", leadUserIds.length ? leadUserIds : ["__none__"]);
+      // Evita erro 400 quando o Supabase recebe `.in(..., [])` (ele vira `__none__`)
+      // ou quando a lista não tem IDs válidos.
+      const { data: plans, error: plansErr } =
+        leadUserIds.length > 0
+          ? await supabase
+              .from("user_plans")
+              .select("user_id,plano")
+              .in("user_id", leadUserIds)
+          : ({ data: [], error: null } as { data: any[]; error: any });
 
       if (plansErr) throw plansErr;
 
