@@ -43,7 +43,6 @@ const getMenuStructure = (showNetwork: boolean) => [
           { title: "Solicitações", page: "transfer/solicitacoes", icon: FileText },
           { title: "Reservas", page: "transfer/reservas", icon: BookOpen },
           { title: "Contrato", page: "transfer/contrato", icon: ClipboardList },
-          { title: "Geolocalização", page: "transfer/geolocalizacao", icon: Map },
         ],
       },
       {
@@ -65,6 +64,8 @@ const getMenuStructure = (showNetwork: boolean) => [
         ],
       },
       { title: "Veículos", page: "veiculos", icon: Car },
+      { title: "Empty Legs", page: "empty-legs", icon: Plane },
+      { title: "Mentoria", page: "mentoria", icon: GraduationCap },
     ],
   },
   {
@@ -78,6 +79,7 @@ const getMenuStructure = (showNetwork: boolean) => [
           { title: "Leads", page: "campanhas/leads", icon: UserCheck },
         ],
       },
+      { title: "Geolocalização", page: "transfer/geolocalizacao", icon: Map },
       { title: "Receptivos", page: "marketing/receptivos", icon: Globe },
       { title: "QR Codes", page: "marketing/qrcode", icon: Search },
       ...(showNetwork ? [{ title: "Network", page: "network", icon: Globe }] : []),
@@ -101,18 +103,6 @@ const getMenuStructure = (showNetwork: boolean) => [
       },
       { title: "Anotações", page: "anotacoes", icon: StickyNote },
       { title: "Tickets", page: "tickets", icon: ClipboardList },
-    ],
-  },
-  {
-    label: "Capacitação",
-    items: [
-      { title: "Mentoria", page: "mentoria", icon: GraduationCap },
-    ],
-  },
-  {
-    label: "Viagens Aéreas",
-    items: [
-      { title: "Empty Legs", page: "empty-legs", icon: Plane },
     ],
   },
 ];

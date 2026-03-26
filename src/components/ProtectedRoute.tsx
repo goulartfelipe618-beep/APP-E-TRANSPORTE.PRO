@@ -5,17 +5,44 @@ import { supabase } from "@/integrations/supabase/client";
 export default function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [authenticated, setAuthenticated] = useState(false);
+  const [needsMfa, setNeedsMfa] = useState(false);
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setAuthenticated(!!session);
-      setLoading(false);
+    const check = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        setAuthenticated(false);
+        setNeedsMfa(false);
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const { data: assuranceData, error: assuranceErr } =
+          await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+
+        const shouldChallenge =
+          !assuranceErr &&
+          assuranceData?.nextLevel === "aal2" &&
+          assuranceData?.currentLevel !== "aal2";
+
+        setNeedsMfa(!!shouldChallenge);
+        setAuthenticated(true);
+      } catch {
+        // Sem erro de MFA, seguimos apenas com autenticação.
+        setNeedsMfa(false);
+        setAuthenticated(true);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
+      setLoading(true);
+      check();
     });
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setAuthenticated(!!session);
-      setLoading(false);
-    });
+    check();
 
     return () => subscription.unsubscribe();
   }, []);
@@ -28,6 +55,7 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
     );
   }
 
+  if (needsMfa) return <Navigate to="/mfa" replace />;
   if (!authenticated) return <Navigate to="/login" replace />;
   return <>{children}</>;
 }

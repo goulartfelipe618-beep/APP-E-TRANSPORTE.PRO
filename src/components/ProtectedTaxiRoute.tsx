@@ -5,14 +5,36 @@ import { supabase } from "@/integrations/supabase/client";
 export default function ProtectedTaxiRoute({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [authorized, setAuthorized] = useState(false);
+  const [needsMfa, setNeedsMfa] = useState(false);
 
   useEffect(() => {
     const checkAccess = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         setAuthorized(false);
+        setNeedsMfa(false);
         setLoading(false);
         return;
+      }
+
+      try {
+        setNeedsMfa(false);
+        const { data: assuranceData, error: assuranceErr } =
+          await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+
+        const shouldChallenge =
+          !assuranceErr &&
+          assuranceData?.nextLevel === "aal2" &&
+          assuranceData?.currentLevel !== "aal2";
+
+        if (shouldChallenge) {
+          setNeedsMfa(true);
+          setAuthorized(false);
+          setLoading(false);
+          return;
+        }
+      } catch {
+        // Ignora problemas de verificação de AAL e segue fluxo de role.
       }
 
       const { data: roleData } = await supabase
@@ -37,6 +59,7 @@ export default function ProtectedTaxiRoute({ children }: { children: React.React
     );
   }
 
+  if (needsMfa) return <Navigate to="/mfa" replace />;
   if (!authorized) return <Navigate to="/login" replace />;
   return <>{children}</>;
 }

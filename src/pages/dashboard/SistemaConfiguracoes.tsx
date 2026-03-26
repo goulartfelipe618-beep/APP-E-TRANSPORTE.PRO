@@ -16,6 +16,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useConfiguracoes } from "@/contexts/ConfiguracoesContext";
 import { Badge } from "@/components/ui/badge";
+import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 
 const FONT_OPTIONS = [
   { value: "montserrat", label: "Montserrat" },
@@ -161,6 +162,16 @@ export default function SistemaConfiguracoesPage() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [savingPassword, setSavingPassword] = useState(false);
+
+  // 2FA (TOTP)
+  const [twoFaDialogOpen, setTwoFaDialogOpen] = useState(false);
+  const [mfaFactorId, setMfaFactorId] = useState<string | null>(null);
+  const [mfaQrCode, setMfaQrCode] = useState<string>("");
+  const [mfaSecret, setMfaSecret] = useState<string>("");
+  const [mfaVerifyCode, setMfaVerifyCode] = useState<string>("");
+  const [enrollingMfa, setEnrollingMfa] = useState(false);
+  const [enablingMfa, setEnablingMfa] = useState(false);
+  const [mfaSetupError, setMfaSetupError] = useState<string>("");
 
   useEffect(() => {
     loadSettings();
@@ -363,6 +374,75 @@ export default function SistemaConfiguracoesPage() {
     setCurrentPassword("");
     setNewPassword("");
     setConfirmPassword("");
+  };
+
+  const resetTwoFaSetup = () => {
+    setMfaFactorId(null);
+    setMfaQrCode("");
+    setMfaSecret("");
+    setMfaVerifyCode("");
+    setEnrollingMfa(false);
+    setEnablingMfa(false);
+    setMfaSetupError("");
+  };
+
+  const startEnrollTwoFa = async () => {
+    resetTwoFaSetup();
+    setEnrollingMfa(true);
+    setMfaSetupError("");
+
+    try {
+      const { data, error } = await supabase.auth.mfa.enroll({
+        factorType: "totp",
+      });
+
+      if (error) throw error;
+
+      setMfaFactorId(data.id);
+      setMfaQrCode(data.totp.qr_code);
+      setMfaSecret(data.totp.secret);
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : "Falha ao iniciar o enrolamento de 2FA.";
+      setMfaSetupError(message);
+      toast.error(message);
+    } finally {
+      setEnrollingMfa(false);
+    }
+  };
+
+  const handleEnableTwoFa = async () => {
+    if (!mfaFactorId) return;
+    if (mfaVerifyCode.trim().length !== 6) {
+      setMfaSetupError("Digite o código completo (6 dígitos).");
+      return;
+    }
+
+    setMfaSetupError("");
+    setEnablingMfa(true);
+    try {
+      const challenge = await supabase.auth.mfa.challenge({ factorId: mfaFactorId });
+      if (challenge.error) throw challenge.error;
+
+      const verify = await supabase.auth.mfa.verify({
+        factorId: mfaFactorId,
+        challengeId: challenge.data.id,
+        code: mfaVerifyCode.trim(),
+      });
+      if (verify.error) throw verify.error;
+
+      toast.success("2FA ativado com sucesso.");
+      setTwoFaDialogOpen(false);
+      resetTwoFaSetup();
+
+      // Garante que o JWT seja atualizado para aal2.
+      await supabase.auth.refreshSession();
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : "Código inválido. Tente novamente.";
+      setMfaSetupError(message);
+      toast.error(message);
+    } finally {
+      setEnablingMfa(false);
+    }
   };
 
   const handleChangePassword = async () => {
@@ -647,13 +727,99 @@ export default function SistemaConfiguracoesPage() {
               variant="outline"
               size="sm"
               type="button"
-              onClick={() => toast.info("Configuração de 2FA em breve.")}
+              onClick={() => {
+                setTwoFaDialogOpen(true);
+                startEnrollTwoFa();
+              }}
             >
               <Shield className="h-4 w-4 mr-2" /> Configurar
             </Button>
           </div>
         </div>
       </div>
+
+      <Dialog
+        open={twoFaDialogOpen}
+        onOpenChange={(open) => {
+          setTwoFaDialogOpen(open);
+          if (!open) resetTwoFaSetup();
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Configurar Autenticação em 2 Fatores</DialogTitle>
+            <DialogDescription>
+              Use seu app autenticador (TOTP) para habilitar a camada extra de segurança.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            {enrollingMfa ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" /> Gerando QR Code...
+              </div>
+            ) : (
+              <>
+                {mfaQrCode ? (
+                  <div className="flex justify-center">
+                    <img
+                      src={mfaQrCode}
+                      alt="QR Code para 2FA"
+                      className="h-44 w-44"
+                    />
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">Aguardando QR Code...</p>
+                )}
+
+                {mfaSecret ? (
+                  <p className="text-xs text-muted-foreground break-all">
+                    Secret: <span className="font-medium text-foreground">{mfaSecret}</span>
+                  </p>
+                ) : null}
+
+                <div className="space-y-2">
+                  <Label>Digite o código do autenticador</Label>
+                  <InputOTP
+                    maxLength={6}
+                    value={mfaVerifyCode}
+                    onChange={(v) => setMfaVerifyCode(v)}
+                    aria-label="Código TOTP"
+                  >
+                    <InputOTPGroup>
+                      {Array.from({ length: 6 }, (_, i) => (
+                        <InputOTPSlot key={i} index={i} />
+                      ))}
+                    </InputOTPGroup>
+                  </InputOTP>
+                </div>
+              </>
+            )}
+
+            {mfaSetupError ? <p className="text-sm text-destructive">{mfaSetupError}</p> : null}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" type="button" disabled={enrollingMfa || enablingMfa} onClick={() => setTwoFaDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              disabled={!mfaFactorId || enrollingMfa || enablingMfa}
+              className="bg-primary text-primary-foreground"
+              onClick={handleEnableTwoFa}
+            >
+              {enablingMfa ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Ativando...
+                </>
+              ) : (
+                "Ativar 2FA"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog
         open={passwordDialogOpen}

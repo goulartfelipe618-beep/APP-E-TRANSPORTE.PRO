@@ -54,6 +54,21 @@ const Login = () => {
       return;
     }
 
+    // Se o usuário já tiver TOTP enrolado mas ainda não fez o desafio (aal1 -> aal2),
+    // direciona para a tela de verificação 2FA antes de consultar roles no banco.
+    try {
+      const { data: assuranceData, error: assuranceErr } =
+        await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+
+      if (!assuranceErr && assuranceData?.nextLevel === "aal2" && assuranceData?.currentLevel !== "aal2") {
+        setLoading(false);
+        navigate("/mfa");
+        return;
+      }
+    } catch {
+      // Caso a verificação de AAL falhe, seguimos com o fluxo normal.
+    }
+
     // Check user role to redirect appropriately
     const { data: roles } = await supabase
       .from("user_roles")

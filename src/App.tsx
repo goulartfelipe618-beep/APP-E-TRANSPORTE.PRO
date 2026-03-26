@@ -12,6 +12,7 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import ProtectedTaxiRoute from "./components/ProtectedTaxiRoute";
 import ProtectedAdminRoute from "./components/ProtectedAdminRoute";
 import { ConfiguracoesProvider } from "./contexts/ConfiguracoesContext";
+import MfaChallengePage from "./pages/MfaChallenge";
 
 const queryClient = new QueryClient();
 
@@ -25,6 +26,7 @@ const App = () => (
         <Routes>
           <Route path="/" element={<Navigate to="/login" replace />} />
           <Route path="/login" element={<Login />} />
+          <Route path="/mfa" element={<MfaChallengePage />} />
           <Route path="/dashboard" element={<ProtectedRoute><DashboardLayout /></ProtectedRoute>} />
           <Route path="/taxi" element={<ProtectedTaxiRoute><TaxiDashboardLayout /></ProtectedTaxiRoute>} />
           <Route path="/admin" element={<ProtectedAdminRoute><AdminLayout /></ProtectedAdminRoute>} />
