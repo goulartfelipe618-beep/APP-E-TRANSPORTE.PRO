@@ -1,8 +1,17 @@
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Car, User, Upload, Save, Key, Shield, RefreshCw, Type, Pencil, FileText, Users, AlertTriangle } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Car, User, Upload, Save, Key, Shield, RefreshCw, Type, Pencil, FileText, Users, AlertTriangle, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useConfiguracoes } from "@/contexts/ConfiguracoesContext";
@@ -146,6 +155,12 @@ export default function SistemaConfiguracoesPage() {
   const [whatsappContratual, setWhatsappContratual] = useState("");
   const [emailOficial, setEmailOficial] = useState("");
   const [uploadingLogoContratual, setUploadingLogoContratual] = useState("");
+
+  const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [savingPassword, setSavingPassword] = useState(false);
 
   useEffect(() => {
     loadSettings();
@@ -342,6 +357,62 @@ export default function SistemaConfiguracoesPage() {
     setLogoContratualUrl(urlData.publicUrl);
     toast.success("Logotipo contratual enviado");
     setUploadingLogoContratual("");
+  };
+
+  const resetPasswordForm = () => {
+    setCurrentPassword("");
+    setNewPassword("");
+    setConfirmPassword("");
+  };
+
+  const handleChangePassword = async () => {
+    if (newPassword.length < 6) {
+      toast.error("A nova senha deve ter no mínimo 6 caracteres.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      toast.error("A confirmação não coincide com a nova senha.");
+      return;
+    }
+    if (currentPassword === newPassword) {
+      toast.error("A nova senha deve ser diferente da atual.");
+      return;
+    }
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user?.email) {
+      toast.error("Não foi possível obter o e-mail da conta.");
+      return;
+    }
+
+    setSavingPassword(true);
+    try {
+      const { error: signInErr } = await supabase.auth.signInWithPassword({
+        email: user.email,
+        password: currentPassword,
+      });
+      if (signInErr) {
+        const msg = signInErr.message?.toLowerCase().includes("invalid") || signInErr.message?.includes("Invalid login")
+          ? "Senha atual incorreta."
+          : signInErr.message;
+        toast.error(msg);
+        return;
+      }
+
+      const { error: updateErr } = await supabase.auth.updateUser({ password: newPassword });
+      if (updateErr) {
+        toast.error(updateErr.message || "Não foi possível atualizar a senha.");
+        return;
+      }
+
+      toast.success("Senha alterada com sucesso.");
+      resetPasswordForm();
+      setPasswordDialogOpen(false);
+    } finally {
+      setSavingPassword(false);
+    }
   };
 
   return (
@@ -563,17 +634,92 @@ export default function SistemaConfiguracoesPage() {
               <p className="font-medium text-foreground">Alteração de Senha</p>
               <p className="text-sm text-muted-foreground">Alterar a senha de acesso</p>
             </div>
-            <Button variant="outline" size="sm"><Key className="h-4 w-4 mr-2" /> Alterar</Button>
+            <Button variant="outline" size="sm" onClick={() => { resetPasswordForm(); setPasswordDialogOpen(true); }}>
+              <Key className="h-4 w-4 mr-2" /> Alterar
+            </Button>
           </div>
           <div className="flex items-center justify-between p-3 rounded-lg border border-border">
             <div>
               <p className="font-medium text-foreground">Autenticação em 2 Fatores (2FA)</p>
               <p className="text-sm text-muted-foreground">Camada extra de segurança via app autenticador (TOTP)</p>
             </div>
-            <Button variant="outline" size="sm"><Shield className="h-4 w-4 mr-2" /> Configurar</Button>
+            <Button
+              variant="outline"
+              size="sm"
+              type="button"
+              onClick={() => toast.info("Configuração de 2FA em breve.")}
+            >
+              <Shield className="h-4 w-4 mr-2" /> Configurar
+            </Button>
           </div>
         </div>
       </div>
+
+      <Dialog
+        open={passwordDialogOpen}
+        onOpenChange={(open) => {
+          setPasswordDialogOpen(open);
+          if (!open) resetPasswordForm();
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Alterar senha</DialogTitle>
+            <DialogDescription>
+              Informe sua senha atual e a nova senha. A alteração é feita no Supabase Auth (conta segura).
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label htmlFor="current-password">Senha atual</Label>
+              <Input
+                id="current-password"
+                type="password"
+                autoComplete="current-password"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                disabled={savingPassword}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="new-password">Nova senha</Label>
+              <Input
+                id="new-password"
+                type="password"
+                autoComplete="new-password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                disabled={savingPassword}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="confirm-password">Confirmar nova senha</Label>
+              <Input
+                id="confirm-password"
+                type="password"
+                autoComplete="new-password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                disabled={savingPassword}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" type="button" disabled={savingPassword} onClick={() => setPasswordDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button type="button" disabled={savingPassword} onClick={handleChangePassword}>
+              {savingPassword ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Salvando...
+                </>
+              ) : (
+                "Salvar nova senha"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Network Nacional */}
       <NetworkSection />
