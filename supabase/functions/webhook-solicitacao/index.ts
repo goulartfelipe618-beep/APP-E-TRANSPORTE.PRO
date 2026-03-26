@@ -89,6 +89,146 @@ function resolveValue(obj: Record<string, any>, path: string): any {
   return current;
 }
 
+function normalizePlano(plano: unknown): string {
+  const v = String(plano || "").trim().toLowerCase();
+  const allowed = ["free", "seed", "grow", "rise", "apex"];
+  return allowed.includes(v) ? v : "free";
+}
+
+function stripAccents(input: string): string {
+  // Normalize and remove diacritics (e.g. "João" => "Joao")
+  return input.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+}
+
+function onlyLettersUpper(input: string): string {
+  return stripAccents(input).replace(/[^a-zA-Z]/g, "").toUpperCase();
+}
+
+function computeLeadPassword(nome: string, telefone: string): string {
+  const letters = onlyLettersUpper(nome);
+  const first3 = (letters.slice(0, 3) || "").padEnd(3, "X");
+
+  const digits = (telefone || "").replace(/\D/g, "");
+  const last4 = (digits.slice(-4) || "").padStart(4, "0");
+
+  return `${first3}${last4}ETP`;
+}
+
+function formatZonedParts(date: Date, timeZone: string) {
+  const dtf = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  });
+  const parts = dtf.formatToParts(date);
+  const map: Record<string, string> = {};
+  for (const p of parts) {
+    if (p.type !== "literal") map[p.type] = p.value;
+  }
+  return map;
+}
+
+function zonedTimeToUtc(
+  year: number,
+  month: number,
+  day: number,
+  hour: number,
+  minute: number,
+  second: number,
+  timeZone: string
+): Date {
+  // Convert a local time in a given timezone to a UTC Date.
+  // Algorithm: guess the UTC timestamp for the desired local time, then correct by the
+  // difference between the guessed local time and the desired local time.
+  const dtf = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  });
+
+  const guessUtc = new Date(Date.UTC(year, month - 1, day, hour, minute, second));
+  const parts = dtf.formatToParts(guessUtc);
+  const map: Record<string, string> = {};
+  for (const p of parts) {
+    if (p.type !== "literal") map[p.type] = p.value;
+  }
+
+  const guessedLocalAsUtc = Date.UTC(
+    Number(map.year),
+    Number(map.month) - 1,
+    Number(map.day),
+    Number(map.hour),
+    Number(map.minute),
+    Number(map.second)
+  );
+
+  const desiredLocalAsUtc = Date.UTC(year, month - 1, day, hour, minute, second);
+  const diffMs = desiredLocalAsUtc - guessedLocalAsUtc;
+  return new Date(guessUtc.getTime() + diffMs);
+}
+
+function computeBanDurationToTarget(
+  now: Date,
+  targetDayOffset: number,
+  timeZone: string,
+  targetHour: number,
+  targetMinute: number,
+  targetSecond: number
+): string {
+  const nowParts = formatZonedParts(now, timeZone);
+  const y = Number(nowParts.year);
+  const m = Number(nowParts.month);
+  const d = Number(nowParts.day);
+
+  // Add days in the "local calendar" (Sao Paulo time) by using a UTC date as a pure calendar container.
+  const base = new Date(Date.UTC(y, m - 1, d, 0, 0, 0));
+  base.setUTCDate(base.getUTCDate() + targetDayOffset);
+
+  const y2 = base.getUTCFullYear();
+  const m2 = base.getUTCMonth() + 1;
+  const d2 = base.getUTCDate();
+
+  const targetUtc = zonedTimeToUtc(y2, m2, d2, targetHour, targetMinute, targetSecond, timeZone);
+  const diffMs = targetUtc.getTime() - now.getTime();
+  const diffSeconds = Math.max(1, Math.ceil(diffMs / 1000));
+
+  return `${diffSeconds}s`;
+}
+
+async function findUserIdByEmail(
+  supabaseAdmin: any,
+  email: string,
+  maxPages = 10,
+  perPage = 100
+): Promise<string | null> {
+  for (let page = 1; page <= maxPages; page++) {
+    const { data: listData, error: listErr } = await supabaseAdmin.auth.admin.listUsers({
+      page,
+      perPage,
+    });
+    if (listErr) throw listErr;
+
+    const users = listData?.users || [];
+    const found = users.find((u: any) => u?.email?.toLowerCase() === email.toLowerCase());
+    if (found?.id) return found.id;
+
+    // If we got fewer than perPage, stop early.
+    if (users.length < perPage) break;
+  }
+
+  return null;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -256,17 +396,109 @@ Deno.serve(async (req) => {
       const { error } = await supabase.from("solicitacoes_grupos").insert(record);
       insertError = error;
     } else if (tipo === "motorista") {
+      // 1) Compute lead fields
+      const leadNome: string = resolvedData.nome || body.nome_completo || body.nome || "Sem nome";
+      const leadEmail: string | null = resolvedData.email || body.email || null;
+      const leadTelefone: string | null = resolvedData.telefone || body.telefone || body.whatsapp || null;
+      const leadCidade: string | null = resolvedData.cidade || body.cidade || body.cidade_nome || null;
+      const leadMensagem: string | null = resolvedData.mensagem || body.mensagem_observacoes || body.mensagem || null;
+      const leadPlano = normalizePlano(body.plano || body.plan || body.subscription || "free");
+
+      if (!leadEmail || !leadTelefone) {
+        return new Response(
+          JSON.stringify({ error: "Campos obrigatórios ausentes: email/telefone" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const computedPassword = computeLeadPassword(leadNome, String(leadTelefone));
+
+      // 2) Upsert auth user (login) by email
+      const existingUserId = await findUserIdByEmail(supabase, leadEmail);
+      let authUserId = existingUserId;
+
+      if (!authUserId) {
+        const { data: newUser, error: createErr } = await supabase.auth.admin.createUser({
+          email: leadEmail,
+          password: computedPassword,
+          email_confirm: true,
+        });
+
+        if (createErr || !newUser?.user?.id) {
+          return new Response(
+            JSON.stringify({ error: "Erro ao criar usuário auth", details: createErr?.message || "unknown" }),
+            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        authUserId = newUser.user.id;
+      } else {
+        const { error: pwErr } = await supabase.auth.admin.updateUserById(authUserId, {
+          password: computedPassword,
+          email_confirm: true,
+        });
+        if (pwErr) {
+          return new Response(
+            JSON.stringify({ error: "Erro ao atualizar senha do usuário", details: pwErr.message }),
+            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+      }
+
+      // 3) Ensure role & plan for the lead login
+      const { error: roleErr } = await supabase.from("user_roles").upsert(
+        { user_id: authUserId, role: "admin_transfer" },
+        { onConflict: "user_id,role" }
+      );
+      if (roleErr) {
+        return new Response(
+          JSON.stringify({ error: "Erro ao inserir user_roles", details: roleErr.message }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const { error: planErr } = await supabase.from("user_plans").upsert(
+        { user_id: authUserId, plano: leadPlano },
+        { onConflict: "user_id" }
+      );
+      if (planErr) {
+        return new Response(
+          JSON.stringify({ error: "Erro ao inserir user_plans", details: planErr.message }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // 4) Schedule deactivation by banning user at the target datetime for FREE plan only.
+      const timeZone = "America/Sao_Paulo";
+      if (leadPlano === "free") {
+        const banDuration = computeBanDurationToTarget(new Date(), 14, timeZone, 23, 59, 59);
+        const { error: banErr } = await supabase.auth.admin.updateUserById(authUserId, {
+          ban_duration: banDuration,
+        });
+        if (banErr) {
+          return new Response(
+            JSON.stringify({ error: "Erro ao agendar desativação", details: banErr.message }),
+            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+      } else {
+        // Indefinite: unban if previously banned.
+        await supabase.auth.admin.updateUserById(authUserId, { ban_duration: "none" });
+      }
+
+      // 5) Insert request row for Admin Master landing table
       const record: Record<string, any> = {
-        user_id: userId,
-        nome: resolvedData.nome || body.nome_completo || body.nome || "Sem nome",
-        email: resolvedData.email || body.email || null,
-        telefone: resolvedData.telefone || body.telefone || body.whatsapp || null,
+        user_id: userId, // automation owner (keeps existing access patterns)
+        lead_user_id: authUserId,
+        nome: leadNome,
+        email: leadEmail,
+        telefone: leadTelefone,
         cpf: resolvedData.cpf || body.cpf || null,
         cnh: resolvedData.cnh || body.numero_cnh || null,
-        cidade: resolvedData.cidade || body.cidade || null,
-        mensagem: resolvedData.mensagem || body.mensagem_observacoes || body.mensagem || null,
-        status: "pendente",
+        cidade: leadCidade,
+        mensagem: leadMensagem,
+        status: "testando",
       };
+
       const { error } = await supabase.from("solicitacoes_motoristas").insert(record);
       insertError = error;
     } else {

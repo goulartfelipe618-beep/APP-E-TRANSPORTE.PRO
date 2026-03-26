@@ -202,7 +202,7 @@ Deno.serve(async (req) => {
       const tablesToClean = [
         "anotacoes", "automacoes", "cabecalho_contratual", "chamadas_taxi",
         "configuracoes", "contratos", "network", "reservas_grupos",
-        "reservas_transfer", "solicitacoes_grupos", "solicitacoes_motoristas",
+        "reservas_transfer", "solicitacoes_grupos",
         "solicitacoes_servicos", "solicitacoes_transfer", "webhook_testes", "user_plans",
       ];
 
@@ -211,6 +211,14 @@ Deno.serve(async (req) => {
           supabaseAdmin.from(table).delete().eq("user_id", user_id)
         )
       );
+
+      // solicitacoes_motoristas may reference either:
+      // - user_id: automation owner (original app behavior)
+      // - lead_user_id: the created login for the landing lead
+      await Promise.all([
+        supabaseAdmin.from("solicitacoes_motoristas").delete().eq("user_id", user_id),
+        supabaseAdmin.from("solicitacoes_motoristas").delete().eq("lead_user_id", user_id),
+      ]);
 
       await supabaseAdmin.from("user_roles").delete().eq("user_id", user_id);
 
@@ -221,6 +229,42 @@ Deno.serve(async (req) => {
       }
 
       return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    // DISABLE USER (ban at Auth level)
+    // Used by Admin Master "Landing Page" to immediately disable the lead user.
+    if (req.method === "POST" && action === "disable_user") {
+      const body = await req.json();
+      const { user_id, ban_duration } = body;
+
+      if (!user_id) {
+        return new Response(JSON.stringify({ error: "user_id é obrigatório" }), {
+          status: 400,
+          headers: corsHeaders,
+        });
+      }
+
+      // Default: ban for ~100 years (practically "disabled until manual action").
+      const ban = ban_duration || "876000h";
+
+      // Update auth user
+      const { error: banErr } = await supabaseAdmin.auth.admin.updateUserById(user_id, {
+        ban_duration: ban,
+      });
+
+      if (banErr) {
+        return new Response(JSON.stringify({ error: banErr.message }), { status: 400, headers: corsHeaders });
+      }
+
+      // Update request row status when this user is stored as the lead.
+      await supabaseAdmin
+        .from("solicitacoes_motoristas")
+        .update({ status: "desativado", updated_at: new Date().toISOString() })
+        .eq("lead_user_id", user_id);
+
+      return new Response(JSON.stringify({ success: true }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     return new Response(JSON.stringify({ error: "Ação não encontrada" }), { status: 404, headers: corsHeaders });
