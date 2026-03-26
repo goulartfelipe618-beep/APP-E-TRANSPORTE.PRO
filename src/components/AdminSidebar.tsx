@@ -20,6 +20,7 @@ const simpleItems = [
   { title: "Home", page: "home", icon: Home },
   { title: "Métricas", page: "metricas", icon: BarChart3 },
   { title: "Abrangência", page: "abrangencia", icon: MapPin },
+  { title: "Landing Page", page: "landing-page", icon: ClipboardList },
   { title: "Slides", page: "slides", icon: SlidersHorizontal },
   { title: "Mentoria", page: "mentoria", icon: GraduationCap },
   { title: "Empty Legs", page: "empty-legs", icon: Plane },

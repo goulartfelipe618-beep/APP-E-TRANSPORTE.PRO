@@ -12,6 +12,7 @@ import AdminUsuariosCadastradosPage from "@/pages/admin/AdminUsuariosCadastrados
 import AdminUsuariosSolicitacoesPage from "@/pages/admin/AdminUsuariosSolicitacoes";
 import AdminNetworkPage from "@/pages/admin/AdminNetworkPage";
 import AdminSolicitacoesServicos from "@/pages/admin/AdminSolicitacoesServicos";
+import AdminLandingPage from "@/pages/admin/AdminLandingPage";
 import AdminTemplatesPage from "@/pages/admin/AdminTemplatesPage";
 import AdminAutomacoesPage from "@/pages/admin/AdminAutomacoesPage";
 import AnotacoesPage from "@/pages/dashboard/AnotacoesPage";
@@ -32,6 +33,7 @@ const PAGE_MAP: Record<string, React.ComponentType> = {
   "usuarios/solicitacoes": AdminUsuariosSolicitacoesPage,
   network: AdminNetworkPage,
   "solicitacoes-servicos": AdminSolicitacoesServicos,
+  "landing-page": AdminLandingPage,
   templates: AdminTemplatesPage,
   "sistema/configuracoes": SistemaConfiguracoesPage,
   "sistema/automacoes": AdminAutomacoesPage,
