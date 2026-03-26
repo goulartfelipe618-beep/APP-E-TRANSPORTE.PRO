@@ -7,9 +7,11 @@ const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY a
 
 if (!SUPABASE_URL?.trim() || !SUPABASE_PUBLISHABLE_KEY?.trim()) {
   throw new Error(
-    "Supabase: defina VITE_SUPABASE_URL e VITE_SUPABASE_PUBLISHABLE_KEY. " +
+    "Supabase: faltam URL e chave. " +
       "Local: copie .env.example para .env. " +
-      "Deploy: configure essas variáveis no serviço de hospedagem antes do npm run build (o Vite embute no build)."
+      "Vercel: Settings → Environment Variables → marque Production (e Preview). " +
+      "Nomes: VITE_SUPABASE_URL + VITE_SUPABASE_PUBLISHABLE_KEY, ou SUPABASE_URL + SUPABASE_ANON_KEY. " +
+      "Depois: Redeploy sem cache."
   );
 }
 
