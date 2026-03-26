@@ -11,7 +11,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RefreshCw, Users, ClipboardList, Clock, Loader2 } from "lucide-react";
 
 type SolicitacaoMotorista = {
@@ -48,8 +47,6 @@ const STATUS_CLASSES: Record<string, string> = {
   concluido: "bg-emerald-500/10 text-emerald-700 border-emerald-500/30",
   desativado: "bg-red-500/10 text-red-700 border-red-500/30",
 };
-
-const STATUS_OPTIONS = ["testando", "pendente", "em_andamento", "cadastrado", "recusado", "concluido", "desativado"];
 
 export default function AdminLandingPage() {
   const [loading, setLoading] = useState(true);
@@ -117,6 +114,26 @@ export default function AdminLandingPage() {
       await fetchData();
     } catch (e) {
       const message = e instanceof Error ? e.message : "Erro ao atualizar status";
+      toast.error(message);
+    } finally {
+      setSavingId(null);
+    }
+  };
+
+  const deleteRowOnly = async (id: string) => {
+    setSavingId(id);
+    try {
+      const { error } = await supabase
+        .from("solicitacoes_motoristas")
+        .delete()
+        .eq("id", id);
+
+      if (error) throw error;
+      toast.success("Registro excluído.");
+      setDeleteConfirmState(null);
+      await fetchData();
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "Erro ao excluir registro";
       toast.error(message);
     } finally {
       setSavingId(null);
@@ -282,28 +299,28 @@ export default function AdminLandingPage() {
                     </TableCell>
                     <TableCell>
                       <div className="flex flex-wrap gap-2 items-center">
-                        <Select
-                          value={s.status}
+                        <Button
+                          variant="outline"
+                          size="sm"
                           disabled={savingId === s.id}
-                          onValueChange={(v) => updateStatus(s.id, v)}
+                          onClick={() => updateStatus(s.id, "cadastrado")}
                         >
-                          <SelectTrigger className="w-[180px]">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {STATUS_OPTIONS.map((opt) => (
-                              <SelectItem key={opt} value={opt}>
-                                {STATUS_LABELS[opt] || opt}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                          Cadastrar
+                        </Button>
 
                         <Button
                           variant="outline"
                           size="sm"
-                          disabled={!s.lead_user_id}
-                          onClick={() => handleDisable(s.lead_user_id)}
+                          disabled={savingId === s.id}
+                          onClick={() => {
+                            // Se não houver lead_user_id, não existe login para banir.
+                            // Nesse caso, apenas marca como "desativado".
+                            if (!s.lead_user_id) {
+                              void updateStatus(s.id, "desativado");
+                              return;
+                            }
+                            void handleDisable(s.lead_user_id);
+                          }}
                         >
                           Desativar
                         </Button>
@@ -311,11 +328,8 @@ export default function AdminLandingPage() {
                         <Button
                           variant="destructive"
                           size="sm"
+                          disabled={savingId === s.id}
                           onClick={() => {
-                            if (!s.lead_user_id) {
-                              toast.error("lead_user_id não encontrado.");
-                              return;
-                            }
                             if (deleteConfirmState?.id !== s.id) {
                               setDeleteConfirmState({ id: s.id, stage: 1 });
                               toast.info("Clique novamente para confirmar a exclusão (2/3).");
@@ -329,7 +343,11 @@ export default function AdminLandingPage() {
                             }
 
                             // stage === 2: perform delete on 3rd click
-                            void handleDelete(s.lead_user_id);
+                            if (s.lead_user_id) {
+                              void handleDelete(s.lead_user_id);
+                            } else {
+                              void deleteRowOnly(s.id);
+                            }
                           }}
                         >
                           {deleteConfirmState?.id === s.id
