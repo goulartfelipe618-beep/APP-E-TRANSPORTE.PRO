@@ -44,17 +44,17 @@ const PX96_TO_MM = 25.4 / 96;
 const LOGO_H_MIN_MM = 60 * PX96_TO_MM;
 const LOGO_H_MAX_MM = 90 * PX96_TO_MM;
 /** Ampliação da logo no PDF; limitada à folha para não sobrepor nome/traço. */
-const LOGO_SCALE_FACTOR = 4.75;
-const LOGO_MAX_HEIGHT_FRAC_H = 0.34;
+const LOGO_SCALE_FACTOR = 5.35;
+const LOGO_MAX_HEIGHT_FRAC_H = 0.38;
 const LOGO_MAX_WIDTH_FRAC_INNER = 0.92;
 /** Espaço entre o fim da logo e o início do nome do cliente (modelos 1–4). */
-const LOGO_TO_NOME_GAP_MM = 26;
+const LOGO_TO_NOME_GAP_MM = 34;
 
-/** Nome do cliente: faixa de tamanho (pt) — valores menores = bloco mais baixo. */
-const NOME_FS_MIN = 26;
-const NOME_FS_MAX = 46;
-/** Entrelinha do nome (menor = altura total do texto menor). */
-const NOME_LINE_LEADING = 1.1;
+/** Nome do cliente: faixa de tamanho (pt). */
+const NOME_FS_MIN = 32;
+const NOME_FS_MAX = 56;
+/** Entrelinha do nome. */
+const NOME_LINE_LEADING = 1.14;
 
 /** Posição aproximada do traço horizontal no PNG do Modelo 1 (fração da altura H, de cima para baixo). */
 const M1_TEMPLATE_LINE_Y_FRAC = 0.77;
@@ -430,7 +430,7 @@ function drawNomeClienteComChaves(
     doc.setFontSize(fs);
     lines = doc.splitTextToSize(display, maxW);
     const estH = lines.length * ((fs * NOME_LINE_LEADING * 25.4) / 72);
-    if (lines.length <= 4 && estH < 40) break;
+    if (lines.length <= 4 && estH < 52) break;
     fs = Math.max(NOME_FS_MIN, fs - 2);
   }
   doc.setFontSize(fs);
@@ -690,9 +690,9 @@ export async function generateReceptivoTransferPdf(
       const contentTop = M_OUT + M_IN + 8;
       let y = contentTop;
       y = await drawLogoCentered(doc, logoDataUrl, nomeProjeto, W / 2, contentW, y, H);
-      y += hasTrip ? 26 : 30;
+      y += hasTrip ? 30 : 34;
       y = drawNomeClienteComChaves(doc, nomeCliente, W / 2, y, contentW * 0.92);
-      y += hasTrip ? 26 : 30;
+      y += hasTrip ? 30 : 34;
       drawTraçoCentralComTicks(doc, W, y, innerW);
       const yAfterLine = y + 1.4 + 10;
 
@@ -729,7 +729,7 @@ export async function generateReceptivoTransferPdf(
         drawTripFooterCentered(doc, W / 2, yFt, contentW * 0.85, footer, { bracedTitle: true });
       }
     } else {
-      const contentTop = M_OUT + M_IN + 28;
+      const contentTop = M_OUT + M_IN + 32;
       const gapAboveLogo = 10;
       const logoBottomMargin = 8;
 
@@ -790,10 +790,10 @@ export async function generateReceptivoTransferPdf(
         drawTripFooterCentered(doc, W / 2, yFt, contentW * 0.85, footer, { bracedTitle: true });
       }
     } else {
-      const contentTop = M_OUT + M_IN + 28;
+      const contentTop = M_OUT + M_IN + 32;
       let y = contentTop;
       y = await drawLogoCentered(doc, logoDataUrl, nomeProjeto, W / 2, contentW, y, H);
-      y += hasTrip ? 26 : 30;
+      y += hasTrip ? 30 : 34;
       if (hasTrip) {
         const reserveAfterNome = 9 + 1.4 + 10 + 6;
         const maxNomeBlockBottom = bottomSafe - footerH - reserveAfterNome - 4;
@@ -801,7 +801,7 @@ export async function generateReceptivoTransferPdf(
       } else {
         y = drawNomeClienteComChaves(doc, nomeCliente, W / 2, y, contentW * 0.92);
       }
-      y += hasTrip ? 26 : 30;
+      y += hasTrip ? 30 : 34;
       drawTraçoCentralComTicks(doc, W, y, innerW);
       const yAfterLine = y + 1.4 + 10;
 
@@ -846,7 +846,7 @@ export async function generateReceptivoTransferPdf(
       const gapAfterName = 10;
       const tickH = 1.4;
       const traçoFrac = 0.65;
-      const regionStart = yAfterLogo + 32;
+      const regionStart = yAfterLogo + 38;
       const footerTop = hasTrip ? bottomSafe - footerH - 8 : bottomSafe;
       const regionEnd = hasTrip ? footerTop - 10 : bottomSafe - 12;
       const regionHeight = Math.max(24, regionEnd - regionStart);
