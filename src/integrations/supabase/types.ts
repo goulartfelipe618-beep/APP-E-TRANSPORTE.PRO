@@ -529,6 +529,63 @@ export type Database = {
         }
         Relationships: []
       }
+      receptivos: {
+        Row: {
+          created_at: string
+          desembarque: string | null
+          embarque: string | null
+          id: string
+          ida_data: string | null
+          ida_hora: string | null
+          modelo: number
+          nome_cliente: string
+          reserva_numero: number | null
+          reserva_transfer_id: string | null
+          tipo_viagem: string | null
+          user_id: string
+          volta_data: string | null
+          volta_desembarque: string | null
+          volta_embarque: string | null
+          volta_hora: string | null
+        }
+        Insert: {
+          created_at?: string
+          desembarque?: string | null
+          embarque?: string | null
+          id?: string
+          ida_data?: string | null
+          ida_hora?: string | null
+          modelo: number
+          nome_cliente: string
+          reserva_numero?: number | null
+          reserva_transfer_id?: string | null
+          tipo_viagem?: string | null
+          user_id: string
+          volta_data?: string | null
+          volta_desembarque?: string | null
+          volta_embarque?: string | null
+          volta_hora?: string | null
+        }
+        Update: {
+          created_at?: string
+          desembarque?: string | null
+          embarque?: string | null
+          id?: string
+          ida_data?: string | null
+          ida_hora?: string | null
+          modelo?: number
+          nome_cliente?: string
+          reserva_numero?: number | null
+          reserva_transfer_id?: string | null
+          tipo_viagem?: string | null
+          user_id?: string
+          volta_data?: string | null
+          volta_desembarque?: string | null
+          volta_embarque?: string | null
+          volta_hora?: string | null
+        }
+        Relationships: []
+      }
       reservas_grupos: {
         Row: {
           cpf_cnpj: string
