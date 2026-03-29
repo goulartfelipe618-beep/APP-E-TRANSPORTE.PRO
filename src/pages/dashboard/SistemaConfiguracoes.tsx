@@ -17,6 +17,8 @@ import { toast } from "sonner";
 import { useConfiguracoes } from "@/contexts/ConfiguracoesContext";
 import { Badge } from "@/components/ui/badge";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
+import MapboxAddressInput from "@/components/mapbox/MapboxAddressInput";
+import { isMapboxConfigured } from "@/lib/mapboxGeocode";
 
 const FONT_OPTIONS = [
   { value: "montserrat", label: "Montserrat" },
@@ -135,6 +137,8 @@ export default function SistemaConfiguracoesPage() {
   const [cidade, setCidade] = useState("");
   const [estado, setEstado] = useState("");
   const [enderecoCompleto, setEnderecoCompleto] = useState("");
+  const [enderecoLat, setEnderecoLat] = useState<number | null>(null);
+  const [enderecoLng, setEnderecoLng] = useState<number | null>(null);
   const [nomeEmpresa, setNomeEmpresa] = useState("");
   const [cnpjPerfil, setCnpjPerfil] = useState("");
 
@@ -219,6 +223,16 @@ export default function SistemaConfiguracoesPage() {
       setCidade(d.cidade || "");
       setEstado(d.estado || "");
       setEnderecoCompleto(d.endereco_completo || "");
+      setEnderecoLat(
+        d.endereco_latitude != null && !Number.isNaN(Number(d.endereco_latitude))
+          ? Number(d.endereco_latitude)
+          : null
+      );
+      setEnderecoLng(
+        d.endereco_longitude != null && !Number.isNaN(Number(d.endereco_longitude))
+          ? Number(d.endereco_longitude)
+          : null
+      );
       setNomeEmpresa(d.nome_empresa || "");
       setCnpjPerfil(d.cnpj || "");
       setNomeProjeto(d.nome_projeto || "E-Transporte.pro");
@@ -271,6 +285,8 @@ export default function SistemaConfiguracoesPage() {
       cidade,
       estado,
       endereco_completo: enderecoCompleto,
+      endereco_latitude: enderecoLat,
+      endereco_longitude: enderecoLng,
       nome_empresa: nomeEmpresa,
       cnpj: cnpjPerfil,
     });
@@ -552,7 +568,39 @@ export default function SistemaConfiguracoesPage() {
           </div>
           <div>
             <label className="text-sm font-medium text-foreground">Endereço Completo</label>
-            <Input placeholder="Rua, número, bairro, CEP" className="mt-1" value={enderecoCompleto} onChange={e => setEnderecoCompleto(e.target.value)} disabled={!profileEditing} />
+            <p className="text-xs text-muted-foreground mt-0.5 mb-2">
+              {isMapboxConfigured()
+                ? "Selecione um endereço na lista para enviar sua localização ao mapa de Abrangência do administrador."
+                : "Com Mapbox configurado (VITE_MAPBOX_ACCESS_TOKEN), a busca habilita o pin exato no mapa do admin."}
+            </p>
+            {isMapboxConfigured() ? (
+              <MapboxAddressInput
+                value={enderecoCompleto}
+                onChangeAddress={(v) => setEnderecoCompleto(v)}
+                onCoordinatesChange={(lat, lng) => {
+                  setEnderecoLat(lat);
+                  setEnderecoLng(lng);
+                }}
+                onPlaceContext={(c, e) => {
+                  if (c?.trim()) setCidade(c.trim());
+                  if (e?.trim()) setEstado(e.trim());
+                }}
+                disabled={!profileEditing}
+                className="mt-1"
+              />
+            ) : (
+              <Input
+                placeholder="Rua, número, bairro, CEP"
+                className="mt-1"
+                value={enderecoCompleto}
+                onChange={(e) => {
+                  setEnderecoCompleto(e.target.value);
+                  setEnderecoLat(null);
+                  setEnderecoLng(null);
+                }}
+                disabled={!profileEditing}
+              />
+            )}
           </div>
         </div>
         {profileEditing && (

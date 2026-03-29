@@ -207,6 +207,8 @@ export type Database = {
           created_at: string
           email: string | null
           endereco_completo: string | null
+          endereco_latitude: number | null
+          endereco_longitude: number | null
           estado: string | null
           fonte_global: string | null
           id: string
@@ -224,6 +226,8 @@ export type Database = {
           created_at?: string
           email?: string | null
           endereco_completo?: string | null
+          endereco_latitude?: number | null
+          endereco_longitude?: number | null
           estado?: string | null
           fonte_global?: string | null
           id?: string
@@ -241,6 +245,8 @@ export type Database = {
           created_at?: string
           email?: string | null
           endereco_completo?: string | null
+          endereco_latitude?: number | null
+          endereco_longitude?: number | null
           estado?: string | null
           fonte_global?: string | null
           id?: string

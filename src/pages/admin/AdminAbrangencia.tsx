@@ -1,11 +1,11 @@
-import { useState, useEffect } from "react";
-import { MapPin } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { MapPin, RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import L from "leaflet";
+import { Button } from "@/components/ui/button";
 import "leaflet/dist/leaflet.css";
 
-// Fix default marker icon
 delete (L.Icon.Default.prototype as any)._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png",
@@ -65,12 +65,22 @@ function findCoords(city: string): [number, number] | null {
   return null;
 }
 
+function chunk<T>(arr: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+  return out;
+}
+
 interface MotoristaPin {
+  userId: string;
   nome: string;
+  email: string;
   cidade: string;
   estado: string;
   nomeEmpresa: string;
+  enderecoCompleto: string;
   coords: [number, number];
+  preciso: boolean;
 }
 
 export default function AdminAbrangencia() {
@@ -78,49 +88,123 @@ export default function AdminAbrangencia() {
   const [loading, setLoading] = useState(true);
   const [citySummary, setCitySummary] = useState<{ cidade: string; count: number }[]>([]);
   const [totalMotoristas, setTotalMotoristas] = useState(0);
+  const [comCoordenadaMapbox, setComCoordenadaMapbox] = useState(0);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      // Fetch from configuracoes - actual registered motoristas with profile data
-      const { data } = await supabase
-        .from("configuracoes")
-        .select("nome_completo, cidade, estado, nome_empresa") as any;
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const { data: roles, error: roleErr } = await supabase
+        .from("user_roles")
+        .select("user_id")
+        .eq("role", "admin_transfer");
 
-      if (!data) { setLoading(false); return; }
+      if (roleErr) {
+        console.error(roleErr);
+        setPins([]);
+        setTotalMotoristas(0);
+        return;
+      }
+
+      const userIds = [...new Set((roles || []).map((r) => r.user_id).filter(Boolean))] as string[];
+      if (userIds.length === 0) {
+        setPins([]);
+        setCitySummary([]);
+        setTotalMotoristas(0);
+        setComCoordenadaMapbox(0);
+        return;
+      }
+
+      const allRows: Record<string, any>[] = [];
+      for (const part of chunk(userIds, 120)) {
+        const { data: rows, error: cfgErr } = await supabase
+          .from("configuracoes")
+          .select(
+            "user_id, nome_completo, cidade, estado, nome_empresa, email, endereco_completo, endereco_latitude, endereco_longitude"
+          )
+          .in("user_id", part);
+        if (cfgErr) {
+          console.error(cfgErr);
+          continue;
+        }
+        allRows.push(...(rows || []));
+      }
 
       const mapped: MotoristaPin[] = [];
       const counts: Record<string, number> = {};
-      let total = 0;
+      let mapboxCount = 0;
 
-      for (const m of data as any[]) {
-        const cidade = m.cidade?.trim();
-        if (!cidade) continue; // Skip motoristas without city set
-        total++;
-        counts[cidade] = (counts[cidade] || 0) + 1;
-        const coords = findCoords(cidade);
-        if (coords) {
-          const offset = () => (Math.random() - 0.5) * 0.02;
-          mapped.push({
-            nome: m.nome_completo || "Sem nome",
-            cidade,
-            estado: m.estado || "",
-            nomeEmpresa: m.nome_empresa || "",
-            coords: [coords[0] + offset(), coords[1] + offset()],
-          });
+      for (const m of allRows) {
+        const lat =
+          m.endereco_latitude != null && !Number.isNaN(Number(m.endereco_latitude))
+            ? Number(m.endereco_latitude)
+            : null;
+        const lng =
+          m.endereco_longitude != null && !Number.isNaN(Number(m.endereco_longitude))
+            ? Number(m.endereco_longitude)
+            : null;
+
+        const cidade = (m.cidade || "").trim();
+        let coords: [number, number] | null = null;
+   
+        if (lat != null && lng != null && Math.abs(lat) <= 90 && Math.abs(lng) <= 180) {
+          coords = [lat, lng];
+          mapboxCount++;
+        } else if (cidade) {
+          const c = findCoords(cidade);
+          if (c) {
+            const jitter = () => (Math.random() - 0.5) * 0.02;
+            coords = [c[0] + jitter(), c[1] + jitter()];
+          }
         }
+
+        if (!coords) continue;
+
+        const labelCidade = cidade || "Sem cidade";
+        counts[labelCidade] = (counts[labelCidade] || 0) + 1;
+
+        mapped.push({
+          userId: m.user_id,
+          nome: m.nome_completo || "Sem nome",
+          email: m.email || "—",
+          cidade: labelCidade,
+          estado: m.estado || "",
+          nomeEmpresa: m.nome_empresa || "",
+          enderecoCompleto: m.endereco_completo || "",
+          coords,
+          preciso: lat != null && lng != null,
+        });
       }
 
       setPins(mapped);
-      setTotalMotoristas(total);
+      setTotalMotoristas(allRows.length);
+      setComCoordenadaMapbox(mapboxCount);
       setCitySummary(
         Object.entries(counts)
           .map(([cidade, count]) => ({ cidade, count }))
           .sort((a, b) => b.count - a.count)
       );
+    } finally {
       setLoading(false);
-    };
-    fetchData();
+    }
   }, []);
+
+  useEffect(() => {
+    void fetchData();
+    const channel = supabase
+      .channel("admin-abrangencia-config")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "configuracoes" },
+        () => {
+          void fetchData();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [fetchData]);
 
   if (loading) {
     return (
@@ -130,38 +214,64 @@ export default function AdminAbrangencia() {
     );
   }
 
+  const center: [number, number] =
+    pins.length === 1
+      ? pins[0].coords
+      : pins.length > 0
+        ? [
+            pins.reduce((s, p) => s + p.coords[0], 0) / pins.length,
+            pins.reduce((s, p) => s + p.coords[1], 0) / pins.length,
+          ]
+        : [-14.235, -51.9253];
+
+  const zoom = pins.length === 0 ? 4 : pins.length === 1 ? 12 : 5;
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-          <MapPin className="h-6 w-6 text-primary" />
-          Abrangência — Motoristas Cadastrados
-        </h1>
-        <p className="text-muted-foreground mt-1">
-          Mostra apenas motoristas com perfil 100% completo (nome, e-mail, telefone, cidade, empresa e CNPJ).
-        </p>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
+            <MapPin className="h-6 w-6 text-primary" />
+            Abrangência — Motoristas executivos
+          </h1>
+          <p className="text-muted-foreground mt-1">
+            Mapa com todos os utilizadores <strong className="font-medium text-foreground">Motorista Executivo</strong>,
+            com base no endereço de <strong className="font-medium text-foreground">Meu Perfil</strong>. Coordenadas
+            exatas quando o motorista seleciona o endereço via Mapbox; caso contrário, usa aproximação pela cidade.
+          </p>
+        </div>
+        <Button variant="outline" size="icon" onClick={() => void fetchData()} title="Atualizar mapa">
+          <RefreshCw className="h-4 w-4" />
+        </Button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Map */}
         <div className="lg:col-span-2 rounded-xl border border-border overflow-hidden" style={{ height: 500 }}>
-          <MapContainer
-            center={[-14.235, -51.9253]}
-            zoom={4}
-            style={{ height: "100%", width: "100%" }}
-            scrollWheelZoom
-          >
+          <MapContainer center={center} zoom={zoom} style={{ height: "100%", width: "100%" }} scrollWheelZoom>
             <TileLayer
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             />
-            {pins.map((pin, i) => (
-              <Marker key={i} position={pin.coords}>
+            {pins.map((pin) => (
+              <Marker key={pin.userId} position={pin.coords}>
                 <Popup>
-                  <div className="text-sm">
-                    <strong>{pin.nome}</strong><br />
-                    🏢 {pin.nomeEmpresa}<br />
-                    📍 {pin.cidade}{pin.estado ? ` - ${pin.estado}` : ""}
+                  <div className="text-sm max-w-[240px]">
+                    <strong>{pin.nome}</strong>
+                    <br />
+                    <span className="text-muted-foreground">{pin.email}</span>
+                    <br />
+                    🏢 {pin.nomeEmpresa || "—"}
+                    <br />
+                    📍 {pin.cidade}
+                    {pin.estado ? ` - ${pin.estado}` : ""}
+                    {pin.enderecoCompleto ? (
+                      <>
+                        <br />
+                        <span className="text-xs text-muted-foreground">{pin.enderecoCompleto}</span>
+                      </>
+                    ) : null}
+                    <br />
+                    <span className="text-xs">{pin.preciso ? "📌 Localização precisa (Mapbox)" : "Aproximação por cidade"}</span>
                   </div>
                 </Popup>
               </Marker>
@@ -169,11 +279,13 @@ export default function AdminAbrangencia() {
           </MapContainer>
         </div>
 
-        {/* Summary */}
         <div className="rounded-xl border border-border bg-card p-5">
-          <h3 className="font-semibold text-foreground mb-4">Motoristas por Cidade</h3>
+          <h3 className="font-semibold text-foreground mb-4">Motoristas por cidade</h3>
           {citySummary.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Nenhum motorista com perfil completo ainda.</p>
+            <p className="text-sm text-muted-foreground">
+              Nenhum motorista executivo com perfil e localização mapeável. Peça para cadastrarem Meu Perfil e, se
+              possível, o endereço com Mapbox.
+            </p>
           ) : (
             <div className="space-y-3 max-h-[420px] overflow-y-auto pr-2">
               {citySummary.map((item, i) => {
@@ -193,15 +305,21 @@ export default function AdminAbrangencia() {
               })}
             </div>
           )}
-          <div className="mt-4 pt-4 border-t border-border">
-            <p className="text-sm text-muted-foreground">
-              Total no mapa: <span className="font-semibold text-foreground">{pins.length}</span> motoristas
+          <div className="mt-4 pt-4 border-t border-border space-y-1 text-sm text-muted-foreground">
+            <p>
+              Perfis (Motorista Exec.):{" "}
+              <span className="font-semibold text-foreground">{totalMotoristas}</span>
             </p>
-            <p className="text-sm text-muted-foreground">
-              Total com cidade: <span className="font-semibold text-foreground">{totalMotoristas}</span>
+            <p>
+              Pins no mapa: <span className="font-semibold text-foreground">{pins.length}</span>
             </p>
-            <p className="text-sm text-muted-foreground">
-              Cidades: <span className="font-semibold text-foreground">{citySummary.length}</span>
+            <p>
+              Com coordenada Mapbox:{" "}
+              <span className="font-semibold text-foreground">{comCoordenadaMapbox}</span>
+            </p>
+            <p>
+              Cidades no resumo:{" "}
+              <span className="font-semibold text-foreground">{citySummary.length}</span>
             </p>
           </div>
         </div>
