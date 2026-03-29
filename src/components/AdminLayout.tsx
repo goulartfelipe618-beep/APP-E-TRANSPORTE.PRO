@@ -62,7 +62,7 @@ function AdminContent() {
 
 export default function AdminLayout() {
   return (
-    <ActivePageProvider defaultPage="abrangencia">
+    <ActivePageProvider defaultPage="abrangencia" storageKey="etp_nav_admin">
       <SidebarProvider>
         <AdminContent />
       </SidebarProvider>

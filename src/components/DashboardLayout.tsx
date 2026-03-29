@@ -134,7 +134,7 @@ function DashboardContent() {
 
 export default function DashboardLayout() {
   return (
-    <ActivePageProvider defaultPage="home">
+    <ActivePageProvider defaultPage="home" storageKey="etp_nav_dashboard">
       <SidebarProvider>
         <DashboardContent />
       </SidebarProvider>

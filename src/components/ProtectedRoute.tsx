@@ -8,43 +8,55 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
   const [needsMfa, setNeedsMfa] = useState(false);
 
   useEffect(() => {
-    const check = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        setAuthenticated(false);
-        setNeedsMfa(false);
-        setLoading(false);
-        return;
-      }
+    let mounted = true;
+
+    const check = async (opts?: { withSpinner?: boolean }) => {
+      const withSpinner = opts?.withSpinner === true;
+      if (withSpinner) setLoading(true);
 
       try {
-        const { data: assuranceData, error: assuranceErr } =
-          await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!mounted) return;
 
-        const shouldChallenge =
-          !assuranceErr &&
-          assuranceData?.nextLevel === "aal2" &&
-          assuranceData?.currentLevel !== "aal2";
+        if (!session) {
+          setAuthenticated(false);
+          setNeedsMfa(false);
+          setLoading(false);
+          return;
+        }
 
-        setNeedsMfa(!!shouldChallenge);
-        setAuthenticated(true);
-      } catch {
-        // Sem erro de MFA, seguimos apenas com autenticação.
-        setNeedsMfa(false);
-        setAuthenticated(true);
+        try {
+          const { data: assuranceData, error: assuranceErr } =
+            await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+
+          const shouldChallenge =
+            !assuranceErr &&
+            assuranceData?.nextLevel === "aal2" &&
+            assuranceData?.currentLevel !== "aal2";
+
+          setNeedsMfa(!!shouldChallenge);
+          setAuthenticated(true);
+        } catch {
+          setNeedsMfa(false);
+          setAuthenticated(true);
+        }
       } finally {
-        setLoading(false);
+        if (mounted && withSpinner) setLoading(false);
       }
     };
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
-      setLoading(true);
-      check();
+      if (!mounted) return;
+      // Sem withSpinner: TOKEN_REFRESHED / INITIAL_SESSION ao focar a aba não desmontam o layout (evita voltar ao Home).
+      void check();
     });
 
-    check();
+    void check({ withSpinner: true });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   if (loading) {

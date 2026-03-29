@@ -59,7 +59,7 @@ function TaxiContent() {
 
 export default function TaxiDashboardLayout() {
   return (
-    <ActivePageProvider defaultPage="home">
+    <ActivePageProvider defaultPage="home" storageKey="etp_nav_taxi">
       <SidebarProvider>
         <TaxiContent />
       </SidebarProvider>
