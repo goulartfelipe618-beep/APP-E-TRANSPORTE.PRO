@@ -38,6 +38,7 @@ export default function UpgradePlanDialog({ open, onOpenChange, requiredPlan }: 
           </DialogTitle>
           <DialogDescription>
             Para continuar, é necessário o plano <Badge variant="outline" className="ml-1 font-semibold">{PLAN_LABELS[requiredPlan]}</Badge>
+            {requiredPlan === "seed" && " — necessário para concluir a contratação de E-mail Business e demais recursos pagos básicos."}
             {requiredPlan === "rise" && " — inclui fluxo completo de website após o domínio."}
             {requiredPlan === "grow" && " — libera o disparador de mensagens."}
             {requiredPlan === "apex" && " — libera criação e gestão do perfil no Google."}

@@ -1,17 +1,21 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import {
-  Globe, Star, User, CheckCircle2, Mail, Minus, Plus,
-  ArrowLeft, ArrowRight, Sparkles, FileText, Loader2,
-  CheckCircle, XCircle,
+  Star, User, CheckCircle2, Mail, Minus, Plus,
+  ArrowLeft, ArrowRight, Sparkles, FileText,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { ExternalLink, Calendar, Info } from "lucide-react";
 import SlideCarousel from "@/components/SlideCarousel";
+import {
+  DomainSelectionCard,
+  canAdvanceFromDomainSelection,
+} from "@/components/domain/DomainSelectionCard";
+import { useUserPlan } from "@/hooks/useUserPlan";
+import UpgradePlanDialog from "@/components/planos/UpgradePlanDialog";
 
 const benefits = [
   "Mais autoridade no WhatsApp",
@@ -36,6 +40,8 @@ function fmt(v: number) {
 export default function EmailBusinessPage() {
   const [submitting, setSubmitting] = useState(false);
   const [servicoAtivo, setServicoAtivo] = useState<any>(null);
+  const { plano } = useUserPlan();
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
 
   // wizard state
   const [wizardActive, setWizardActive] = useState(false);
@@ -95,13 +101,6 @@ export default function EmailBusinessPage() {
     } finally {
       setCheckingDomain(false);
     }
-  };
-
-  const canAdvanceFromDomain = () => {
-    if (!domain.trim() || !domain.includes(".")) return false;
-    if (domainOption === "existing") return true;
-    // new domain: must have checked and be available
-    return domainChecked && domainAvailable === true;
   };
 
   useEffect(() => {
@@ -247,6 +246,7 @@ export default function EmailBusinessPage() {
   /* ── Wizard ── */
   return (
     <div className="space-y-8">
+      <UpgradePlanDialog open={upgradeOpen} onOpenChange={setUpgradeOpen} requiredPlan="seed" />
       {pendingBanner}
       {/* Stepper */}
       <div className="flex items-center justify-center gap-0">
@@ -269,78 +269,18 @@ export default function EmailBusinessPage() {
       <div className="rounded-xl border border-border bg-card p-8">
         {/* STEP 1 – Domínio */}
         {step === 0 && (
-          <div className="space-y-6">
-            <div className="flex items-center gap-2">
-              <Globe className="h-5 w-5 text-foreground" />
-              <h2 className="text-lg font-bold text-foreground">Escolha seu domínio</h2>
-            </div>
-
-            <div className="space-y-2">
-              <p className="text-sm font-medium text-foreground">Você já tem um domínio?</p>
-              <div className="flex items-center gap-6">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input type="radio" name="domain" checked={domainOption === "new"} onChange={() => { setDomainOption("new"); resetDomainCheck(); }} className="accent-primary" />
-                  <span className="text-sm text-foreground">Quero registrar um novo</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input type="radio" name="domain" checked={domainOption === "existing"} onChange={() => { setDomainOption("existing"); resetDomainCheck(); }} className="accent-primary" />
-                  <span className="text-sm text-foreground">Já tenho um domínio</span>
-                </label>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="text-sm font-medium text-foreground">
-                  {domainOption === "new" ? "Nome desejado para o domínio" : "Informe seu domínio"}
-                </label>
-                <Input
-                  value={domain}
-                  onChange={(e) => { setDomain(e.target.value); resetDomainCheck(); }}
-                  placeholder="suaempresa.com.br"
-                  className="mt-1"
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  {domainOption === "new"
-                    ? "Pesquise a disponibilidade antes de continuar."
-                    : "Será necessário apontar o DNS para ativação."}
-                </p>
-              </div>
-
-              {domainOption === "new" && (
-                <Button variant="outline" onClick={handleCheckDomain} disabled={checkingDomain || !domain.trim()}>
-                  {checkingDomain ? (
-                    <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Verificando...</>
-                  ) : (
-                    <><Globe className="h-4 w-4 mr-2" /> Pesquisar Domínio</>
-                  )}
-                </Button>
-              )}
-
-              {domainChecked && (
-                <div className={cn(
-                  "rounded-lg border p-4 flex items-start gap-3",
-                  domainAvailable === true && "border-green-500/30 bg-green-500/10",
-                  domainAvailable === false && "border-destructive/30 bg-destructive/10",
-                )}>
-                  {domainAvailable === true && <CheckCircle className="h-5 w-5 text-green-500 shrink-0 mt-0.5" />}
-                  {domainAvailable === false && <XCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />}
-                  <div>
-                    <p className={cn(
-                      "text-sm font-semibold",
-                      domainAvailable === true && "text-green-500",
-                      domainAvailable === false && "text-destructive",
-                    )}>
-                      {domainMessage || (domainAvailable ? "Domínio disponível!" : "Domínio indisponível.")}
-                    </p>
-                    {domainAvailable === false && (
-                      <p className="text-xs text-muted-foreground mt-1">Tente outro nome ou variação.</p>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
+          <DomainSelectionCard
+            domainOption={domainOption}
+            onDomainOptionChange={setDomainOption}
+            domain={domain}
+            onDomainChange={setDomain}
+            domainChecked={domainChecked}
+            domainAvailable={domainAvailable}
+            domainMessage={domainMessage}
+            checkingDomain={checkingDomain}
+            onCheckDomain={handleCheckDomain}
+            onResetCheck={resetDomainCheck}
+          />
         )}
 
         {/* STEP 2 – Plano */}
@@ -511,15 +451,21 @@ export default function EmailBusinessPage() {
           {step < 3 ? (
             <Button
               onClick={() => {
-                if (step === 0 && !canAdvanceFromDomain()) {
-                  if (domainOption === "new" && !domainChecked) {
-                    toast.error("Pesquise a disponibilidade do domínio antes de continuar.");
-                  } else if (domainOption === "new" && !domainAvailable) {
-                    toast.error("Domínio indisponível. Escolha outro domínio.");
-                  } else {
-                    toast.error("Informe um domínio válido.");
+                if (step === 0) {
+                  if (!canAdvanceFromDomainSelection(domain, domainOption, domainChecked, domainAvailable)) {
+                    if (domainOption === "new" && !domainChecked) {
+                      toast.error("Pesquise a disponibilidade do domínio antes de continuar.");
+                    } else if (domainOption === "new" && domainAvailable === false) {
+                      toast.error("Domínio indisponível. Escolha outro domínio.");
+                    } else {
+                      toast.error("Informe um domínio válido.");
+                    }
+                    return;
                   }
-                  return;
+                  if (plano === "free") {
+                    setUpgradeOpen(true);
+                    return;
+                  }
                 }
                 if (step === 2) {
                   if (!nomeCompleto.trim()) { toast.error("Preencha o nome completo."); return; }
@@ -528,7 +474,11 @@ export default function EmailBusinessPage() {
                 }
                 setStep((s) => s + 1);
               }}
-              variant={step === 0 && !canAdvanceFromDomain() ? "outline" : "default"}
+              variant={
+                step === 0 && !canAdvanceFromDomainSelection(domain, domainOption, domainChecked, domainAvailable)
+                  ? "outline"
+                  : "default"
+              }
             >
               Próximo <ArrowRight className="h-4 w-4 ml-2" />
             </Button>

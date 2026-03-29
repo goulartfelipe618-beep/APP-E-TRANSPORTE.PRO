@@ -7,8 +7,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  Globe, ArrowLeft, ArrowRight, Monitor, Loader2,
-  CheckCircle, XCircle, Eye, Check,
+  ArrowLeft, ArrowRight, Monitor, Eye, Check,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -18,6 +17,11 @@ import { ExternalLink, CheckCircle2, Calendar, Info } from "lucide-react";
 import SlideCarousel from "@/components/SlideCarousel";
 import { useUserPlan } from "@/hooks/useUserPlan";
 import UpgradePlanDialog from "@/components/planos/UpgradePlanDialog";
+import {
+  DomainSelectionCard,
+  canAdvanceFromDomainSelection,
+  type DomainOption,
+} from "@/components/domain/DomainSelectionCard";
 
 interface TemplateDB {
   id: string;
@@ -129,12 +133,20 @@ export default function WebsitePage() {
   const { plano } = useUserPlan();
   const [upgradeOpen, setUpgradeOpen] = useState(false);
 
-  // Step 1 - Domínio
+  // Step 1 - Domínio (alinhado ao wizard E-mail Business)
   const [domain, setDomain] = useState("");
+  const [domainOption, setDomainOption] = useState<DomainOption>("new");
   const [provider, setProvider] = useState("");
-  const [hasDomain, setHasDomain] = useState(false);
-  const [domainResult, setDomainResult] = useState<{ available: boolean | null; message: string } | null>(null);
+  const [domainChecked, setDomainChecked] = useState(false);
+  const [domainAvailable, setDomainAvailable] = useState<boolean | null>(null);
+  const [domainMessage, setDomainMessage] = useState("");
   const [checkingDomain, setCheckingDomain] = useState(false);
+
+  const resetDomainCheck = () => {
+    setDomainChecked(false);
+    setDomainAvailable(null);
+    setDomainMessage("");
+  };
 
   // Step 2 - Empresa
   const [companyName, setCompanyName] = useState("");
@@ -225,17 +237,33 @@ export default function WebsitePage() {
 
   // ── Handlers ───────────────────────────────────────
   const handleCheckDomain = async () => {
-    if (!domain.trim()) { toast.error("Informe um domínio"); return; }
-    setCheckingDomain(true); setDomainResult(null);
-    try {
-      const { data, error } = await supabase.functions.invoke("check-domain", { body: { domain: domain.trim() } });
-      if (error) throw error;
-      setDomainResult({ available: data.available, message: data.message });
-    } catch {
-      toast.error("Erro ao verificar domínio");
-      setDomainResult({ available: null, message: "Não foi possível verificar. Tente novamente." });
+    if (!domain.trim() || !domain.includes(".")) {
+      toast.error("Informe um domínio válido (ex: suaempresa.com.br)");
+      return;
     }
-    setCheckingDomain(false);
+    setCheckingDomain(true);
+    setDomainChecked(false);
+    setDomainAvailable(null);
+    setDomainMessage("");
+    try {
+      const { data, error } = await supabase.functions.invoke("check-domain", {
+        body: { domain: domain.trim() },
+      });
+      if (error) throw error;
+      setDomainChecked(true);
+      setDomainAvailable(data.available === true);
+      setDomainMessage(data.message || "");
+      if (data.available) {
+        toast.success("Domínio disponível!");
+      } else {
+        toast.error(data.message || "Domínio indisponível");
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "";
+      toast.error("Erro ao verificar domínio: " + msg);
+    } finally {
+      setCheckingDomain(false);
+    }
   };
 
   const selectedTemplateName = dbTemplates.find(t => t.id === selectedTemplate)?.nome || "";
@@ -249,7 +277,10 @@ export default function WebsitePage() {
       tipo_servico: "website",
       dados_solicitacao: {
         template: selectedTemplateName, template_id: selectedTemplate,
-        dominio: domain, provedor: provider, possui_dominio: hasDomain,
+        dominio: domain,
+        tipo_dominio: domainOption,
+        provedor: provider,
+        possui_dominio: domainOption === "existing",
         nome_empresa: companyName, responsavel, whatsapp, telefone_secundario: telefoneSecundario,
         email, cnpj, cidade_sede: cidadeSede, regiao_atendida: regiaoAtendida,
         possui_logo: hasLogo, cores_preferidas: preferredColors, estilo: desiredStyle,
@@ -327,6 +358,7 @@ export default function WebsitePage() {
   if (step === "briefing") {
     return (
       <>
+        <UpgradePlanDialog open={upgradeOpen} onOpenChange={setUpgradeOpen} requiredPlan="rise" />
         {pendingBanner}
         <div className="space-y-6">
           <div>
@@ -349,62 +381,71 @@ export default function WebsitePage() {
             ))}
           </div>
 
-          {/* ── STEP 1: Domínio ── */}
+          {/* ── STEP 1: Domínio (layout = E-mail Business) + Marca ── */}
           {bs === 1 && (
-            <Section title="🌐 Domínio e Marca">
-              <div className="space-y-2">
-                <p className="text-sm font-medium text-foreground">Você já tem um domínio?</p>
-                <div className="flex items-center gap-6">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="radio" checked={!hasDomain} onChange={() => { setHasDomain(false); setDomainResult(null); }} className="accent-primary" />
-                    <span className="text-sm text-foreground">Quero registrar um novo</span>
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="radio" checked={hasDomain} onChange={() => { setHasDomain(true); setDomainResult(null); }} className="accent-primary" />
-                    <span className="text-sm text-foreground">Já tenho um domínio</span>
-                  </label>
-                </div>
-              </div>
-              <div className="space-y-4">
-                <div>
-                  <label className="text-sm font-medium text-foreground">{hasDomain ? "Seu domínio atual" : "Nome desejado para o domínio"}</label>
-                  <Input value={domain} onChange={e => { setDomain(e.target.value); setDomainResult(null); }} placeholder="empresa.com.br" className="mt-1" />
-                </div>
-                {!hasDomain && (
-                  <Button variant="outline" onClick={handleCheckDomain} disabled={checkingDomain || !domain.trim()}>
-                    {checkingDomain ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Verificando...</> : <><Globe className="h-4 w-4 mr-2" /> Pesquisar Domínio</>}
-                  </Button>
-                )}
-                {domainResult && (
-                  <div className={cn("rounded-lg border p-4 flex items-start gap-3",
-                    domainResult.available === true && "border-green-500/30 bg-green-500/10",
-                    domainResult.available === false && "border-destructive/30 bg-destructive/10",
-                    domainResult.available === null && "border-border bg-muted/30",
-                  )}>
-                    {domainResult.available === true && <CheckCircle className="h-5 w-5 text-green-500 shrink-0 mt-0.5" />}
-                    {domainResult.available === false && <XCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />}
-                    <p className="text-sm font-semibold">{domainResult.message}</p>
+            <div className="rounded-xl border border-border bg-card p-8 space-y-0">
+              <DomainSelectionCard
+                domainOption={domainOption}
+                onDomainOptionChange={setDomainOption}
+                domain={domain}
+                onDomainChange={setDomain}
+                domainChecked={domainChecked}
+                domainAvailable={domainAvailable}
+                domainMessage={domainMessage}
+                checkingDomain={checkingDomain}
+                onCheckDomain={handleCheckDomain}
+                onResetCheck={resetDomainCheck}
+                extraBelowDomain={
+                  domainOption === "existing" ? (
+                    <div>
+                      <label className="text-sm font-medium text-foreground">Provedor atual</label>
+                      <Input
+                        value={provider}
+                        onChange={(e) => setProvider(e.target.value)}
+                        placeholder="Hostinger, GoDaddy, Registro.br, etc."
+                        className="mt-1"
+                      />
+                    </div>
+                  ) : undefined
+                }
+              />
+              <div className="mt-10 pt-8 border-t border-border space-y-4">
+                <h2 className="text-lg font-bold text-foreground">Marca</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium text-foreground">Possui logotipo?</label>
+                    <div className="flex items-center gap-2 mt-1">
+                      <Checkbox checked={hasLogo} onCheckedChange={(v) => setHasLogo(!!v)} />
+                      <span className="text-sm text-foreground">Sim, já possuo</span>
+                    </div>
                   </div>
-                )}
-                {hasDomain && (
-                  <div><label className="text-sm font-medium text-foreground">Provedor atual</label><Input value={provider} onChange={e => setProvider(e.target.value)} placeholder="Hostinger, GoDaddy, Registro.br, etc." className="mt-1" /></div>
-                )}
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-                <div>
-                  <label className="text-sm font-medium text-foreground">Possui logotipo?</label>
-                  <div className="flex items-center gap-2 mt-1"><Checkbox checked={hasLogo} onCheckedChange={v => setHasLogo(!!v)} /><span className="text-sm text-foreground">Sim, já possuo</span></div>
+                  <div>
+                    <label className="text-sm font-medium text-foreground">Cores da marca</label>
+                    <Input
+                      value={preferredColors}
+                      onChange={(e) => setPreferredColors(e.target.value)}
+                      placeholder="Preto e dourado, azul marinho..."
+                      className="mt-1"
+                    />
+                  </div>
                 </div>
-                <div><label className="text-sm font-medium text-foreground">Cores da marca</label><Input value={preferredColors} onChange={e => setPreferredColors(e.target.value)} placeholder="Preto e dourado, azul marinho..." className="mt-1" /></div>
+                <div>
+                  <label className="text-sm font-medium text-foreground">Estilo visual desejado</label>
+                  <Select value={desiredStyle} onValueChange={setDesiredStyle}>
+                    <SelectTrigger className="mt-1">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {STYLE_OPTIONS.map((s) => (
+                        <SelectItem key={s} value={s}>
+                          {s}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
-              <div>
-                <label className="text-sm font-medium text-foreground">Estilo visual desejado</label>
-                <Select value={desiredStyle} onValueChange={setDesiredStyle}>
-                  <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                  <SelectContent>{STYLE_OPTIONS.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
-                </Select>
-              </div>
-            </Section>
+            </div>
           )}
 
           {/* ── STEP 2: Empresa ── */}
@@ -616,17 +657,16 @@ export default function WebsitePage() {
             </Button>
             <span className="text-xs text-muted-foreground">{bs} de {STEPS.length}</span>
             <Button onClick={() => {
-              // Plano FREE: após etapa domínio, exige verificação (novo domínio) e oferece upgrade Rise
               if (bs === 1) {
-                if (!hasDomain) {
-                  if (!domain.trim()) {
-                    toast.error("Informe o domínio desejado.");
-                    return;
+                if (!canAdvanceFromDomainSelection(domain, domainOption, domainChecked, domainAvailable)) {
+                  if (domainOption === "new" && !domainChecked) {
+                    toast.error("Pesquise a disponibilidade do domínio antes de continuar.");
+                  } else if (domainOption === "new" && domainAvailable === false) {
+                    toast.error("Domínio indisponível. Escolha outro domínio.");
+                  } else {
+                    toast.error("Informe um domínio válido.");
                   }
-                  if (domainResult?.available !== true) {
-                    toast.error("Pesquise a disponibilidade do domínio e confirme que está disponível antes de continuar.");
-                    return;
-                  }
+                  return;
                 }
                 if (plano === "free") {
                   setUpgradeOpen(true);
