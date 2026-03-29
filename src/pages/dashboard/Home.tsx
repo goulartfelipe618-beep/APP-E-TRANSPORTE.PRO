@@ -7,6 +7,12 @@ import { Badge } from "@/components/ui/badge";
 import SlideCarousel from "@/components/SlideCarousel";
 import { useActivePage } from "@/contexts/ActivePageContext";
 import { Progress } from "@/components/ui/progress";
+import { toast } from "sonner";
+import {
+  persistNetworkAceitoNao,
+  persistNetworkAceitoSim,
+  persistNetworkRetornoSolicitado,
+} from "@/lib/networkNacionalPrefs";
 
 const tools = [
   { icon: Mail, title: "E-mail Profissional", desc: "Crie e-mails corporativos com o domínio da sua empresa para credibilidade total." },
@@ -99,15 +105,24 @@ export default function HomePage() {
     setMostrarRegras(true);
   };
 
-  const handleConfirmarRegras = () => {
+  const handleConfirmarRegras = async () => {
+    localStorage.removeItem("network_highlight_shown");
     localStorage.setItem("network_nacional_aceito", "sim");
+    const ok = await persistNetworkAceitoSim();
+    if (!ok) {
+      toast.error("Não foi possível salvar no servidor. A preferência ficou apenas neste dispositivo.");
+    }
     setNetworkAceito(true);
     setMostrarRegras(false);
     window.dispatchEvent(new Event("network-status-changed"));
   };
 
-  const handleRecusarNetwork = () => {
+  const handleRecusarNetwork = async () => {
     localStorage.setItem("network_nacional_aceito", "nao");
+    const ok = await persistNetworkAceitoNao();
+    if (!ok) {
+      toast.error("Não foi possível salvar no servidor. A preferência ficou apenas neste dispositivo.");
+    }
     setNetworkAceito(false);
     window.dispatchEvent(new Event("network-status-changed"));
   };
@@ -267,7 +282,21 @@ export default function HomePage() {
             <Users className="h-5 w-5 text-muted-foreground" />
             <p className="text-sm text-muted-foreground">Você optou por não participar do Network Nacional.</p>
           </div>
-          <Button variant="outline" size="sm" onClick={() => { setNetworkAceito(null); localStorage.removeItem("network_nacional_aceito"); window.dispatchEvent(new Event("network-status-changed")); }}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={async () => {
+              localStorage.removeItem("network_nacional_aceito");
+              localStorage.removeItem("network_saida_data");
+              localStorage.removeItem("network_highlight_shown");
+              const ok = await persistNetworkRetornoSolicitado();
+              if (!ok) {
+                toast.error("Não foi possível atualizar no servidor.");
+              }
+              setNetworkAceito(null);
+              window.dispatchEvent(new Event("network-status-changed"));
+            }}
+          >
             Reconsiderar
           </Button>
         </div>

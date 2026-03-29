@@ -21,6 +21,14 @@ import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useConfiguracoes } from "@/contexts/ConfiguracoesContext";
 import { useActivePage } from "@/contexts/ActivePageContext";
+import { persistNetworkHighlightDismissed } from "@/lib/networkNacionalPrefs";
+
+function readNetworkSpotlightHighlight() {
+  if (typeof window === "undefined") return false;
+  const aceito = localStorage.getItem("network_nacional_aceito") === "sim";
+  const highlightShown = localStorage.getItem("network_highlight_shown") === "sim";
+  return aceito && !highlightShown;
+}
 
 const getMenuStructure = (showNetwork: boolean) => [
   {
@@ -114,14 +122,14 @@ export function AppSidebar() {
   const { config } = useConfiguracoes();
   const { activePage, setActivePage } = useActivePage();
   const [networkAceito, setNetworkAceito] = useState(() => localStorage.getItem("network_nacional_aceito") === "sim");
-  const [showNetworkHighlight, setShowNetworkHighlight] = useState(false);
+  const [showNetworkHighlight, setShowNetworkHighlight] = useState(readNetworkSpotlightHighlight);
 
   useEffect(() => {
     const handler = () => {
       const aceito = localStorage.getItem("network_nacional_aceito") === "sim";
       const highlightShown = localStorage.getItem("network_highlight_shown") === "sim";
       setNetworkAceito(aceito);
-      if (aceito && !highlightShown) setShowNetworkHighlight(true);
+      setShowNetworkHighlight(aceito && !highlightShown);
     };
     const dismissHandler = () => setShowNetworkHighlight(false);
     window.addEventListener("network-status-changed", handler);
@@ -134,6 +142,13 @@ export function AppSidebar() {
     };
   }, []);
 
+  const dismissNetworkSpotlight = () => {
+    setShowNetworkHighlight(false);
+    localStorage.setItem("network_highlight_shown", "sim");
+    void persistNetworkHighlightDismissed();
+    window.dispatchEvent(new Event("network-highlight-dismissed"));
+  };
+
   const isActive = (page: string) => activePage === page;
   const isGroupActive = (children: { page: string }[]) =>
     children.some((c) => activePage === c.page);
@@ -144,8 +159,16 @@ export function AppSidebar() {
   };
 
   return (
-    <Sidebar collapsible="icon" className="border-r border-border">
-      <div className="p-4 flex items-center gap-3 border-b border-border">
+    <Sidebar
+      collapsible="icon"
+      className={cn("border-r border-border", showNetworkHighlight && "relative z-50")}
+    >
+      <div
+        className={cn(
+          "p-4 flex items-center gap-3 border-b border-border",
+          showNetworkHighlight && "relative z-30 opacity-40 pointer-events-none",
+        )}
+      >
         {config.logo_url ? (
           <img src={config.logo_url} alt="Logo" className="h-8 w-8 rounded-full object-cover" />
         ) : (
@@ -161,7 +184,7 @@ export function AppSidebar() {
         )}
       </div>
 
-      <SidebarContent>
+      <SidebarContent className={cn(showNetworkHighlight && "relative z-30")}>
         {getMenuStructure(networkAceito).map((group) => (
           <SidebarGroup key={group.label}>
             <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
@@ -171,7 +194,11 @@ export function AppSidebar() {
                   if ("children" in item && item.children && item.children.length > 0) {
                     const groupActive = isGroupActive(item.children);
                     return (
-                      <Collapsible key={item.title} defaultOpen={groupActive}>
+                      <Collapsible
+                        key={item.title}
+                        defaultOpen={groupActive}
+                        className={cn(showNetworkHighlight && "opacity-40 pointer-events-none")}
+                      >
                         <SidebarMenuItem>
                           <CollapsibleTrigger asChild>
                             <SidebarMenuButton className={cn("w-full justify-between", groupActive && "text-primary")}>
@@ -207,42 +234,29 @@ export function AppSidebar() {
 
                   const page = (item as { page: string }).page;
                   const isNetworkItem = item.title === "Network";
+                  const dimFlat = showNetworkHighlight && !isNetworkItem;
                   return (
-                    <SidebarMenuItem key={item.title} className="relative">
+                    <SidebarMenuItem
+                      key={item.title}
+                      className={cn(
+                        "relative",
+                        dimFlat && "opacity-40 pointer-events-none",
+                        isNetworkItem && showNetworkHighlight && "z-40 opacity-100 pointer-events-auto",
+                      )}
+                    >
                       <SidebarMenuButton
                         onClick={() => setActivePage(page)}
                         className={cn(
                           "cursor-pointer",
                           isActive(page) && "bg-muted text-primary font-medium",
-                          isNetworkItem && showNetworkHighlight && "relative z-[60] bg-primary/20 ring-2 ring-primary rounded-md animate-pulse"
+                          isNetworkItem &&
+                            showNetworkHighlight &&
+                            "bg-sidebar text-foreground ring-2 ring-primary shadow-md rounded-md",
                         )}
                       >
                         <item.icon className="h-4 w-4 mr-2" />
                         {!collapsed && <span>{item.title}</span>}
                       </SidebarMenuButton>
-                      {isNetworkItem && showNetworkHighlight && !collapsed && (
-                        <div className="absolute left-full top-1/2 -translate-y-1/2 ml-3 z-[70] animate-fade-in">
-                          <div className="relative bg-card text-card-foreground border border-border rounded-xl shadow-2xl px-5 py-4 w-64">
-                            <div className="absolute -left-2 top-1/2 -translate-y-1/2 w-0 h-0 border-t-8 border-b-8 border-r-8 border-t-transparent border-b-transparent border-r-border" />
-                            <p className="text-sm font-bold mb-1">🎉 Menu Network Liberado!</p>
-                            <p className="text-xs text-muted-foreground mb-3">
-                              Agora você faz parte do Network Nacional. Acesse aqui para ver empresas atribuídas a você.
-                            </p>
-                            <button
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                setShowNetworkHighlight(false);
-                                localStorage.setItem("network_highlight_shown", "sim");
-                                window.dispatchEvent(new Event("network-highlight-dismissed"));
-                              }}
-                              className="w-full bg-primary text-primary-foreground text-sm font-semibold py-2 rounded-lg hover:opacity-90 transition-opacity"
-                            >
-                              OK, Entendi!
-                            </button>
-                          </div>
-                        </div>
-                      )}
                     </SidebarMenuItem>
                   );
                 })}
@@ -252,7 +266,39 @@ export function AppSidebar() {
         ))}
       </SidebarContent>
 
-      <SidebarFooter className="border-t border-border">
+      {showNetworkHighlight && (
+        <div
+          className={cn(
+            "fixed z-[100] max-h-[min(24rem,calc(100vh-2rem))] w-[min(22rem,calc(100vw-1.5rem))] overflow-y-auto rounded-xl border border-neutral-200 bg-white p-5 text-neutral-900 shadow-2xl animate-fade-in",
+            collapsed ? "left-[3.75rem] top-[22%]" : "left-[calc(var(--sidebar-width)+0.75rem)] top-[22%]",
+          )}
+          role="dialog"
+          aria-labelledby="network-spotlight-title"
+        >
+          <p id="network-spotlight-title" className="text-base font-bold text-neutral-900 mb-2">
+            Menu Network liberado
+          </p>
+          <p className="text-sm text-neutral-700 leading-relaxed mb-4">
+            O item <strong className="text-neutral-900">Network</strong> foi adicionado ao seu painel porque você aceitou os termos do{" "}
+            <strong className="text-neutral-900">Network Nacional E-Transporte.pro</strong>. Por esse menu você acessa empresas do programa
+            atribuídas a você e gerencia seus contatos na rede nacional de parceiros.
+          </p>
+          <button
+            type="button"
+            onClick={dismissNetworkSpotlight}
+            className="w-full rounded-lg bg-primary py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90 transition-opacity"
+          >
+            OK, entendi
+          </button>
+        </div>
+      )}
+
+      <SidebarFooter
+        className={cn(
+          "border-t border-border",
+          showNetworkHighlight && "relative z-30 opacity-40 pointer-events-none",
+        )}
+      >
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton className="w-full">

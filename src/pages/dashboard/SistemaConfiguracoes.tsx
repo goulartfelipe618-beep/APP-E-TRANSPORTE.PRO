@@ -19,6 +19,7 @@ import { Badge } from "@/components/ui/badge";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import MapboxAddressInput from "@/components/mapbox/MapboxAddressInput";
 import { isMapboxConfigured } from "@/lib/mapboxGeocode";
+import { persistNetworkRetornoSolicitado, persistNetworkSair } from "@/lib/networkNacionalPrefs";
 
 const FONT_OPTIONS = [
   { value: "montserrat", label: "Montserrat" },
@@ -47,17 +48,19 @@ function NetworkSection() {
     emCooldown = diasRestantes > 0;
   }
 
-  const handleSair = () => {
+  const handleSair = async () => {
     localStorage.setItem("network_nacional_aceito", "nao");
     localStorage.setItem("network_saida_data", new Date().toISOString());
     localStorage.removeItem("network_highlight_shown");
+    const ok = await persistNetworkSair();
+    if (!ok) toast.error("Não foi possível sincronizar com o servidor; os dados locais foram atualizados.");
     window.dispatchEvent(new Event("network-status-changed"));
     setConfirmando(false);
     toast.success("Você saiu do Network Nacional. Poderá retornar após 60 dias.");
     window.location.reload();
   };
 
-  const handleVoltar = () => {
+  const handleVoltar = async () => {
     if (emCooldown) {
       toast.error(`Você só poderá retornar ao Network em ${diasRestantes} dias.`);
       return;
@@ -65,6 +68,8 @@ function NetworkSection() {
     localStorage.removeItem("network_nacional_aceito");
     localStorage.removeItem("network_saida_data");
     localStorage.removeItem("network_highlight_shown");
+    const ok = await persistNetworkRetornoSolicitado();
+    if (!ok) toast.error("Não foi possível sincronizar com o servidor; os dados locais foram atualizados.");
     window.dispatchEvent(new Event("network-status-changed"));
     toast.success("Agora você pode aceitar os termos novamente na página Home.");
     window.location.reload();

@@ -213,6 +213,9 @@ export type Database = {
           fonte_global: string | null
           id: string
           logo_url: string | null
+          network_highlight_shown: boolean
+          network_nacional_aceito: string | null
+          network_saida_data: string | null
           nome_completo: string | null
           nome_empresa: string | null
           nome_projeto: string | null
@@ -232,6 +235,9 @@ export type Database = {
           fonte_global?: string | null
           id?: string
           logo_url?: string | null
+          network_highlight_shown?: boolean
+          network_nacional_aceito?: string | null
+          network_saida_data?: string | null
           nome_completo?: string | null
           nome_empresa?: string | null
           nome_projeto?: string | null
@@ -251,6 +257,9 @@ export type Database = {
           fonte_global?: string | null
           id?: string
           logo_url?: string | null
+          network_highlight_shown?: boolean
+          network_nacional_aceito?: string | null
+          network_saida_data?: string | null
           nome_completo?: string | null
           nome_empresa?: string | null
           nome_projeto?: string | null

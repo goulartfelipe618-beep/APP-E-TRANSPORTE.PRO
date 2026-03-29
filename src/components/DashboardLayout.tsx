@@ -1,10 +1,12 @@
-import { useState, useEffect, lazy, Suspense } from "react";
+import { useState, useEffect } from "react";
 import PageLoader from "@/components/PageLoader";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { Shield } from "lucide-react";
 import { ActivePageProvider, useActivePage } from "@/contexts/ActivePageContext";
 import FloatingSupportChat from "@/components/FloatingSupportChat"; // [CHAT-FLOATING-IMPLEMENTACAO]
+import { NetworkSpotlightProvider } from "@/contexts/NetworkSpotlightContext";
+import { hydrateNetworkNacionalFromDb, persistNetworkHighlightDismissed } from "@/lib/networkNacionalPrefs";
 
 // Import all page components
 import HomePage from "@/pages/dashboard/Home";
@@ -75,15 +77,36 @@ const PAGE_MAP: Record<string, React.ComponentType> = {
   "empty-legs": EmptyLegsPage,
 };
 
+function readNetworkSpotlightActive() {
+  if (typeof window === "undefined") return false;
+  const aceito = localStorage.getItem("network_nacional_aceito") === "sim";
+  const highlightShown = localStorage.getItem("network_highlight_shown") === "sim";
+  return aceito && !highlightShown;
+}
+
 function DashboardContent() {
   const { activePage } = useActivePage();
-  const [showOverlay, setShowOverlay] = useState(false);
+  const [showOverlay, setShowOverlay] = useState(readNetworkSpotlightActive);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      await hydrateNetworkNacionalFromDb();
+      if (cancelled) return;
+      setShowOverlay(readNetworkSpotlightActive());
+      window.dispatchEvent(new Event("network-status-changed"));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     const handler = () => {
       const aceito = localStorage.getItem("network_nacional_aceito") === "sim";
       const highlightShown = localStorage.getItem("network_highlight_shown") === "sim";
       if (aceito && !highlightShown) setShowOverlay(true);
+      else setShowOverlay(false);
     };
     window.addEventListener("network-status-changed", handler);
     return () => window.removeEventListener("network-status-changed", handler);
@@ -98,37 +121,44 @@ function DashboardContent() {
     return () => window.removeEventListener("network-highlight-dismissed", handler);
   }, []);
 
+  const dismissSpotlight = () => {
+    setShowOverlay(false);
+    localStorage.setItem("network_highlight_shown", "sim");
+    void persistNetworkHighlightDismissed();
+    window.dispatchEvent(new Event("network-highlight-dismissed"));
+  };
+
   const PageComponent = PAGE_MAP[activePage] || HomePage;
 
   return (
-    <div className="min-h-screen flex w-full">
-      <AppSidebar />
-      <div className="flex-1 flex flex-col">
-        <header className="h-12 flex items-center border-b border-border bg-card px-4 gap-3">
-          <SidebarTrigger />
-          <div className="flex items-center gap-2">
-            <Shield className="h-5 w-5 text-muted-foreground" />
-            <span className="text-sm font-medium text-foreground">E-Transporte.pro — Gestão de Frota</span>
-          </div>
-        </header>
-        <main className="flex-1 bg-background p-6 overflow-auto">
-          <PageLoader pageKey={activePage}>
-            <PageComponent key={activePage} />
-          </PageLoader>
-        </main>
+    <NetworkSpotlightProvider active={showOverlay}>
+      <div className="min-h-screen flex w-full">
+        <AppSidebar />
+        <div className="relative flex flex-1 min-w-0 flex-col">
+          {showOverlay && (
+            <button
+              type="button"
+              aria-label="Fechar destaque do menu Network"
+              className="absolute inset-0 z-40 bg-black/60 animate-fade-in cursor-default border-0 p-0"
+              onClick={dismissSpotlight}
+            />
+          )}
+          <header className="relative z-0 h-12 flex items-center border-b border-border bg-card px-4 gap-3">
+            <SidebarTrigger />
+            <div className="flex items-center gap-2">
+              <Shield className="h-5 w-5 text-muted-foreground" />
+              <span className="text-sm font-medium text-foreground">E-Transporte.pro — Gestão de Frota</span>
+            </div>
+          </header>
+          <main className="relative z-0 flex-1 bg-background p-6 overflow-auto">
+            <PageLoader pageKey={activePage}>
+              <PageComponent key={activePage} />
+            </PageLoader>
+          </main>
+        </div>
+        <FloatingSupportChat /> {/* [CHAT-FLOATING-IMPLEMENTACAO] */}
       </div>
-      {showOverlay && (
-        <div
-          className="fixed inset-0 bg-black/60 z-50 animate-fade-in"
-          onClick={() => {
-            setShowOverlay(false);
-            localStorage.setItem("network_highlight_shown", "sim");
-            window.dispatchEvent(new Event("network-highlight-dismissed"));
-          }}
-        />
-      )}
-      <FloatingSupportChat /> {/* [CHAT-FLOATING-IMPLEMENTACAO] */}
-    </div>
+    </NetworkSpotlightProvider>
   );
 }
 

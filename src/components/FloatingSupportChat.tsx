@@ -1,8 +1,11 @@
 import { useMemo, useState } from "react";
 import { MessageCircle, X } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { useNetworkSpotlightActive } from "@/contexts/NetworkSpotlightContext";
 
 export default function FloatingSupportChat() {
   // [CHAT-FLOATING-IMPLEMENTACAO]
+  const networkSpotlight = useNetworkSpotlightActive();
   const [isOpen, setIsOpen] = useState(false);
 
   // [CHAT-FLOATING-IMPLEMENTACAO]
@@ -15,7 +18,12 @@ export default function FloatingSupportChat() {
   const hasTypebotUrl = typebotUrl.length > 0;
 
   return (
-    <div className="fixed bottom-5 right-5 z-[60] flex flex-col items-end gap-3">
+    <div
+      className={cn(
+        "fixed bottom-5 right-5 z-[60] flex flex-col items-end gap-3 transition-opacity",
+        networkSpotlight && "pointer-events-none opacity-25",
+      )}
+    >
       {/* [CHAT-FLOATING-IMPLEMENTACAO] */}
       {isOpen && (
         <div className="w-[350px] max-w-[calc(100vw-2.5rem)] h-[500px] max-h-[70vh] rounded-xl border border-border bg-card shadow-2xl overflow-hidden">
