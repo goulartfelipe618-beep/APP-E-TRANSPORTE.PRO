@@ -19,7 +19,7 @@ const tools = [
   { icon: Globe, title: "Criação de Website", desc: "Tenha seu site profissional no ar em minutos, com design exclusivo para transporte." },
   { icon: Search, title: "Google Meu Negócio", desc: "Apareça no Google Maps e nas buscas locais com perfil verificado." },
   { icon: ShoppingCart, title: "Domínio Oficial", desc: "Registre seu domínio .com.br direto pela plataforma com planos acessíveis." },
-  { icon: Users, title: "Network", desc: "Construa sua rede de contatos com hotéis, agências e parceiros estratégicos." },
+  { icon: Users, title: "Network", desc: "Publique e acompanhe oportunidades de viagens compartilhadas com outros motoristas da plataforma." },
   { icon: BarChart3, title: "Métricas & Análises", desc: "Acompanhe KPIs, volume de corridas e desempenho da sua operação em tempo real." },
   { icon: Car, title: "Gestão de Veículos", desc: "Cadastre e controle sua frota com documentação, status e manutenção." },
   { icon: ArrowLeftRight, title: "Transfer & Reservas", desc: "Gerencie solicitações, reservas e contratos de transfer executivo." },

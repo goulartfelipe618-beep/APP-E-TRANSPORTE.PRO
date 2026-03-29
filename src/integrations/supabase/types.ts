@@ -423,6 +423,8 @@ export type Database = {
       }
       network: {
         Row: {
+          autor_email: string | null
+          autor_nome: string | null
           cargo_funcao: string | null
           categoria: string
           cidade: string | null
@@ -432,7 +434,6 @@ export type Database = {
           endereco: string | null
           estado: string | null
           id: string
-          motorista_atribuido_id: string | null
           nome_contato: string | null
           nome_empresa: string
           observacoes: string | null
@@ -446,6 +447,8 @@ export type Database = {
           website: string | null
         }
         Insert: {
+          autor_email?: string | null
+          autor_nome?: string | null
           cargo_funcao?: string | null
           categoria?: string
           cidade?: string | null
@@ -455,7 +458,6 @@ export type Database = {
           endereco?: string | null
           estado?: string | null
           id?: string
-          motorista_atribuido_id?: string | null
           nome_contato?: string | null
           nome_empresa: string
           observacoes?: string | null
@@ -469,6 +471,8 @@ export type Database = {
           website?: string | null
         }
         Update: {
+          autor_email?: string | null
+          autor_nome?: string | null
           cargo_funcao?: string | null
           categoria?: string
           cidade?: string | null
@@ -478,7 +482,6 @@ export type Database = {
           endereco?: string | null
           estado?: string | null
           id?: string
-          motorista_atribuido_id?: string | null
           nome_contato?: string | null
           nome_empresa?: string
           observacoes?: string | null

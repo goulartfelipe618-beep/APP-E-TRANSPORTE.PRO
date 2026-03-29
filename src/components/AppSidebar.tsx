@@ -280,8 +280,8 @@ export function AppSidebar() {
           </p>
           <p className="text-sm text-neutral-700 leading-relaxed mb-4">
             O item <strong className="text-neutral-900">Network</strong> foi adicionado ao seu painel porque você aceitou os termos do{" "}
-            <strong className="text-neutral-900">Network Nacional E-Transporte.pro</strong>. Por esse menu você acessa empresas do programa
-            atribuídas a você e gerencia seus contatos na rede nacional de parceiros.
+            <strong className="text-neutral-900">Network Nacional E-Transporte.pro</strong>. Use este canal para publicar e acompanhar
+            oportunidades de viagens compartilhadas com os outros motoristas da plataforma.
           </p>
           <button
             type="button"

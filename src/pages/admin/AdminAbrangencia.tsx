@@ -5,6 +5,7 @@ import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import L from "leaflet";
 import { Button } from "@/components/ui/button";
 import "leaflet/dist/leaflet.css";
+import { nominatimGeocode, nominatimDelayMs } from "@/lib/nominatimGeocode";
 
 delete (L.Icon.Default.prototype as any)._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -13,7 +14,8 @@ L.Icon.Default.mergeOptions({
   shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png",
 });
 
-const cityCoords: Record<string, [number, number]> = {
+/** Coordenadas aproximadas do centro urbano; chaves em minúsculas (com acento) para legibilidade. */
+const rawCityCoords: Record<string, [number, number]> = {
   "são paulo": [-23.5505, -46.6333],
   "rio de janeiro": [-22.9068, -43.1729],
   "belo horizonte": [-19.9167, -43.9345],
@@ -54,15 +56,52 @@ const cityCoords: Record<string, [number, number]> = {
   "são bernardo do campo": [-23.6914, -46.5646],
   "santo andré": [-23.6737, -46.5432],
   "são josé do rio preto": [-20.8113, -49.3758],
+  // Santa Catarina (comuns em transporte executivo litoral)
+  "balneário camboriú": [-26.9926, -48.6347],
+  "balneario camboriu": [-26.9926, -48.6347],
+  "itajaí": [-26.9078, -48.6619],
+  "itajai": [-26.9078, -48.6619],
+  "camboriú": [-27.0306, -48.6547],
+  "camboriu": [-27.0306, -48.6547],
+  navegantes: [-26.8978, -48.6542],
+  gaspar: [-26.9314, -48.9589],
+  blumenau: [-26.9194, -49.0661],
+  brusque: [-27.0978, -48.9118],
+  chapecó: [-27.0964, -52.618],
+  chapeco: [-27.0964, -52.618],
+  criciúma: [-28.6773, -49.3697],
+  criciuma: [-28.6773, -49.3697],
+  "são josé": [-27.5954, -48.6236],
+  "sao jose": [-27.5954, -48.6236],
+  tubarão: [-28.4703, -49.0139],
+  tubarao: [-28.4703, -49.0139],
 };
 
+function normalizeCityKey(city: string): string {
+  return city
+    .toLowerCase()
+    .trim()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
+const cityCoordsNormalized: Record<string, [number, number]> = {};
+for (const [key, coords] of Object.entries(rawCityCoords)) {
+  cityCoordsNormalized[normalizeCityKey(key)] = coords;
+}
+
 function findCoords(city: string): [number, number] | null {
-  const normalized = city.toLowerCase().trim();
-  if (cityCoords[normalized]) return cityCoords[normalized];
-  for (const [key, coords] of Object.entries(cityCoords)) {
+  const normalized = normalizeCityKey(city);
+  if (!normalized) return null;
+  if (cityCoordsNormalized[normalized]) return cityCoordsNormalized[normalized];
+  for (const [key, coords] of Object.entries(cityCoordsNormalized)) {
     if (normalized.includes(key) || key.includes(normalized)) return coords;
   }
   return null;
+}
+
+function sleep(ms: number) {
+  return new Promise<void>((r) => setTimeout(r, ms));
 }
 
 function chunk<T>(arr: T[], size: number): T[][] {
@@ -70,6 +109,8 @@ function chunk<T>(arr: T[], size: number): T[][] {
   for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
   return out;
 }
+
+type LocSource = "mapbox" | "lista" | "osm";
 
 interface MotoristaPin {
   userId: string;
@@ -81,6 +122,7 @@ interface MotoristaPin {
   enderecoCompleto: string;
   coords: [number, number];
   preciso: boolean;
+  locSource: LocSource;
 }
 
 export default function AdminAbrangencia() {
@@ -89,6 +131,7 @@ export default function AdminAbrangencia() {
   const [citySummary, setCitySummary] = useState<{ cidade: string; count: number }[]>([]);
   const [totalMotoristas, setTotalMotoristas] = useState(0);
   const [comCoordenadaMapbox, setComCoordenadaMapbox] = useState(0);
+  const [pinsOsm, setPinsOsm] = useState(0);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -102,6 +145,7 @@ export default function AdminAbrangencia() {
         console.error(roleErr);
         setPins([]);
         setTotalMotoristas(0);
+        setPinsOsm(0);
         return;
       }
 
@@ -111,6 +155,7 @@ export default function AdminAbrangencia() {
         setCitySummary([]);
         setTotalMotoristas(0);
         setComCoordenadaMapbox(0);
+        setPinsOsm(0);
         return;
       }
 
@@ -132,6 +177,31 @@ export default function AdminAbrangencia() {
       const mapped: MotoristaPin[] = [];
       const counts: Record<string, number> = {};
       let mapboxCount = 0;
+      const pendingOsm: Record<string, any>[] = [];
+      const jitter = () => (Math.random() - 0.5) * 0.02;
+
+      const addPin = (
+        m: Record<string, any>,
+        coords: [number, number],
+        preciso: boolean,
+        locSource: LocSource,
+      ) => {
+        const cidade = (m.cidade || "").trim();
+        const labelCidade = cidade || "Sem cidade";
+        counts[labelCidade] = (counts[labelCidade] || 0) + 1;
+        mapped.push({
+          userId: m.user_id,
+          nome: m.nome_completo || "Sem nome",
+          email: m.email || "—",
+          cidade: labelCidade,
+          estado: m.estado || "",
+          nomeEmpresa: m.nome_empresa || "",
+          enderecoCompleto: m.endereco_completo || "",
+          coords,
+          preciso,
+          locSource,
+        });
+      };
 
       for (const m of allRows) {
         const lat =
@@ -145,39 +215,49 @@ export default function AdminAbrangencia() {
 
         const cidade = (m.cidade || "").trim();
         let coords: [number, number] | null = null;
-   
+
         if (lat != null && lng != null && Math.abs(lat) <= 90 && Math.abs(lng) <= 180) {
           coords = [lat, lng];
           mapboxCount++;
-        } else if (cidade) {
+          addPin(m, coords, true, "mapbox");
+          continue;
+        }
+
+        if (cidade) {
           const c = findCoords(cidade);
           if (c) {
-            const jitter = () => (Math.random() - 0.5) * 0.02;
             coords = [c[0] + jitter(), c[1] + jitter()];
+            addPin(m, coords, false, "lista");
+            continue;
           }
         }
 
-        if (!coords) continue;
+        if (cidade) pendingOsm.push(m);
+      }
 
+      let osmCount = 0;
+      for (const m of pendingOsm) {
+        await sleep(nominatimDelayMs());
+        const cidade = (m.cidade || "").trim();
+        const estado = (m.estado || "").trim();
         const labelCidade = cidade || "Sem cidade";
-        counts[labelCidade] = (counts[labelCidade] || 0) + 1;
-
-        mapped.push({
-          userId: m.user_id,
-          nome: m.nome_completo || "Sem nome",
-          email: m.email || "—",
-          cidade: labelCidade,
-          estado: m.estado || "",
-          nomeEmpresa: m.nome_empresa || "",
-          enderecoCompleto: m.endereco_completo || "",
-          coords,
-          preciso: lat != null && lng != null,
-        });
+        const parts = [labelCidade, estado, "Brasil"].filter((p) => p.length > 0);
+        let pair = await nominatimGeocode(parts.join(", "));
+        if (!pair && m.endereco_completo?.trim()) {
+          await sleep(nominatimDelayMs());
+          pair = await nominatimGeocode(`${String(m.endereco_completo).trim()}, ${parts.join(", ")}`);
+        }
+        if (pair) {
+          const coords: [number, number] = [pair[0] + jitter(), pair[1] + jitter()];
+          osmCount++;
+          addPin(m, coords, false, "osm");
+        }
       }
 
       setPins(mapped);
       setTotalMotoristas(allRows.length);
       setComCoordenadaMapbox(mapboxCount);
+      setPinsOsm(osmCount);
       setCitySummary(
         Object.entries(counts)
           .map(([cidade, count]) => ({ cidade, count }))
@@ -237,7 +317,8 @@ export default function AdminAbrangencia() {
           <p className="text-muted-foreground mt-1">
             Mapa com todos os utilizadores <strong className="font-medium text-foreground">Motorista Executivo</strong>,
             com base no endereço de <strong className="font-medium text-foreground">Meu Perfil</strong>. Coordenadas
-            exatas quando o motorista seleciona o endereço via Mapbox; caso contrário, usa aproximação pela cidade.
+            exatas quando o motorista escolhe um endereço na lista Mapbox; senão, tentamos a cidade numa lista interna
+            ou busca automática (OpenStreetMap).
           </p>
         </div>
         <Button variant="outline" size="icon" onClick={() => void fetchData()} title="Atualizar mapa">
@@ -271,7 +352,11 @@ export default function AdminAbrangencia() {
                       </>
                     ) : null}
                     <br />
-                    <span className="text-xs">{pin.preciso ? "📌 Localização precisa (Mapbox)" : "Aproximação por cidade"}</span>
+                    <span className="text-xs">
+                      {pin.locSource === "mapbox" && "📌 Localização precisa (Mapbox)"}
+                      {pin.locSource === "lista" && "📍 Aproximação por cidade (lista interna)"}
+                      {pin.locSource === "osm" && "📍 Aproximação (OpenStreetMap)"}
+                    </span>
                   </div>
                 </Popup>
               </Marker>
@@ -283,8 +368,8 @@ export default function AdminAbrangencia() {
           <h3 className="font-semibold text-foreground mb-4">Motoristas por cidade</h3>
           {citySummary.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              Nenhum motorista executivo com perfil e localização mapeável. Peça para cadastrarem Meu Perfil e, se
-              possível, o endereço com Mapbox.
+              Nenhum motorista com cidade preenchida ou localização resolvida. Confirme cidade/UF em Meu Perfil; com
+              token Mapbox, peça para escolher o endereço na lista de sugestões.
             </p>
           ) : (
             <div className="space-y-3 max-h-[420px] overflow-y-auto pr-2">
@@ -316,6 +401,10 @@ export default function AdminAbrangencia() {
             <p>
               Com coordenada Mapbox:{" "}
               <span className="font-semibold text-foreground">{comCoordenadaMapbox}</span>
+            </p>
+            <p>
+              Por busca OpenStreetMap:{" "}
+              <span className="font-semibold text-foreground">{pinsOsm}</span>
             </p>
             <p>
               Cidades no resumo:{" "}

@@ -98,7 +98,7 @@ function NetworkSection() {
             <div className="rounded-lg border border-destructive/50 bg-destructive/5 p-4 space-y-3">
               <p className="text-sm font-semibold text-destructive">⚠️ Tem certeza que deseja sair?</p>
               <p className="text-xs text-muted-foreground">
-                Ao sair, você perderá acesso ao menu Network e às empresas atribuídas a você.
+                Ao sair, você perderá acesso ao menu Network e ao canal colaborativo de oportunidades entre motoristas.
                 <strong className="text-foreground"> Você só poderá retornar após 60 dias corridos.</strong>
               </p>
               <div className="flex gap-2">
