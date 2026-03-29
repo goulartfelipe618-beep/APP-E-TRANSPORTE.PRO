@@ -346,6 +346,25 @@ Deno.serve(async (req) => {
       // 2) Descobrir se o e-mail já tinha conta (antes de criar/atualizar auth)
       const existingUserId = await findUserIdByEmail(supabase, leadEmail);
 
+      // Nunca transformar admin em lead: o webhook reutiliza user_id por e-mail e chamaria replace_user_role.
+      if (existingUserId) {
+        const { data: existingRoles } = await supabase
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", existingUserId);
+        const roles = (existingRoles || []).map((r: { role: string }) => r.role);
+        if (roles.includes("admin_master") || roles.includes("admin_taxi")) {
+          return new Response(
+            JSON.stringify({
+              success: false,
+              error:
+                "Este e-mail pertence a um administrador. Use outro e-mail para cadastro de motorista pela landing.",
+            }),
+            { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+      }
+
       // Plano FREE: não registra nada se o e-mail já estiver cadastrado
       if (leadPlano === "free" && existingUserId) {
         return new Response(

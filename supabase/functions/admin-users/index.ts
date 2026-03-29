@@ -212,6 +212,21 @@ Deno.serve(async (req) => {
 
       const leadUserId = row.lead_user_id as string | null;
       if (leadUserId) {
+        const { data: leadRoles } = await supabaseAdmin
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", leadUserId);
+        const r = (leadRoles || []).map((x: { role: string }) => x.role);
+        if (r.includes("admin_master") || r.includes("admin_taxi")) {
+          return new Response(
+            JSON.stringify({
+              error:
+                "Este lead aponta para uma conta de administrador. Exclua o registro ou corrija o e-mail no formulário.",
+            }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+          );
+        }
+
         const { error: roleErr } = await supabaseAdmin.rpc("replace_user_role", {
           _user_id: leadUserId,
           _role: "admin_transfer",
