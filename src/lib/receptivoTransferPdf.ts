@@ -24,6 +24,12 @@ const tipoLabels: Record<string, string> = {
   por_hora: "Disponibilidade por hora",
 };
 
+/**
+ * Deve coincidir com a coluna `receptivos.receptivo_pdf_layout_version` e com a migração
+ * `20260404130300_receptivos_pdf_layout_version.sql`.
+ */
+export const RECEPTIVO_PDF_LAYOUT_VERSION = "v2" as const;
+
 /** Margem externa (~20mm). Espaço entre fim da linha da borda e o canto da página (~15mm). */
 const M_OUT = 20;
 /** Margem interna uniforme entre a borda arredondada e o conteúdo (Modelo 1). */
@@ -33,10 +39,16 @@ const G_CORNER = 15;
 const G_CORNER_MODEL4 = 26;
 const BORDER_LINE_MM = 0.35;
 
-/** Logo: altura equivalente entre ~60px e ~90px em 96dpi → mm */
+/** Logo: altura equivalente entre ~60px e ~90px em 96dpi → mm (antes do fator visual). */
 const PX96_TO_MM = 25.4 / 96;
 const LOGO_H_MIN_MM = 60 * PX96_TO_MM;
 const LOGO_H_MAX_MM = 90 * PX96_TO_MM;
+/** Ampliação pedida (~4×); depois limitada à folha para não sobrepor nome/traço. */
+const LOGO_SCALE_FACTOR = 4;
+const LOGO_MAX_HEIGHT_FRAC_H = 0.3;
+const LOGO_MAX_WIDTH_FRAC_INNER = 0.92;
+/** Espaço entre o fim da logo e o início do nome do cliente (modelos 1–4). */
+const LOGO_TO_NOME_GAP_MM = 26;
 
 const NOME_FS_MIN = 48;
 const NOME_FS_MAX = 72;
@@ -207,24 +219,49 @@ function getNaturalImageSize(dataUrl: string): Promise<{ w: number; h: number }>
   });
 }
 
-/** Logo sem distorção: altura em mm entre LOGO_H_MIN e LOGO_H_MAX, largura proporcional. */
+function capLogoToPage(
+  wMm: number,
+  hMm: number,
+  innerW: number,
+  pageHeightMm: number,
+): { wMm: number; hMm: number } {
+  const maxW = innerW * LOGO_MAX_WIDTH_FRAC_INNER;
+  const maxH = pageHeightMm * LOGO_MAX_HEIGHT_FRAC_H;
+  let w = wMm;
+  let h = hMm;
+  const aspect = w / Math.max(h, 0.01);
+  if (h > maxH) {
+    h = maxH;
+    w = h * aspect;
+  }
+  if (w > maxW) {
+    w = maxW;
+    h = w / aspect;
+  }
+  if (h > maxH) {
+    h = maxH;
+    w = h * aspect;
+  }
+  return { wMm: w, hMm: h };
+}
+
+/** Logo sem distorção; ~LOGO_SCALE_FACTOR× o tamanho base, limitada à área útil da folha. */
 async function computeLogoDrawMm(
   logoDataUrl: string,
   innerW: number,
+  pageHeightMm: number,
 ): Promise<{ wMm: number; hMm: number }> {
   const { w: nw, h: nh } = await getNaturalImageSize(logoDataUrl);
-  if (!nh || !nw) return { wMm: 40, hMm: 18 };
+  if (!nh || !nw) {
+    return capLogoToPage(40 * LOGO_SCALE_FACTOR, 18 * LOGO_SCALE_FACTOR, innerW, pageHeightMm);
+  }
   const aspect = nw / nh;
   let hMm = nh * PX96_TO_MM;
   hMm = Math.min(LOGO_H_MAX_MM, Math.max(LOGO_H_MIN_MM, hMm));
   let wMm = hMm * aspect;
-  const maxW = innerW * 0.88;
-  if (wMm > maxW) {
-    wMm = maxW;
-    hMm = wMm / aspect;
-    if (hMm < LOGO_H_MIN_MM) hMm = LOGO_H_MIN_MM;
-  }
-  return { wMm, hMm };
+  hMm *= LOGO_SCALE_FACTOR;
+  wMm *= LOGO_SCALE_FACTOR;
+  return capLogoToPage(wMm, hMm, innerW, pageHeightMm);
 }
 
 /** Borda em 4 segmentos; cantos abertos (linhas não se encontram). `cornerGapMm` = espaço entre extremidade da linha e o canto da moldura. */
@@ -239,54 +276,6 @@ function drawOpenCornerBorder(doc: jsPDF, W: number, H: number, cornerGapMm: num
   doc.line(x0, H - M_OUT, x1, H - M_OUT);
   doc.line(M_OUT, y0, M_OUT, y1);
   doc.line(W - M_OUT, y0, W - M_OUT, y1);
-}
-
-function pickNomeFontSize(len: number): number {
-  if (len <= 14) return 72;
-  if (len <= 22) return 64;
-  if (len <= 34) return 56;
-  if (len <= 48) return 52;
-  if (len <= 62) return 48;
-  return NOME_FS_MIN;
-}
-
-/** Nome centralizado, negrito, 48–72pt com redução se quebrar demais. Retorna Y após o bloco. */
-function drawNomeClienteResponsivo(
-  doc: jsPDF,
-  nome: string,
-  centerX: number,
-  yTop: number,
-  maxW: number,
-): number {
-  const upper = nome.trim().toUpperCase();
-  let fs = Math.min(NOME_FS_MAX, pickNomeFontSize(upper.length));
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(0, 0, 0);
-  let lines: string[] = [];
-  for (let i = 0; i < 12; i++) {
-    doc.setFontSize(fs);
-    lines = doc.splitTextToSize(upper, maxW);
-    const estH = lines.length * ((fs * 1.2 * 25.4) / 72);
-    if (lines.length <= 3 && estH < 55) break;
-    fs = Math.max(NOME_FS_MIN, fs - 3);
-  }
-  doc.setFontSize(fs);
-  lines = doc.splitTextToSize(upper, maxW);
-  const lineH = (fs * 1.22 * 25.4) / 72;
-  let y = yTop;
-  lines.forEach((ln) => {
-    doc.text(ln, centerX, y, { align: "center" });
-    y += lineH;
-  });
-  return y;
-}
-
-function drawTraçoCentral(doc: jsPDF, W: number, y: number, innerW: number) {
-  const tw = innerW * 0.7;
-  const x0 = (W - tw) / 2;
-  doc.setDrawColor(35, 35, 35);
-  doc.setLineWidth(BORDER_LINE_MM);
-  doc.line(x0, y, x0 + tw, y);
 }
 
 /** Traço com marcas; `widthFrac` da largura útil (ex.: 0.65–0.70). */
@@ -452,127 +441,6 @@ function drawNomeClienteComChaves(
   return y;
 }
 
-/** Altura do bloco do nome (Modelo 5 — prioriza uma linha). */
-function measureNomeClienteComChavesPreferSingleLineHeight(doc: jsPDF, nome: string, maxW: number): number {
-  const upper = nome.trim().toUpperCase();
-  const display = `{ ${upper} }`;
-  doc.setFont("helvetica", "bold");
-  let fs = NOME_FS_MAX;
-  let lines: string[] = [];
-  for (let i = 0; i < 14; i++) {
-    doc.setFontSize(fs);
-    lines = doc.splitTextToSize(display, maxW);
-    if (lines.length === 1) break;
-    fs = Math.max(NOME_FS_MIN, fs - 2);
-  }
-  if (lines.length > 1) {
-    for (let j = 0; j < 10; j++) {
-      doc.setFontSize(fs);
-      lines = doc.splitTextToSize(display, maxW);
-      if (lines.length <= 2) break;
-      fs = Math.max(NOME_FS_MIN, fs - 2);
-    }
-  }
-  doc.setFontSize(fs);
-  lines = doc.splitTextToSize(display, maxW);
-  const lineH = (fs * 1.22 * 25.4) / 72;
-  return lines.length * lineH;
-}
-
-/** Nome com chaves: tenta uma linha; se não couber, no máximo duas (Modelo 5). */
-function drawNomeClienteComChavesPreferSingleLine(
-  doc: jsPDF,
-  nome: string,
-  centerX: number,
-  yTop: number,
-  maxW: number,
-): number {
-  const upper = nome.trim().toUpperCase();
-  const display = `{ ${upper} }`;
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(0, 0, 0);
-  let fs = NOME_FS_MAX;
-  let lines: string[] = [];
-  for (let i = 0; i < 14; i++) {
-    doc.setFontSize(fs);
-    lines = doc.splitTextToSize(display, maxW);
-    if (lines.length === 1) break;
-    fs = Math.max(NOME_FS_MIN, fs - 2);
-  }
-  if (lines.length > 1) {
-    for (let j = 0; j < 10; j++) {
-      doc.setFontSize(fs);
-      lines = doc.splitTextToSize(display, maxW);
-      if (lines.length <= 2) break;
-      fs = Math.max(NOME_FS_MIN, fs - 2);
-    }
-  }
-  doc.setFontSize(fs);
-  lines = doc.splitTextToSize(display, maxW);
-  const lineH = (fs * 1.22 * 25.4) / 72;
-  let y = yTop;
-  lines.forEach((ln) => {
-    doc.text(ln, centerX, y, { align: "center" });
-    y += lineH;
-  });
-  return y;
-}
-
-function estimateFooterHeightModel5(): number {
-  return 6 + 6 * 3.5 + 4;
-}
-
-/** Rodapé Modelo 5: título entre chaves + Origem, Destino, Data, Hora, Tipo. */
-function drawTripFooterCenteredModel5(
-  doc: jsPDF,
-  centerX: number,
-  y: number,
-  maxW: number,
-  f: ReceptivoFooterPayload,
-): number {
-  if (f.numeroReserva == null) return y;
-  doc.setTextColor(35, 35, 35);
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(8);
-  doc.text("{ Detalhes da viagem }", centerX, y, { align: "center" });
-  let cy = y + 4.5;
-  doc.setFontSize(7);
-  const rows = [
-    `Origem: ${f.embarque || "—"}`,
-    `Destino: ${f.desembarque || "—"}`,
-    `Data: ${f.idaData || "—"}`,
-    `Hora: ${f.idaHora || "—"}`,
-    `Tipo da reserva: ${f.tipoLabel || "—"}`,
-  ];
-  rows.forEach((t) => {
-    wrapLines(doc, t, maxW, 7).forEach((line) => {
-      doc.text(line, centerX, cy, { align: "center" });
-      cy += 3.5;
-    });
-  });
-  doc.setTextColor(0, 0, 0);
-  return cy + 2;
-}
-
-async function computeLogoDimsModel5(
-  logoDataUrl: string | null,
-  contentW: number,
-): Promise<{ wMm: number; hMm: number }> {
-  if (!logoDataUrl) return { wMm: 44, hMm: 14 };
-  const m = await computeLogoDrawMm(logoDataUrl, contentW);
-  const maxH = 20;
-  if (m.hMm <= maxH) return m;
-  const aspect = m.wMm / m.hMm;
-  let hMm = maxH;
-  let wMm = hMm * aspect;
-  const maxW = contentW * 0.75;
-  if (wMm > maxW) {
-    wMm = maxW;
-    hMm = wMm / aspect;
-  }
-  return { wMm, hMm };
-}
-
 /**
  * Nome com chaves, limitado verticalmente para caber acima de traço + rodapé + logo (Modelo 2).
  * `maxBlockBottomY` = último Y permitido para a base do bloco do nome (aprox.).
@@ -645,6 +513,7 @@ async function drawLogoCenteredAtY(
   centerX: number,
   innerW: number,
   yTop: number,
+  pageHeightMm: number,
   dim?: { wMm: number; hMm: number },
 ): Promise<number> {
   let wMm: number;
@@ -654,16 +523,18 @@ async function drawLogoCenteredAtY(
     hMm = dim.hMm;
   } else if (logoDataUrl) {
     try {
-      const m = await computeLogoDrawMm(logoDataUrl, innerW);
+      const m = await computeLogoDrawMm(logoDataUrl, innerW, pageHeightMm);
       wMm = m.wMm;
       hMm = m.hMm;
     } catch {
-      wMm = 50;
-      hMm = 16;
+      const fb = capLogoToPage(50 * LOGO_SCALE_FACTOR, 16 * LOGO_SCALE_FACTOR, innerW, pageHeightMm);
+      wMm = fb.wMm;
+      hMm = fb.hMm;
     }
   } else {
-    wMm = 50;
-    hMm = 16;
+    const fb = capLogoToPage(50 * LOGO_SCALE_FACTOR, 16 * LOGO_SCALE_FACTOR, innerW, pageHeightMm);
+    wMm = fb.wMm;
+    hMm = fb.hMm;
   }
   if (logoDataUrl) {
     try {
@@ -675,11 +546,11 @@ async function drawLogoCenteredAtY(
     }
   }
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(14);
+  doc.setFontSize(22);
   doc.setTextColor(45, 45, 45);
-  doc.text(nomeProjeto.slice(0, 44), centerX, yTop + 8, { align: "center", maxWidth: innerW });
+  doc.text(nomeProjeto.slice(0, 44), centerX, yTop + 10, { align: "center", maxWidth: innerW });
   doc.setTextColor(0, 0, 0);
-  return 16;
+  return 22;
 }
 
 async function drawLogoCentered(
@@ -689,10 +560,11 @@ async function drawLogoCentered(
   centerX: number,
   innerW: number,
   yTop: number,
+  pageHeightMm: number,
 ): Promise<number> {
   if (logoDataUrl) {
     try {
-      const { wMm, hMm } = await computeLogoDrawMm(logoDataUrl, innerW);
+      const { wMm, hMm } = await computeLogoDrawMm(logoDataUrl, innerW, pageHeightMm);
       const fmt = imageFormatFromDataUrl(logoDataUrl);
       doc.addImage(logoDataUrl, fmt, centerX - wMm / 2, yTop, wMm, hMm);
       return yTop + hMm + 8;
@@ -701,30 +573,11 @@ async function drawLogoCentered(
     }
   }
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(14);
+  doc.setFontSize(22);
   doc.setTextColor(45, 45, 45);
-  doc.text(nomeProjeto.slice(0, 44), centerX, yTop + 8, { align: "center", maxWidth: innerW });
+  doc.text(nomeProjeto.slice(0, 44), centerX, yTop + 10, { align: "center", maxWidth: innerW });
   doc.setTextColor(0, 0, 0);
-  return yTop + 16;
-}
-
-function footerYStart(H: number, hasFooter: boolean): number {
-  return hasFooter ? H - M_OUT - 38 : H - M_OUT;
-}
-
-function drawFooterBlock(
-  doc: jsPDF,
-  W: number,
-  H: number,
-  innerW: number,
-  footer: ReceptivoFooterPayload,
-) {
-  if (footer.numeroReserva == null) return;
-  const y0 = H - M_OUT - 36;
-  doc.setDrawColor(210, 210, 210);
-  doc.setLineWidth(0.25);
-  doc.line(M_OUT + 2, y0 - 1, W - M_OUT - 2, y0 - 1);
-  drawTripFooter(doc, M_OUT + 3, y0 + 2, innerW - 6, footer);
+  return yTop + 22;
 }
 
 function estimateFooterHeightMm(f: ReceptivoFooterPayload): number {
@@ -749,20 +602,20 @@ export async function generateReceptivoTransferPdf(
   const innerW = W - 2 * M_OUT;
   const logoDataUrl = logoUrl ? await loadImageDataUrl(logoUrl) : null;
   const hasTrip = footer.numeroReserva != null;
-  const yContentEnd = footerYStart(H, hasTrip);
-  const gapV = 7;
-  const modelo1Template = modelo === 1 ? await loadModelo1TemplateDataUrl() : null;
+  /** Apenas modelos 1–4; valores fora do intervalo são limitados a 1–4. */
+  const m = Math.min(4, Math.max(1, modelo));
+  const modelo1Template = m === 1 ? await loadModelo1TemplateDataUrl() : null;
   let modelo1TemplateRendered = false;
-  const modelo2Template = modelo === 2 ? await loadModelo2TemplateDataUrl() : null;
+  const modelo2Template = m === 2 ? await loadModelo2TemplateDataUrl() : null;
   let modelo2TemplateRendered = false;
-  const modelo3Template = modelo === 3 ? await loadModelo3TemplateDataUrl() : null;
+  const modelo3Template = m === 3 ? await loadModelo3TemplateDataUrl() : null;
   let modelo3TemplateRendered = false;
-  const modelo4Template = modelo === 4 ? await loadModelo4TemplateDataUrl() : null;
+  const modelo4Template = m === 4 ? await loadModelo4TemplateDataUrl() : null;
   let modelo4TemplateRendered = false;
 
   doc.setFillColor(255, 255, 255);
   doc.rect(0, 0, W, H, "F");
-  if (modelo === 1) {
+  if (m === 1) {
     if (modelo1Template) {
       try {
         doc.addImage(modelo1Template, imageFormatFromDataUrl(modelo1Template), 0, 0, W, H);
@@ -773,7 +626,7 @@ export async function generateReceptivoTransferPdf(
     } else {
       drawRoundedUsefulBorder(doc, W, H);
     }
-  } else if (modelo === 2) {
+  } else if (m === 2) {
     if (modelo2Template) {
       try {
         doc.addImage(modelo2Template, imageFormatFromDataUrl(modelo2Template), 0, 0, W, H);
@@ -784,7 +637,7 @@ export async function generateReceptivoTransferPdf(
     } else {
       drawRoundedUsefulBorder(doc, W, H);
     }
-  } else if (modelo === 3) {
+  } else if (m === 3) {
     if (modelo3Template) {
       try {
         doc.addImage(modelo3Template, imageFormatFromDataUrl(modelo3Template), 0, 0, W, H);
@@ -795,7 +648,7 @@ export async function generateReceptivoTransferPdf(
     } else {
       drawOpenCornerBorder(doc, W, H);
     }
-  } else if (modelo === 4) {
+  } else if (m === 4) {
     if (modelo4Template) {
       try {
         doc.addImage(modelo4Template, imageFormatFromDataUrl(modelo4Template), 0, 0, W, H);
@@ -806,13 +659,9 @@ export async function generateReceptivoTransferPdf(
     } else {
       drawOpenCornerBorder(doc, W, H, G_CORNER_MODEL4);
     }
-  } else if (modelo === 5) {
-    /* Modelo 5: sem moldura fechada / sem linhas de moldura */
-  } else {
-    drawOpenCornerBorder(doc, W, H);
   }
 
-  if (modelo === 1) {
+  if (m === 1) {
     const contentW = innerW - 2 * M_IN;
     const bottomSafe = H - M_OUT - M_IN - 2;
     const footerH = estimateFooterHeightMm(footer);
@@ -823,8 +672,8 @@ export async function generateReceptivoTransferPdf(
       const yFooterStart = yLineMm + 6;
 
       let y = M1_LOGO_TOP_MM;
-      y = await drawLogoCentered(doc, logoDataUrl, nomeProjeto, W / 2, contentW, y);
-      y += 10;
+      y = await drawLogoCentered(doc, logoDataUrl, nomeProjeto, W / 2, contentW, y, H);
+      y += LOGO_TO_NOME_GAP_MM;
       y = drawNomeClienteComChavesFit(doc, nomeCliente, W / 2, y, contentW * 0.88, yAboveLine);
 
       if (hasTrip) {
@@ -837,10 +686,10 @@ export async function generateReceptivoTransferPdf(
     } else {
       const contentTop = M_OUT + M_IN + 8;
       let y = contentTop;
-      y = await drawLogoCentered(doc, logoDataUrl, nomeProjeto, W / 2, contentW, y);
-      y += hasTrip ? 9 : 12;
+      y = await drawLogoCentered(doc, logoDataUrl, nomeProjeto, W / 2, contentW, y, H);
+      y += hasTrip ? 26 : 30;
       y = drawNomeClienteComChaves(doc, nomeCliente, W / 2, y, contentW * 0.92);
-      y += hasTrip ? 9 : 12;
+      y += hasTrip ? 26 : 30;
       drawTraçoCentralComTicks(doc, W, y, innerW);
       const yAfterLine = y + 1.4 + 10;
 
@@ -854,7 +703,7 @@ export async function generateReceptivoTransferPdf(
         drawTripFooterCentered(doc, W / 2, yFooterTop, contentW * 0.9, footer);
       }
     }
-  } else if (modelo === 2) {
+  } else if (m === 2) {
     const contentW = innerW - 2 * M_IN;
     const bottomSafe = H - M_OUT - M_IN - 2;
     const footerH = estimateFooterHeightMm(footer);
@@ -865,8 +714,8 @@ export async function generateReceptivoTransferPdf(
       const yFooterStart = yLineMm + 6;
 
       let y = M2_LOGO_TOP_MM;
-      y = await drawLogoCentered(doc, logoDataUrl, nomeProjeto, W / 2, contentW, y);
-      y += 10;
+      y = await drawLogoCentered(doc, logoDataUrl, nomeProjeto, W / 2, contentW, y, H);
+      y += LOGO_TO_NOME_GAP_MM;
       y = drawNomeClienteComChavesFit(doc, nomeCliente, W / 2, y, contentW * 0.88, yAboveLine);
 
       if (hasTrip) {
@@ -877,16 +726,16 @@ export async function generateReceptivoTransferPdf(
         drawTripFooterCentered(doc, W / 2, yFt, contentW * 0.85, footer, { bracedTitle: true });
       }
     } else {
-      const contentTop = M_OUT + M_IN + 8;
+      const contentTop = M_OUT + M_IN + 28;
       const gapAboveLogo = 10;
       const logoBottomMargin = 8;
 
       let logoW = 50;
       let logoH = 16;
       if (logoDataUrl) {
-        const m = await computeLogoDrawMm(logoDataUrl, contentW);
-        logoW = m.wMm;
-        logoH = m.hMm;
+        const dims = await computeLogoDrawMm(logoDataUrl, contentW, H);
+        logoW = dims.wMm;
+        logoH = dims.hMm;
       }
       const logoAspect = logoW / Math.max(logoH, 0.01);
       let yLogoTop = bottomSafe - logoH - logoBottomMargin;
@@ -910,12 +759,12 @@ export async function generateReceptivoTransferPdf(
       if (hasTrip) {
         drawTripFooterCentered(doc, W / 2, y, contentW * 0.9, footer, { bracedTitle: true });
       }
-      await drawLogoCenteredAtY(doc, logoDataUrl, nomeProjeto, W / 2, contentW, yLogoTop, {
+      await drawLogoCenteredAtY(doc, logoDataUrl, nomeProjeto, W / 2, contentW, yLogoTop, H, {
         wMm: logoW,
         hMm: logoH,
       });
     }
-  } else if (modelo === 3) {
+  } else if (m === 3) {
     const contentW = innerW - 2 * M_IN;
     const bottomSafe = H - M_OUT - M_IN - 2;
     const footerH = estimateFooterHeightMm(footer);
@@ -926,8 +775,8 @@ export async function generateReceptivoTransferPdf(
       const yFooterStart = yLineMm + 6;
 
       let y = M3_LOGO_TOP_MM;
-      y = await drawLogoCentered(doc, logoDataUrl, nomeProjeto, W / 2, contentW, y);
-      y += 10;
+      y = await drawLogoCentered(doc, logoDataUrl, nomeProjeto, W / 2, contentW, y, H);
+      y += LOGO_TO_NOME_GAP_MM;
       y = drawNomeClienteComChavesFit(doc, nomeCliente, W / 2, y, contentW * 0.88, yAboveLine);
 
       if (hasTrip) {
@@ -938,10 +787,10 @@ export async function generateReceptivoTransferPdf(
         drawTripFooterCentered(doc, W / 2, yFt, contentW * 0.85, footer, { bracedTitle: true });
       }
     } else {
-      const contentTop = M_OUT + M_IN + 8;
+      const contentTop = M_OUT + M_IN + 28;
       let y = contentTop;
-      y = await drawLogoCentered(doc, logoDataUrl, nomeProjeto, W / 2, contentW, y);
-      y += hasTrip ? 9 : 12;
+      y = await drawLogoCentered(doc, logoDataUrl, nomeProjeto, W / 2, contentW, y, H);
+      y += hasTrip ? 26 : 30;
       if (hasTrip) {
         const reserveAfterNome = 9 + 1.4 + 10 + 6;
         const maxNomeBlockBottom = bottomSafe - footerH - reserveAfterNome - 4;
@@ -949,7 +798,7 @@ export async function generateReceptivoTransferPdf(
       } else {
         y = drawNomeClienteComChaves(doc, nomeCliente, W / 2, y, contentW * 0.92);
       }
-      y += hasTrip ? 9 : 12;
+      y += hasTrip ? 26 : 30;
       drawTraçoCentralComTicks(doc, W, y, innerW);
       const yAfterLine = y + 1.4 + 10;
 
@@ -963,7 +812,7 @@ export async function generateReceptivoTransferPdf(
         drawTripFooterCentered(doc, W / 2, yFooterTop, contentW * 0.9, footer, { bracedTitle: true });
       }
     }
-  } else if (modelo === 4) {
+  } else if (m === 4) {
     const contentW = innerW - 2 * M_IN;
     const bottomSafe = H - M_OUT - M_IN - 2;
     const footerH = estimateFooterHeightMm(footer);
@@ -974,8 +823,8 @@ export async function generateReceptivoTransferPdf(
       const yFooterStart = yLineMm + 6;
 
       let y = M4_LOGO_TOP_MM;
-      y = await drawLogoCentered(doc, logoDataUrl, nomeProjeto, W / 2, contentW, y);
-      y += 10;
+      y = await drawLogoCentered(doc, logoDataUrl, nomeProjeto, W / 2, contentW, y, H);
+      y += LOGO_TO_NOME_GAP_MM;
       y = drawNomeClienteComChavesFit(doc, nomeCliente, W / 2, y, contentW * 0.88, yAboveLine);
 
       if (hasTrip) {
@@ -988,13 +837,13 @@ export async function generateReceptivoTransferPdf(
     } else {
       const contentTop = M_OUT + M_IN + 16;
       let y = contentTop;
-      y = await drawLogoCentered(doc, logoDataUrl, nomeProjeto, W / 2, contentW, y);
+      y = await drawLogoCentered(doc, logoDataUrl, nomeProjeto, W / 2, contentW, y, H);
       const yAfterLogo = y;
 
       const gapAfterName = 10;
       const tickH = 1.4;
       const traçoFrac = 0.65;
-      const regionStart = yAfterLogo + 14;
+      const regionStart = yAfterLogo + 32;
       const footerTop = hasTrip ? bottomSafe - footerH - 8 : bottomSafe;
       const regionEnd = hasTrip ? footerTop - 10 : bottomSafe - 12;
       const regionHeight = Math.max(24, regionEnd - regionStart);
@@ -1030,42 +879,6 @@ export async function generateReceptivoTransferPdf(
         drawTripFooterCentered(doc, W / 2, yFooterTop, contentW * 0.9, footer, { bracedTitle: true });
       }
     }
-  } else if (modelo === 5) {
-    const contentW = innerW - 2 * M_IN;
-    const gapLogo = 14;
-    const gapAfterName = 10;
-    const tickH = 1.4;
-    const gapAfterLine = 12;
-    const traçoFrac = 0.7;
-
-    const { wMm: logoW, hMm: logoH } = await computeLogoDimsModel5(logoDataUrl, contentW);
-    const nameH = measureNomeClienteComChavesPreferSingleLineHeight(doc, nomeCliente, contentW * 0.92);
-    const footerH = hasTrip ? estimateFooterHeightModel5() : 0;
-    const totalH = logoH + gapLogo + nameH + gapAfterName + tickH + gapAfterLine + footerH;
-    let y = Math.max(M_OUT + M_IN + 4, (H - totalH) / 2);
-
-    await drawLogoCenteredAtY(doc, logoDataUrl, nomeProjeto, W / 2, contentW, y, { wMm: logoW, hMm: logoH });
-    y += logoH + gapLogo;
-    y = drawNomeClienteComChavesPreferSingleLine(doc, nomeCliente, W / 2, y, contentW * 0.92);
-    y += gapAfterName;
-    drawTraçoCentralComTicks(doc, W, y, innerW, traçoFrac, 0.22);
-    y += tickH + gapAfterLine;
-    if (hasTrip) {
-      drawTripFooterCenteredModel5(doc, W / 2, y, contentW * 0.9, footer);
-    }
-  } else {
-    let y = M_OUT + 14;
-    y = await drawLogoCentered(doc, logoDataUrl, nomeProjeto, W / 2, innerW, y);
-    y += gapV + 2;
-    drawTraçoCentral(doc, W, y, innerW);
-    y += gapV + 8;
-    y = drawNomeClienteResponsivo(doc, nomeCliente, W / 2, y, innerW * 0.92);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(7);
-    doc.setTextColor(95, 95, 95);
-    doc.text("Embarque autorizado", W / 2, Math.min(y + 5, yContentEnd - 6), { align: "center" });
-    doc.setTextColor(0, 0, 0);
-    drawFooterBlock(doc, W, H, innerW, footer);
   }
 
   return doc;

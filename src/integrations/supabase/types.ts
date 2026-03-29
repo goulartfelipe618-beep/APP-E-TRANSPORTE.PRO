@@ -539,6 +539,7 @@ export type Database = {
           ida_hora: string | null
           modelo: number
           nome_cliente: string
+          receptivo_pdf_layout_version: string
           reserva_numero: number | null
           reserva_transfer_id: string | null
           tipo_viagem: string | null
@@ -557,6 +558,7 @@ export type Database = {
           ida_hora?: string | null
           modelo: number
           nome_cliente: string
+          receptivo_pdf_layout_version?: string
           reserva_numero?: number | null
           reserva_transfer_id?: string | null
           tipo_viagem?: string | null
@@ -575,6 +577,7 @@ export type Database = {
           ida_hora?: string | null
           modelo?: number
           nome_cliente?: string
+          receptivo_pdf_layout_version?: string
           reserva_numero?: number | null
           reserva_transfer_id?: string | null
           tipo_viagem?: string | null

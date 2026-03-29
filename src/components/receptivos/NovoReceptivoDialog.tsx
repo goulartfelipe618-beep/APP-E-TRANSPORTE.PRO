@@ -18,6 +18,7 @@ import {
   generateReceptivoTransferPdf,
   downloadReceptivoPdf,
   getEnderecosReservaParaExibicao,
+  RECEPTIVO_PDF_LAYOUT_VERSION,
 } from "@/lib/receptivoTransferPdf";
 
 type Reserva = Tables<"reservas_transfer">;
@@ -71,7 +72,7 @@ export default function NovoReceptivoDialog({ open, onOpenChange, onSaved }: Pro
       return;
     }
     const m = Number(modelo);
-    if (m < 1 || m > 5) {
+    if (m < 1 || m > 4) {
       toast.error("Selecione um modelo válido");
       return;
     }
@@ -105,6 +106,7 @@ export default function NovoReceptivoDialog({ open, onOpenChange, onSaved }: Pro
       const { error: insErr } = await supabase.from("receptivos").insert({
         user_id: user.id,
         modelo: m,
+        receptivo_pdf_layout_version: RECEPTIVO_PDF_LAYOUT_VERSION,
         nome_cliente: nome,
         reserva_transfer_id: reserva?.id ?? null,
         reserva_numero: reserva?.numero_reserva ?? null,
@@ -158,7 +160,6 @@ export default function NovoReceptivoDialog({ open, onOpenChange, onSaved }: Pro
                 <SelectItem value="2">Modelo 2 — Faixa superior e destaque</SelectItem>
                 <SelectItem value="3">Modelo 3 — Coluna lateral e tipografia</SelectItem>
                 <SelectItem value="4">Modelo 4 — Moldura dupla clássica</SelectItem>
-                <SelectItem value="5">Modelo 5 — Cantoneiras decorativas</SelectItem>
               </SelectContent>
             </Select>
           </div>
