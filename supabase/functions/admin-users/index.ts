@@ -166,6 +166,16 @@ Deno.serve(async (req) => {
         return new Response(JSON.stringify({ error: "Plano inválido" }), { status: 400, headers: corsHeaders });
       }
 
+      if (plano === "free") {
+        return new Response(
+          JSON.stringify({
+            error:
+              "O plano FREE não pode ser atribuído em usuários cadastrados. FREE é apenas para solicitações vindas do site.",
+          }),
+          { status: 400, headers: corsHeaders },
+        );
+      }
+
       // Upsert plan
       const { error } = await supabaseAdmin.from("user_plans").upsert(
         { user_id, plano, updated_at: new Date().toISOString() },
@@ -182,13 +192,22 @@ Deno.serve(async (req) => {
     // Finalizar lead da Landing Page: garante role/plano/login, remove só a solicitação (usuário permanece em Cadastrados).
     if (req.method === "POST" && action === "finalize_landing_lead") {
       const body = await req.json();
-      const { solicitacao_id } = body as { solicitacao_id?: string };
+      const { solicitacao_id, plano: bodyPlano } = body as { solicitacao_id?: string; plano?: string };
 
       if (!solicitacao_id) {
         return new Response(JSON.stringify({ error: "solicitacao_id é obrigatório" }), {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
+      }
+
+      const paidPlans = ["seed", "grow", "rise", "apex"] as const;
+      const planoFinal = String(bodyPlano || "").toLowerCase().trim();
+      if (!paidPlans.includes(planoFinal as (typeof paidPlans)[number])) {
+        return new Response(
+          JSON.stringify({ error: "plano é obrigatório: seed, grow, rise ou apex" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
       }
 
       const { data: row, error: rowErr } = await supabaseAdmin
@@ -238,23 +257,15 @@ Deno.serve(async (req) => {
           });
         }
 
-        const { data: planRow } = await supabaseAdmin
-          .from("user_plans")
-          .select("plano")
-          .eq("user_id", leadUserId)
-          .maybeSingle();
-
-        if (!planRow?.plano) {
-          const { error: planErr } = await supabaseAdmin.from("user_plans").upsert(
-            { user_id: leadUserId, plano: "free", updated_at: new Date().toISOString() },
-            { onConflict: "user_id" }
-          );
-          if (planErr) {
-            return new Response(JSON.stringify({ error: planErr.message }), {
-              status: 400,
-              headers: { ...corsHeaders, "Content-Type": "application/json" },
-            });
-          }
+        const { error: planErr } = await supabaseAdmin.from("user_plans").upsert(
+          { user_id: leadUserId, plano: planoFinal, updated_at: new Date().toISOString() },
+          { onConflict: "user_id" },
+        );
+        if (planErr) {
+          return new Response(JSON.stringify({ error: planErr.message }), {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
         }
 
         const { error: unbanErr } = await supabaseAdmin.auth.admin.updateUserById(leadUserId, {

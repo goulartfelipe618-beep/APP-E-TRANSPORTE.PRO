@@ -89,12 +89,6 @@ function resolveValue(obj: Record<string, any>, path: string): any {
   return current;
 }
 
-function normalizePlano(plano: unknown): string {
-  const v = String(plano || "").trim().toLowerCase();
-  const allowed = ["free", "seed", "grow", "rise", "apex"];
-  return allowed.includes(v) ? v : "free";
-}
-
 function stripAccents(input: string): string {
   // Normalize and remove diacritics (e.g. "João" => "Joao")
   return input.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -334,7 +328,8 @@ Deno.serve(async (req) => {
       ]
         .filter(Boolean)
         .join("\n");
-      const leadPlano = normalizePlano(body.plano || body.plan || body.subscription || "free");
+      // Cadastro pelo site: solicitação sempre em FREE com login liberado (plano pago só no admin ou upgrade no painel).
+      const leadPlano = "free";
 
       if (!leadEmail || !leadTelefone) {
         return new Response(

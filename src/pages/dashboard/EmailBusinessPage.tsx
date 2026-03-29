@@ -40,7 +40,7 @@ function fmt(v: number) {
 export default function EmailBusinessPage() {
   const [submitting, setSubmitting] = useState(false);
   const [servicoAtivo, setServicoAtivo] = useState<any>(null);
-  const { plano } = useUserPlan();
+  const { plano, refetch: refetchPlano } = useUserPlan();
   const [upgradeOpen, setUpgradeOpen] = useState(false);
 
   // wizard state
@@ -246,7 +246,13 @@ export default function EmailBusinessPage() {
   /* ── Wizard ── */
   return (
     <div className="space-y-8">
-      <UpgradePlanDialog open={upgradeOpen} onOpenChange={setUpgradeOpen} requiredPlan="seed" />
+      <UpgradePlanDialog
+        open={upgradeOpen}
+        onOpenChange={setUpgradeOpen}
+        requiredPlan="seed"
+        selfServiceUpgrade={plano === "free"}
+        onUpgradeSuccess={() => void refetchPlano()}
+      />
       {pendingBanner}
       {/* Stepper */}
       <div className="flex items-center justify-center gap-0">

@@ -6,3 +6,6 @@ verify_jwt = false
 # Permite preflight OPTIONS sem JWT; a função valida o token manualmente.
 [functions.admin-users]
 verify_jwt = false
+
+[functions.self-upgrade-plan]
+verify_jwt = true

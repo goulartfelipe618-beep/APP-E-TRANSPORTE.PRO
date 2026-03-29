@@ -25,8 +25,6 @@ const roleLabels: Record<string, string> = {
   admin_master: "Administrador Master",
 };
 
-const PLANS: PlanType[] = ["free", "seed", "grow", "rise", "apex"];
-
 /** Headers exigidos pelo gateway do Supabase ao chamar Edge Functions pelo fetch */
 function edgeFunctionHeaders(accessToken: string): HeadersInit {
   return {
@@ -161,7 +159,8 @@ export default function AdminUsuariosCadastrados() {
 
   const handleOpenPlanDialog = (user: UserItem) => {
     setSelectedUser(user);
-    setSelectedPlan((user.plano || "free") as PlanType);
+    const p = (user.plano || "free") as PlanType;
+    setSelectedPlan(p === "free" ? "seed" : p);
     setPlanDialogOpen(true);
   };
 
@@ -366,11 +365,14 @@ export default function AdminUsuariosCadastrados() {
               <Select value={selectedPlan} onValueChange={(v) => setSelectedPlan(v as PlanType)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {PLANS.map((p) => (
+                  {PLANS_PAID_ORDER.map((p) => (
                     <SelectItem key={p} value={p}>{PLAN_LABELS[p]}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+              <p className="text-xs text-muted-foreground mt-1">
+                O plano FREE existe apenas para pré-cadastros vindos do site; usuários em Cadastrados usam planos pagos.
+              </p>
             </div>
             <Button onClick={handleUpdatePlan} disabled={updatingPlan} className="w-full">
               {updatingPlan ? "Atualizando..." : "Salvar Plano"}

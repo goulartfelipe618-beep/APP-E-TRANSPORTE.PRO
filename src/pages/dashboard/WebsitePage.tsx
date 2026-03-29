@@ -130,7 +130,7 @@ export default function WebsitePage() {
   const [submitting, setSubmitting] = useState(false);
   const [servicoAtivo, setServicoAtivo] = useState<any>(null);
   const [dbTemplates, setDbTemplates] = useState<TemplateDB[]>([]);
-  const { plano } = useUserPlan();
+  const { plano, refetch: refetchPlano } = useUserPlan();
   const [upgradeOpen, setUpgradeOpen] = useState(false);
 
   // Step 1 - Domínio (alinhado ao wizard E-mail Business)
@@ -358,7 +358,13 @@ export default function WebsitePage() {
   if (step === "briefing") {
     return (
       <>
-        <UpgradePlanDialog open={upgradeOpen} onOpenChange={setUpgradeOpen} requiredPlan="rise" />
+        <UpgradePlanDialog
+          open={upgradeOpen}
+          onOpenChange={setUpgradeOpen}
+          requiredPlan="rise"
+          selfServiceUpgrade={plano === "free"}
+          onUpgradeSuccess={() => void refetchPlano()}
+        />
         {pendingBanner}
         <div className="space-y-6">
           <div>
@@ -735,7 +741,13 @@ export default function WebsitePage() {
           </Button>
         </div>
       )}
-      <UpgradePlanDialog open={upgradeOpen} onOpenChange={setUpgradeOpen} requiredPlan="rise" />
+      <UpgradePlanDialog
+        open={upgradeOpen}
+        onOpenChange={setUpgradeOpen}
+        requiredPlan="rise"
+        selfServiceUpgrade={plano === "free"}
+        onUpgradeSuccess={() => void refetchPlano()}
+      />
     </div>
   );
 }

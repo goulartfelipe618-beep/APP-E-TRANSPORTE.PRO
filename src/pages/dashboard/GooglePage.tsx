@@ -52,7 +52,7 @@ const MANAGEMENT_TABS = [
 ];
 
 export default function GooglePage() {
-  const { hasPlan } = useUserPlan();
+  const { hasPlan, plano, refetch: refetchPlano } = useUserPlan();
   const [upgradeOpen, setUpgradeOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("info");
@@ -1177,7 +1177,13 @@ export default function GooglePage() {
           </div>
         </DialogContent>
       </Dialog>
-      <UpgradePlanDialog open={upgradeOpen} onOpenChange={setUpgradeOpen} requiredPlan="apex" />
+      <UpgradePlanDialog
+        open={upgradeOpen}
+        onOpenChange={setUpgradeOpen}
+        requiredPlan="apex"
+        selfServiceUpgrade={plano === "free"}
+        onUpgradeSuccess={() => void refetchPlano()}
+      />
     </div>
   );
 }

@@ -62,7 +62,7 @@ const WARNINGS = [
 ];
 
 export default function DisparadorPage() {
-  const { hasPlan } = useUserPlan();
+  const { hasPlan, plano, refetch: refetchPlano } = useUserPlan();
   const [upgradeOpen, setUpgradeOpen] = useState(false);
   const [domainStep, setDomainStep] = useState(false);
   const [domain, setDomain] = useState("");
@@ -139,7 +139,13 @@ export default function DisparadorPage() {
             </Button>
           </div>
         </div>
-        <UpgradePlanDialog open={upgradeOpen} onOpenChange={setUpgradeOpen} requiredPlan="grow" />
+        <UpgradePlanDialog
+          open={upgradeOpen}
+          onOpenChange={setUpgradeOpen}
+          requiredPlan="grow"
+          selfServiceUpgrade={plano === "free"}
+          onUpgradeSuccess={() => void refetchPlano()}
+        />
       </div>
     );
   }
@@ -237,7 +243,13 @@ export default function DisparadorPage() {
         </CardContent>
       </Card>
 
-      <UpgradePlanDialog open={upgradeOpen} onOpenChange={setUpgradeOpen} requiredPlan="grow" />
+      <UpgradePlanDialog
+        open={upgradeOpen}
+        onOpenChange={setUpgradeOpen}
+        requiredPlan="grow"
+        selfServiceUpgrade={plano === "free"}
+        onUpgradeSuccess={() => void refetchPlano()}
+      />
     </div>
   );
 }

@@ -19,7 +19,6 @@ import { useActivePage } from "@/contexts/ActivePageContext";
 const simpleItems = [
   { title: "Abrangência", page: "abrangencia", icon: MapPin },
   { title: "Métricas", page: "metricas", icon: BarChart3 },
-  { title: "Landing Page", page: "landing-page", icon: ClipboardList },
   { title: "Slides", page: "slides", icon: SlidersHorizontal },
   { title: "Mentoria", page: "mentoria", icon: GraduationCap },
   { title: "Empty Legs", page: "empty-legs", icon: Plane },
