@@ -43,15 +43,18 @@ const BORDER_LINE_MM = 0.35;
 const PX96_TO_MM = 25.4 / 96;
 const LOGO_H_MIN_MM = 60 * PX96_TO_MM;
 const LOGO_H_MAX_MM = 90 * PX96_TO_MM;
-/** Ampliação pedida (~4×); depois limitada à folha para não sobrepor nome/traço. */
-const LOGO_SCALE_FACTOR = 4;
-const LOGO_MAX_HEIGHT_FRAC_H = 0.3;
+/** Ampliação da logo no PDF; limitada à folha para não sobrepor nome/traço. */
+const LOGO_SCALE_FACTOR = 4.75;
+const LOGO_MAX_HEIGHT_FRAC_H = 0.34;
 const LOGO_MAX_WIDTH_FRAC_INNER = 0.92;
 /** Espaço entre o fim da logo e o início do nome do cliente (modelos 1–4). */
 const LOGO_TO_NOME_GAP_MM = 26;
 
-const NOME_FS_MIN = 48;
-const NOME_FS_MAX = 72;
+/** Nome do cliente: faixa de tamanho (pt) — valores menores = bloco mais baixo. */
+const NOME_FS_MIN = 26;
+const NOME_FS_MAX = 46;
+/** Entrelinha do nome (menor = altura total do texto menor). */
+const NOME_LINE_LEADING = 1.1;
 
 /** Posição aproximada do traço horizontal no PNG do Modelo 1 (fração da altura H, de cima para baixo). */
 const M1_TEMPLATE_LINE_Y_FRAC = 0.77;
@@ -409,7 +412,7 @@ function drawTripFooterCentered(
   return cy + 1;
 }
 
-/** Nome centralizado, negrito, 48–72pt em maiúsculas — prioriza fonte o maior possível. */
+/** Nome centralizado, negrito, em maiúsculas (faixa NOME_FS_MIN–NOME_FS_MAX) — prioriza fonte o maior possível. */
 function drawNomeClienteComChaves(
   doc: jsPDF,
   nome: string,
@@ -426,13 +429,13 @@ function drawNomeClienteComChaves(
   for (let i = 0; i < 14; i++) {
     doc.setFontSize(fs);
     lines = doc.splitTextToSize(display, maxW);
-    const estH = lines.length * ((fs * 1.22 * 25.4) / 72);
-    if (lines.length <= 4 && estH < 58) break;
+    const estH = lines.length * ((fs * NOME_LINE_LEADING * 25.4) / 72);
+    if (lines.length <= 4 && estH < 40) break;
     fs = Math.max(NOME_FS_MIN, fs - 2);
   }
   doc.setFontSize(fs);
   lines = doc.splitTextToSize(display, maxW);
-  const lineH = (fs * 1.22 * 25.4) / 72;
+  const lineH = (fs * NOME_LINE_LEADING * 25.4) / 72;
   let y = yTop;
   lines.forEach((ln) => {
     doc.text(ln, centerX, y, { align: "center" });
@@ -462,14 +465,14 @@ function drawNomeClienteComChavesFit(
   for (let i = 0; i < 18; i++) {
     doc.setFontSize(fs);
     lines = doc.splitTextToSize(display, maxW);
-    const lineH = (fs * 1.22 * 25.4) / 72;
+    const lineH = (fs * NOME_LINE_LEADING * 25.4) / 72;
     const blockBottom = yTop + lines.length * lineH;
     if (blockBottom <= maxBlockBottomY && lines.length <= 5) break;
     fs = Math.max(NOME_FS_MIN, fs - 2);
   }
   doc.setFontSize(fs);
   lines = doc.splitTextToSize(display, maxW);
-  const lineH = (fs * 1.22 * 25.4) / 72;
+  const lineH = (fs * NOME_LINE_LEADING * 25.4) / 72;
   let y = yTop;
   lines.forEach((ln) => {
     doc.text(ln, centerX, y, { align: "center" });
@@ -494,14 +497,14 @@ function measureNomeClienteComChavesBlockHeight(
   for (let i = 0; i < 18; i++) {
     doc.setFontSize(fs);
     lines = doc.splitTextToSize(display, maxW);
-    const lineH = (fs * 1.22 * 25.4) / 72;
+    const lineH = (fs * NOME_LINE_LEADING * 25.4) / 72;
     const blockBottom = yStart + lines.length * lineH;
     if (blockBottom <= maxBlockBottomY && lines.length <= 5) break;
     fs = Math.max(NOME_FS_MIN, fs - 2);
   }
   doc.setFontSize(fs);
   lines = doc.splitTextToSize(display, maxW);
-  const lineH = (fs * 1.22 * 25.4) / 72;
+  const lineH = (fs * NOME_LINE_LEADING * 25.4) / 72;
   return lines.length * lineH;
 }
 
