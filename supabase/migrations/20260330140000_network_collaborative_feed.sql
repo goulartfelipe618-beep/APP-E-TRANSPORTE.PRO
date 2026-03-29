@@ -8,12 +8,7 @@ alter table public.network
 comment on column public.network.autor_nome is 'Nome exibido do autor (denormalizado no insert).';
 comment on column public.network.autor_email is 'E-mail do autor no momento da publicação (denormalizado).';
 
-alter table public.network drop column if exists motorista_atribuido_id;
-
-create index if not exists network_created_at_idx on public.network (created_at desc);
-
-alter table public.network enable row level security;
-
+-- Políticas antigas podem referenciar motorista_atribuido_id: remover antes de dropar a coluna
 do $$
 declare
   pol record;
@@ -26,6 +21,12 @@ begin
     execute format('drop policy if exists %I on public.network', pol.policyname);
   end loop;
 end $$;
+
+alter table public.network drop column if exists motorista_atribuido_id;
+
+create index if not exists network_created_at_idx on public.network (created_at desc);
+
+alter table public.network enable row level security;
 
 -- Leitura: motoristas executivos e admin master
 create policy network_select_collaborative
@@ -73,7 +74,7 @@ create policy network_delete_master
     )
   );
 
--- Atualização: apenas o autor (edição futura); admin pode usar service role se necessário
+-- Atualização: apenas o autor
 create policy network_update_own
   on public.network
   for update
