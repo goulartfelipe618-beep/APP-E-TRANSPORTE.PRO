@@ -41,6 +41,15 @@ const LOGO_H_MAX_MM = 90 * PX96_TO_MM;
 const NOME_FS_MIN = 48;
 const NOME_FS_MAX = 72;
 
+/** Posição aproximada do traço horizontal no PNG do Modelo 1 (fração da altura H, de cima para baixo). */
+const M1_TEMPLATE_LINE_Y_FRAC = 0.77;
+/** Logo: distância do topo da folha (mm). */
+const M1_LOGO_TOP_MM = 22;
+
+/** Modelo 2 — PNG de fundo: posição do traço e logo (ajustar ao arte-final). */
+const M2_TEMPLATE_LINE_Y_FRAC = 0.77;
+const M2_LOGO_TOP_MM = 22;
+
 export function buildFooterPayloadFromReceptivoRow(row: ReceptivoRow): ReceptivoFooterPayload {
   const semReserva = !row.reserva_transfer_id && row.reserva_numero == null;
   if (semReserva) {
@@ -151,6 +160,20 @@ export async function loadImageDataUrl(url: string): Promise<string | null> {
   } catch {
     return null;
   }
+}
+
+/** PNG de fundo do Modelo 1 (`public/receptivos/modelo-1-template.png`). */
+export async function loadModelo1TemplateDataUrl(): Promise<string | null> {
+  const base = import.meta.env.BASE_URL || "/";
+  const prefix = base.endsWith("/") ? base : `${base}/`;
+  return loadImageDataUrl(`${prefix}receptivos/modelo-1-template.png`);
+}
+
+/** PNG de fundo do Modelo 2 (`public/receptivos/modelo-2-template.png`). */
+export async function loadModelo2TemplateDataUrl(): Promise<string | null> {
+  const base = import.meta.env.BASE_URL || "/";
+  const prefix = base.endsWith("/") ? base : `${base}/`;
+  return loadImageDataUrl(`${prefix}receptivos/modelo-2-template.png`);
 }
 
 function getNaturalImageSize(dataUrl: string): Promise<{ w: number; h: number }> {
@@ -706,11 +729,35 @@ export async function generateReceptivoTransferPdf(
   const hasTrip = footer.numeroReserva != null;
   const yContentEnd = footerYStart(H, hasTrip);
   const gapV = 7;
+  const modelo1Template = modelo === 1 ? await loadModelo1TemplateDataUrl() : null;
+  let modelo1TemplateRendered = false;
+  const modelo2Template = modelo === 2 ? await loadModelo2TemplateDataUrl() : null;
+  let modelo2TemplateRendered = false;
 
   doc.setFillColor(255, 255, 255);
   doc.rect(0, 0, W, H, "F");
-  if (modelo === 1 || modelo === 2) {
-    drawRoundedUsefulBorder(doc, W, H);
+  if (modelo === 1) {
+    if (modelo1Template) {
+      try {
+        doc.addImage(modelo1Template, imageFormatFromDataUrl(modelo1Template), 0, 0, W, H);
+        modelo1TemplateRendered = true;
+      } catch {
+        drawRoundedUsefulBorder(doc, W, H);
+      }
+    } else {
+      drawRoundedUsefulBorder(doc, W, H);
+    }
+  } else if (modelo === 2) {
+    if (modelo2Template) {
+      try {
+        doc.addImage(modelo2Template, imageFormatFromDataUrl(modelo2Template), 0, 0, W, H);
+        modelo2TemplateRendered = true;
+      } catch {
+        drawRoundedUsefulBorder(doc, W, H);
+      }
+    } else {
+      drawRoundedUsefulBorder(doc, W, H);
+    }
   } else if (modelo === 5) {
     /* Modelo 5: sem moldura fechada / sem linhas de moldura */
   } else if (modelo === 4) {
@@ -721,67 +768,107 @@ export async function generateReceptivoTransferPdf(
 
   if (modelo === 1) {
     const contentW = innerW - 2 * M_IN;
-    const contentTop = M_OUT + M_IN + 8;
     const bottomSafe = H - M_OUT - M_IN - 2;
     const footerH = estimateFooterHeightMm(footer);
 
-    let y = contentTop;
-    y = await drawLogoCentered(doc, logoDataUrl, nomeProjeto, W / 2, contentW, y);
-    y += hasTrip ? 9 : 12;
-    y = drawNomeClienteComChaves(doc, nomeCliente, W / 2, y, contentW * 0.92);
-    y += hasTrip ? 9 : 12;
-    drawTraçoCentralComTicks(doc, W, y, innerW);
-    const yAfterLine = y + 1.4 + 10;
+    if (modelo1TemplateRendered) {
+      const yLineMm = H * M1_TEMPLATE_LINE_Y_FRAC;
+      const yAboveLine = yLineMm - 10;
+      const yFooterStart = yLineMm + 6;
 
-    if (hasTrip) {
-      const minY = yAfterLine + 6;
-      const bottomAlignedY = bottomSafe - footerH - 2;
-      let yFooterTop = Math.max(minY, bottomAlignedY);
-      if (yFooterTop + footerH > bottomSafe) {
-        yFooterTop = Math.max(minY, bottomSafe - footerH - 2);
+      let y = M1_LOGO_TOP_MM;
+      y = await drawLogoCentered(doc, logoDataUrl, nomeProjeto, W / 2, contentW, y);
+      y += 10;
+      y = drawNomeClienteComChavesFit(doc, nomeCliente, W / 2, y, contentW * 0.88, yAboveLine);
+
+      if (hasTrip) {
+        let yFt = yFooterStart;
+        if (yFt + footerH > bottomSafe) {
+          yFt = Math.max(yLineMm + 4, bottomSafe - footerH - 2);
+        }
+        drawTripFooterCentered(doc, W / 2, yFt, contentW * 0.85, footer, { bracedTitle: true });
       }
-      drawTripFooterCentered(doc, W / 2, yFooterTop, contentW * 0.9, footer);
+    } else {
+      const contentTop = M_OUT + M_IN + 8;
+      let y = contentTop;
+      y = await drawLogoCentered(doc, logoDataUrl, nomeProjeto, W / 2, contentW, y);
+      y += hasTrip ? 9 : 12;
+      y = drawNomeClienteComChaves(doc, nomeCliente, W / 2, y, contentW * 0.92);
+      y += hasTrip ? 9 : 12;
+      drawTraçoCentralComTicks(doc, W, y, innerW);
+      const yAfterLine = y + 1.4 + 10;
+
+      if (hasTrip) {
+        const minY = yAfterLine + 6;
+        const bottomAlignedY = bottomSafe - footerH - 2;
+        let yFooterTop = Math.max(minY, bottomAlignedY);
+        if (yFooterTop + footerH > bottomSafe) {
+          yFooterTop = Math.max(minY, bottomSafe - footerH - 2);
+        }
+        drawTripFooterCentered(doc, W / 2, yFooterTop, contentW * 0.9, footer);
+      }
     }
   } else if (modelo === 2) {
     const contentW = innerW - 2 * M_IN;
-    const contentTop = M_OUT + M_IN + 8;
     const bottomSafe = H - M_OUT - M_IN - 2;
-    const gapAboveLogo = 10;
-    const logoBottomMargin = 8;
+    const footerH = estimateFooterHeightMm(footer);
 
-    let logoW = 50;
-    let logoH = 16;
-    if (logoDataUrl) {
-      const m = await computeLogoDrawMm(logoDataUrl, contentW);
-      logoW = m.wMm;
-      logoH = m.hMm;
-    }
-    const logoAspect = logoW / Math.max(logoH, 0.01);
-    let yLogoTop = bottomSafe - logoH - logoBottomMargin;
+    if (modelo2TemplateRendered) {
+      const yLineMm = H * M2_TEMPLATE_LINE_Y_FRAC;
+      const yAboveLine = yLineMm - 10;
+      const yFooterStart = yLineMm + 6;
 
-    const reserveAfterName = 9 + 1.4 + 10;
-    const footerBlock = hasTrip ? estimateFooterHeightMm(footer) + 12 : 14;
-    let maxNomeBlockBottom = yLogoTop - gapAboveLogo - reserveAfterName - footerBlock;
-    if (maxNomeBlockBottom < contentTop + 28) {
-      const need = contentTop + 32 - maxNomeBlockBottom;
-      logoH = Math.max(LOGO_H_MIN_MM, logoH - need);
-      logoW = logoH * logoAspect;
-      yLogoTop = bottomSafe - logoH - logoBottomMargin;
-      maxNomeBlockBottom = yLogoTop - gapAboveLogo - reserveAfterName - footerBlock;
-    }
+      let y = M2_LOGO_TOP_MM;
+      y = await drawLogoCentered(doc, logoDataUrl, nomeProjeto, W / 2, contentW, y);
+      y += 10;
+      y = drawNomeClienteComChavesFit(doc, nomeCliente, W / 2, y, contentW * 0.88, yAboveLine);
 
-    let y = contentTop;
-    y = drawNomeClienteComChavesFit(doc, nomeCliente, W / 2, y, contentW * 0.92, maxNomeBlockBottom);
-    y += 9;
-    drawTraçoCentralComTicks(doc, W, y, innerW);
-    y += 1.4 + 10;
-    if (hasTrip) {
-      drawTripFooterCentered(doc, W / 2, y, contentW * 0.9, footer, { bracedTitle: true });
+      if (hasTrip) {
+        let yFt = yFooterStart;
+        if (yFt + footerH > bottomSafe) {
+          yFt = Math.max(yLineMm + 4, bottomSafe - footerH - 2);
+        }
+        drawTripFooterCentered(doc, W / 2, yFt, contentW * 0.85, footer, { bracedTitle: true });
+      }
+    } else {
+      const contentTop = M_OUT + M_IN + 8;
+      const gapAboveLogo = 10;
+      const logoBottomMargin = 8;
+
+      let logoW = 50;
+      let logoH = 16;
+      if (logoDataUrl) {
+        const m = await computeLogoDrawMm(logoDataUrl, contentW);
+        logoW = m.wMm;
+        logoH = m.hMm;
+      }
+      const logoAspect = logoW / Math.max(logoH, 0.01);
+      let yLogoTop = bottomSafe - logoH - logoBottomMargin;
+
+      const reserveAfterName = 9 + 1.4 + 10;
+      const footerBlock = hasTrip ? estimateFooterHeightMm(footer) + 12 : 14;
+      let maxNomeBlockBottom = yLogoTop - gapAboveLogo - reserveAfterName - footerBlock;
+      if (maxNomeBlockBottom < contentTop + 28) {
+        const need = contentTop + 32 - maxNomeBlockBottom;
+        logoH = Math.max(LOGO_H_MIN_MM, logoH - need);
+        logoW = logoH * logoAspect;
+        yLogoTop = bottomSafe - logoH - logoBottomMargin;
+        maxNomeBlockBottom = yLogoTop - gapAboveLogo - reserveAfterName - footerBlock;
+      }
+
+      let y = contentTop;
+      y = drawNomeClienteComChavesFit(doc, nomeCliente, W / 2, y, contentW * 0.92, maxNomeBlockBottom);
+      y += 9;
+      drawTraçoCentralComTicks(doc, W, y, innerW);
+      y += 1.4 + 10;
+      if (hasTrip) {
+        drawTripFooterCentered(doc, W / 2, y, contentW * 0.9, footer, { bracedTitle: true });
+      }
+      await drawLogoCenteredAtY(doc, logoDataUrl, nomeProjeto, W / 2, contentW, yLogoTop, {
+        wMm: logoW,
+        hMm: logoH,
+      });
     }
-    await drawLogoCenteredAtY(doc, logoDataUrl, nomeProjeto, W / 2, contentW, yLogoTop, {
-      wMm: logoW,
-      hMm: logoH,
-    });
   } else if (modelo === 3) {
     const contentW = innerW - 2 * M_IN;
     const contentTop = M_OUT + M_IN + 8;
