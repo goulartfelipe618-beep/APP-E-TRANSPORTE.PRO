@@ -349,7 +349,7 @@ Deno.serve(async (req) => {
     }
 
     // DISABLE USER (ban at Auth level)
-    // Used by Admin Master "Landing Page" to immediately disable the lead user.
+    // Used pelo admin (Solicitações → Cadastro pelo site) para desativar o login do lead.
     if (req.method === "POST" && action === "disable_user") {
       const body = await req.json();
       const { user_id, ban_duration } = body;
