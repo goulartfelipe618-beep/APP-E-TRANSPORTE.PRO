@@ -20,23 +20,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Label } from "@/components/ui/label";
-import { RefreshCw, Users, ClipboardList, Clock, Loader2, Trash2, Settings2, UserPlus } from "lucide-react";
+import { RefreshCw, Users, ClipboardList, Clock, Loader2, Trash2, UserPlus } from "lucide-react";
 
 /** Dispara atualização da lista em Usuários > Cadastrados sem F5 */
 const ADMIN_CADASTRADOS_REFRESH = "admin-master-cadastrados-refresh";
@@ -78,21 +62,11 @@ const STATUS_CLASSES: Record<string, string> = {
   desativado: "bg-red-500/10 text-red-700 border-red-500/30",
 };
 
-const PLANO_OPTIONS: { value: string; label: string }[] = [
-  { value: "free", label: "Free" },
-  { value: "seed", label: "Seed" },
-  { value: "grow", label: "Grow" },
-  { value: "rise", label: "Rise" },
-  { value: "apex", label: "Apex" },
-];
-
 export default function AdminLandingPage() {
   const [loading, setLoading] = useState(true);
   const [items, setItems] = useState<SolicitacaoComPlano[]>([]);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<SolicitacaoComPlano | null>(null);
-  const [planDialogRow, setPlanDialogRow] = useState<SolicitacaoComPlano | null>(null);
-  const [planDraft, setPlanDraft] = useState<string>("free");
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -219,11 +193,6 @@ export default function AdminLandingPage() {
     }
   };
 
-  const openPlanDialog = (s: SolicitacaoComPlano) => {
-    setPlanDraft(s.plano);
-    setPlanDialogRow(s);
-  };
-
   const handleFinalizeCadastro = async (s: SolicitacaoComPlano) => {
     if (!s.lead_user_id) {
       toast.error("Este lead não tem usuário vinculado ao sistema.");
@@ -259,51 +228,9 @@ export default function AdminLandingPage() {
       setItems((prev) => prev.filter((row) => row.id !== s.id));
       toast.success("Usuário confirmado em Cadastrados. Lead removido da Landing Page.");
       window.dispatchEvent(new CustomEvent(ADMIN_CADASTRADOS_REFRESH));
-    } catch (e) {
-      const message = e instanceof Error ? e.message : "Erro ao finalizar cadastro";
-      toast.error(message);
-    } finally {
-      setSavingId(null);
-    }
-  };
-
-  const handleUpdatePlan = async () => {
-    if (!planDialogRow?.lead_user_id) {
-      toast.error("Não há login vinculado a este lead para alterar o plano.");
-      return;
-    }
-
-    setSavingId(planDialogRow.id);
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        toast.error("Sessão não encontrada. Faça login novamente.");
-        return;
-      }
-
-      const res = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-users?action=update_plan`,
-        {
-          method: "POST",
-          headers: {
-            ...edgeFunctionHeaders(session.access_token),
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ user_id: planDialogRow.lead_user_id, plano: planDraft }),
-        }
-      );
-
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || data.error) {
-        toast.error(typeof data?.error === "string" ? data.error : `Erro (${res.status})`);
-        return;
-      }
-
-      toast.success("Plano atualizado.");
-      setPlanDialogRow(null);
       await fetchData();
     } catch (e) {
-      const message = e instanceof Error ? e.message : "Erro ao atualizar plano";
+      const message = e instanceof Error ? e.message : "Erro ao finalizar cadastro";
       toast.error(message);
     } finally {
       setSavingId(null);
@@ -320,8 +247,9 @@ export default function AdminLandingPage() {
             <ClipboardList className="h-6 w-6 text-primary" /> Landing Page
           </h1>
           <p className="text-muted-foreground">
-            O webhook já cria o login com role Motorista Executivo e plano FREE. Use Cadastrar para
-            confirmar e enviar o usuário para Usuários Cadastrados (o lead sai desta lista).
+            O webhook cria o login do lead. Use <strong className="font-medium text-foreground">Cadastrar</strong> para
+            confirmar o usuário em Usuários → Cadastrados e remover o lead desta lista. O plano continua o definido na
+            captura; alteração de plano é feita somente em Cadastrados.
           </p>
         </div>
         <Button variant="outline" size="icon" onClick={fetchData} disabled={loading}>
@@ -356,7 +284,7 @@ export default function AdminLandingPage() {
                   <TableHead>Data</TableHead>
                   <TableHead>Plano</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead className="min-w-[280px]">Ações</TableHead>
+                  <TableHead className="min-w-[200px]">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -409,15 +337,6 @@ export default function AdminLandingPage() {
                           <UserPlus className="h-4 w-4 mr-1" /> Cadastrar
                         </Button>
                         <Button
-                          variant="outline"
-                          size="sm"
-                          disabled={savingId === s.id || !s.lead_user_id}
-                          title={!s.lead_user_id ? "Sem login vinculado — não é possível alterar o plano" : undefined}
-                          onClick={() => openPlanDialog(s)}
-                        >
-                          <Settings2 className="h-4 w-4 mr-1" /> Plano
-                        </Button>
-                        <Button
                           variant="destructive"
                           size="sm"
                           disabled={savingId === s.id}
@@ -463,50 +382,6 @@ export default function AdminLandingPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      <Dialog open={!!planDialogRow} onOpenChange={(open) => !open && setPlanDialogRow(null)}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Alterar plano</DialogTitle>
-            <DialogDescription>
-              Define o plano do usuário vinculado a este lead ({planDialogRow?.email || "sem e-mail"}).
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-2 py-2">
-            <Label htmlFor="plano-landing">Plano</Label>
-            <Select value={planDraft} onValueChange={setPlanDraft}>
-              <SelectTrigger id="plano-landing">
-                <SelectValue placeholder="Selecione" />
-              </SelectTrigger>
-              <SelectContent>
-                {PLANO_OPTIONS.map((o) => (
-                  <SelectItem key={o.value} value={o.value}>
-                    {o.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <DialogFooter className="gap-2 sm:gap-0">
-            <Button type="button" variant="outline" onClick={() => setPlanDialogRow(null)}>
-              Cancelar
-            </Button>
-            <Button
-              type="button"
-              disabled={planDialogRow ? savingId === planDialogRow.id : false}
-              onClick={() => void handleUpdatePlan()}
-            >
-              {planDialogRow && savingId === planDialogRow.id ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Salvando…
-                </>
-              ) : (
-                "Salvar plano"
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

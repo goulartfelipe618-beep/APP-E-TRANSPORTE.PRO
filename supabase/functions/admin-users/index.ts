@@ -212,10 +212,10 @@ Deno.serve(async (req) => {
 
       const leadUserId = row.lead_user_id as string | null;
       if (leadUserId) {
-        const { error: roleErr } = await supabaseAdmin.from("user_roles").upsert(
-          { user_id: leadUserId, role: "admin_transfer" },
-          { onConflict: "user_id,role" }
-        );
+        const { error: roleErr } = await supabaseAdmin.rpc("replace_user_role", {
+          _user_id: leadUserId,
+          _role: "admin_transfer",
+        });
         if (roleErr) {
           return new Response(JSON.stringify({ error: roleErr.message }), {
             status: 400,
@@ -223,7 +223,24 @@ Deno.serve(async (req) => {
           });
         }
 
-        // Plano já foi definido pelo webhook (ex.: FREE); não sobrescrever aqui.
+        const { data: planRow } = await supabaseAdmin
+          .from("user_plans")
+          .select("plano")
+          .eq("user_id", leadUserId)
+          .maybeSingle();
+
+        if (!planRow?.plano) {
+          const { error: planErr } = await supabaseAdmin.from("user_plans").upsert(
+            { user_id: leadUserId, plano: "free", updated_at: new Date().toISOString() },
+            { onConflict: "user_id" }
+          );
+          if (planErr) {
+            return new Response(JSON.stringify({ error: planErr.message }), {
+              status: 400,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+          }
+        }
 
         const { error: unbanErr } = await supabaseAdmin.auth.admin.updateUserById(leadUserId, {
           ban_duration: "none",

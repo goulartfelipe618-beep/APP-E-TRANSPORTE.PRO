@@ -391,14 +391,14 @@ Deno.serve(async (req) => {
 
       const emailHadAccountAtIntake = !!existingUserId;
 
-      // 4) Ensure role & plan for the lead login
-      const { error: roleErr } = await supabase.from("user_roles").upsert(
-        { user_id: authUserId, role: "admin_transfer" },
-        { onConflict: "user_id,role" }
-      );
+      // 4) Ensure role & plan for the lead login (uma linha de papel por usuário)
+      const { error: roleErr } = await supabase.rpc("replace_user_role", {
+        _user_id: authUserId,
+        _role: "admin_transfer",
+      });
       if (roleErr) {
         return new Response(
-          JSON.stringify({ error: "Erro ao inserir user_roles", details: roleErr.message }),
+          JSON.stringify({ error: "Erro ao definir user_roles", details: roleErr.message }),
           { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
