@@ -409,7 +409,7 @@ function drawTripFooterCentered(
   return cy + 1;
 }
 
-/** Nome centralizado, negrito, 48–72pt, entre chaves `{ NOME }` — prioriza fonte o maior possível. */
+/** Nome centralizado, negrito, 48–72pt em maiúsculas — prioriza fonte o maior possível. */
 function drawNomeClienteComChaves(
   doc: jsPDF,
   nome: string,
@@ -418,7 +418,7 @@ function drawNomeClienteComChaves(
   maxW: number,
 ): number {
   const upper = nome.trim().toUpperCase();
-  const display = `{ ${upper} }`;
+  const display = upper;
   doc.setFont("helvetica", "bold");
   doc.setTextColor(0, 0, 0);
   let fs = NOME_FS_MAX;
@@ -442,7 +442,7 @@ function drawNomeClienteComChaves(
 }
 
 /**
- * Nome com chaves, limitado verticalmente para caber acima de traço + rodapé + logo (Modelo 2).
+ * Nome em maiúsculas, limitado verticalmente para caber acima de traço + rodapé + logo.
  * `maxBlockBottomY` = último Y permitido para a base do bloco do nome (aprox.).
  */
 function drawNomeClienteComChavesFit(
@@ -454,7 +454,7 @@ function drawNomeClienteComChavesFit(
   maxBlockBottomY: number,
 ): number {
   const upper = nome.trim().toUpperCase();
-  const display = `{ ${upper} }`;
+  const display = upper;
   doc.setFont("helvetica", "bold");
   doc.setTextColor(0, 0, 0);
   let fs = NOME_FS_MAX;
@@ -478,7 +478,7 @@ function drawNomeClienteComChavesFit(
   return y;
 }
 
-/** Altura do bloco do nome com chaves (mesma lógica que `drawNomeClienteComChavesFit`), para centralizar verticalmente. */
+/** Altura do bloco do nome (mesma lógica que `drawNomeClienteComChavesFit`), para centralizar verticalmente. */
 function measureNomeClienteComChavesBlockHeight(
   doc: jsPDF,
   nome: string,
@@ -487,7 +487,7 @@ function measureNomeClienteComChavesBlockHeight(
   yStart: number,
 ): number {
   const upper = nome.trim().toUpperCase();
-  const display = `{ ${upper} }`;
+  const display = upper;
   doc.setFont("helvetica", "bold");
   let fs = NOME_FS_MAX;
   let lines: string[] = [];
