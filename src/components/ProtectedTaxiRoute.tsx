@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { getPostLoginPath } from "@/lib/sessionRole";
 
 export default function ProtectedTaxiRoute({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
@@ -37,14 +38,8 @@ export default function ProtectedTaxiRoute({ children }: { children: React.React
         // Ignora problemas de verificação de AAL e segue fluxo de role.
       }
 
-      const { data: roleData } = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", session.user.id)
-        .eq("role", "admin_taxi")
-        .maybeSingle();
-
-      setAuthorized(!!roleData);
+      const path = await getPostLoginPath(session.user.id);
+      setAuthorized(path === "/taxi");
       setLoading(false);
     };
 

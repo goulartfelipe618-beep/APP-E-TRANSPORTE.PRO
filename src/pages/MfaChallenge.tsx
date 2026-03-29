@@ -4,6 +4,7 @@ import { Shield, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
+import { getPostLoginPath } from "@/lib/sessionRole";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -39,20 +40,8 @@ export default function MfaChallengePage() {
       return;
     }
 
-    const { data: roles } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", session.user.id);
-
-    const userRoles = roles?.map((r) => r.role) || [];
-
-    if (userRoles.includes("admin_master")) {
-      navigate("/admin", { replace: true });
-    } else if (userRoles.includes("admin_taxi")) {
-      navigate("/taxi", { replace: true });
-    } else {
-      navigate("/dashboard", { replace: true });
-    }
+    const path = await getPostLoginPath(session.user.id);
+    navigate(path, { replace: true });
   }
 
   useEffect(() => {

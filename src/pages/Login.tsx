@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Mail, Lock, Key, RefreshCw, LogIn } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { getPostLoginPath } from "@/lib/sessionRole";
 import luxuryCar from "@/assets/luxury-car.jpg";
 
 function generateCaptcha(length = 6): string {
@@ -69,21 +70,8 @@ const Login = () => {
       // Caso a verificação de AAL falhe, seguimos com o fluxo normal.
     }
 
-    // Check user role to redirect appropriately
-    const { data: roles } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", data.user.id);
-
-    const userRoles = roles?.map((r) => r.role) || [];
-
-    if (userRoles.includes("admin_master")) {
-      navigate("/admin");
-    } else if (userRoles.includes("admin_taxi")) {
-      navigate("/taxi");
-    } else {
-      navigate("/dashboard");
-    }
+    const path = await getPostLoginPath(data.user.id);
+    navigate(path);
   };
 
   return (

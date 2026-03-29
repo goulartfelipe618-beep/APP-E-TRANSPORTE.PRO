@@ -1232,6 +1232,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_session_primary_role: {
+        Args: Record<PropertyKey, never>
+        Returns: Database["public"]["Enums"]["app_role"] | null
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
