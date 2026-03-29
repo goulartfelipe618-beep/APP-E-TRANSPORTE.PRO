@@ -24,6 +24,19 @@ const tipoLabels: Record<string, string> = {
   por_hora: "Disponibilidade por hora",
 };
 
+/** Margem externa (~20mm). Espaço entre fim da linha da borda e o canto da página (~15mm). */
+const M_OUT = 20;
+const G_CORNER = 15;
+const BORDER_LINE_MM = 0.35;
+
+/** Logo: altura equivalente entre ~60px e ~90px em 96dpi → mm */
+const PX96_TO_MM = 25.4 / 96;
+const LOGO_H_MIN_MM = 60 * PX96_TO_MM;
+const LOGO_H_MAX_MM = 90 * PX96_TO_MM;
+
+const NOME_FS_MIN = 48;
+const NOME_FS_MAX = 72;
+
 export function buildFooterPayloadFromReceptivoRow(row: ReceptivoRow): ReceptivoFooterPayload {
   const semReserva = !row.reserva_transfer_id && row.reserva_numero == null;
   if (semReserva) {
@@ -101,7 +114,6 @@ export function buildFooterPayloadFromReserva(
   };
 }
 
-/** Endereços exibidos na UI (somente leitura) a partir da reserva Transfer. */
 export function getEnderecosReservaParaExibicao(r: ReservaTransfer): { embarque: string; desembarque: string } {
   const tv = r.tipo_viagem || "";
   if (tv === "por_hora") {
@@ -137,6 +149,97 @@ export async function loadImageDataUrl(url: string): Promise<string | null> {
   }
 }
 
+function getNaturalImageSize(dataUrl: string): Promise<{ w: number; h: number }> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => resolve({ w: img.naturalWidth || 1, h: img.naturalHeight || 1 });
+    img.onerror = () => resolve({ w: 1, h: 1 });
+    img.src = dataUrl;
+  });
+}
+
+/** Logo sem distorção: altura em mm entre LOGO_H_MIN e LOGO_H_MAX, largura proporcional. */
+async function computeLogoDrawMm(
+  logoDataUrl: string,
+  innerW: number,
+): Promise<{ wMm: number; hMm: number }> {
+  const { w: nw, h: nh } = await getNaturalImageSize(logoDataUrl);
+  if (!nh || !nw) return { wMm: 40, hMm: 18 };
+  const aspect = nw / nh;
+  let hMm = nh * PX96_TO_MM;
+  hMm = Math.min(LOGO_H_MAX_MM, Math.max(LOGO_H_MIN_MM, hMm));
+  let wMm = hMm * aspect;
+  const maxW = innerW * 0.88;
+  if (wMm > maxW) {
+    wMm = maxW;
+    hMm = wMm / aspect;
+    if (hMm < LOGO_H_MIN_MM) hMm = LOGO_H_MIN_MM;
+  }
+  return { wMm, hMm };
+}
+
+/** Borda em 4 segmentos; cantos abertos (linhas não se encontram). */
+function drawOpenCornerBorder(doc: jsPDF, W: number, H: number) {
+  doc.setDrawColor(20, 20, 20);
+  doc.setLineWidth(BORDER_LINE_MM);
+  const x0 = M_OUT + G_CORNER;
+  const x1 = W - M_OUT - G_CORNER;
+  const y0 = M_OUT + G_CORNER;
+  const y1 = H - M_OUT - G_CORNER;
+  doc.line(x0, M_OUT, x1, M_OUT);
+  doc.line(x0, H - M_OUT, x1, H - M_OUT);
+  doc.line(M_OUT, y0, M_OUT, y1);
+  doc.line(W - M_OUT, y0, W - M_OUT, y1);
+}
+
+function pickNomeFontSize(len: number): number {
+  if (len <= 14) return 72;
+  if (len <= 22) return 64;
+  if (len <= 34) return 56;
+  if (len <= 48) return 52;
+  if (len <= 62) return 48;
+  return NOME_FS_MIN;
+}
+
+/** Nome centralizado, negrito, 48–72pt com redução se quebrar demais. Retorna Y após o bloco. */
+function drawNomeClienteResponsivo(
+  doc: jsPDF,
+  nome: string,
+  centerX: number,
+  yTop: number,
+  maxW: number,
+): number {
+  const upper = nome.trim().toUpperCase();
+  let fs = Math.min(NOME_FS_MAX, pickNomeFontSize(upper.length));
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(0, 0, 0);
+  let lines: string[] = [];
+  for (let i = 0; i < 12; i++) {
+    doc.setFontSize(fs);
+    lines = doc.splitTextToSize(upper, maxW);
+    const estH = lines.length * ((fs * 1.2 * 25.4) / 72);
+    if (lines.length <= 3 && estH < 55) break;
+    fs = Math.max(NOME_FS_MIN, fs - 3);
+  }
+  doc.setFontSize(fs);
+  lines = doc.splitTextToSize(upper, maxW);
+  const lineH = (fs * 1.22 * 25.4) / 72;
+  let y = yTop;
+  lines.forEach((ln) => {
+    doc.text(ln, centerX, y, { align: "center" });
+    y += lineH;
+  });
+  return y;
+}
+
+function drawTraçoCentral(doc: jsPDF, W: number, y: number, innerW: number) {
+  const tw = innerW * 0.7;
+  const x0 = (W - tw) / 2;
+  doc.setDrawColor(35, 35, 35);
+  doc.setLineWidth(BORDER_LINE_MM);
+  doc.line(x0, y, x0 + tw, y);
+}
+
 function wrapLines(doc: jsPDF, text: string, maxW: number, fontSize: number): string[] {
   doc.setFontSize(fontSize);
   return doc.splitTextToSize(text || "—", maxW);
@@ -144,25 +247,23 @@ function wrapLines(doc: jsPDF, text: string, maxW: number, fontSize: number): st
 
 function drawTripFooter(
   doc: jsPDF,
-  x: number,
+  xLeft: number,
   y: number,
   maxW: number,
   f: ReceptivoFooterPayload,
 ): number {
-  if (f.numeroReserva == null) {
-    return y;
-  }
-  doc.setTextColor(30, 30, 30);
+  if (f.numeroReserva == null) return y;
+  doc.setTextColor(35, 35, 35);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(9);
-  doc.text("Detalhes da viagem", x, y);
-  let cy = y + 5;
-  doc.setFont("helvetica", "normal");
   doc.setFontSize(8);
+  doc.text("Detalhes da viagem", xLeft, y);
+  let cy = y + 4.2;
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7);
   const reservaTxt = `Reserva nº ${f.numeroReserva}  |  Tipo: ${f.tipoLabel || "—"}`;
-  wrapLines(doc, reservaTxt, maxW, 8).forEach((line) => {
-    doc.text(line, x, cy);
-    cy += 3.8;
+  wrapLines(doc, reservaTxt, maxW, 7).forEach((line) => {
+    doc.text(line, xLeft, cy);
+    cy += 3.4;
   });
   const lines: string[] = [
     `Embarque: ${f.embarque || "—"}`,
@@ -179,42 +280,60 @@ function drawTripFooter(
     lines.push(`Data/hora (volta): ${[f.voltaData, f.voltaHora].filter(Boolean).join(" · ") || "—"}`);
   }
   lines.forEach((t) => {
-    wrapLines(doc, t, maxW, 8).forEach((line) => {
-      doc.text(line, x, cy);
-      cy += 3.8;
+    wrapLines(doc, t, maxW, 7).forEach((line) => {
+      doc.text(line, xLeft, cy);
+      cy += 3.4;
     });
   });
   doc.setTextColor(0, 0, 0);
-  return cy + 2;
+  return cy + 1;
 }
 
-function drawLogoBlock(
+async function drawLogoCentered(
   doc: jsPDF,
   logoDataUrl: string | null,
   nomeProjeto: string,
   centerX: number,
-  topY: number,
-  maxW: number,
-  maxH: number,
-): number {
+  innerW: number,
+  yTop: number,
+): Promise<number> {
   if (logoDataUrl) {
     try {
+      const { wMm, hMm } = await computeLogoDrawMm(logoDataUrl, innerW);
       const fmt = imageFormatFromDataUrl(logoDataUrl);
-      doc.addImage(logoDataUrl, fmt, centerX - maxW / 2, topY, maxW, maxH);
-      return topY + maxH + 4;
+      doc.addImage(logoDataUrl, fmt, centerX - wMm / 2, yTop, wMm, hMm);
+      return yTop + hMm + 8;
     } catch {
-      /* fall through */
+      /* fallback */
     }
   }
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(16);
-  doc.setTextColor(40, 40, 40);
-  doc.text(nomeProjeto.slice(0, 42), centerX, topY + 10, { align: "center", maxWidth: maxW + 20 });
+  doc.setFontSize(14);
+  doc.setTextColor(45, 45, 45);
+  doc.text(nomeProjeto.slice(0, 44), centerX, yTop + 8, { align: "center", maxWidth: innerW });
   doc.setTextColor(0, 0, 0);
-  return topY + 16;
+  return yTop + 16;
 }
 
-/** Gera PDF A4 paisagem, fundo branco. modelo 1..5 */
+function footerYStart(H: number, hasFooter: boolean): number {
+  return hasFooter ? H - M_OUT - 38 : H - M_OUT;
+}
+
+function drawFooterBlock(
+  doc: jsPDF,
+  W: number,
+  H: number,
+  innerW: number,
+  footer: ReceptivoFooterPayload,
+) {
+  if (footer.numeroReserva == null) return;
+  const y0 = H - M_OUT - 36;
+  doc.setDrawColor(210, 210, 210);
+  doc.setLineWidth(0.25);
+  doc.line(M_OUT + 2, y0 - 1, W - M_OUT - 2, y0 - 1);
+  drawTripFooter(doc, M_OUT + 3, y0 + 2, innerW - 6, footer);
+}
+
 export async function generateReceptivoTransferPdf(
   modelo: number,
   nomeCliente: string,
@@ -225,140 +344,97 @@ export async function generateReceptivoTransferPdf(
   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
   const W = doc.internal.pageSize.getWidth();
   const H = doc.internal.pageSize.getHeight();
+  const innerW = W - 2 * M_OUT;
   const logoDataUrl = logoUrl ? await loadImageDataUrl(logoUrl) : null;
-
-  const M = 14;
-  const footerH = 42;
-  const footerTop = H - M - footerH;
-  const innerW = W - 2 * M;
-
-  const drawFooterBlock = () => {
-    if (footer.numeroReserva == null) return;
-    doc.setDrawColor(220, 220, 220);
-    doc.setLineWidth(0.2);
-    doc.line(M, footerTop - 2, W - M, footerTop - 2);
-    drawTripFooter(doc, M + 2, footerTop + 4, innerW - 4, footer);
-  };
+  const hasTrip = footer.numeroReserva != null;
+  const yContentEnd = footerYStart(H, hasTrip);
+  const gapV = 7;
 
   doc.setFillColor(255, 255, 255);
   doc.rect(0, 0, W, H, "F");
+  drawOpenCornerBorder(doc, W, H);
 
   if (modelo === 1) {
-    doc.setDrawColor(30, 30, 30);
-    doc.setLineWidth(0.35);
-    doc.rect(M, M, W - 2 * M, footerTop - M - 4);
-    let y = M + 8;
-    y = drawLogoBlock(doc, logoDataUrl, nomeProjeto, W / 2, y, 72, 28);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(26);
-    doc.text(nomeCliente.toUpperCase(), W / 2, y + 6, { align: "center" });
-    const lineY = y + 14;
-    doc.setDrawColor(40, 40, 40);
-    doc.line(M + 10, lineY, W - M - 10, lineY);
-    drawFooterBlock();
+    let y = M_OUT + 10;
+    y = await drawLogoCentered(doc, logoDataUrl, nomeProjeto, W / 2, innerW, y);
+    y += gapV;
+    drawTraçoCentral(doc, W, y, innerW);
+    y += gapV + 4;
+    y = drawNomeClienteResponsivo(doc, nomeCliente, W / 2, y, innerW * 0.92);
+    drawFooterBlock(doc, W, H, innerW, footer);
   } else if (modelo === 2) {
-    doc.setFillColor(242, 242, 242);
-    doc.rect(0, 0, W, 22, "F");
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(11);
-    doc.setTextColor(60, 60, 60);
-    doc.text("RECEPTIVO", W - M - 2, 14, { align: "right" });
+    let y = M_OUT + 5;
     if (logoDataUrl) {
       try {
-        doc.addImage(logoDataUrl, imageFormatFromDataUrl(logoDataUrl), M, 4, 28, 12);
-      } catch {
-        doc.setFontSize(10);
-        doc.text(nomeProjeto.slice(0, 28), M, 13);
-      }
-    } else {
-      doc.setFontSize(10);
-      doc.text(nomeProjeto.slice(0, 28), M, 13);
-    }
-    doc.setTextColor(0, 0, 0);
-    doc.setFontSize(32);
-    doc.text(nomeCliente.toUpperCase(), W / 2, 75, { align: "center" });
-    doc.setDrawColor(200, 200, 200);
-    doc.line(M + 30, 88, W - M - 30, 88);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(9);
-    doc.text("Apresente este receptivo no embarque", W / 2, 96, { align: "center" });
-    drawFooterBlock();
-  } else if (modelo === 3) {
-    const splitX = 62;
-    doc.setDrawColor(210, 210, 210);
-    doc.line(splitX, M, splitX, footerTop - 4);
-    doc.setFillColor(250, 250, 250);
-    doc.rect(M, M, splitX - M - 2, footerTop - M - 4, "F");
-    let ly = M + 8;
-    if (logoDataUrl) {
-      try {
-        doc.addImage(logoDataUrl, imageFormatFromDataUrl(logoDataUrl), M + 4, ly, 44, 18);
-        ly += 22;
+        const { wMm, hMm } = await computeLogoDrawMm(logoDataUrl, innerW * 0.35);
+        const fmt = imageFormatFromDataUrl(logoDataUrl);
+        doc.addImage(logoDataUrl, fmt, M_OUT + 4, y, wMm, hMm);
       } catch {
         doc.setFont("helvetica", "bold");
-        doc.setFontSize(9);
-        doc.text(nomeProjeto.slice(0, 22), M + 4, ly + 6);
-        ly += 12;
+        doc.setFontSize(10);
+        doc.text(nomeProjeto.slice(0, 30), M_OUT + 4, y + 6);
       }
     } else {
       doc.setFont("helvetica", "bold");
       doc.setFontSize(10);
-      doc.text(nomeProjeto.slice(0, 24), M + 4, ly + 8);
-      ly += 14;
+      doc.text(nomeProjeto.slice(0, 30), M_OUT + 4, y + 6);
     }
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    doc.setTextColor(90, 90, 90);
+    doc.text("RECEPTIVO", W - M_OUT - 4, y + 8, { align: "right" });
+    doc.setTextColor(0, 0, 0);
+    y = M_OUT + 28;
+    drawTraçoCentral(doc, W, y, innerW);
+    y += gapV + 10;
+    y = drawNomeClienteResponsivo(doc, nomeCliente, W / 2, y, innerW * 0.92);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(7);
     doc.setTextColor(100, 100, 100);
-    doc.text("Identificação do passageiro", M + 4, ly + 6);
+    doc.text("Apresente no embarque", M_OUT + 3, Math.min(y + 6, yContentEnd - 8));
     doc.setTextColor(0, 0, 0);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(22);
-    const lines = wrapLines(doc, nomeCliente.toUpperCase(), W - splitX - M - 8, 22);
-    let ny = M + 35;
-    lines.forEach((ln) => {
-      doc.text(ln, splitX + 8, ny);
-      ny += 9;
-    });
-    drawFooterBlock();
+    drawFooterBlock(doc, W, H, innerW, footer);
+  } else if (modelo === 3) {
+    const split = M_OUT + innerW * 0.34;
+    const colLeftW = split - M_OUT - 1;
+    const colLeftCenter = M_OUT + colLeftW / 2;
+    doc.setDrawColor(200, 200, 200);
+    doc.setLineWidth(0.25);
+    doc.line(split, M_OUT + G_CORNER, split, yContentEnd - G_CORNER);
+    let ly = M_OUT + 8;
+    ly = await drawLogoCentered(doc, logoDataUrl, nomeProjeto, colLeftCenter, colLeftW - 6, ly);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(6.5);
+    doc.setTextColor(110, 110, 110);
+    doc.text("Passageiro", split + 6, M_OUT + 10);
+    doc.setTextColor(0, 0, 0);
+    const rightCenterX = split + (W - M_OUT - split) / 2;
+    const rightMaxW = W - M_OUT - split - 10;
+    let ny = M_OUT + 18;
+    ny = drawNomeClienteResponsivo(doc, nomeCliente, rightCenterX, ny, rightMaxW);
+    drawTraçoCentral(doc, W, Math.min(ny + 8, yContentEnd - 22), innerW);
+    drawFooterBlock(doc, W, H, innerW, footer);
   } else if (modelo === 4) {
-    doc.setDrawColor(25, 25, 25);
-    doc.setLineWidth(0.45);
-    doc.rect(M, M, W - 2 * M, footerTop - M - 4);
-    doc.setLineWidth(0.2);
-    doc.rect(M + 4, M + 4, W - 2 * M - 8, footerTop - M - 12);
-    const yLogo = M + 12;
-    drawLogoBlock(doc, logoDataUrl, nomeProjeto, W / 2, yLogo, 56, 22);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(30);
-    doc.text(nomeCliente.toUpperCase(), W / 2, (M + footerTop) / 2 + 5, { align: "center" });
-    drawFooterBlock();
+    let y = M_OUT + 12;
+    y = await drawLogoCentered(doc, logoDataUrl, nomeProjeto, W / 2, innerW, y);
+    y += gapV;
+    drawTraçoCentral(doc, W, y, innerW);
+    y += gapV + 8;
+    y = drawNomeClienteResponsivo(doc, nomeCliente, W / 2, y, innerW * 0.9);
+    drawFooterBlock(doc, W, H, innerW, footer);
   } else {
-    const L = 18;
-    doc.setDrawColor(50, 50, 50);
-    doc.setLineWidth(0.5);
-    doc.line(M, M, M + L, M);
-    doc.line(M, M, M, M + L);
-    doc.line(W - M, M, W - M - L, M);
-    doc.line(W - M, M, W - M, M + L);
-    doc.line(M, H - M, M + L, H - M);
-    doc.line(M, H - M, M, H - M - L);
-    doc.line(W - M, H - M, W - M - L, H - M);
-    doc.line(W - M, H - M, W - M, H - M - L);
-    drawLogoBlock(doc, logoDataUrl, nomeProjeto, W / 2, M + 10, 50, 20);
+    let y = M_OUT + 14;
+    y = await drawLogoCentered(doc, logoDataUrl, nomeProjeto, W / 2, innerW, y);
+    y += gapV + 2;
+    drawTraçoCentral(doc, W, y, innerW);
+    y += gapV + 8;
+    y = drawNomeClienteResponsivo(doc, nomeCliente, W / 2, y, innerW * 0.92);
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(8);
-    doc.setTextColor(120, 120, 120);
-    doc.text(nomeProjeto.slice(0, 40), W / 2, M + 38, { align: "center" });
+    doc.setFontSize(7);
+    doc.setTextColor(95, 95, 95);
+    doc.text("Embarque autorizado", W / 2, Math.min(y + 5, yContentEnd - 6), { align: "center" });
     doc.setTextColor(0, 0, 0);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(34);
-    doc.text(nomeCliente.toUpperCase(), W / 2, 95, { align: "center" });
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(9);
-    doc.setTextColor(80, 80, 80);
-    doc.text("•  Embarque autorizado  •", W / 2, 108, { align: "center" });
-    doc.setTextColor(0, 0, 0);
-    drawFooterBlock();
+    drawFooterBlock(doc, W, H, innerW, footer);
   }
 
   return doc;
