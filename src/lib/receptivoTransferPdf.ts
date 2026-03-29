@@ -54,6 +54,10 @@ const M2_LOGO_TOP_MM = 22;
 const M3_TEMPLATE_LINE_Y_FRAC = 0.77;
 const M3_LOGO_TOP_MM = 22;
 
+/** Modelo 4 — PNG de fundo (moldura aberta + traço no arte; ajustar ao PNG). */
+const M4_TEMPLATE_LINE_Y_FRAC = 0.77;
+const M4_LOGO_TOP_MM = 22;
+
 export function buildFooterPayloadFromReceptivoRow(row: ReceptivoRow): ReceptivoFooterPayload {
   const semReserva = !row.reserva_transfer_id && row.reserva_numero == null;
   if (semReserva) {
@@ -185,6 +189,13 @@ export async function loadModelo3TemplateDataUrl(): Promise<string | null> {
   const base = import.meta.env.BASE_URL || "/";
   const prefix = base.endsWith("/") ? base : `${base}/`;
   return loadImageDataUrl(`${prefix}receptivos/modelo-3-template.png`);
+}
+
+/** PNG de fundo do Modelo 4 (`public/receptivos/modelo-4-template.png`). */
+export async function loadModelo4TemplateDataUrl(): Promise<string | null> {
+  const base = import.meta.env.BASE_URL || "/";
+  const prefix = base.endsWith("/") ? base : `${base}/`;
+  return loadImageDataUrl(`${prefix}receptivos/modelo-4-template.png`);
 }
 
 function getNaturalImageSize(dataUrl: string): Promise<{ w: number; h: number }> {
@@ -746,6 +757,8 @@ export async function generateReceptivoTransferPdf(
   let modelo2TemplateRendered = false;
   const modelo3Template = modelo === 3 ? await loadModelo3TemplateDataUrl() : null;
   let modelo3TemplateRendered = false;
+  const modelo4Template = modelo === 4 ? await loadModelo4TemplateDataUrl() : null;
+  let modelo4TemplateRendered = false;
 
   doc.setFillColor(255, 255, 255);
   doc.rect(0, 0, W, H, "F");
@@ -782,10 +795,19 @@ export async function generateReceptivoTransferPdf(
     } else {
       drawOpenCornerBorder(doc, W, H);
     }
+  } else if (modelo === 4) {
+    if (modelo4Template) {
+      try {
+        doc.addImage(modelo4Template, imageFormatFromDataUrl(modelo4Template), 0, 0, W, H);
+        modelo4TemplateRendered = true;
+      } catch {
+        drawOpenCornerBorder(doc, W, H, G_CORNER_MODEL4);
+      }
+    } else {
+      drawOpenCornerBorder(doc, W, H, G_CORNER_MODEL4);
+    }
   } else if (modelo === 5) {
     /* Modelo 5: sem moldura fechada / sem linhas de moldura */
-  } else if (modelo === 4) {
-    drawOpenCornerBorder(doc, W, H, G_CORNER_MODEL4);
   } else {
     drawOpenCornerBorder(doc, W, H);
   }
@@ -943,51 +965,70 @@ export async function generateReceptivoTransferPdf(
     }
   } else if (modelo === 4) {
     const contentW = innerW - 2 * M_IN;
-    const contentTop = M_OUT + M_IN + 16;
     const bottomSafe = H - M_OUT - M_IN - 2;
     const footerH = estimateFooterHeightMm(footer);
 
-    let y = contentTop;
-    y = await drawLogoCentered(doc, logoDataUrl, nomeProjeto, W / 2, contentW, y);
-    const yAfterLogo = y;
+    if (modelo4TemplateRendered) {
+      const yLineMm = H * M4_TEMPLATE_LINE_Y_FRAC;
+      const yAboveLine = yLineMm - 10;
+      const yFooterStart = yLineMm + 6;
 
-    const gapAfterName = 10;
-    const tickH = 1.4;
-    const traçoFrac = 0.65;
-    const regionStart = yAfterLogo + 14;
-    const footerTop = hasTrip ? bottomSafe - footerH - 8 : bottomSafe;
-    const regionEnd = hasTrip ? footerTop - 10 : bottomSafe - 12;
-    const regionHeight = Math.max(24, regionEnd - regionStart);
+      let y = M4_LOGO_TOP_MM;
+      y = await drawLogoCentered(doc, logoDataUrl, nomeProjeto, W / 2, contentW, y);
+      y += 10;
+      y = drawNomeClienteComChavesFit(doc, nomeCliente, W / 2, y, contentW * 0.88, yAboveLine);
 
-    const maxNomeBottomY = regionEnd - gapAfterName - tickH - 2;
-    let yNameStart = regionStart;
-    for (let k = 0; k < 4; k++) {
-      const nh = measureNomeClienteComChavesBlockHeight(
-        doc,
-        nomeCliente,
-        contentW * 0.92,
-        maxNomeBottomY,
-        yNameStart,
-      );
-      const clusterH = nh + gapAfterName + tickH;
-      const nextY = regionStart + Math.max(0, (regionHeight - clusterH) / 2);
-      if (Math.abs(nextY - yNameStart) < 0.4) break;
-      yNameStart = nextY;
-    }
-
-    y = drawNomeClienteComChavesFit(doc, nomeCliente, W / 2, yNameStart, contentW * 0.92, maxNomeBottomY);
-    y += gapAfterName;
-    drawTraçoCentralComTicks(doc, W, y, innerW, traçoFrac);
-
-    const yAfterLine = y + tickH + 10;
-    if (hasTrip) {
-      const minY = yAfterLine + 6;
-      const bottomAlignedY = bottomSafe - footerH - 2;
-      let yFooterTop = Math.max(minY, bottomAlignedY);
-      if (yFooterTop + footerH > bottomSafe) {
-        yFooterTop = Math.max(minY, bottomSafe - footerH - 2);
+      if (hasTrip) {
+        let yFt = yFooterStart;
+        if (yFt + footerH > bottomSafe) {
+          yFt = Math.max(yLineMm + 4, bottomSafe - footerH - 2);
+        }
+        drawTripFooterCentered(doc, W / 2, yFt, contentW * 0.85, footer, { bracedTitle: true });
       }
-      drawTripFooterCentered(doc, W / 2, yFooterTop, contentW * 0.9, footer, { bracedTitle: true });
+    } else {
+      const contentTop = M_OUT + M_IN + 16;
+      let y = contentTop;
+      y = await drawLogoCentered(doc, logoDataUrl, nomeProjeto, W / 2, contentW, y);
+      const yAfterLogo = y;
+
+      const gapAfterName = 10;
+      const tickH = 1.4;
+      const traçoFrac = 0.65;
+      const regionStart = yAfterLogo + 14;
+      const footerTop = hasTrip ? bottomSafe - footerH - 8 : bottomSafe;
+      const regionEnd = hasTrip ? footerTop - 10 : bottomSafe - 12;
+      const regionHeight = Math.max(24, regionEnd - regionStart);
+
+      const maxNomeBottomY = regionEnd - gapAfterName - tickH - 2;
+      let yNameStart = regionStart;
+      for (let k = 0; k < 4; k++) {
+        const nh = measureNomeClienteComChavesBlockHeight(
+          doc,
+          nomeCliente,
+          contentW * 0.92,
+          maxNomeBottomY,
+          yNameStart,
+        );
+        const clusterH = nh + gapAfterName + tickH;
+        const nextY = regionStart + Math.max(0, (regionHeight - clusterH) / 2);
+        if (Math.abs(nextY - yNameStart) < 0.4) break;
+        yNameStart = nextY;
+      }
+
+      y = drawNomeClienteComChavesFit(doc, nomeCliente, W / 2, yNameStart, contentW * 0.92, maxNomeBottomY);
+      y += gapAfterName;
+      drawTraçoCentralComTicks(doc, W, y, innerW, traçoFrac);
+
+      const yAfterLine = y + tickH + 10;
+      if (hasTrip) {
+        const minY = yAfterLine + 6;
+        const bottomAlignedY = bottomSafe - footerH - 2;
+        let yFooterTop = Math.max(minY, bottomAlignedY);
+        if (yFooterTop + footerH > bottomSafe) {
+          yFooterTop = Math.max(minY, bottomSafe - footerH - 2);
+        }
+        drawTripFooterCentered(doc, W / 2, yFooterTop, contentW * 0.9, footer, { bracedTitle: true });
+      }
     }
   } else if (modelo === 5) {
     const contentW = innerW - 2 * M_IN;
