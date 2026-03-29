@@ -25,6 +25,7 @@ interface Slide {
 const PAGINAS = [
   { value: "home", label: "Home (Motorista)" },
   { value: "home_taxi", label: "Home (Taxista)" },
+  { value: "geolocalizacao", label: "Geolocalização" },
   { value: "google", label: "Google" },
   { value: "email_business", label: "E-mail Business" },
   { value: "website", label: "Website" },

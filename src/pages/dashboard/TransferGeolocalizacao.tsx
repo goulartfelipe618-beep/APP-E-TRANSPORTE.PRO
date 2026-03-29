@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Plus } from "lucide-react";
+import SlideCarousel from "@/components/SlideCarousel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -16,6 +17,17 @@ export default function TransferGeolocalizacaoPage() {
 
   return (
     <div className="space-y-6">
+      <SlideCarousel
+        pagina="geolocalizacao"
+        fallbackSlides={[
+          {
+            titulo: "Geolocalização",
+            subtitulo: "Links de rastreamento e localização durante o transfer",
+            mostrar_texto: true,
+          },
+        ]}
+      />
+
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Geolocalização de Clientes</h1>
