@@ -77,7 +77,7 @@ const getMenuStructure = (showNetwork: boolean) => [
     ],
   },
   {
-    label: "Marketing",
+    label: "Ferramentas",
     items: [
       {
         title: "Campanhas",
