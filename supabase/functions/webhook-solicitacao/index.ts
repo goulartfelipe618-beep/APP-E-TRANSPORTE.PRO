@@ -114,97 +114,6 @@ function computeLeadPassword(nome: string, telefone: string): string {
   return `${first3}${last4}ETP`;
 }
 
-function formatZonedParts(date: Date, timeZone: string) {
-  const dtf = new Intl.DateTimeFormat("en-US", {
-    timeZone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: false,
-  });
-  const parts = dtf.formatToParts(date);
-  const map: Record<string, string> = {};
-  for (const p of parts) {
-    if (p.type !== "literal") map[p.type] = p.value;
-  }
-  return map;
-}
-
-function zonedTimeToUtc(
-  year: number,
-  month: number,
-  day: number,
-  hour: number,
-  minute: number,
-  second: number,
-  timeZone: string
-): Date {
-  // Convert a local time in a given timezone to a UTC Date.
-  // Algorithm: guess the UTC timestamp for the desired local time, then correct by the
-  // difference between the guessed local time and the desired local time.
-  const dtf = new Intl.DateTimeFormat("en-US", {
-    timeZone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: false,
-  });
-
-  const guessUtc = new Date(Date.UTC(year, month - 1, day, hour, minute, second));
-  const parts = dtf.formatToParts(guessUtc);
-  const map: Record<string, string> = {};
-  for (const p of parts) {
-    if (p.type !== "literal") map[p.type] = p.value;
-  }
-
-  const guessedLocalAsUtc = Date.UTC(
-    Number(map.year),
-    Number(map.month) - 1,
-    Number(map.day),
-    Number(map.hour),
-    Number(map.minute),
-    Number(map.second)
-  );
-
-  const desiredLocalAsUtc = Date.UTC(year, month - 1, day, hour, minute, second);
-  const diffMs = desiredLocalAsUtc - guessedLocalAsUtc;
-  return new Date(guessUtc.getTime() + diffMs);
-}
-
-function computeBanDurationToTarget(
-  now: Date,
-  targetDayOffset: number,
-  timeZone: string,
-  targetHour: number,
-  targetMinute: number,
-  targetSecond: number
-): string {
-  const nowParts = formatZonedParts(now, timeZone);
-  const y = Number(nowParts.year);
-  const m = Number(nowParts.month);
-  const d = Number(nowParts.day);
-
-  // Add days in the "local calendar" (Sao Paulo time) by using a UTC date as a pure calendar container.
-  const base = new Date(Date.UTC(y, m - 1, d, 0, 0, 0));
-  base.setUTCDate(base.getUTCDate() + targetDayOffset);
-
-  const y2 = base.getUTCFullYear();
-  const m2 = base.getUTCMonth() + 1;
-  const d2 = base.getUTCDate();
-
-  const targetUtc = zonedTimeToUtc(y2, m2, d2, targetHour, targetMinute, targetSecond, timeZone);
-  const diffMs = targetUtc.getTime() - now.getTime();
-  const diffSeconds = Math.max(1, Math.ceil(diffMs / 1000));
-
-  return `${diffSeconds}s`;
-}
-
 async function findUserIdByEmail(
   supabaseAdmin: any,
   email: string,
@@ -401,7 +310,30 @@ Deno.serve(async (req) => {
       const leadEmail: string | null = resolvedData.email || body.email || null;
       const leadTelefone: string | null = resolvedData.telefone || body.telefone || body.whatsapp || null;
       const leadCidade: string | null = resolvedData.cidade || body.cidade || body.cidade_nome || null;
-      const leadMensagem: string | null = resolvedData.mensagem || body.mensagem_observacoes || body.mensagem || null;
+      const leadMensagemBase: string | null = resolvedData.mensagem || body.mensagem_observacoes || body.mensagem || null;
+      const leadEstado: string | null = resolvedData.estado || body.estado || body.uf || null;
+      const leadEmpresa: string | null = resolvedData.nome_empresa || body.nome_empresa || body.empresa || null;
+      const leadOrigem: string | null =
+        resolvedData.origem ||
+        body.origem ||
+        body.de_onde_nos_encontrou ||
+        body.onde_nos_encontrou ||
+        null;
+      const leadEspecificacao: string | null =
+        resolvedData.especificacao ||
+        body.especifique ||
+        body.origem_outro ||
+        body.outro ||
+        null;
+      const leadMensagem = [
+        leadMensagemBase,
+        leadEstado ? `Estado: ${leadEstado}` : null,
+        leadEmpresa ? `Empresa: ${leadEmpresa}` : null,
+        leadOrigem ? `Origem: ${Array.isArray(leadOrigem) ? leadOrigem.join(", ") : String(leadOrigem)}` : null,
+        leadEspecificacao ? `Especificação: ${leadEspecificacao}` : null,
+      ]
+        .filter(Boolean)
+        .join("\n");
       const leadPlano = normalizePlano(body.plano || body.plan || body.subscription || "free");
 
       if (!leadEmail || !leadTelefone) {
@@ -411,10 +343,23 @@ Deno.serve(async (req) => {
         );
       }
 
+      // 2) Descobrir se o e-mail já tinha conta (antes de criar/atualizar auth)
+      const existingUserId = await findUserIdByEmail(supabase, leadEmail);
+
+      // Plano FREE: não registra nada se o e-mail já estiver cadastrado
+      if (leadPlano === "free" && existingUserId) {
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: "Este e-mail já possui cadastro. O cadastro FREE não foi realizado.",
+          }),
+          { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
       const computedPassword = computeLeadPassword(leadNome, String(leadTelefone));
 
-      // 2) Upsert auth user (login) by email
-      const existingUserId = await findUserIdByEmail(supabase, leadEmail);
+      // 3) Upsert auth user (login) by email
       let authUserId = existingUserId;
 
       if (!authUserId) {
@@ -444,7 +389,9 @@ Deno.serve(async (req) => {
         }
       }
 
-      // 3) Ensure role & plan for the lead login
+      const emailHadAccountAtIntake = !!existingUserId;
+
+      // 4) Ensure role & plan for the lead login
       const { error: roleErr } = await supabase.from("user_roles").upsert(
         { user_id: authUserId, role: "admin_transfer" },
         { onConflict: "user_id,role" }
@@ -467,25 +414,18 @@ Deno.serve(async (req) => {
         );
       }
 
-      // 4) Schedule deactivation by banning user at the target datetime for FREE plan only.
-      const timeZone = "America/Sao_Paulo";
-      if (leadPlano === "free") {
-        const banDuration = computeBanDurationToTarget(new Date(), 14, timeZone, 23, 59, 59);
-        const { error: banErr } = await supabase.auth.admin.updateUserById(authUserId, {
-          ban_duration: banDuration,
-        });
-        if (banErr) {
-          return new Response(
-            JSON.stringify({ error: "Erro ao agendar desativação", details: banErr.message }),
-            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
-        }
-      } else {
-        // Indefinite: unban if previously banned.
-        await supabase.auth.admin.updateUserById(authUserId, { ban_duration: "none" });
+      // 5) Garantir login ativo (não banir contas FREE — ban impedia "Iniciar Sessão")
+      const { error: loginErr } = await supabase.auth.admin.updateUserById(authUserId, {
+        ban_duration: "none",
+      });
+      if (loginErr) {
+        return new Response(
+          JSON.stringify({ error: "Erro ao liberar login do usuário", details: loginErr.message }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
       }
 
-      // 5) Insert request row for Admin Master landing table
+      // 6) Insert request row for Admin Master landing table
       const record: Record<string, any> = {
         user_id: userId, // automation owner (keeps existing access patterns)
         lead_user_id: authUserId,
@@ -495,8 +435,9 @@ Deno.serve(async (req) => {
         cpf: resolvedData.cpf || body.cpf || null,
         cnh: resolvedData.cnh || body.numero_cnh || null,
         cidade: leadCidade,
-        mensagem: leadMensagem,
+        mensagem: leadMensagem || null,
         status: "testando",
+        email_had_account_at_intake: emailHadAccountAtIntake,
       };
 
       const { error } = await supabase.from("solicitacoes_motoristas").insert(record);

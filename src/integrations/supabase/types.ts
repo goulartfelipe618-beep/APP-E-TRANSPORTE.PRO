@@ -890,7 +890,9 @@ export type Database = {
           cpf: string | null
           created_at: string
           email: string | null
+          email_had_account_at_intake: boolean
           id: string
+          lead_user_id: string | null
           mensagem: string | null
           nome: string
           status: string
@@ -904,7 +906,9 @@ export type Database = {
           cpf?: string | null
           created_at?: string
           email?: string | null
+          email_had_account_at_intake?: boolean
           id?: string
+          lead_user_id?: string | null
           mensagem?: string | null
           nome: string
           status?: string
@@ -918,7 +922,9 @@ export type Database = {
           cpf?: string | null
           created_at?: string
           email?: string | null
+          email_had_account_at_intake?: boolean
           id?: string
+          lead_user_id?: string | null
           mensagem?: string | null
           nome?: string
           status?: string

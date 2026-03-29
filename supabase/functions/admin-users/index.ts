@@ -179,6 +179,80 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
+    // Finalizar lead da Landing Page: garante role/plano/login, remove só a solicitação (usuário permanece em Cadastrados).
+    if (req.method === "POST" && action === "finalize_landing_lead") {
+      const body = await req.json();
+      const { solicitacao_id } = body as { solicitacao_id?: string };
+
+      if (!solicitacao_id) {
+        return new Response(JSON.stringify({ error: "solicitacao_id é obrigatório" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const { data: row, error: rowErr } = await supabaseAdmin
+        .from("solicitacoes_motoristas")
+        .select("id, lead_user_id")
+        .eq("id", solicitacao_id)
+        .maybeSingle();
+
+      if (rowErr) {
+        return new Response(JSON.stringify({ error: rowErr.message }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      if (!row) {
+        return new Response(JSON.stringify({ error: "Solicitação não encontrada" }), {
+          status: 404,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const leadUserId = row.lead_user_id as string | null;
+      if (leadUserId) {
+        const { error: roleErr } = await supabaseAdmin.from("user_roles").upsert(
+          { user_id: leadUserId, role: "admin_transfer" },
+          { onConflict: "user_id,role" }
+        );
+        if (roleErr) {
+          return new Response(JSON.stringify({ error: roleErr.message }), {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        // Plano já foi definido pelo webhook (ex.: FREE); não sobrescrever aqui.
+
+        const { error: unbanErr } = await supabaseAdmin.auth.admin.updateUserById(leadUserId, {
+          ban_duration: "none",
+        });
+        if (unbanErr) {
+          return new Response(JSON.stringify({ error: unbanErr.message }), {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+      }
+
+      const { error: delErr } = await supabaseAdmin
+        .from("solicitacoes_motoristas")
+        .delete()
+        .eq("id", solicitacao_id);
+
+      if (delErr) {
+        return new Response(JSON.stringify({ error: delErr.message }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      return new Response(JSON.stringify({ success: true }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     // DELETE USER
     if (req.method === "POST" && action === "delete") {
       const body = await req.json();

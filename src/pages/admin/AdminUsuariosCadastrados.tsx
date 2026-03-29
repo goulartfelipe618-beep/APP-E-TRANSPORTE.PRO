@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -51,7 +51,7 @@ export default function AdminUsuariosCadastrados() {
   const [creating, setCreating] = useState(false);
   const [updatingPlan, setUpdatingPlan] = useState(false);
 
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     setLoading(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -75,9 +75,19 @@ export default function AdminUsuariosCadastrados() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  useEffect(() => { fetchUsers(); }, []);
+  useEffect(() => {
+    void fetchUsers();
+  }, [fetchUsers]);
+
+  useEffect(() => {
+    const onCadastradosRefresh = () => {
+      void fetchUsers();
+    };
+    window.addEventListener("admin-master-cadastrados-refresh", onCadastradosRefresh);
+    return () => window.removeEventListener("admin-master-cadastrados-refresh", onCadastradosRefresh);
+  }, [fetchUsers]);
 
   const showPlanField = formRole === "admin_transfer" || formRole === "admin_taxi";
 
