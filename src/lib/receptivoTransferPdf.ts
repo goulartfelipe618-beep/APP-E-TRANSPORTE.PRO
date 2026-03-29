@@ -50,11 +50,11 @@ const LOGO_MAX_WIDTH_FRAC_INNER = 0.92;
 /** Espaço entre o fim da logo e o início do nome do cliente (modelos 1–4). */
 const LOGO_TO_NOME_GAP_MM = 34;
 
-/** Nome do cliente: faixa de tamanho (pt). */
-const NOME_FS_MIN = 32;
-const NOME_FS_MAX = 56;
+/** Nome do cliente: faixa de tamanho (pt) — só o texto do nome; logo/rodapé inalterados. */
+const NOME_FS_MIN = 44;
+const NOME_FS_MAX = 78;
 /** Entrelinha do nome. */
-const NOME_LINE_LEADING = 1.14;
+const NOME_LINE_LEADING = 1.12;
 
 /** Posição aproximada do traço horizontal no PNG do Modelo 1 (fração da altura H, de cima para baixo). */
 const M1_TEMPLATE_LINE_Y_FRAC = 0.77;
@@ -430,7 +430,7 @@ function drawNomeClienteComChaves(
     doc.setFontSize(fs);
     lines = doc.splitTextToSize(display, maxW);
     const estH = lines.length * ((fs * NOME_LINE_LEADING * 25.4) / 72);
-    if (lines.length <= 4 && estH < 52) break;
+    if (lines.length <= 4 && estH < 72) break;
     fs = Math.max(NOME_FS_MIN, fs - 2);
   }
   doc.setFontSize(fs);
