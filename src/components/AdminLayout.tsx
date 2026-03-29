@@ -2,7 +2,6 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AdminSidebar } from "@/components/AdminSidebar";
 import { ActivePageProvider, useActivePage } from "@/contexts/ActivePageContext";
 
-import AdminHomePage from "@/pages/admin/AdminHome";
 import AdminSlidesPage from "@/pages/admin/SlidesPage";
 import AdminMetricasPage from "@/pages/admin/AdminMetricas";
 import AdminAbrangenciaPage from "@/pages/admin/AdminAbrangencia";
@@ -23,7 +22,6 @@ import AdminMentoriaPage from "@/pages/admin/AdminMentoriaPage";
 import AdminEmptyLegsPage from "@/pages/admin/AdminEmptyLegsPage";
 
 const PAGE_MAP: Record<string, React.ComponentType> = {
-  home: AdminHomePage,
   metricas: AdminMetricasPage,
   abrangencia: AdminAbrangenciaPage,
   slides: AdminSlidesPage,
@@ -46,7 +44,7 @@ const PAGE_MAP: Record<string, React.ComponentType> = {
 
 function AdminContent() {
   const { activePage } = useActivePage();
-  const PageComponent = PAGE_MAP[activePage] || AdminHomePage;
+  const PageComponent = PAGE_MAP[activePage] || AdminAbrangenciaPage;
 
   return (
     <div className="min-h-screen flex w-full bg-background">
@@ -66,7 +64,7 @@ function AdminContent() {
 
 export default function AdminLayout() {
   return (
-    <ActivePageProvider defaultPage="home">
+    <ActivePageProvider defaultPage="abrangencia">
       <SidebarProvider>
         <AdminContent />
       </SidebarProvider>

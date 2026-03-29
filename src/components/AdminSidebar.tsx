@@ -1,5 +1,5 @@
 import {
-  Home, SlidersHorizontal, LogOut, Shield, BarChart3, MapPin, FileText, ChevronDown, Users, ClipboardList, Building2, LayoutTemplate, Bell, Moon, Sun, Settings, StickyNote, MessageSquare, Zap, GraduationCap, Plane,
+  SlidersHorizontal, LogOut, Shield, BarChart3, MapPin, FileText, ChevronDown, Users, ClipboardList, Building2, LayoutTemplate, Bell, Moon, Sun, Settings, StickyNote, MessageSquare, Zap, GraduationCap, Plane,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
@@ -17,9 +17,8 @@ import { cn } from "@/lib/utils";
 import { useActivePage } from "@/contexts/ActivePageContext";
 
 const simpleItems = [
-  { title: "Home", page: "home", icon: Home },
-  { title: "Métricas", page: "metricas", icon: BarChart3 },
   { title: "Abrangência", page: "abrangencia", icon: MapPin },
+  { title: "Métricas", page: "metricas", icon: BarChart3 },
   { title: "Landing Page", page: "landing-page", icon: ClipboardList },
   { title: "Slides", page: "slides", icon: SlidersHorizontal },
   { title: "Mentoria", page: "mentoria", icon: GraduationCap },
