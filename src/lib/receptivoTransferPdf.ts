@@ -25,6 +25,22 @@ const tipoLabels: Record<string, string> = {
 };
 
 export function buildFooterPayloadFromReceptivoRow(row: ReceptivoRow): ReceptivoFooterPayload {
+  const semReserva = !row.reserva_transfer_id && row.reserva_numero == null;
+  if (semReserva) {
+    return {
+      nomeCliente: row.nome_cliente,
+      numeroReserva: null,
+      tipoLabel: "",
+      embarque: "",
+      desembarque: "",
+      voltaEmb: null,
+      voltaDesemb: null,
+      idaData: null,
+      idaHora: null,
+      voltaData: null,
+      voltaHora: null,
+    };
+  }
   const tv = row.tipo_viagem || "";
   return {
     nomeCliente: row.nome_cliente,
@@ -49,7 +65,7 @@ export function buildFooterPayloadFromReserva(
     return {
       nomeCliente,
       numeroReserva: null,
-      tipoLabel: "—",
+      tipoLabel: "",
       embarque: "",
       desembarque: "",
       voltaEmb: null,
@@ -82,6 +98,21 @@ export function buildFooterPayloadFromReserva(
     idaHora: reserva.ida_hora,
     voltaData: reserva.volta_data,
     voltaHora: reserva.volta_hora,
+  };
+}
+
+/** Endereços exibidos na UI (somente leitura) a partir da reserva Transfer. */
+export function getEnderecosReservaParaExibicao(r: ReservaTransfer): { embarque: string; desembarque: string } {
+  const tv = r.tipo_viagem || "";
+  if (tv === "por_hora") {
+    return {
+      embarque: r.por_hora_endereco_inicio?.trim() || "—",
+      desembarque: r.por_hora_ponto_encerramento?.trim() || "—",
+    };
+  }
+  return {
+    embarque: r.ida_embarque?.trim() || "—",
+    desembarque: r.ida_desembarque?.trim() || "—",
   };
 }
 
@@ -118,6 +149,9 @@ function drawTripFooter(
   maxW: number,
   f: ReceptivoFooterPayload,
 ): number {
+  if (f.numeroReserva == null) {
+    return y;
+  }
   doc.setTextColor(30, 30, 30);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(9);
@@ -125,8 +159,7 @@ function drawTripFooter(
   let cy = y + 5;
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8);
-  const reservaTxt =
-    f.numeroReserva != null ? `Reserva nº ${f.numeroReserva}  |  Tipo: ${f.tipoLabel}` : `Tipo: ${f.tipoLabel}`;
+  const reservaTxt = `Reserva nº ${f.numeroReserva}  |  Tipo: ${f.tipoLabel || "—"}`;
   wrapLines(doc, reservaTxt, maxW, 8).forEach((line) => {
     doc.text(line, x, cy);
     cy += 3.8;
@@ -200,6 +233,7 @@ export async function generateReceptivoTransferPdf(
   const innerW = W - 2 * M;
 
   const drawFooterBlock = () => {
+    if (footer.numeroReserva == null) return;
     doc.setDrawColor(220, 220, 220);
     doc.setLineWidth(0.2);
     doc.line(M, footerTop - 2, W - M, footerTop - 2);

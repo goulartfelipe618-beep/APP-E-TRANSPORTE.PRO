@@ -5,7 +5,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -18,6 +17,7 @@ import {
   buildFooterPayloadFromReserva,
   generateReceptivoTransferPdf,
   downloadReceptivoPdf,
+  getEnderecosReservaParaExibicao,
 } from "@/lib/receptivoTransferPdf";
 
 type Reserva = Tables<"reservas_transfer">;
@@ -34,8 +34,6 @@ export default function NovoReceptivoDialog({ open, onOpenChange, onSaved }: Pro
   const [nomeCliente, setNomeCliente] = useState("");
   const [reservaId, setReservaId] = useState<string>("");
   const [reservas, setReservas] = useState<Reserva[]>([]);
-  const [embarque, setEmbarque] = useState("");
-  const [desembarque, setDesembarque] = useState("");
   const [loadingReservas, setLoadingReservas] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -58,27 +56,12 @@ export default function NovoReceptivoDialog({ open, onOpenChange, onSaved }: Pro
   }, [open]);
 
   const selectedReserva = reservas.find((r) => r.id === reservaId) ?? null;
-
-  useEffect(() => {
-    if (!selectedReserva) {
-      return;
-    }
-    const tv = selectedReserva.tipo_viagem || "";
-    if (tv === "por_hora") {
-      setEmbarque(selectedReserva.por_hora_endereco_inicio?.trim() || "");
-      setDesembarque(selectedReserva.por_hora_ponto_encerramento?.trim() || "");
-    } else {
-      setEmbarque(selectedReserva.ida_embarque?.trim() || "");
-      setDesembarque(selectedReserva.ida_desembarque?.trim() || "");
-    }
-  }, [selectedReserva]);
+  const enderecosPreview = selectedReserva ? getEnderecosReservaParaExibicao(selectedReserva) : null;
 
   const reset = () => {
     setModelo("1");
     setNomeCliente("");
     setReservaId("");
-    setEmbarque("");
-    setDesembarque("");
   };
 
   const handleGerar = async () => {
@@ -104,12 +87,7 @@ export default function NovoReceptivoDialog({ open, onOpenChange, onSaved }: Pro
       }
 
       const reserva = selectedReserva;
-      const baseFooter = buildFooterPayloadFromReserva(reserva, nome);
-      const footer = {
-        ...baseFooter,
-        embarque: embarque.trim() || baseFooter.embarque,
-        desembarque: desembarque.trim() || baseFooter.desembarque,
-      };
+      const footer = buildFooterPayloadFromReserva(reserva, nome);
 
       const nomeProjeto = config.nome_projeto || "E-Transporte.pro";
       const doc = await generateReceptivoTransferPdf(
@@ -131,8 +109,8 @@ export default function NovoReceptivoDialog({ open, onOpenChange, onSaved }: Pro
         reserva_transfer_id: reserva?.id ?? null,
         reserva_numero: reserva?.numero_reserva ?? null,
         tipo_viagem: reserva?.tipo_viagem ?? null,
-        embarque: footer.embarque || null,
-        desembarque: footer.desembarque || null,
+        embarque: reserva ? footer.embarque || null : null,
+        desembarque: reserva ? footer.desembarque || null : null,
         volta_embarque: reserva?.volta_embarque ?? null,
         volta_desembarque: reserva?.volta_desembarque ?? null,
         ida_data: reserva?.ida_data ?? null,
@@ -161,8 +139,10 @@ export default function NovoReceptivoDialog({ open, onOpenChange, onSaved }: Pro
         <DialogHeader>
           <DialogTitle>Novo receptivo</DialogTitle>
           <p className="text-sm text-muted-foreground font-normal">
-            Gera uma plaquinha em PDF (A4 paisagem) para identificação no embarque. Apenas reservas{" "}
-            <strong className="text-foreground">Transfer</strong> (não inclui grupos).
+            Gera uma plaquinha em PDF (A4 paisagem). Os endereços de embarque e desembarque{" "}
+            <strong className="text-foreground">só entram no PDF</strong> quando você associa uma{" "}
+            <strong className="text-foreground">reserva Transfer</strong>; caso contrário, o rodapé da viagem fica em
+            branco.
           </p>
         </DialogHeader>
 
@@ -195,7 +175,7 @@ export default function NovoReceptivoDialog({ open, onOpenChange, onSaved }: Pro
           </div>
 
           <div>
-            <Label>Reserva Transfer (opcional)</Label>
+            <Label>Reserva Transfer</Label>
             <Select
               value={reservaId || "none"}
               onValueChange={(v) => setReservaId(v === "none" ? "" : v)}
@@ -205,7 +185,7 @@ export default function NovoReceptivoDialog({ open, onOpenChange, onSaved }: Pro
                 <SelectValue placeholder={loadingReservas ? "Carregando…" : "Selecione uma reserva"} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="none">Nenhuma — preencher endereços manualmente</SelectItem>
+                <SelectItem value="none">Nenhuma — sem endereços no PDF (só nome na plaquinha)</SelectItem>
                 {reservas.map((r) => (
                   <SelectItem key={r.id} value={r.id}>
                     #{r.numero_reserva} — {r.nome_completo} ({r.tipo_viagem?.replace("_", " ")})
@@ -215,28 +195,20 @@ export default function NovoReceptivoDialog({ open, onOpenChange, onSaved }: Pro
             </Select>
           </div>
 
-          <div>
-            <Label htmlFor="emb">Endereço de embarque</Label>
-            <Textarea
-              id="emb"
-              className="mt-1.5"
-              rows={2}
-              value={embarque}
-              onChange={(e) => setEmbarque(e.target.value)}
-              placeholder="Preenchido ao escolher a reserva; você pode editar."
-            />
-          </div>
-          <div>
-            <Label htmlFor="des">Endereço de desembarque</Label>
-            <Textarea
-              id="des"
-              className="mt-1.5"
-              rows={2}
-              value={desembarque}
-              onChange={(e) => setDesembarque(e.target.value)}
-              placeholder="Preenchido ao escolher a reserva; você pode editar."
-            />
-          </div>
+          {selectedReserva && enderecosPreview && (
+            <div className="rounded-md border border-border bg-muted/40 p-3 text-sm space-y-2">
+              <p className="font-medium text-foreground">Endereços da reserva (automáticos no PDF)</p>
+              <p>
+                <span className="text-muted-foreground">Embarque: </span>
+                {enderecosPreview.embarque}
+              </p>
+              <p>
+                <span className="text-muted-foreground">Desembarque: </span>
+                {enderecosPreview.desembarque}
+              </p>
+              <p className="text-xs text-muted-foreground">Não é possível editar manualmente; altere a reserva na base se necessário.</p>
+            </div>
+          )}
         </div>
 
         <DialogFooter className="gap-2 sm:gap-0">

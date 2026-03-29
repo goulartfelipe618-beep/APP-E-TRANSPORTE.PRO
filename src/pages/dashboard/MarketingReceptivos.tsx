@@ -79,8 +79,9 @@ export default function MarketingReceptivosPage() {
         <div>
           <h1 className="text-2xl font-bold text-foreground">Receptivos</h1>
           <p className="text-muted-foreground">
-            Plaquinhas em PDF (A4 paisagem) para identificação no embarque. Use reservas{" "}
-            <strong className="text-foreground">Transfer</strong> para preencher endereços automaticamente.
+            Plaquinhas em PDF (A4 paisagem). Endereços de embarque/desembarque no rodapé{" "}
+            <strong className="text-foreground">só aparecem</strong> se você vincular uma reserva Transfer ao gerar o
+            receptivo.
           </p>
         </div>
         <div className="flex items-center gap-2">
