@@ -192,7 +192,7 @@ export default function AdminTemplatesPage() {
                   <img
                     src={t.imagem_url}
                     alt={t.nome}
-                    className="w-full object-cover object-top transition-transform duration-[8s] ease-[cubic-bezier(0.25,0.1,0.25,1)] group-hover:translate-y-[calc(-100%+12rem)]"
+                    className="w-full object-cover object-top transition-transform duration-[28s] ease-[cubic-bezier(0.25,0.1,0.25,1)] group-hover:translate-y-[calc(-100%+12rem)]"
                     style={{ minHeight: "200%" }}
                   />
                 </div>
@@ -265,7 +265,7 @@ export default function AdminTemplatesPage() {
                   <img
                     src={imagemPreview}
                     alt="Preview"
-                    className="w-full object-cover object-top transition-transform duration-[8s] ease-[cubic-bezier(0.25,0.1,0.25,1)] group-hover:translate-y-[calc(-100%+8rem)]"
+                    className="w-full object-cover object-top transition-transform duration-[28s] ease-[cubic-bezier(0.25,0.1,0.25,1)] group-hover:translate-y-[calc(-100%+8rem)]"
                     style={{ minHeight: "200%" }}
                   />
                   <button

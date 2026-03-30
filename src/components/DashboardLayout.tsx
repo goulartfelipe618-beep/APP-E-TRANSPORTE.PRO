@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import { useSlowScrollContainer } from "@/hooks/useSlowScrollContainer";
 import PageLoader from "@/components/PageLoader";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
@@ -86,6 +87,8 @@ function readNetworkSpotlightActive() {
 
 function DashboardContent() {
   const { activePage } = useActivePage();
+  const mainRef = useRef<HTMLElement>(null);
+  useSlowScrollContainer(mainRef, activePage === "website");
   const [showOverlay, setShowOverlay] = useState(readNetworkSpotlightActive);
 
   useEffect(() => {
@@ -150,7 +153,10 @@ function DashboardContent() {
               <span className="text-sm font-medium text-foreground">E-Transporte.pro — Gestão de Frota</span>
             </div>
           </header>
-          <main className="relative z-0 flex-1 bg-background p-6 overflow-auto">
+          <main
+            ref={mainRef}
+            className="relative z-0 flex-1 bg-background p-6 overflow-auto scroll-smooth"
+          >
             <PageLoader pageKey={activePage}>
               <PageComponent key={activePage} />
             </PageLoader>

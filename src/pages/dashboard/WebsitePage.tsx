@@ -716,7 +716,7 @@ export default function WebsitePage() {
             <div key={t.id} className="flex flex-col">
               <div className={cn("rounded-xl h-48 relative overflow-hidden border bg-muted group cursor-pointer", isSelected ? "ring-2 ring-primary" : "border-border")} onClick={() => setSelectedTemplate(t.id)}>
                 {t.imagem_url ? (
-                  <img src={t.imagem_url} alt={t.nome} className="w-full object-cover object-top transition-transform duration-[60s] ease-linear group-hover:translate-y-[calc(-100%+12rem)]" style={{ minHeight: "200%" }} />
+                  <img src={t.imagem_url} alt={t.nome} className="w-full object-cover object-top transition-transform duration-[120s] ease-linear group-hover:translate-y-[calc(-100%+12rem)]" style={{ minHeight: "200%" }} />
                 ) : (
                   <div className="h-full flex items-center justify-center text-muted-foreground">Sem imagem</div>
                 )}
