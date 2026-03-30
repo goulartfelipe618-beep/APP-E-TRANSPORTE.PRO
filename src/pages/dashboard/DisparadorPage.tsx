@@ -1,4 +1,3 @@
-import { useState } from "react";
 import SlideCarousel from "@/components/SlideCarousel";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -8,8 +7,6 @@ import {
   Smartphone, ShieldAlert, XCircle, Zap,
 } from "lucide-react";
 import { toast } from "sonner";
-import { useUserPlan } from "@/hooks/useUserPlan";
-import UpgradePlanDialog from "@/components/planos/UpgradePlanDialog";
 
 const DISPARADOR_URL = "https://api-construtor.pro";
 
@@ -61,14 +58,7 @@ const WARNINGS = [
 ];
 
 export default function DisparadorPage() {
-  const { hasPlan, plano, refetch: refetchPlano } = useUserPlan();
-  const [upgradeOpen, setUpgradeOpen] = useState(false);
-
   const handleAccessDispatcher = () => {
-    if (!hasPlan("grow")) {
-      setUpgradeOpen(true);
-      return;
-    }
     const w = window.open(DISPARADOR_URL, "_blank", "noopener,noreferrer");
     if (!w) {
       toast.error("Não foi possível abrir uma nova aba. Verifique o bloqueador de pop-ups.");
@@ -166,14 +156,6 @@ export default function DisparadorPage() {
           </Button>
         </CardContent>
       </Card>
-
-      <UpgradePlanDialog
-        open={upgradeOpen}
-        onOpenChange={setUpgradeOpen}
-        requiredPlan="grow"
-        selfServiceUpgrade={plano === "free"}
-        onUpgradeSuccess={() => void refetchPlano()}
-      />
     </div>
   );
 }
