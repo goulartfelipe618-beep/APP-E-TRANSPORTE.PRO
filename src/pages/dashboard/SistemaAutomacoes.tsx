@@ -634,6 +634,16 @@ export default function SistemaAutomacoesPage() {
                         setSelected(a);
                         setMappings(m);
                         fetchTestes(a.id);
+                        // Sempre abrir com mapeamento recolhido; o motorista expande com "Editar"
+                        if (a.tipo === "transfer") {
+                          setCollapsedContainers({
+                            somente_ida: true,
+                            ida_volta: true,
+                            por_hora: true,
+                          });
+                        } else {
+                          setCollapsedContainers({ default: true });
+                        }
                       }}>
                         Configurar
                       </Button>
