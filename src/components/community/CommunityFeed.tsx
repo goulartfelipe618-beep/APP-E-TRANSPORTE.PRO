@@ -478,7 +478,7 @@ export default function CommunityFeed({ title, subtitle }: Props) {
       </div>
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="mx-auto w-full max-w-3xl space-y-6 xl:mx-0">
+        <div className="space-y-6">
           <Card>
             <CardHeader>
               <p className="font-semibold text-foreground">Nova publicação</p>
