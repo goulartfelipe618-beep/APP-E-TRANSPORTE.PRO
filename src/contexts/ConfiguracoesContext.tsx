@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 
 interface Configuracoes {
   nome_projeto: string;
+  nome_completo: string;
   logo_url: string;
   fonte_global: string;
 }
@@ -14,6 +15,7 @@ interface ConfiguracoesContextType {
 
 const defaultConfig: Configuracoes = {
   nome_projeto: "E-Transporte.pro",
+  nome_completo: "",
   logo_url: "",
   fonte_global: "montserrat",
 };
@@ -42,23 +44,34 @@ export function ConfiguracoesProvider({ children }: { children: ReactNode }) {
     if (!user) return;
 
     const { data } = await supabase
-      .from("configuracoes" as any)
-      .select("nome_projeto, logo_url, fonte_global")
+      .from("configuracoes")
+      .select("nome_projeto, nome_completo, logo_url, fonte_global")
       .eq("user_id", user.id)
       .maybeSingle();
 
     if (data) {
-      const d = data as any;
       setConfig({
-        nome_projeto: d.nome_projeto || defaultConfig.nome_projeto,
-        logo_url: d.logo_url || "",
-        fonte_global: d.fonte_global || defaultConfig.fonte_global,
+        nome_projeto: data.nome_projeto || defaultConfig.nome_projeto,
+        nome_completo: data.nome_completo || "",
+        logo_url: data.logo_url || "",
+        fonte_global: data.fonte_global || defaultConfig.fonte_global,
       });
+    } else {
+      setConfig(defaultConfig);
     }
   };
 
   useEffect(() => {
-    fetchConfig();
+    void fetchConfig();
+    const onConfigUpdated = () => void fetchConfig();
+    window.addEventListener("configuracoes-updated", onConfigUpdated);
+    const { data: authSub } = supabase.auth.onAuthStateChange(() => {
+      void fetchConfig();
+    });
+    return () => {
+      window.removeEventListener("configuracoes-updated", onConfigUpdated);
+      authSub.subscription.unsubscribe();
+    };
   }, []);
 
   // Apply font globally

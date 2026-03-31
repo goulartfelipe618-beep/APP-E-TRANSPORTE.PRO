@@ -21,6 +21,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { useConfiguracoes } from "@/contexts/ConfiguracoesContext";
 
 type CommunityProfile = {
   user_id: string;
@@ -90,6 +91,7 @@ function initialsFromName(name: string) {
 }
 
 export default function CommunityFeed({ title, subtitle }: Props) {
+  const { config } = useConfiguracoes();
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [isAdminMaster, setIsAdminMaster] = useState(false);
   const [profiles, setProfiles] = useState<Record<string, CommunityProfile>>({});
@@ -197,9 +199,17 @@ export default function CommunityFeed({ title, subtitle }: Props) {
     ((profilesRes.data || []) as CommunityProfile[]).forEach((p) => {
       nextProfiles[p.user_id] = p;
     });
+    if (userId) {
+      nextProfiles[userId] = {
+        user_id: userId,
+        nome_completo: config.nome_completo || nextProfiles[userId]?.nome_completo || null,
+        nome_projeto: config.nome_projeto || nextProfiles[userId]?.nome_projeto || null,
+        logo_url: config.logo_url || nextProfiles[userId]?.logo_url || null,
+      };
+    }
     setProfiles(nextProfiles);
     setLoading(false);
-  }, []);
+  }, [config.logo_url, config.nome_completo, config.nome_projeto]);
 
   useEffect(() => {
     void fetchAll();

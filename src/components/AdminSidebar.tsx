@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
 import { useActivePage } from "@/contexts/ActivePageContext";
+import { useConfiguracoes } from "@/contexts/ConfiguracoesContext";
 
 const simpleItems = [
   { title: "Abrangência", page: "abrangencia", icon: MapPin },
@@ -47,6 +48,7 @@ export function AdminSidebar() {
   const collapsed = state === "collapsed";
   const navigate = useNavigate();
   const { activePage, setActivePage } = useActivePage();
+  const { config } = useConfiguracoes();
 
   const [darkMode, setDarkMode] = useState(() => document.documentElement.classList.contains("dark"));
 
@@ -105,12 +107,16 @@ export function AdminSidebar() {
   return (
     <Sidebar collapsible="icon" className="border-r border-border">
       <div className="p-4 flex items-center gap-3 border-b border-border">
-        <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center">
-          <Shield className="h-4 w-4 text-primary-foreground" />
-        </div>
+        {config.logo_url ? (
+          <img src={config.logo_url} alt="Logo" className="h-8 w-8 rounded-full object-cover" />
+        ) : (
+          <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center">
+            <Shield className="h-4 w-4 text-primary-foreground" />
+          </div>
+        )}
         {!collapsed && (
           <div>
-            <p className="text-sm font-bold text-foreground">Admin Master</p>
+            <p className="text-sm font-bold text-foreground">{config.nome_projeto || "Admin Master"}</p>
             <p className="text-xs text-muted-foreground">Painel Administrativo</p>
           </div>
         )}

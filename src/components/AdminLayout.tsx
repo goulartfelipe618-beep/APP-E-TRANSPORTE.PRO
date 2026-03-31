@@ -3,6 +3,7 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { useSlowScrollContainer } from "@/hooks/useSlowScrollContainer";
 import { AdminSidebar } from "@/components/AdminSidebar";
 import { ActivePageProvider, useActivePage } from "@/contexts/ActivePageContext";
+import { useConfiguracoes } from "@/contexts/ConfiguracoesContext";
 
 import AdminSlidesPage from "@/pages/admin/SlidesPage";
 import AdminMetricasPage from "@/pages/admin/AdminMetricas";
@@ -46,6 +47,7 @@ const PAGE_MAP: Record<string, React.ComponentType> = {
 
 function AdminContent() {
   const { activePage } = useActivePage();
+  const { config } = useConfiguracoes();
   const mainRef = useRef<HTMLElement>(null);
   useSlowScrollContainer(mainRef, activePage === "templates");
   const PageComponent = PAGE_MAP[activePage] || AdminAbrangenciaPage;
@@ -56,7 +58,7 @@ function AdminContent() {
       <div className="flex-1 flex flex-col">
         <header className="h-12 flex items-center border-b border-border px-4">
           <SidebarTrigger />
-          <span className="ml-3 text-sm font-semibold text-foreground">Painel Admin Master</span>
+          <span className="ml-3 text-sm font-semibold text-foreground">{config.nome_projeto || "Painel Admin Master"}</span>
         </header>
         <main ref={mainRef} className="flex-1 p-6 overflow-auto scroll-smooth">
           <PageComponent key={activePage} />

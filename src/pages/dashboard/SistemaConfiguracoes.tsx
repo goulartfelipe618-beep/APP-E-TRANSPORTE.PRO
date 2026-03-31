@@ -298,6 +298,7 @@ export default function SistemaConfiguracoesPage() {
     if (ok) {
       toast.success("Perfil salvo");
       setProfileEditing(false);
+      await refreshConfig();
       window.dispatchEvent(new Event("configuracoes-updated"));
     }
   };
