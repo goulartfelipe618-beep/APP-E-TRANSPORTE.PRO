@@ -269,6 +269,167 @@ export type Database = {
         }
         Relationships: []
       }
+      community_post_comments: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          is_edited: boolean
+          post_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          is_edited?: boolean
+          post_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          is_edited?: boolean
+          post_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "community_post_comments_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "community_posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      community_post_likes: {
+        Row: {
+          created_at: string
+          post_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          post_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          post_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "community_post_likes_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "community_posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      community_post_media: {
+        Row: {
+          created_at: string
+          id: string
+          media_type: string
+          media_url: string
+          position: number
+          post_id: string
+          storage_path: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          media_type: string
+          media_url: string
+          position?: number
+          post_id: string
+          storage_path?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          media_type?: string
+          media_url?: string
+          position?: number
+          post_id?: string
+          storage_path?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "community_post_media_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "community_posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      community_post_mentions: {
+        Row: {
+          created_at: string
+          id: string
+          mentioned_by_user_id: string
+          mentioned_user_id: string
+          post_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          mentioned_by_user_id: string
+          mentioned_user_id: string
+          post_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          mentioned_by_user_id?: string
+          mentioned_user_id?: string
+          post_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "community_post_mentions_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "community_posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      community_posts: {
+        Row: {
+          author_user_id: string
+          content: string
+          created_at: string
+          id: string
+          is_edited: boolean
+          updated_at: string
+        }
+        Insert: {
+          author_user_id: string
+          content: string
+          created_at?: string
+          id?: string
+          is_edited?: boolean
+          updated_at?: string
+        }
+        Update: {
+          author_user_id?: string
+          content?: string
+          created_at?: string
+          id?: string
+          is_edited?: boolean
+          updated_at?: string
+        }
+        Relationships: []
+      }
       contratos: {
         Row: {
           clausulas_adicionais: string
@@ -1317,6 +1478,18 @@ export type Database = {
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      is_admin_master: {
+        Args: {
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      is_community_member: {
+        Args: {
           _user_id: string
         }
         Returns: boolean

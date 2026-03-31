@@ -16,6 +16,7 @@ import SistemaConfiguracoesPage from "@/pages/dashboard/SistemaConfiguracoes";
 import SistemaAutomacoesPage from "@/pages/dashboard/SistemaAutomacoes";
 import SistemaComunicadorPage from "@/pages/dashboard/SistemaComunicador";
 import TicketsPage from "@/pages/dashboard/TicketsPage";
+import TaxiCommunityPage from "@/pages/taxi/TaxiCommunityPage";
 
 const PAGE_MAP: Record<string, React.ComponentType> = {
   home: TaxiHome,
@@ -24,6 +25,7 @@ const PAGE_MAP: Record<string, React.ComponentType> = {
   chamadas: TaxiChamadas,
   atendimentos: TaxiAtendimentos,
   clientes: TaxiClientes,
+  comunidade: TaxiCommunityPage,
   anotacoes: AnotacoesPage,
   "sistema/configuracoes": SistemaConfiguracoesPage,
   "sistema/automacoes": SistemaAutomacoesPage,

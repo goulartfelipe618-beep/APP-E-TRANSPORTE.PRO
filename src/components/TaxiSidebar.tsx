@@ -55,6 +55,7 @@ const menuStructure = [
           { title: "Comunicador", page: "sistema/comunicador", icon: Monitor },
         ],
       },
+      { title: "Comunidade", page: "comunidade", icon: Users },
       { title: "Anotações", page: "anotacoes", icon: StickyNote },
       { title: "Tickets", page: "tickets", icon: ClipboardList },
     ],

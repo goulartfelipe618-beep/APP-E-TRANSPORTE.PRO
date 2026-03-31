@@ -42,6 +42,7 @@ import DisparadorPage from "@/pages/dashboard/DisparadorPage";
 import MentoriaPage from "@/pages/dashboard/MentoriaPage";
 import EmptyLegsPage from "@/pages/dashboard/EmptyLegsPage";
 import AtualizacoesPage from "@/pages/dashboard/AtualizacoesPage";
+import CommunityPage from "@/pages/dashboard/CommunityPage";
 
 const PAGE_MAP: Record<string, React.ComponentType> = {
   home: HomePage,
@@ -65,6 +66,7 @@ const PAGE_MAP: Record<string, React.ComponentType> = {
   "marketing/receptivos": MarketingReceptivosPage,
   "marketing/qrcode": MarketingQRCodePage,
   network: NetworkPage,
+  comunidade: CommunityPage,
   google: GooglePage,
   "email-business": EmailBusinessPage,
   website: WebsitePage,

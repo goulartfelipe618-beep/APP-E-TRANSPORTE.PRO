@@ -21,11 +21,13 @@ import SistemaComunicadorPage from "@/pages/dashboard/SistemaComunicador";
 import AdminTicketsPage from "@/pages/admin/AdminTicketsPage";
 import AdminMentoriaPage from "@/pages/admin/AdminMentoriaPage";
 import AdminEmptyLegsPage from "@/pages/admin/AdminEmptyLegsPage";
+import AdminCommunityPage from "@/pages/admin/AdminCommunityPage";
 
 const PAGE_MAP: Record<string, React.ComponentType> = {
   metricas: AdminMetricasPage,
   abrangencia: AdminAbrangenciaPage,
   slides: AdminSlidesPage,
+  comunidade: AdminCommunityPage,
   "contrato/transfer": AdminContratoTransferPage,
   "contrato/taxi": AdminContratoTaxiPage,
   "usuarios/cadastrados": AdminUsuariosCadastradosPage,
