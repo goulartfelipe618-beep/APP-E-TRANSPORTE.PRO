@@ -8,7 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Heart, MessageCircle, Pencil, Trash2, RefreshCw, ImagePlus, Video } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Heart, MessageCircle, Pencil, Trash2, RefreshCw, ImagePlus, Video, Tags } from "lucide-react";
 
 type CommunityProfile = {
   user_id: string;
@@ -20,6 +21,7 @@ type CommunityProfile = {
 type CommunityPost = {
   id: string;
   author_user_id: string;
+  category_id: string | null;
   content: string;
   created_at: string;
   updated_at: string;
@@ -52,6 +54,13 @@ type CommunityComment = {
   created_at: string;
 };
 
+type CommunityCategory = {
+  id: string;
+  name: string;
+  is_active: boolean;
+  created_by_user_id: string;
+};
+
 type Props = {
   title: string;
   subtitle: string;
@@ -79,17 +88,53 @@ export default function CommunityFeed({ title, subtitle }: Props) {
   const [mentions, setMentions] = useState<CommunityMention[]>([]);
   const [likes, setLikes] = useState<CommunityLike[]>([]);
   const [comments, setComments] = useState<CommunityComment[]>([]);
+  const [categories, setCategories] = useState<CommunityCategory[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [newPostContent, setNewPostContent] = useState("");
   const [newPostFiles, setNewPostFiles] = useState<File[]>([]);
+  const [newPostCategoryId, setNewPostCategoryId] = useState<string>("");
   const [selectedMentions, setSelectedMentions] = useState<string[]>([]);
   const [publishing, setPublishing] = useState(false);
+  const [activeCategoryId, setActiveCategoryId] = useState<string>("all");
 
   const [editingPostId, setEditingPostId] = useState<string | null>(null);
   const [editingContent, setEditingContent] = useState("");
 
   const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>({});
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
+  const [editingCategoryName, setEditingCategoryName] = useState("");
+
+  const getImageDimensions = (file: File) =>
+    new Promise<{ width: number; height: number }>((resolve, reject) => {
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        resolve({ width: img.width, height: img.height });
+        URL.revokeObjectURL(url);
+      };
+      img.onerror = () => {
+        reject(new Error("Não foi possível ler a imagem"));
+        URL.revokeObjectURL(url);
+      };
+      img.src = url;
+    });
+
+  const handleFilesPicked = async (files: File[]) => {
+    const validFiles: File[] = [];
+    for (const file of files) {
+      if (file.type.startsWith("image/")) {
+        const dims = await getImageDimensions(file);
+        if (dims.width !== 1536 || dims.height !== 1024) {
+          toast.error(`A imagem "${file.name}" precisa ter exatamente 1536x1024px.`);
+          continue;
+        }
+      }
+      validFiles.push(file);
+    }
+    setNewPostFiles(validFiles);
+  };
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
@@ -109,16 +154,17 @@ export default function CommunityFeed({ title, subtitle }: Props) {
       setIsAdminMaster(false);
     }
 
-    const [postsRes, mediaRes, mentionsRes, likesRes, commentsRes, profilesRes] = await Promise.all([
+    const [postsRes, mediaRes, mentionsRes, likesRes, commentsRes, profilesRes, categoriesRes] = await Promise.all([
       supabase.from("community_posts").select("*").order("created_at", { ascending: false }),
       supabase.from("community_post_media").select("*").order("position", { ascending: true }),
       supabase.from("community_post_mentions").select("*"),
       supabase.from("community_post_likes").select("*"),
       supabase.from("community_post_comments").select("*").order("created_at", { ascending: true }),
       supabase.from("configuracoes").select("user_id,nome_completo,nome_projeto,logo_url"),
+      supabase.from("community_categories").select("*").eq("is_active", true).order("name", { ascending: true }),
     ]);
 
-    if (postsRes.error || mediaRes.error || mentionsRes.error || likesRes.error || commentsRes.error || profilesRes.error) {
+    if (postsRes.error || mediaRes.error || mentionsRes.error || likesRes.error || commentsRes.error || profilesRes.error || categoriesRes.error) {
       toast.error("Erro ao carregar Comunidade");
       setLoading(false);
       return;
@@ -129,6 +175,11 @@ export default function CommunityFeed({ title, subtitle }: Props) {
     setMentions((mentionsRes.data || []) as CommunityMention[]);
     setLikes((likesRes.data || []) as CommunityLike[]);
     setComments((commentsRes.data || []) as CommunityComment[]);
+    const loadedCategories = (categoriesRes.data || []) as CommunityCategory[];
+    setCategories(loadedCategories);
+    if (!newPostCategoryId && loadedCategories.length > 0) {
+      setNewPostCategoryId(loadedCategories[0].id);
+    }
 
     const nextProfiles: Record<string, CommunityProfile> = {};
     ((profilesRes.data || []) as CommunityProfile[]).forEach((p) => {
@@ -150,6 +201,7 @@ export default function CommunityFeed({ title, subtitle }: Props) {
       .on("postgres_changes", { event: "*", schema: "public", table: "community_post_mentions" }, () => void fetchAll())
       .on("postgres_changes", { event: "*", schema: "public", table: "community_post_likes" }, () => void fetchAll())
       .on("postgres_changes", { event: "*", schema: "public", table: "community_post_comments" }, () => void fetchAll())
+      .on("postgres_changes", { event: "*", schema: "public", table: "community_categories" }, () => void fetchAll())
       .subscribe();
 
     return () => {
@@ -174,6 +226,52 @@ export default function CommunityFeed({ title, subtitle }: Props) {
     return post.author_user_id === currentUserId || isAdminMaster;
   };
 
+  const handleCreateCategory = async () => {
+    const name = newCategoryName.trim();
+    if (!name || !currentUserId) return;
+    const { error } = await supabase.from("community_categories").insert({
+      name,
+      created_by_user_id: currentUserId,
+      is_active: true,
+    });
+    if (error) {
+      toast.error("Erro ao criar categoria");
+      return;
+    }
+    setNewCategoryName("");
+    toast.success("Categoria criada");
+    void fetchAll();
+  };
+
+  const handleSaveCategoryEdit = async () => {
+    const name = editingCategoryName.trim();
+    if (!editingCategoryId || !name) return;
+    const { error } = await supabase
+      .from("community_categories")
+      .update({ name, updated_at: new Date().toISOString() })
+      .eq("id", editingCategoryId);
+    if (error) {
+      toast.error("Erro ao editar categoria");
+      return;
+    }
+    setEditingCategoryId(null);
+    setEditingCategoryName("");
+    toast.success("Categoria atualizada");
+    void fetchAll();
+  };
+
+  const handleDeleteCategory = async (categoryId: string) => {
+    const { error } = await supabase.from("community_categories").delete().eq("id", categoryId);
+    if (error) {
+      toast.error("Erro ao excluir categoria");
+      return;
+    }
+    if (activeCategoryId === categoryId) setActiveCategoryId("all");
+    if (newPostCategoryId === categoryId) setNewPostCategoryId("");
+    toast.success("Categoria excluída");
+    void fetchAll();
+  };
+
   const handleCreatePost = async () => {
     const content = newPostContent.trim();
     if (!content) {
@@ -184,12 +282,16 @@ export default function CommunityFeed({ title, subtitle }: Props) {
       toast.error("Usuário não autenticado");
       return;
     }
+    if (!newPostCategoryId) {
+      toast.error("Selecione uma categoria da publicação");
+      return;
+    }
 
     setPublishing(true);
     try {
       const { data: inserted, error: postError } = await supabase
         .from("community_posts")
-        .insert({ author_user_id: currentUserId, content })
+        .insert({ author_user_id: currentUserId, content, category_id: newPostCategoryId })
         .select("id")
         .single();
 
@@ -239,6 +341,7 @@ export default function CommunityFeed({ title, subtitle }: Props) {
       setNewPostContent("");
       setNewPostFiles([]);
       setSelectedMentions([]);
+      setNewPostCategoryId(categories[0]?.id || "");
       toast.success("Publicação criada");
       void fetchAll();
     } catch (error: unknown) {
@@ -331,6 +434,9 @@ export default function CommunityFeed({ title, subtitle }: Props) {
     );
   }
 
+  const visiblePosts = posts.filter((p) => activeCategoryId === "all" || p.category_id === activeCategoryId);
+  const categoryMap = new Map(categories.map((c) => [c.id, c.name]));
+
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-3">
@@ -343,229 +449,341 @@ export default function CommunityFeed({ title, subtitle }: Props) {
         </Button>
       </div>
 
-      <Card>
-        <CardHeader>
-          <p className="font-semibold text-foreground">Nova publicação</p>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <Textarea
-            placeholder="Compartilhe uma novidade com a comunidade..."
-            value={newPostContent}
-            onChange={(e) => setNewPostContent(e.target.value)}
-            rows={4}
-          />
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2">
-              <Label className="text-sm">Adicionar imagens e vídeos</Label>
-              <Input
-                type="file"
-                accept="image/*,video/*"
-                multiple
-                onChange={(e) => setNewPostFiles(Array.from(e.target.files || []))}
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <p className="font-semibold text-foreground">Nova publicação</p>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <Textarea
+                placeholder="Compartilhe uma novidade com a comunidade..."
+                value={newPostContent}
+                onChange={(e) => setNewPostContent(e.target.value)}
+                rows={4}
               />
-              {newPostFiles.length > 0 && (
-                <p className="text-xs text-muted-foreground">{newPostFiles.length} arquivo(s) selecionado(s)</p>
-              )}
-            </div>
-            <div className="space-y-2">
-              <Label className="text-sm">Marcar usuários</Label>
-              <div className="max-h-28 overflow-y-auto rounded-md border border-border p-2">
-                {mentionOptions.length === 0 ? (
-                  <p className="text-xs text-muted-foreground">Nenhum usuário disponível para marcação</p>
-                ) : (
-                  <div className="flex flex-wrap gap-2">
-                    {mentionOptions.map((m) => (
-                      <button
-                        key={m.user_id}
-                        type="button"
-                        onClick={() => toggleMention(m.user_id)}
-                        className={`rounded-md border px-2 py-1 text-xs transition-colors ${
-                          selectedMentions.includes(m.user_id)
-                            ? "border-primary bg-primary/10 text-primary"
-                            : "border-border text-muted-foreground hover:text-foreground"
-                        }`}
-                      >
-                        @{displayName(m)}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-          <Button onClick={() => void handleCreatePost()} disabled={publishing}>
-            Publicar
-          </Button>
-        </CardContent>
-      </Card>
-
-      <div className="space-y-4">
-        {posts.map((post) => {
-          const authorProfile = profiles[post.author_user_id];
-          const authorName = displayName(authorProfile);
-          const postMedia = media.filter((m) => m.post_id === post.id);
-          const postMentions = mentions.filter((m) => m.post_id === post.id);
-          const postLikes = likes.filter((l) => l.post_id === post.id);
-          const postComments = comments.filter((c) => c.post_id === post.id);
-          const userLiked = !!currentUserId && postLikes.some((l) => l.user_id === currentUserId);
-
-          return (
-            <Card key={post.id}>
-              <CardHeader className="pb-3">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <Avatar className="h-10 w-10">
-                      <AvatarImage src={authorProfile?.logo_url || undefined} alt={authorName} />
-                      <AvatarFallback>{initialsFromName(authorName)}</AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <p className="font-semibold text-foreground">{authorName}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {new Date(post.created_at).toLocaleString("pt-BR")}
-                        {post.is_edited ? " · editado" : ""}
-                      </p>
-                    </div>
-                  </div>
-                  {canEditOrDeletePost(post) && (
-                    <div className="flex items-center gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => {
-                          setEditingPostId(post.id);
-                          setEditingContent(post.content);
-                        }}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="text-destructive hover:text-destructive"
-                        onClick={() => void handleDeletePost(post)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label className="text-sm">Categoria</Label>
+                  <Select value={newPostCategoryId} onValueChange={setNewPostCategoryId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione uma categoria" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {categories.map((category) => (
+                        <SelectItem key={category.id} value={category.id}>
+                          {category.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm">Adicionar imagens e vídeos</Label>
+                  <Input
+                    type="file"
+                    accept="image/*,video/*"
+                    multiple
+                    onChange={(e) => void handleFilesPicked(Array.from(e.target.files || []))}
+                  />
+                  <p className="text-[11px] text-muted-foreground">
+                    Imagens obrigatoriamente em 1536x1024px. Vídeos seguem formato livre.
+                  </p>
+                  {newPostFiles.length > 0 && (
+                    <p className="text-xs text-muted-foreground">{newPostFiles.length} arquivo(s) selecionado(s)</p>
                   )}
                 </div>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {editingPostId === post.id ? (
-                  <div className="space-y-2">
-                    <Textarea value={editingContent} onChange={(e) => setEditingContent(e.target.value)} rows={4} />
-                    <div className="flex gap-2">
-                      <Button size="sm" onClick={() => void handleSaveEditPost(post)}>Salvar edição</Button>
-                      <Button size="sm" variant="outline" onClick={() => setEditingPostId(null)}>Cancelar</Button>
-                    </div>
-                  </div>
-                ) : (
-                  <p className="whitespace-pre-wrap text-sm text-foreground">{post.content}</p>
-                )}
-
-                {postMentions.length > 0 && (
-                  <div className="flex flex-wrap gap-2">
-                    {postMentions.map((mention) => (
-                      <Badge key={`${mention.post_id}-${mention.mentioned_user_id}`} variant="secondary">
-                        @{displayName(profiles[mention.mentioned_user_id])}
-                      </Badge>
-                    ))}
-                  </div>
-                )}
-
-                {postMedia.length > 0 && (
-                  <div className="grid gap-3 md:grid-cols-2">
-                    {postMedia.map((item) =>
-                      item.media_type === "image" ? (
-                        <div key={item.id} className="overflow-hidden rounded-lg border border-border">
-                          <img src={item.media_url} alt="Mídia da publicação" className="h-56 w-full object-cover" />
-                        </div>
-                      ) : (
-                        <div key={item.id} className="overflow-hidden rounded-lg border border-border">
-                          <video src={item.media_url} controls className="h-56 w-full bg-black object-contain" />
-                        </div>
-                      ),
+                <div className="space-y-2 md:col-span-2">
+                  <Label className="text-sm">Marcar usuários</Label>
+                  <div className="max-h-28 overflow-y-auto rounded-md border border-border p-2">
+                    {mentionOptions.length === 0 ? (
+                      <p className="text-xs text-muted-foreground">Nenhum usuário disponível para marcação</p>
+                    ) : (
+                      <div className="flex flex-wrap gap-2">
+                        {mentionOptions.map((m) => (
+                          <button
+                            key={m.user_id}
+                            type="button"
+                            onClick={() => toggleMention(m.user_id)}
+                            className={`rounded-md border px-2 py-1 text-xs transition-colors ${
+                              selectedMentions.includes(m.user_id)
+                                ? "border-primary bg-primary/10 text-primary"
+                                : "border-border text-muted-foreground hover:text-foreground"
+                            }`}
+                          >
+                            @{displayName(m)}
+                          </button>
+                        ))}
+                      </div>
                     )}
                   </div>
-                )}
-
-                <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3">
-                  <Button
-                    variant={userLiked ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => void handleToggleLike(post.id)}
-                  >
-                    <Heart className="mr-1.5 h-4 w-4" />
-                    Curtir ({postLikes.length})
-                  </Button>
-                  <Badge variant="outline" className="gap-1">
-                    <MessageCircle className="h-3.5 w-3.5" />
-                    {postComments.length} comentário(s)
-                  </Badge>
-                  {postMedia.some((m) => m.media_type === "image") && (
-                    <Badge variant="outline" className="gap-1">
-                      <ImagePlus className="h-3.5 w-3.5" />
-                      imagem
-                    </Badge>
-                  )}
-                  {postMedia.some((m) => m.media_type === "video") && (
-                    <Badge variant="outline" className="gap-1">
-                      <Video className="h-3.5 w-3.5" />
-                      vídeo
-                    </Badge>
-                  )}
                 </div>
+              </div>
+              <Button onClick={() => void handleCreatePost()} disabled={publishing}>
+                Publicar
+              </Button>
+            </CardContent>
+          </Card>
 
-                <div className="space-y-2">
-                  {postComments.map((comment) => {
-                    const commentAuthor = profiles[comment.user_id];
-                    const commentAuthorName = displayName(commentAuthor);
-                    const canDeleteComment = !!currentUserId && (comment.user_id === currentUserId || isAdminMaster);
-                    return (
-                      <div key={comment.id} className="rounded-md border border-border bg-muted/20 p-2">
-                        <div className="mb-1 flex items-center justify-between gap-2">
-                          <div className="flex items-center gap-2">
-                            <Avatar className="h-7 w-7">
-                              <AvatarImage src={commentAuthor?.logo_url || undefined} alt={commentAuthorName} />
-                              <AvatarFallback className="text-[10px]">{initialsFromName(commentAuthorName)}</AvatarFallback>
-                            </Avatar>
-                            <p className="text-xs font-medium text-foreground">{commentAuthorName}</p>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <p className="text-[11px] text-muted-foreground">
-                              {new Date(comment.created_at).toLocaleString("pt-BR")}
-                            </p>
-                            {canDeleteComment && (
-                              <button
-                                type="button"
-                                className="text-destructive text-xs hover:underline"
-                                onClick={() => void handleDeleteComment(comment)}
-                              >
-                                excluir
-                              </button>
-                            )}
-                          </div>
+          <div className="space-y-4">
+            {visiblePosts.map((post) => {
+              const authorProfile = profiles[post.author_user_id];
+              const authorName = displayName(authorProfile);
+              const postMedia = media.filter((m) => m.post_id === post.id);
+              const postMentions = mentions.filter((m) => m.post_id === post.id);
+              const postLikes = likes.filter((l) => l.post_id === post.id);
+              const postComments = comments.filter((c) => c.post_id === post.id);
+              const userLiked = !!currentUserId && postLikes.some((l) => l.user_id === currentUserId);
+
+              return (
+                <Card key={post.id}>
+                  <CardHeader className="pb-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <Avatar className="h-10 w-10">
+                          <AvatarImage src={authorProfile?.logo_url || undefined} alt={authorName} />
+                          <AvatarFallback>{initialsFromName(authorName)}</AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <p className="font-semibold text-foreground">{authorName}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {new Date(post.created_at).toLocaleString("pt-BR")}
+                            {post.is_edited ? " · editado" : ""}
+                          </p>
                         </div>
-                        <p className="whitespace-pre-wrap text-xs text-foreground">{comment.content}</p>
                       </div>
-                    );
-                  })}
-                </div>
+                      {canEditOrDeletePost(post) && (
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => {
+                              setEditingPostId(post.id);
+                              setEditingContent(post.content);
+                            }}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="text-destructive hover:text-destructive"
+                            onClick={() => void handleDeletePost(post)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {editingPostId === post.id ? (
+                      <div className="space-y-2">
+                        <Textarea value={editingContent} onChange={(e) => setEditingContent(e.target.value)} rows={4} />
+                        <div className="flex gap-2">
+                          <Button size="sm" onClick={() => void handleSaveEditPost(post)}>Salvar edição</Button>
+                          <Button size="sm" variant="outline" onClick={() => setEditingPostId(null)}>Cancelar</Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="whitespace-pre-wrap text-sm text-foreground">{post.content}</p>
+                    )}
 
+                    <div className="flex flex-wrap gap-2">
+                      <Badge variant="secondary">{categoryMap.get(post.category_id || "") || "Sem categoria"}</Badge>
+                      {postMentions.map((mention) => (
+                        <Badge key={`${mention.post_id}-${mention.mentioned_user_id}`} variant="secondary">
+                          @{displayName(profiles[mention.mentioned_user_id])}
+                        </Badge>
+                      ))}
+                    </div>
+
+                    {postMedia.length > 0 && (
+                      <div className="grid gap-3 md:grid-cols-2">
+                        {postMedia.map((item) =>
+                          item.media_type === "image" ? (
+                            <div key={item.id} className="overflow-hidden rounded-lg border border-border bg-black/70 p-2">
+                              <img src={item.media_url} alt="Mídia da publicação" className="h-auto w-full object-contain" />
+                            </div>
+                          ) : (
+                            <div key={item.id} className="overflow-hidden rounded-lg border border-border">
+                              <video src={item.media_url} controls className="h-56 w-full bg-black object-contain" />
+                            </div>
+                          ),
+                        )}
+                      </div>
+                    )}
+
+                    <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3">
+                      <Button
+                        variant={userLiked ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => void handleToggleLike(post.id)}
+                      >
+                        <Heart className="mr-1.5 h-4 w-4" />
+                        Curtir ({postLikes.length})
+                      </Button>
+                      <Badge variant="outline" className="gap-1">
+                        <MessageCircle className="h-3.5 w-3.5" />
+                        {postComments.length} comentário(s)
+                      </Badge>
+                      {postMedia.some((m) => m.media_type === "image") && (
+                        <Badge variant="outline" className="gap-1">
+                          <ImagePlus className="h-3.5 w-3.5" />
+                          imagem
+                        </Badge>
+                      )}
+                      {postMedia.some((m) => m.media_type === "video") && (
+                        <Badge variant="outline" className="gap-1">
+                          <Video className="h-3.5 w-3.5" />
+                          vídeo
+                        </Badge>
+                      )}
+                    </div>
+
+                    <div className="space-y-2">
+                      {postComments.map((comment) => {
+                        const commentAuthor = profiles[comment.user_id];
+                        const commentAuthorName = displayName(commentAuthor);
+                        const canDeleteComment = !!currentUserId && (comment.user_id === currentUserId || isAdminMaster);
+                        return (
+                          <div key={comment.id} className="rounded-md border border-border bg-muted/20 p-2">
+                            <div className="mb-1 flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-2">
+                                <Avatar className="h-7 w-7">
+                                  <AvatarImage src={commentAuthor?.logo_url || undefined} alt={commentAuthorName} />
+                                  <AvatarFallback className="text-[10px]">{initialsFromName(commentAuthorName)}</AvatarFallback>
+                                </Avatar>
+                                <p className="text-xs font-medium text-foreground">{commentAuthorName}</p>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <p className="text-[11px] text-muted-foreground">
+                                  {new Date(comment.created_at).toLocaleString("pt-BR")}
+                                </p>
+                                {canDeleteComment && (
+                                  <button
+                                    type="button"
+                                    className="text-destructive text-xs hover:underline"
+                                    onClick={() => void handleDeleteComment(comment)}
+                                  >
+                                    excluir
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                            <p className="whitespace-pre-wrap text-xs text-foreground">{comment.content}</p>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder="Comentar nesta publicação..."
+                        value={commentDrafts[post.id] || ""}
+                        onChange={(e) => setCommentDrafts((prev) => ({ ...prev, [post.id]: e.target.value }))}
+                      />
+                      <Button size="sm" onClick={() => void handleAddComment(post.id)}>
+                        Enviar
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        </div>
+
+        <aside className="space-y-4">
+          <Card>
+            <CardHeader className="pb-2">
+              <p className="font-semibold text-foreground flex items-center gap-2">
+                <Tags className="h-4 w-4" />
+                Categorias
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <button
+                type="button"
+                className={`w-full rounded-md border px-3 py-2 text-left text-sm ${
+                  activeCategoryId === "all" ? "border-primary bg-primary/10 text-primary" : "border-border"
+                }`}
+                onClick={() => setActiveCategoryId("all")}
+              >
+                Todas as categorias
+              </button>
+              {categories.map((category) => (
+                <button
+                  key={category.id}
+                  type="button"
+                  className={`w-full rounded-md border px-3 py-2 text-left text-sm ${
+                    activeCategoryId === category.id ? "border-primary bg-primary/10 text-primary" : "border-border"
+                  }`}
+                  onClick={() => setActiveCategoryId(category.id)}
+                >
+                  {category.name}
+                </button>
+              ))}
+            </CardContent>
+          </Card>
+
+          {isAdminMaster && (
+            <Card>
+              <CardHeader className="pb-2">
+                <p className="font-semibold text-foreground">Gerenciar categorias</p>
+              </CardHeader>
+              <CardContent className="space-y-3">
                 <div className="flex gap-2">
                   <Input
-                    placeholder="Comentar nesta publicação..."
-                    value={commentDrafts[post.id] || ""}
-                    onChange={(e) => setCommentDrafts((prev) => ({ ...prev, [post.id]: e.target.value }))}
+                    placeholder="Nova categoria"
+                    value={newCategoryName}
+                    onChange={(e) => setNewCategoryName(e.target.value)}
                   />
-                  <Button size="sm" onClick={() => void handleAddComment(post.id)}>
-                    Enviar
-                  </Button>
+                  <Button size="sm" onClick={() => void handleCreateCategory()}>Criar</Button>
+                </div>
+                <div className="space-y-2">
+                  {categories.map((category) => (
+                    <div key={category.id} className="rounded-md border border-border p-2">
+                      {editingCategoryId === category.id ? (
+                        <div className="space-y-2">
+                          <Input value={editingCategoryName} onChange={(e) => setEditingCategoryName(e.target.value)} />
+                          <div className="flex gap-2">
+                            <Button size="sm" onClick={() => void handleSaveCategoryEdit()}>Salvar</Button>
+                            <Button size="sm" variant="outline" onClick={() => setEditingCategoryId(null)}>Cancelar</Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-sm text-foreground">{category.name}</p>
+                          <div className="flex gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => {
+                                setEditingCategoryId(category.id);
+                                setEditingCategoryName(category.name);
+                              }}
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="text-destructive hover:text-destructive"
+                              onClick={() => void handleDeleteCategory(category.id)}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
                 </div>
               </CardContent>
             </Card>
-          );
-        })}
+          )}
+        </aside>
       </div>
     </div>
   );

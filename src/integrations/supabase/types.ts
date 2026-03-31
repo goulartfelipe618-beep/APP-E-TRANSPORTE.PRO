@@ -403,9 +403,37 @@ export type Database = {
           },
         ]
       }
+      community_categories: {
+        Row: {
+          created_at: string
+          created_by_user_id: string
+          id: string
+          is_active: boolean
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by_user_id: string
+          id?: string
+          is_active?: boolean
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by_user_id?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       community_posts: {
         Row: {
           author_user_id: string
+          category_id: string | null
           content: string
           created_at: string
           id: string
@@ -414,6 +442,7 @@ export type Database = {
         }
         Insert: {
           author_user_id: string
+          category_id?: string | null
           content: string
           created_at?: string
           id?: string
@@ -422,13 +451,22 @@ export type Database = {
         }
         Update: {
           author_user_id?: string
+          category_id?: string | null
           content?: string
           created_at?: string
           id?: string
           is_edited?: boolean
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "community_posts_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "community_categories"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       contratos: {
         Row: {
