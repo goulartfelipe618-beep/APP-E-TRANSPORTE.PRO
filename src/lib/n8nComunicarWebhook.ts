@@ -79,14 +79,29 @@ export function buildComunicadorSnapshot(
   };
 }
 
+/**
+ * Envia o payload ao n8n via Edge Function (servidor → n8n), evitando CORS no browser.
+ * Opcionalmente `webhookUrl` no env do front para staging/outro fluxo (mesmo host permitido).
+ */
 export async function postMotoristaComunicarWebhook(body: Record<string, unknown>): Promise<void> {
-  const url = getN8nComunicarWebhookUrl();
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+  const urlOverride = getN8nComunicarWebhookUrl();
+  const { data, error } = await supabase.functions.invoke("n8n-comunicar-proxy", {
+    body: {
+      payload: body,
+      ...(urlOverride !== DEFAULT_WEBHOOK ? { webhookUrl: urlOverride } : {}),
+    },
   });
-  if (!res.ok) {
-    throw new Error(`Webhook n8n ${res.status}`);
+  if (error) {
+    throw new Error(
+      error.message ||
+        "Deploy: supabase functions deploy n8n-comunicar-proxy",
+    );
+  }
+  if (data && typeof data === "object" && "error" in data) {
+    throw new Error(String((data as { error: string }).error));
+  }
+  const pack = data as { ok?: boolean; status?: number };
+  if (!pack?.ok) {
+    throw new Error(`Webhook n8n status ${pack?.status ?? "?"}`);
   }
 }
