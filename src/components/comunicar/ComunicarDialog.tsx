@@ -158,13 +158,17 @@ export default function ComunicarDialog({
   const abertoWebhookDoneRef = useRef<string | null>(null);
   const abertoWebhookScheduledRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!open || !origemMotoristaWebhook) {
-      if (!open) {
-        abertoWebhookDoneRef.current = null;
-        abertoWebhookScheduledRef.current = null;
-      }
+    if (!open) {
+      abertoWebhookDoneRef.current = null;
+      abertoWebhookScheduledRef.current = null;
       return;
     }
+    if (!origemMotoristaWebhook) return;
+    /** Reservas: apenas um envio ao confirmar (sem WhatsApp), não dispara ao abrir o modal */
+    if (origemMotoristaWebhook === "transfer_reserva" || origemMotoristaWebhook === "grupo_reserva") {
+      return;
+    }
+
     const key = `${origemMotoristaWebhook}:${dadosFingerprint}`;
     if (abertoWebhookDoneRef.current === key || abertoWebhookScheduledRef.current === key) return;
     abertoWebhookScheduledRef.current = key;
@@ -230,6 +234,10 @@ export default function ComunicarDialog({
   const isSolicitacaoN8n =
     origemMotoristaWebhook === "transfer_solicitacao" || origemMotoristaWebhook === "grupo_solicitacao";
 
+  /** Reservas oficiais: só envio ao webhook n8n, sem abrir WhatsApp */
+  const isReservaN8n =
+    origemMotoristaWebhook === "transfer_reserva" || origemMotoristaWebhook === "grupo_reserva";
+
   const toggleVar = (key: string) => {
     setSelectedVars((prev) => {
       const next = new Set(prev);
@@ -276,7 +284,7 @@ export default function ComunicarDialog({
         try {
           const motorista = await fetchMotoristaPainelSnapshot();
           await postMotoristaComunicarWebhook({
-            evento: "comunicar_envio_whatsapp",
+            evento: isReservaN8n ? "comunicar_reserva_webhook" : "comunicar_envio_whatsapp",
             origem: origemMotoristaWebhook,
             momento: new Date().toISOString(),
             titulo_modal: titulo,
@@ -298,6 +306,12 @@ export default function ComunicarDialog({
           toast.error("Falha ao notificar o n8n.");
           return;
         }
+      }
+
+      if (isReservaN8n) {
+        toast.success("Dados da reserva enviados ao n8n.");
+        onOpenChange(false);
+        return;
       }
 
       if (phone) {
@@ -454,7 +468,8 @@ export default function ComunicarDialog({
               </Button>
             )}
             <Button onClick={handleEnviar} className="flex-1" disabled={loadingCanais}>
-              <Send className="h-4 w-4 mr-2" /> Enviar via WhatsApp
+              <Send className="h-4 w-4 mr-2" />{" "}
+              {isReservaN8n ? "Enviar ao n8n" : "Enviar via WhatsApp"}
             </Button>
           </div>
         </div>
