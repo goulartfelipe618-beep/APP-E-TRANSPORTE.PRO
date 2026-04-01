@@ -1,11 +1,14 @@
-import { useState } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { MessageSquare, FileDown, Send } from "lucide-react";
 import { toast } from "sonner";
+import { useComunicadoresEvolution } from "@/hooks/useComunicadoresEvolution";
+import { formatPhoneBrDisplay } from "@/lib/evolutionApi";
 
 interface ComunicarDialogProps {
   open: boolean;
@@ -71,14 +74,63 @@ const labelMap: Record<string, string> = {
 
 const ignoredKeys = ["id", "user_id", "created_at", "updated_at", "veiculo_id", "motorista_id", "solicitacao_id"];
 
+type CanalEnvio = "oficial" | "proprio";
+
+function sufixoCanal(canal: CanalEnvio, temOficial: boolean, temProprio: boolean): string {
+  if (temOficial && temProprio) {
+    return canal === "oficial"
+      ? "\n\n_Enviado pela linha oficial E-Transporte.pro._"
+      : "\n\n_Enviado pelo meu WhatsApp (motorista)._";
+  }
+  if (temOficial && !temProprio) return "\n\n_Enviado pela linha oficial E-Transporte.pro._";
+  if (!temOficial && temProprio) return "\n\n_Enviado pelo meu WhatsApp (motorista)._";
+  return "";
+}
+
 export default function ComunicarDialog({ open, onOpenChange, dados, telefone, titulo, onGerarPDF }: ComunicarDialogProps) {
+  const dadosRef = useRef(dados);
+  dadosRef.current = dados;
+
+  const { sistema, own, loading: loadingCanais } = useComunicadoresEvolution();
   const [msgAcima, setMsgAcima] = useState("");
   const [msgAbaixo, setMsgAbaixo] = useState("");
   const [selectedVars, setSelectedVars] = useState<Set<string>>(new Set());
+  const [canal, setCanal] = useState<CanalEnvio>("oficial");
 
-  const availableVars = Object.entries(dados)
-    .filter(([key, value]) => !ignoredKeys.includes(key) && value != null && value !== "")
-    .map(([key, value]) => ({ key, label: labelMap[key] || key, value: String(value) }));
+  const telOficial = sistema?.telefone_conectado?.trim() || null;
+  const telProprio = own?.telefone_conectado?.trim() || null;
+  const temOficial = Boolean(telOficial);
+  const temProprio = Boolean(telProprio);
+
+  const availableVars = useMemo(
+    () =>
+      Object.entries(dados)
+        .filter(([key, value]) => !ignoredKeys.includes(key) && value != null && value !== "")
+        .map(([key, value]) => ({ key, label: labelMap[key] || key, value: String(value) })),
+    [dados],
+  );
+
+  /** Evita re-selecionar tudo a cada render do pai; só quando abre ou troca o registro */
+  const dadosFingerprint = useMemo(() => {
+    const rowId = (dados as { id?: string }).id;
+    if (rowId != null && rowId !== "") return `id:${rowId}`;
+    return availableVars.map((v) => `${v.key}=${v.value}`).join("\u0001");
+  }, [dados, availableVars]);
+
+  useEffect(() => {
+    if (!open) return;
+    if (temProprio && temOficial) setCanal("proprio");
+    else if (temProprio) setCanal("proprio");
+    else if (temOficial) setCanal("oficial");
+  }, [open, temProprio, temOficial]);
+
+  useEffect(() => {
+    if (!open) return;
+    const keys = Object.entries(dadosRef.current)
+      .filter(([key, value]) => !ignoredKeys.includes(key) && value != null && value !== "")
+      .map(([key]) => key);
+    setSelectedVars(new Set(keys));
+  }, [open, dadosFingerprint]);
 
   const toggleVar = (key: string) => {
     setSelectedVars((prev) => {
@@ -87,14 +139,6 @@ export default function ComunicarDialog({ open, onOpenChange, dados, telefone, t
       else next.add(key);
       return next;
     });
-  };
-
-  const selectAll = () => {
-    setSelectedVars(new Set(availableVars.map((v) => v.key)));
-  };
-
-  const clearAll = () => {
-    setSelectedVars(new Set());
   };
 
   const buildMessage = () => {
@@ -119,8 +163,8 @@ export default function ComunicarDialog({ open, onOpenChange, dados, telefone, t
   };
 
   const handleEnviar = () => {
-    const message = buildMessage();
-    if (!message.trim()) {
+    const base = buildMessage();
+    if (!base.trim()) {
       toast.error("Escreva uma mensagem ou selecione variáveis.");
       return;
     }
@@ -130,6 +174,9 @@ export default function ComunicarDialog({ open, onOpenChange, dados, telefone, t
       toast.error("Telefone não disponível.");
       return;
     }
+
+    const suffix = sufixoCanal(canal, temOficial, temProprio);
+    const message = base + suffix;
 
     const url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
     window.open(url, "_blank");
@@ -147,6 +194,54 @@ export default function ComunicarDialog({ open, onOpenChange, dados, telefone, t
         </DialogHeader>
 
         <div className="space-y-4">
+          {/* Sempre no topo: escolha do comunicador */}
+          <div className="space-y-3 rounded-lg border border-primary/25 bg-muted/30 p-3">
+            <Label className="text-foreground text-base">Comunicador</Label>
+            {loadingCanais ? (
+              <p className="text-sm text-muted-foreground">Carregando canais…</p>
+            ) : temOficial && temProprio ? (
+              <RadioGroup value={canal} onValueChange={(v) => setCanal(v as CanalEnvio)} className="grid gap-3">
+                <div className="flex items-start gap-3 rounded-md border border-transparent px-1 py-0.5 has-[:checked]:border-primary/40 has-[:checked]:bg-primary/5">
+                  <RadioGroupItem value="proprio" id="canal-proprio" className="mt-1" />
+                  <Label htmlFor="canal-proprio" className="cursor-pointer font-normal leading-snug">
+                    <span className="font-medium text-foreground">Meu WhatsApp</span>
+                    <span className="block text-xs text-muted-foreground font-mono">{formatPhoneBrDisplay(telProprio!)}</span>
+                  </Label>
+                </div>
+                <div className="flex items-start gap-3 rounded-md border border-transparent px-1 py-0.5 has-[:checked]:border-primary/40 has-[:checked]:bg-primary/5">
+                  <RadioGroupItem value="oficial" id="canal-oficial" className="mt-1" />
+                  <Label htmlFor="canal-oficial" className="cursor-pointer font-normal leading-snug">
+                    <span className="font-medium text-foreground">Linha oficial da plataforma</span>
+                    <span className="block text-xs text-muted-foreground font-mono">{formatPhoneBrDisplay(telOficial!)}</span>
+                  </Label>
+                </div>
+              </RadioGroup>
+            ) : temOficial || temProprio ? (
+              <p className="text-sm text-muted-foreground">
+                {temOficial && (
+                  <>
+                    <span className="font-medium text-foreground">Linha oficial</span> — {formatPhoneBrDisplay(telOficial!)}
+                  </>
+                )}
+                {temOficial && temProprio ? <span className="mx-1">·</span> : null}
+                {temProprio && (
+                  <>
+                    <span className="font-medium text-foreground">Meu WhatsApp</span> — {formatPhoneBrDisplay(telProprio!)}
+                  </>
+                )}
+              </p>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Nenhum número de comunicador sincronizado. Configure em <strong className="text-foreground">Sistema → Comunicador</strong>. A mensagem será enviada sem rodapé de canal.
+              </p>
+            )}
+            {(temOficial || temProprio) && (
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                O link abre a conversa com o <strong className="text-foreground">cliente</strong>. Use o WhatsApp já logado na linha escolhida.
+              </p>
+            )}
+          </div>
+
           {/* Message above */}
           <div className="space-y-1.5">
             <Label>Mensagem Inicial</Label>
@@ -158,18 +253,11 @@ export default function ComunicarDialog({ open, onOpenChange, dados, telefone, t
             />
           </div>
 
-          {/* Variable selector */}
+          {/* Variable selector — todas marcadas ao abrir; clique para retirar da mensagem */}
           <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label>Selecione as variáveis</Label>
-              <div className="flex gap-2">
-                <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={selectAll}>
-                  Selecionar Tudo
-                </Button>
-                <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={clearAll}>
-                  Limpar
-                </Button>
-              </div>
+            <div className="space-y-1">
+              <Label>Variáveis do registro</Label>
+              <p className="text-xs text-muted-foreground">Todas vêm incluídas; clique num chip para excluir da mensagem.</p>
             </div>
             <div className="flex flex-wrap gap-2 max-h-[200px] overflow-y-auto rounded-lg border border-border p-3 bg-muted/30">
               {availableVars.map((v) => (
@@ -204,7 +292,7 @@ export default function ComunicarDialog({ open, onOpenChange, dados, telefone, t
             <div className="space-y-1.5">
               <Label className="text-xs text-muted-foreground">Pré-visualização</Label>
               <div className="rounded-lg border border-border bg-card p-3 text-sm whitespace-pre-wrap max-h-[150px] overflow-y-auto">
-                {buildMessage()}
+                {buildMessage() + sufixoCanal(canal, temOficial, temProprio)}
               </div>
             </div>
           )}
@@ -216,7 +304,7 @@ export default function ComunicarDialog({ open, onOpenChange, dados, telefone, t
                 <FileDown className="h-4 w-4 mr-2" /> Gerar PDF
               </Button>
             )}
-            <Button onClick={handleEnviar} className="flex-1">
+            <Button onClick={handleEnviar} className="flex-1" disabled={loadingCanais}>
               <Send className="h-4 w-4 mr-2" /> Enviar via WhatsApp
             </Button>
           </div>

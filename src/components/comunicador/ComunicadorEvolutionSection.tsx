@@ -88,7 +88,7 @@ export function ComunicadorEvolutionSection({
         )}
         {readOnly && !row?.telefone_conectado && !img && !loading && (
           <p className="text-sm text-muted-foreground">
-            Quando o administrador master salvar os dados da Evolution, o número oficial aparecerá aqui automaticamente para todos os motoristas executivos.
+            Quando a linha oficial estiver sincronizada (n8n / backend), o número aparecerá aqui para referência.
           </p>
         )}
 
@@ -121,7 +121,7 @@ export function ComunicadorEvolutionSection({
               )}
               {readOnly && (
                 <p className="text-xs text-muted-foreground">
-                  O comunicador oficial conecta automaticamente pelo administrador; use o número quando estiver disponível.
+                  O número oficial é sincronizado pelo sistema; use-o como referência quando estiver disponível.
                 </p>
               )}
             </div>

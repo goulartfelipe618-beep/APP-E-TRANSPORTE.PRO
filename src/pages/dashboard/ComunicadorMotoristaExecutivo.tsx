@@ -104,9 +104,10 @@ export default function ComunicadorMotoristaExecutivoPage() {
         <div>
           <h1 className="text-2xl font-bold text-foreground">Comunicador</h1>
           <p className="text-muted-foreground">
-            Você tem no <strong className="text-foreground">máximo dois</strong> comunicadores: o{" "}
-            <strong className="text-foreground">oficial E-Transporte.pro</strong> (sempre disponível) e, se quiser,{" "}
-            <strong className="text-foreground">o seu próprio</strong> WhatsApp.
+            A <strong className="text-foreground">linha oficial</strong> da plataforma aparece abaixo para referência. Você
+            pode conectar <strong className="text-foreground">apenas um</strong> WhatsApp próprio (integração via n8n /
+            Evolution). Em <strong className="text-foreground">Comunicar</strong>, você escolhe se fala pelo oficial ou
+            pelo seu número.
           </p>
         </div>
         <Button type="button" variant="outline" onClick={() => void reload()} disabled={loading}>
@@ -133,7 +134,7 @@ export default function ComunicadorMotoristaExecutivoPage() {
 
       <ComunicadorEvolutionSection
         title="Comunicador oficial E-Transporte.pro"
-        description="Conectado automaticamente pelo administrador master ao salvar URL, chave e instância na Evolution. Use este canal para falar com clientes pela linha oficial."
+        description="Linha oficial da plataforma (sincronizada via n8n / backend). Ao usar Comunicar, você pode enviar mensagens em nome deste canal."
         row={sistema}
         readOnly
         loading={loading}
@@ -147,7 +148,7 @@ export default function ComunicadorMotoristaExecutivoPage() {
       {own ? (
         <ComunicadorEvolutionSection
           title="Meu comunicador"
-          description="Seu WhatsApp próprio, separado do oficial. Máximo de um comunicador pessoal por conta."
+          description="Seu único WhatsApp próprio nesta conta. Em Comunicar, use esta opção para falar pelo seu número."
           row={own}
           readOnly={false}
           loading={loading}
@@ -160,12 +161,13 @@ export default function ComunicadorMotoristaExecutivoPage() {
         />
       ) : (
         <div className="rounded-xl border border-border bg-card p-6">
-          <h3 className="font-semibold text-foreground mb-2">Comunicador próprio (opcional)</h3>
+          <h3 className="font-semibold text-foreground mb-2">Conectar meu WhatsApp</h3>
           <p className="text-sm text-muted-foreground mb-4">
-            Adicione até um WhatsApp seu (segunda opção). O primeiro comunicador continua sendo sempre o oficial acima.
+            Você pode vincular <strong className="text-foreground">um</strong> número seu. Depois, em Comunicar, escolha
+            entre este número e a linha oficial da plataforma.
           </p>
           <Button type="button" className="bg-primary text-primary-foreground" onClick={() => void handleGerarProprio()} disabled={loading || busy}>
-            Adicionar meu comunicador e gerar QR
+            Conectar meu comunicador (QR)
           </Button>
         </div>
       )}
