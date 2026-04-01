@@ -12,6 +12,15 @@ dist
 dist-ssr
 *.local
 
+# Tooling / IDE
+.lovable/
+coverage
+.cache
+.turbo
+*.tsbuildinfo
+playwright-report/
+test-results/
+
 # Environment (secrets — never commit)
 .env
 .env.*
