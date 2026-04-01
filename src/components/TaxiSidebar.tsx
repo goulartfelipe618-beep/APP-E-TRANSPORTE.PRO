@@ -1,7 +1,7 @@
 import {
   LayoutDashboard, Home, Activity, MapPin, Car,
   Phone, CheckCircle, Users, Settings, StickyNote,
-  Bell, Moon, LogOut, Globe, Monitor, ClipboardList,
+  Bell, Moon, LogOut, Globe, ClipboardList,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -52,7 +52,6 @@ const menuStructure = [
         children: [
           { title: "Configurações", page: "sistema/configuracoes", icon: Settings },
           { title: "Automações", page: "sistema/automacoes", icon: Globe },
-          { title: "Comunicador", page: "sistema/comunicador", icon: Monitor },
         ],
       },
       { title: "Comunidade", page: "comunidade", icon: Users },

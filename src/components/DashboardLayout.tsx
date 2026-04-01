@@ -36,7 +36,7 @@ import WebsitePage from "@/pages/dashboard/WebsitePage";
 import AnotacoesPage from "@/pages/dashboard/AnotacoesPage";
 import SistemaConfiguracoesPage from "@/pages/dashboard/SistemaConfiguracoes";
 import SistemaAutomacoesPage from "@/pages/dashboard/SistemaAutomacoes";
-import SistemaComunicadorPage from "@/pages/dashboard/SistemaComunicador";
+import ComunicadorMotoristaExecutivoPage from "@/pages/dashboard/ComunicadorMotoristaExecutivo";
 import TicketsPage from "@/pages/dashboard/TicketsPage";
 import DisparadorPage from "@/pages/dashboard/DisparadorPage";
 import MentoriaPage from "@/pages/dashboard/MentoriaPage";
@@ -73,7 +73,7 @@ const PAGE_MAP: Record<string, React.ComponentType> = {
   anotacoes: AnotacoesPage,
   "sistema/configuracoes": SistemaConfiguracoesPage,
   "sistema/automacoes": SistemaAutomacoesPage,
-  "sistema/comunicador": SistemaComunicadorPage,
+  "sistema/comunicador": ComunicadorMotoristaExecutivoPage,
   tickets: TicketsPage,
   disparador: DisparadorPage,
   mentoria: MentoriaPage,

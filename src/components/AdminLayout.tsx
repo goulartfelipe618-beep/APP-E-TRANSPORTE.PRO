@@ -18,7 +18,7 @@ import AdminTemplatesPage from "@/pages/admin/AdminTemplatesPage";
 import AdminAutomacoesPage from "@/pages/admin/AdminAutomacoesPage";
 import AnotacoesPage from "@/pages/dashboard/AnotacoesPage";
 import SistemaConfiguracoesPage from "@/pages/dashboard/SistemaConfiguracoes";
-import SistemaComunicadorPage from "@/pages/dashboard/SistemaComunicador";
+import ComunicadorAdminMasterPage from "@/pages/dashboard/ComunicadorAdminMaster";
 import AdminTicketsPage from "@/pages/admin/AdminTicketsPage";
 import AdminMentoriaPage from "@/pages/admin/AdminMentoriaPage";
 import AdminEmptyLegsPage from "@/pages/admin/AdminEmptyLegsPage";
@@ -38,7 +38,7 @@ const PAGE_MAP: Record<string, React.ComponentType> = {
   templates: AdminTemplatesPage,
   "sistema/configuracoes": SistemaConfiguracoesPage,
   "sistema/automacoes": AdminAutomacoesPage,
-  "sistema/comunicador": SistemaComunicadorPage,
+  "sistema/comunicador": ComunicadorAdminMasterPage,
   "sistema/anotacoes": AnotacoesPage,
   tickets: AdminTicketsPage,
   mentoria: AdminMentoriaPage,

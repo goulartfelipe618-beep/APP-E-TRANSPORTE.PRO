@@ -269,6 +269,45 @@ export type Database = {
         }
         Relationships: []
       }
+      comunicadores_evolution: {
+        Row: {
+          connection_status: string
+          created_at: string
+          escopo: string
+          id: string
+          instance_name: string | null
+          qr_code_base64: string | null
+          rotulo: string
+          telefone_conectado: string | null
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          connection_status?: string
+          created_at?: string
+          escopo: string
+          id?: string
+          instance_name?: string | null
+          qr_code_base64?: string | null
+          rotulo?: string
+          telefone_conectado?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          connection_status?: string
+          created_at?: string
+          escopo?: string
+          id?: string
+          instance_name?: string | null
+          qr_code_base64?: string | null
+          rotulo?: string
+          telefone_conectado?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       community_post_comments: {
         Row: {
           content: string

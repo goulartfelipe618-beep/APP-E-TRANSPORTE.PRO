@@ -14,7 +14,6 @@ import TaxiClientes from "@/pages/taxi/TaxiClientes";
 import AnotacoesPage from "@/pages/dashboard/AnotacoesPage";
 import SistemaConfiguracoesPage from "@/pages/dashboard/SistemaConfiguracoes";
 import SistemaAutomacoesPage from "@/pages/dashboard/SistemaAutomacoes";
-import SistemaComunicadorPage from "@/pages/dashboard/SistemaComunicador";
 import TicketsPage from "@/pages/dashboard/TicketsPage";
 import TaxiCommunityPage from "@/pages/taxi/TaxiCommunityPage";
 
@@ -29,7 +28,6 @@ const PAGE_MAP: Record<string, React.ComponentType> = {
   anotacoes: AnotacoesPage,
   "sistema/configuracoes": SistemaConfiguracoesPage,
   "sistema/automacoes": SistemaAutomacoesPage,
-  "sistema/comunicador": SistemaComunicadorPage,
   tickets: TicketsPage,
 };
 
