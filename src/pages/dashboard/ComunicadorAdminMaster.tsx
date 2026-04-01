@@ -14,8 +14,19 @@ import {
   ensureInstanceAndPollConnection,
   formatPhoneBrDisplay,
   resolveEvolutionCreds,
+  sanitizeApiKey,
   type EvolutionCreds,
 } from "@/lib/evolutionApi";
+
+const UUID_INSTANCIA_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Nome salvo por engano como id do banco — não é nome de instância na Evolution */
+function nomeInstanciaSeguro(raw: string | null | undefined, fallback: string) {
+  const n = raw?.trim();
+  if (!n) return fallback;
+  if (UUID_INSTANCIA_RE.test(n)) return fallback;
+  return n;
+}
 
 const emptyForm = (): OficialFormValues => ({
   api_url: "",
@@ -33,7 +44,7 @@ export default function ComunicadorAdminMasterPage() {
     if (!sistema) return;
     setOficialForm((f) => ({
       ...f,
-      instance_name: sistema.instance_name?.trim() || INSTANCE_SISTEMA_DEFAULT,
+      instance_name: nomeInstanciaSeguro(sistema.instance_name, INSTANCE_SISTEMA_DEFAULT),
       nome_dispositivo: sistema.nome_dispositivo ?? "",
     }));
   }, [sistema?.id, sistema?.instance_name, sistema?.nome_dispositivo]);
@@ -75,8 +86,12 @@ export default function ComunicadorAdminMasterPage() {
       return;
     }
     const url = oficialForm.api_url.trim();
-    const key = oficialForm.api_key.trim();
-    const inst = oficialForm.instance_name.trim() || INSTANCE_SISTEMA_DEFAULT;
+    const key = sanitizeApiKey(oficialForm.api_key);
+    const rawNomeInstancia = oficialForm.instance_name.trim();
+    let inst = nomeInstanciaSeguro(rawNomeInstancia, INSTANCE_SISTEMA_DEFAULT);
+    if (rawNomeInstancia && UUID_INSTANCIA_RE.test(rawNomeInstancia)) {
+      toast.warning("O nome da instância não pode ser um UUID. Use o mesmo nome curto da instância no Manager da Evolution (ex.: etp-oficial). Foi aplicado o nome padrão do sistema.");
+    }
     if (!url || !key) {
       toast.error("Preencha URL e chave da API.");
       return;
@@ -115,10 +130,6 @@ export default function ComunicadorAdminMasterPage() {
           ...credPayload,
         });
         if (iErr) throw iErr;
-      }
-
-      if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(inst)) {
-        toast.warning("O “Nome da instância” parece um UUID. Na Evolution o nome da instância é um identificador curto (ex.: etp-oficial), não um ID do sistema.");
       }
 
       const creds: EvolutionCreds = { baseUrl: url, apiKey: key };

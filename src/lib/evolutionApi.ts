@@ -1,7 +1,12 @@
 /**
  * Evolution API (WhatsApp) — URL e chave podem vir do painel (comunicador oficial)
  * ou, para testes, de VITE_EVOLUTION_API_URL / VITE_EVOLUTION_API_KEY.
+ *
+ * As chamadas usam a Edge Function `evolution-proxy` (servidor → Evolution) para evitar
+ * 403 Forbidden que proxies costumam aplicar ao navegador.
  */
+
+import { supabase } from "@/integrations/supabase/client";
 
 export type EvolutionCreds = {
   baseUrl: string;
@@ -26,14 +31,22 @@ function envKey(): string | undefined {
   return import.meta.env.VITE_EVOLUTION_API_KEY as string | undefined;
 }
 
+/** Remove espaços invisíveis e quebras de linha coladas ao copiar a API Key */
+export function sanitizeApiKey(key: string): string {
+  return key
+    .trim()
+    .replace(/[\u200B-\u200D\uFEFF]/g, "")
+    .replace(/\r?\n/g, "");
+}
+
 /** Resolve credenciais: prioridade para as passadas (painel); senão .env */
 export function resolveEvolutionCreds(override?: EvolutionCreds | null): EvolutionCreds | null {
   if (override?.baseUrl?.trim() && override?.apiKey?.trim()) {
-    return { baseUrl: normalizeBase(override.baseUrl), apiKey: override.apiKey.trim() };
+    return { baseUrl: normalizeBase(override.baseUrl), apiKey: sanitizeApiKey(override.apiKey) };
   }
   const b = envBase();
   const k = envKey();
-  if (b && k) return { baseUrl: b, apiKey: k };
+  if (b && k) return { baseUrl: b, apiKey: sanitizeApiKey(k) };
   return null;
 }
 
@@ -41,27 +54,35 @@ export function evolutionEnvConfigured(override?: EvolutionCreds | null): boolea
   return resolveEvolutionCreds(override) !== null;
 }
 
-/** Evolution aceita apikey; alguns proxies também Bearer */
-function evolutionHeaders(apiKey: string, jsonBody: boolean): Record<string, string> {
-  const h: Record<string, string> = {
-    apikey: apiKey,
-    Authorization: `Bearer ${apiKey}`,
-  };
-  if (jsonBody) {
-    h["Content-Type"] = "application/json";
-  }
-  return h;
-}
-
-function evolutionGetHeaders(apiKey: string): Record<string, string> {
-  return evolutionHeaders(apiKey, false);
-}
-
-/** Junta base + path sem barra dupla */
-function apiUrl(base: string, path: string): string {
-  const b = normalizeBase(base);
+async function evolutionHttp(
+  creds: EvolutionCreds,
+  path: string,
+  opts: { method: "GET" | "POST"; jsonBody?: unknown },
+): Promise<{ status: number; bodyText: string }> {
   const p = path.startsWith("/") ? path : `/${path}`;
-  return `${b}${p}`;
+  const { data, error } = await supabase.functions.invoke("evolution-proxy", {
+    body: {
+      baseUrl: creds.baseUrl,
+      apiKey: creds.apiKey,
+      path: p,
+      method: opts.method,
+      jsonBody: opts.method === "POST" ? opts.jsonBody ?? null : undefined,
+    },
+  });
+  if (error) {
+    throw new Error(
+      error.message ||
+        "Deploy da função: supabase functions deploy evolution-proxy",
+    );
+  }
+  if (data && typeof data === "object" && "error" in data) {
+    throw new Error(String((data as { error: string }).error));
+  }
+  const pack = data as { status: number; bodyText: string };
+  if (typeof pack?.status !== "number" || typeof pack?.bodyText !== "string") {
+    throw new Error("Resposta inválida do evolution-proxy");
+  }
+  return pack;
 }
 
 /** Extrai número exibível a partir de JID ou string só dígitos */
@@ -123,16 +144,13 @@ function extractState(data: unknown): string | null {
 
 /** Lista instâncias e tenta achar telefone/estado pelo nome */
 async function fetchPhoneFromInstancesList(
-  baseUrl: string,
-  apiKey: string,
+  creds: EvolutionCreds,
   instanceName: string,
 ): Promise<{ phone: string | null; state: string | null }> {
   try {
-    const res2 = await fetch(apiUrl(baseUrl, "/instance/fetchInstances"), {
-      headers: evolutionGetHeaders(apiKey),
-    });
-    if (!res2.ok) return { phone: null, state: null };
-    const list = (await res2.json()) as unknown;
+    const { status, bodyText } = await evolutionHttp(creds, "/instance/fetchInstances", { method: "GET" });
+    if (status < 200 || status >= 300) return { phone: null, state: null };
+    const list = JSON.parse(bodyText) as unknown;
     const arr = Array.isArray(list) ? list : [list];
     let phone: string | null = null;
     let state: string | null = null;
@@ -171,30 +189,27 @@ export async function fetchEvolutionQrCode(
   }
 
   try {
-    const createRes = await fetch(apiUrl(c.baseUrl, "/instance/create"), {
+    const createPack = await evolutionHttp(c, "/instance/create", {
       method: "POST",
-      headers: evolutionHeaders(c.apiKey, true),
-      body: JSON.stringify({
+      jsonBody: {
         instanceName,
         qrcode: true,
         integration: "WHATSAPP-BAILEYS",
-      }),
+      },
     });
-    if (!createRes.ok && createRes.status !== 409) {
-      const t = await createRes.text();
-      return { base64: null, error: "http", detail: `${createRes.status}: ${t.slice(0, 200)}` };
+    if (![200, 201, 409].includes(createPack.status)) {
+      return { base64: null, error: "http", detail: `${createPack.status}: ${createPack.bodyText.slice(0, 200)}` };
     }
 
-    const connectRes = await fetch(apiUrl(c.baseUrl, `/instance/connect/${encodeURIComponent(instanceName)}`), {
-      headers: evolutionGetHeaders(c.apiKey),
+    const connectPack = await evolutionHttp(c, `/instance/connect/${encodeURIComponent(instanceName)}`, {
+      method: "GET",
     });
 
-    if (!connectRes.ok) {
-      const t = await connectRes.text();
-      return { base64: null, error: "http", detail: t.slice(0, 240) };
+    if (connectPack.status < 200 || connectPack.status >= 300) {
+      return { base64: null, error: "http", detail: connectPack.bodyText.slice(0, 240) };
     }
 
-    const data = (await connectRes.json()) as Record<string, unknown>;
+    const data = JSON.parse(connectPack.bodyText) as Record<string, unknown>;
     const b64 =
       (typeof data.base64 === "string" && data.base64) ||
       (typeof (data as { qrcode?: { base64?: string } }).qrcode?.base64 === "string" &&
@@ -246,19 +261,21 @@ export async function ensureInstanceAndPollConnection(
     if (nd) {
       body.deviceName = nd;
     }
-    const createRes = await fetch(apiUrl(c.baseUrl, "/instance/create"), {
+    const createPack = await evolutionHttp(c, "/instance/create", {
       method: "POST",
-      headers: evolutionHeaders(c.apiKey, true),
-      body: JSON.stringify(body),
+      jsonBody: body,
     });
-    createHttpStatus = createRes.status;
-    if (!createRes.ok && createRes.status !== 409) {
-      const t = await createRes.text();
-      if (createRes.status === 401) {
+    createHttpStatus = createPack.status;
+    if (![200, 201, 409].includes(createPack.status)) {
+      const t = createPack.bodyText;
+      if (createPack.status === 401) {
         createErrorHint =
-          "401: API Key inválida ou não autorizada. Confira a Global API Key no painel da Evolution (AUTHENTICATION_API_KEY).";
+          "401: a Evolution recusou a API Key. Confira AUTHENTICATION_API_KEY no .env da Evolution e o mesmo valor no painel.";
+      } else if (createPack.status === 403) {
+        createErrorHint =
+          "403: a Evolution recusou a requisição. Com a função evolution-proxy no Supabase o tráfego sai do servidor; se persistir, verifique firewall/API Key no servidor Evolution.";
       } else {
-        createErrorHint = `${createRes.status}: ${t.slice(0, 160)}`;
+        createErrorHint = `${createPack.status}: ${t.slice(0, 160)}`;
       }
     }
   } catch (e) {
@@ -300,17 +317,17 @@ export async function fetchEvolutionConnectionInfo(
   }
 
   try {
-    const res = await fetch(
-      apiUrl(c.baseUrl, `/instance/connectionState/${encodeURIComponent(instanceName)}`),
-      { headers: evolutionGetHeaders(c.apiKey) },
-    );
-    const text = await res.text();
+    const pack = await evolutionHttp(c, `/instance/connectionState/${encodeURIComponent(instanceName)}`, {
+      method: "GET",
+    });
+    const text = pack.bodyText;
+    const status = pack.status;
     let data: unknown;
     try {
       data = JSON.parse(text) as unknown;
     } catch {
-      if (res.status === 404) {
-        return fetchPhoneFromInstancesList(c.baseUrl, c.apiKey, instanceName);
+      if (status === 404) {
+        return fetchPhoneFromInstancesList(c, instanceName);
       }
       return { phone: null, state: null, detail: text.slice(0, 200) };
     }
@@ -318,14 +335,14 @@ export async function fetchEvolutionConnectionInfo(
     let phone = extractPhoneFromUnknown(data);
     let state = extractState(data);
 
-    if (!phone && res.ok) {
-      const fromList = await fetchPhoneFromInstancesList(c.baseUrl, c.apiKey, instanceName);
+    if (!phone && status >= 200 && status < 300) {
+      const fromList = await fetchPhoneFromInstancesList(c, instanceName);
       phone = phone ?? fromList.phone;
       state = state ?? fromList.state;
     }
 
-    if (!phone && (res.status === 404 || !res.ok)) {
-      const fromList = await fetchPhoneFromInstancesList(c.baseUrl, c.apiKey, instanceName);
+    if (!phone && (status === 404 || status < 200 || status >= 300)) {
+      const fromList = await fetchPhoneFromInstancesList(c, instanceName);
       phone = fromList.phone;
       state = fromList.state ?? state;
     }

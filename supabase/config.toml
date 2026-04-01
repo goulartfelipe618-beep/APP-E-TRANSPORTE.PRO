@@ -9,3 +9,7 @@ verify_jwt = false
 
 [functions.self-upgrade-plan]
 verify_jwt = true
+
+# Proxy para Evolution API (evita 403 do navegador → servidor Evolution).
+[functions.evolution-proxy]
+verify_jwt = false
