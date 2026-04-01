@@ -276,6 +276,7 @@ export type Database = {
           escopo: string
           id: string
           instance_name: string | null
+          nome_dispositivo: string | null
           qr_code_base64: string | null
           rotulo: string
           telefone_conectado: string | null
@@ -288,6 +289,7 @@ export type Database = {
           escopo: string
           id?: string
           instance_name?: string | null
+          nome_dispositivo?: string | null
           qr_code_base64?: string | null
           rotulo?: string
           telefone_conectado?: string | null
@@ -300,6 +302,7 @@ export type Database = {
           escopo?: string
           id?: string
           instance_name?: string | null
+          nome_dispositivo?: string | null
           qr_code_base64?: string | null
           rotulo?: string
           telefone_conectado?: string | null
@@ -307,6 +310,38 @@ export type Database = {
           user_id?: string | null
         }
         Relationships: []
+      }
+      comunicador_evolution_credenciais: {
+        Row: {
+          api_key: string
+          api_url: string
+          comunicador_id: string
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          api_key?: string
+          api_url?: string
+          comunicador_id: string
+          id?: string
+          updated_at?: string
+        }
+        Update: {
+          api_key?: string
+          api_url?: string
+          comunicador_id?: string
+          id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comunicador_evolution_credenciais_comunicador_id_fkey"
+            columns: ["comunicador_id"]
+            isOneToOne: true
+            referencedRelation: "comunicadores_evolution"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       community_post_comments: {
         Row: {

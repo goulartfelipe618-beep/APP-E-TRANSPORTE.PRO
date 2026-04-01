@@ -5,7 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import type { ComunicadorRow } from "@/hooks/useComunicadoresEvolution";
 import { qrSrc } from "@/hooks/useComunicadoresEvolution";
-import { evolutionEnvConfigured } from "@/lib/evolutionApi";
+import type { EvolutionCreds } from "@/lib/evolutionApi";
+import { evolutionEnvConfigured, formatPhoneBrDisplay } from "@/lib/evolutionApi";
 
 type Props = {
   title: string;
@@ -19,6 +20,8 @@ type Props = {
   onGerarQr: () => void | Promise<void>;
   onRemover?: () => void | Promise<void>;
   showRemover?: boolean;
+  /** Credenciais do painel (oficial) ou undefined para usar só .env no comunicador pessoal */
+  evolutionCreds?: EvolutionCreds | null;
 };
 
 export function ComunicadorEvolutionSection({
@@ -32,9 +35,10 @@ export function ComunicadorEvolutionSection({
   onGerarQr,
   onRemover,
   showRemover,
+  evolutionCreds,
 }: Props) {
   const img = qrSrc(row?.qr_code_base64 ?? null);
-  const envOk = evolutionEnvConfigured();
+  const envOk = evolutionEnvConfigured(evolutionCreds ?? undefined);
 
   return (
     <Card>
@@ -45,9 +49,13 @@ export function ComunicadorEvolutionSection({
             <Badge variant="outline">{row?.connection_status ?? "—"}</Badge>
           </CardTitle>
           <CardDescription>{description}</CardDescription>
+          {row?.nome_dispositivo ? (
+            <p className="text-sm font-medium text-foreground pt-1">{row.nome_dispositivo}</p>
+          ) : null}
           {row?.telefone_conectado ? (
             <p className="text-sm text-foreground pt-1">
-              Número: <span className="font-mono">{row.telefone_conectado}</span>
+              Número:{" "}
+              <span className="font-mono font-semibold">{formatPhoneBrDisplay(row.telefone_conectado)}</span>
             </p>
           ) : null}
           {row?.instance_name ? (
@@ -70,9 +78,9 @@ export function ComunicadorEvolutionSection({
             </AlertDescription>
           </Alert>
         )}
-        {readOnly && !img && !loading && (
+        {readOnly && !row?.telefone_conectado && !img && !loading && (
           <p className="text-sm text-muted-foreground">
-            Quando o administrador master gerar o QR e conectar o número oficial, ele aparecerá aqui para todos os motoristas executivos.
+            Quando o administrador master salvar a Evolution e conectar o WhatsApp oficial, o número aparecerá aqui para todos os motoristas executivos.
           </p>
         )}
 
