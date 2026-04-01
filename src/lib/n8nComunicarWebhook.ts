@@ -17,11 +17,8 @@ export function jsonSafeRecord(obj: Record<string, unknown>): Record<string, unk
   }
 }
 
-export type OrigemComunicarMotorista =
-  | "transfer_solicitacao"
-  | "grupo_solicitacao"
-  | "transfer_reserva"
-  | "grupo_reserva";
+/** Só solicitações (Transfer / Grupo). Reservas usam outro fluxo/webhook. */
+export type OrigemComunicarMotorista = "transfer_solicitacao" | "grupo_solicitacao";
 
 export async function fetchMotoristaPainelSnapshot(): Promise<Record<string, unknown>> {
   const { data: { user } } = await supabase.auth.getUser();

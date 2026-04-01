@@ -25,7 +25,10 @@ interface ComunicarDialogProps {
   telefone: string | null;
   titulo: string;
   onGerarPDF?: () => void;
-  /** Painel motorista executivo: envia payload ao n8n ao abrir (Comunicar) e ao confirmar WhatsApp */
+  /**
+   * Só solicitações Transfer / Grupo: envia ao webhook n8n e pré-preenche textos.
+   * Reservas não usam este prop (outro fluxo/webhook).
+   */
   origemMotoristaWebhook?: OrigemComunicarMotorista | null;
 }
 
@@ -204,6 +207,35 @@ export default function ComunicarDialog({
     setSelectedVars(new Set(keys));
   }, [open, dadosFingerprint]);
 
+  const solicitacaoPresetKeyRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!open) {
+      solicitacaoPresetKeyRef.current = null;
+      return;
+    }
+    const o = origemMotoristaWebhook;
+    if (o !== "transfer_solicitacao" && o !== "grupo_solicitacao") return;
+
+    const key = `${o}:${dadosFingerprint}`;
+    if (solicitacaoPresetKeyRef.current === key) return;
+    solicitacaoPresetKeyRef.current = key;
+
+    const nome = String((dadosRef.current as { nome_cliente?: string }).nome_cliente || "").trim() || "Cliente";
+    if (o === "transfer_solicitacao") {
+      setMsgAcima(
+        `Olá ${nome}, recebemos a sua solicitação de viagem!\n\nDetalhes da viagem:`,
+      );
+    } else {
+      setMsgAcima(
+        `Olá ${nome}, recebemos a sua solicitação de viagem em grupo!\n\nDetalhes da viagem:`,
+      );
+    }
+    setMsgAbaixo("Em breve um de nossos motoristas entrará em contato!");
+  }, [open, origemMotoristaWebhook, dadosFingerprint]);
+
+  const isSolicitacaoN8n =
+    origemMotoristaWebhook === "transfer_solicitacao" || origemMotoristaWebhook === "grupo_solicitacao";
+
   const toggleVar = (key: string) => {
     setSelectedVars((prev) => {
       const next = new Set(prev);
@@ -351,12 +383,21 @@ export default function ComunicarDialog({
 
           {/* Message above */}
           <div className="space-y-1.5">
-            <Label>Mensagem Inicial</Label>
+            <Label>Mensagem inicial {isSolicitacaoN8n ? "(acima das variáveis)" : ""}</Label>
+            {isSolicitacaoN8n ? (
+              <p className="text-xs text-muted-foreground">
+                Texto sugerido com o nome do cliente; você pode editar ou apagar por completo.
+              </p>
+            ) : null}
             <Textarea
-              placeholder="Escreva uma saudação ou mensagem inicial..."
+              placeholder={
+                isSolicitacaoN8n
+                  ? "Saudação e introdução antes dos detalhes…"
+                  : "Escreva uma saudação ou mensagem inicial…"
+              }
               value={msgAcima}
               onChange={(e) => setMsgAcima(e.target.value)}
-              rows={3}
+              rows={isSolicitacaoN8n ? 5 : 3}
             />
           </div>
 
@@ -385,12 +426,19 @@ export default function ComunicarDialog({
 
           {/* Message below */}
           <div className="space-y-1.5">
-            <Label>Mensagem Final</Label>
+            <Label>Mensagem final {isSolicitacaoN8n ? "(abaixo das variáveis)" : ""}</Label>
+            {isSolicitacaoN8n ? (
+              <p className="text-xs text-muted-foreground">
+                Texto sugerido de encerramento; você pode editar ou apagar por completo.
+              </p>
+            ) : null}
             <Textarea
-              placeholder="Escreva uma mensagem de encerramento..."
+              placeholder={
+                isSolicitacaoN8n ? "Encerramento da mensagem…" : "Escreva uma mensagem de encerramento…"
+              }
               value={msgAbaixo}
               onChange={(e) => setMsgAbaixo(e.target.value)}
-              rows={3}
+              rows={isSolicitacaoN8n ? 4 : 3}
             />
           </div>
 
