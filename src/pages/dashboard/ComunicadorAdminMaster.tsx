@@ -3,10 +3,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { Tables } from "@/integrations/supabase/types";
-import { Loader2, Pencil, Save, X } from "lucide-react";
+import { AlertTriangle, Loader2, Pencil, Save, X } from "lucide-react";
 
 const ROW_ID = "00000000-0000-0000-0000-000000000001";
 
@@ -34,6 +35,20 @@ const FIELD_META: { key: UrlKey; title: string; hint: string }[] = [
   { key: "geolocalizacao_url", title: "7 — Link de rastreamento de geolocalização", hint: "Criação de link em Transfer → Geolocalização." },
 ];
 
+/** PostgREST 404 / PGRST205 quando a tabela ainda não existe no projeto (migração não aplicada). */
+function isTableMissingError(error: { code?: string; message?: string } | null): boolean {
+  if (!error) return false;
+  const code = String(error.code ?? "");
+  const msg = String(error.message ?? "").toLowerCase();
+  return (
+    code === "PGRST205" ||
+    code === "42P01" ||
+    msg.includes("schema cache") ||
+    msg.includes("does not exist") ||
+    msg.includes("could not find the table")
+  );
+}
+
 function emptyDraft(): Record<UrlKey, string> {
   return {
     transfer_solicitacao_url: "",
@@ -48,6 +63,7 @@ function emptyDraft(): Record<UrlKey, string> {
 
 export default function ComunicadorAdminMasterPage() {
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<"missing_table" | "other" | null>(null);
   const [savingKey, setSavingKey] = useState<UrlKey | null>(null);
   const [server, setServer] = useState<Record<UrlKey, string>>(emptyDraft);
   const [draft, setDraft] = useState<Record<UrlKey, string>>(emptyDraft);
@@ -57,6 +73,7 @@ export default function ComunicadorAdminMasterPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
+    setLoadError(null);
     const { data, error } = await supabase
       .from("sistema_webhooks_comunicacao")
       .select("*")
@@ -64,7 +81,13 @@ export default function ComunicadorAdminMasterPage() {
       .maybeSingle();
 
     if (error) {
-      toast.error("Erro ao carregar webhooks.");
+      if (isTableMissingError(error)) {
+        setLoadError("missing_table");
+        toast.error("Tabela de webhooks ainda não existe no banco. Aplique a migração no Supabase.");
+      } else {
+        setLoadError("other");
+        toast.error(error.message || "Erro ao carregar webhooks.");
+      }
       setLoading(false);
       return;
     }
@@ -132,6 +155,44 @@ export default function ComunicadorAdminMasterPage() {
         </p>
       </div>
 
+      {loadError === "missing_table" && (
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Banco de dados desatualizado</AlertTitle>
+          <AlertDescription className="space-y-2 text-sm">
+            <p>
+              A tabela <code className="rounded bg-muted px-1 py-0.5 text-xs">sistema_webhooks_comunicacao</code> não
+              foi encontrada (o navegador pode mostrar erro 404 na API do Supabase). Isso normalmente significa que a
+              migração ainda não foi aplicada no projeto.
+            </p>
+            <p className="font-medium text-foreground">O que fazer:</p>
+            <ol className="list-decimal list-inside space-y-1 pl-1">
+              <li>
+                No projeto local, execute: <code className="rounded bg-muted px-1 py-0.5 text-xs">supabase db push</code>{" "}
+                (ou aplique o SQL manualmente no painel Supabase → SQL).
+              </li>
+              <li>
+                Arquivo da migração:{" "}
+                <code className="rounded bg-muted px-1 py-0.5 text-xs">
+                  supabase/migrations/20260410120000_sistema_webhooks_comunicacao.sql
+                </code>
+              </li>
+            </ol>
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {loadError === "other" && (
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Não foi possível carregar os webhooks</AlertTitle>
+          <AlertDescription>
+            Verifique se você está logado como administrador master e se as políticas RLS permitem leitura desta
+            tabela.
+          </AlertDescription>
+        </Alert>
+      )}
+
       <Card className="border-border">
         <CardHeader>
           <CardTitle className="text-lg">Webhooks globais</CardTitle>
@@ -145,6 +206,13 @@ export default function ComunicadorAdminMasterPage() {
             <p className="text-sm text-muted-foreground flex items-center gap-2">
               <Loader2 className="h-4 w-4 animate-spin" /> Carregando…
             </p>
+          ) : loadError ? (
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <p className="text-sm text-muted-foreground">Depois de aplicar a migração, tente novamente.</p>
+              <Button type="button" variant="outline" size="sm" onClick={() => void load()}>
+                Tentar novamente
+              </Button>
+            </div>
           ) : (
             FIELD_META.map(({ key, title, hint }) => (
               <div key={key} className="space-y-2">
