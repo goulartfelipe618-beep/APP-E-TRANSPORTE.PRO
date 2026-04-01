@@ -8,7 +8,15 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { MessageSquare, FileDown, Send } from "lucide-react";
 import { toast } from "sonner";
 import { useComunicadoresEvolution } from "@/hooks/useComunicadoresEvolution";
+import type { ComunicadorRow } from "@/hooks/useComunicadoresEvolution";
 import { formatPhoneBrDisplay } from "@/lib/evolutionApi";
+import {
+  buildComunicadorSnapshot,
+  fetchMotoristaPainelSnapshot,
+  jsonSafeRecord,
+  postMotoristaComunicarWebhook,
+  type OrigemComunicarMotorista,
+} from "@/lib/n8nComunicarWebhook";
 
 interface ComunicarDialogProps {
   open: boolean;
@@ -17,6 +25,8 @@ interface ComunicarDialogProps {
   telefone: string | null;
   titulo: string;
   onGerarPDF?: () => void;
+  /** Painel motorista executivo: envia payload ao n8n ao abrir (Comunicar) e ao confirmar WhatsApp */
+  origemMotoristaWebhook?: OrigemComunicarMotorista | null;
 }
 
 const labelMap: Record<string, string> = {
@@ -87,11 +97,24 @@ function sufixoCanal(canal: CanalEnvio, temOficial: boolean, temProprio: boolean
   return "";
 }
 
-export default function ComunicarDialog({ open, onOpenChange, dados, telefone, titulo, onGerarPDF }: ComunicarDialogProps) {
+export default function ComunicarDialog({
+  open,
+  onOpenChange,
+  dados,
+  telefone,
+  titulo,
+  onGerarPDF,
+  origemMotoristaWebhook = null,
+}: ComunicarDialogProps) {
   const dadosRef = useRef(dados);
   dadosRef.current = dados;
 
   const { sistema, own, loading: loadingCanais } = useComunicadoresEvolution();
+  const sistemaRef = useRef<ComunicadorRow | null>(null);
+  const ownRef = useRef<ComunicadorRow | null>(null);
+  const canalRef = useRef<CanalEnvio>("oficial");
+  sistemaRef.current = sistema;
+  ownRef.current = own;
   const [msgAcima, setMsgAcima] = useState("");
   const [msgAbaixo, setMsgAbaixo] = useState("");
   const [selectedVars, setSelectedVars] = useState<Set<string>>(new Set());
@@ -123,6 +146,55 @@ export default function ComunicarDialog({ open, onOpenChange, dados, telefone, t
     else if (temProprio) setCanal("proprio");
     else if (temOficial) setCanal("oficial");
   }, [open, temProprio, temOficial]);
+
+  useEffect(() => {
+    canalRef.current = canal;
+  }, [canal]);
+
+  /** Clique em Comunicar: notifica n8n com todos os dados + motorista + comunicador (canal após hidratar) */
+  const abertoWebhookDoneRef = useRef<string | null>(null);
+  const abertoWebhookScheduledRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!open || !origemMotoristaWebhook) {
+      if (!open) {
+        abertoWebhookDoneRef.current = null;
+        abertoWebhookScheduledRef.current = null;
+      }
+      return;
+    }
+    const key = `${origemMotoristaWebhook}:${dadosFingerprint}`;
+    if (abertoWebhookDoneRef.current === key || abertoWebhookScheduledRef.current === key) return;
+    abertoWebhookScheduledRef.current = key;
+
+    let cancelled = false;
+    const t = window.setTimeout(async () => {
+      if (cancelled || !origemMotoristaWebhook) return;
+      try {
+        const motorista = await fetchMotoristaPainelSnapshot();
+        await postMotoristaComunicarWebhook({
+          evento: "comunicar_dialogo_aberto",
+          origem: origemMotoristaWebhook,
+          momento: new Date().toISOString(),
+          titulo_modal: titulo,
+          telefone_cliente: telefone?.replace(/\D/g, "") || null,
+          dados_registro: jsonSafeRecord(dadosRef.current as Record<string, unknown>),
+          variaveis_disponiveis: Object.entries(dadosRef.current)
+            .filter(([k, v]) => !ignoredKeys.includes(k) && v != null && v !== "")
+            .map(([k]) => k),
+          motorista_painel: motorista,
+          comunicador: buildComunicadorSnapshot(canalRef.current, sistemaRef.current, ownRef.current),
+        });
+        abertoWebhookDoneRef.current = key;
+      } catch (e) {
+        console.error(e);
+        abertoWebhookScheduledRef.current = null;
+      }
+    }, 450);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [open, origemMotoristaWebhook, dadosFingerprint, titulo, telefone]);
 
   useEffect(() => {
     if (!open) return;
@@ -163,24 +235,59 @@ export default function ComunicarDialog({ open, onOpenChange, dados, telefone, t
   };
 
   const handleEnviar = () => {
-    const base = buildMessage();
-    if (!base.trim()) {
-      toast.error("Escreva uma mensagem ou selecione variáveis.");
-      return;
-    }
+    void (async () => {
+      const base = buildMessage();
+      if (!base.trim()) {
+        toast.error("Escreva uma mensagem ou selecione variáveis.");
+        return;
+      }
 
-    const phone = telefone?.replace(/\D/g, "") || "";
-    if (!phone) {
-      toast.error("Telefone não disponível.");
-      return;
-    }
+      const phone = telefone?.replace(/\D/g, "") || "";
+      const suffix = sufixoCanal(canal, temOficial, temProprio);
+      const message = base + suffix;
 
-    const suffix = sufixoCanal(canal, temOficial, temProprio);
-    const message = base + suffix;
+      if (origemMotoristaWebhook) {
+        try {
+          const motorista = await fetchMotoristaPainelSnapshot();
+          await postMotoristaComunicarWebhook({
+            evento: "comunicar_envio_whatsapp",
+            origem: origemMotoristaWebhook,
+            momento: new Date().toISOString(),
+            titulo_modal: titulo,
+            telefone_cliente: phone || null,
+            telefone_cliente_disponivel: Boolean(phone),
+            dados_registro: jsonSafeRecord(dadosRef.current as Record<string, unknown>),
+            variaveis_chaves_incluidas: [...selectedVars],
+            mensagem_whatsapp_completa: message,
+            mensagem_partes: {
+              inicial: msgAcima,
+              final: msgAbaixo,
+              sufixo_canal: suffix,
+            },
+            motorista_painel: motorista,
+            comunicador: buildComunicadorSnapshot(canal, sistema, own),
+          });
+        } catch (e) {
+          console.error(e);
+          toast.error("Falha ao notificar o n8n.");
+          return;
+        }
+      }
 
-    const url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
-    window.open(url, "_blank");
-    onOpenChange(false);
+      if (phone) {
+        const url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+        window.open(url, "_blank");
+      } else if (origemMotoristaWebhook) {
+        toast.message("Dados enviados ao n8n.", {
+          description: "Não há telefone do cliente neste registro para abrir o WhatsApp.",
+        });
+      } else {
+        toast.error("Telefone não disponível.");
+        return;
+      }
+
+      onOpenChange(false);
+    })();
   };
 
   return (

@@ -148,6 +148,7 @@ export default function GruposReservasPage() {
           telefone={comunicarDados.whatsapp}
           titulo="Comunicar — Reserva de Grupo"
           onGerarPDF={() => generateGrupoPDF(comunicarDados.id)}
+          origemMotoristaWebhook="grupo_reserva"
         />
       )}
     </div>

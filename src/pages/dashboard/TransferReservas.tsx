@@ -146,6 +146,7 @@ export default function TransferReservasPage() {
           telefone={comunicarDados.telefone}
           titulo="Comunicar — Reserva Transfer"
           onGerarPDF={() => generateTransferPDF(comunicarDados.id)}
+          origemMotoristaWebhook="transfer_reserva"
         />
       )}
     </div>
