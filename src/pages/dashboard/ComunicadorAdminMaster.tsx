@@ -11,7 +11,7 @@ import {
 } from "@/hooks/useComunicadoresEvolution";
 import {
   fetchEvolutionQrCode,
-  fetchEvolutionConnectionInfo,
+  ensureInstanceAndPollConnection,
   formatPhoneBrDisplay,
   resolveEvolutionCreds,
   type EvolutionCreds,
@@ -84,6 +84,7 @@ export default function ComunicadorAdminMasterPage() {
 
     setBusy("sistema");
     try {
+      toast.loading("Conectando à Evolution e sincronizando o número…", { id: "evo-oficial" });
       await patchRow(sistema.id, {
         instance_name: inst,
         nome_dispositivo: oficialForm.nome_dispositivo.trim() || null,
@@ -117,67 +118,31 @@ export default function ComunicadorAdminMasterPage() {
       }
 
       const creds: EvolutionCreds = { baseUrl: url, apiKey: key };
-      const { phone, state } = await fetchEvolutionConnectionInfo(inst, creds);
+      const { phone, state } = await ensureInstanceAndPollConnection(inst, creds, {
+        nomeDispositivo: oficialForm.nome_dispositivo.trim() || null,
+      });
       const connected = Boolean(phone) || state === "open";
       await patchRow(sistema.id, {
         telefone_conectado: phone ?? sistema.telefone_conectado,
         connection_status: connected ? "conectado" : state || "desconectado",
+        qr_code_base64: null,
       });
-
       if (phone) {
         toast.success(`Número oficial disponível para todos: ${formatPhoneBrDisplay(phone)}`);
       } else {
-        toast.success("Configuração salva. Gere o QR abaixo para conectar o WhatsApp; depois salve novamente para atualizar o número.");
+        toast.message("Configuração salva. A instância foi registrada; quando a Evolution reportar o número conectado, use “Salvar” de novo ou “Atualizar página”.", {
+          description: "Não é necessário escanear QR Code neste painel.",
+        });
       }
       await reload();
     } catch (e) {
       console.error(e);
       toast.error("Erro ao salvar configuração do comunicador oficial.");
     } finally {
+      toast.dismiss("evo-oficial");
       setBusy(null);
     }
   }, [sistema, oficialForm, patchRow, reload]);
-
-  const handleGerarSistema = useCallback(async () => {
-    if (!sistema?.id) {
-      toast.error("Registro oficial não encontrado.");
-      return;
-    }
-    const creds = resolveEvolutionCreds({
-      baseUrl: oficialForm.api_url,
-      apiKey: oficialForm.api_key,
-    });
-    if (!creds) {
-      toast.error("Preencha e salve URL e chave da API na configuração acima.");
-      return;
-    }
-    setBusy("sistema");
-    try {
-      const inst = oficialForm.instance_name.trim() || sistema.instance_name?.trim() || INSTANCE_SISTEMA_DEFAULT;
-      await patchRow(sistema.id, { instance_name: inst });
-
-      const { base64, error, detail } = await fetchEvolutionQrCode(inst, creds);
-      if (error === "missing_env") {
-        toast.error("Credenciais inválidas.");
-        return;
-      }
-      if (!base64) {
-        toast.error("Não foi possível obter o QR Code.", { description: detail });
-        return;
-      }
-      await patchRow(sistema.id, {
-        qr_code_base64: base64,
-        connection_status: "aguardando_scan",
-      });
-      toast.success("QR Code gerado. Escaneie com o WhatsApp; em seguida use “Salvar e publicar” para atualizar o número.");
-      await reload();
-    } catch (e) {
-      console.error(e);
-      toast.error("Erro ao gerar QR do comunicador oficial.");
-    } finally {
-      setBusy(null);
-    }
-  }, [sistema, oficialForm.api_url, oficialForm.api_key, oficialForm.instance_name, patchRow, reload]);
 
   const handleGerarProprio = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -269,7 +234,7 @@ export default function ComunicadorAdminMasterPage() {
         <div>
           <h1 className="text-2xl font-bold text-foreground">Comunicador</h1>
           <p className="text-muted-foreground">
-            Defina a Evolution do <strong className="text-foreground">comunicador oficial</strong> abaixo; ao salvar, o número passa a aparecer para todos os motoristas executivos. Opcionalmente, use um segundo comunicador só para esta conta master.
+            Preencha os quatro campos do comunicador oficial e salve: a conexão é feita <strong className="text-foreground">automaticamente</strong> com a Evolution (sem escanear QR neste painel). Opcionalmente, use um segundo comunicador só para esta conta master.
           </p>
         </div>
         <Button type="button" variant="outline" onClick={() => void reload()} disabled={loading}>
@@ -286,15 +251,16 @@ export default function ComunicadorAdminMasterPage() {
       />
 
       <ComunicadorEvolutionSection
-        title="Comunicador oficial do sistema"
-        description="Gere o QR com as credenciais salvas acima. Depois que o WhatsApp conectar, clique em “Salvar e publicar” para sincronizar o número exibido aos motoristas."
+        title="Status do comunicador oficial"
+        description="Após “Salvar e publicar”, o sistema registra a instância na Evolution e busca o número automaticamente. Não é necessário escanear QR Code aqui."
         row={sistema}
         readOnly={false}
         loading={loading}
         busy={busy === "sistema"}
         onRefresh={() => void reload()}
-        onGerarQr={handleGerarSistema}
+        onGerarQr={() => {}}
         evolutionCreds={oficialCreds}
+        hideQr
       />
 
       <div className="rounded-lg border border-dashed border-border bg-muted/20 p-4">

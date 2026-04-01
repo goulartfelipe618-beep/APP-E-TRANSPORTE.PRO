@@ -25,7 +25,7 @@ export function ComunicadorOficialConfigForm({ values, onChange, onSubmit, savin
       <CardHeader>
         <CardTitle className="text-lg">Configuração Evolution — comunicador oficial</CardTitle>
         <CardDescription>
-          Informe apenas estes dados; ao salvar, o número conectado passa a aparecer para todos os motoristas executivos quando a instância estiver ativa na Evolution.
+          Preencha os quatro campos e salve: a conexão com a Evolution é feita automaticamente — não é necessário escanear QR Code neste painel. O número passa a aparecer para todos os motoristas quando a Evolution devolver a linha conectada.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -76,7 +76,7 @@ export function ComunicadorOficialConfigForm({ values, onChange, onSubmit, savin
         </div>
         <Button type="button" className="bg-primary text-primary-foreground" onClick={() => void onSubmit()} disabled={disabled || saving}>
           {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
-          Salvar e publicar para todos
+          Salvar e conectar automaticamente
         </Button>
       </CardContent>
     </Card>

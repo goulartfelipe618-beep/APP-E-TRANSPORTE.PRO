@@ -133,7 +133,7 @@ export default function ComunicadorMotoristaExecutivoPage() {
 
       <ComunicadorEvolutionSection
         title="Comunicador oficial E-Transporte.pro"
-        description="Conectado pelo administrador master. Use este canal quando quiser falar com clientes pela linha oficial da plataforma."
+        description="Conectado automaticamente pelo administrador master ao salvar URL, chave e instância na Evolution. Use este canal para falar com clientes pela linha oficial."
         row={sistema}
         readOnly
         loading={loading}
@@ -141,6 +141,7 @@ export default function ComunicadorMotoristaExecutivoPage() {
         onRefresh={() => void reload()}
         onGerarQr={() => {}}
         evolutionCreds={undefined}
+        hideQr
       />
 
       {own ? (

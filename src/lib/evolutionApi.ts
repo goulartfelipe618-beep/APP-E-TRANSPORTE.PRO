@@ -147,6 +147,58 @@ export async function fetchEvolutionQrCode(
   }
 }
 
+/**
+ * Registra a instância na Evolution sem solicitar QR no fluxo (qrcode: false)
+ * e consulta o estado várias vezes até obter número ou esgotar tentativas.
+ * Adequado quando o pareamento já foi feito no servidor Evolution ou a linha já está ativa.
+ */
+export async function ensureInstanceAndPollConnection(
+  instanceName: string,
+  creds: EvolutionCreds,
+  opts?: { pollAttempts?: number; pollMs?: number; nomeDispositivo?: string | null },
+): Promise<{ phone: string | null; state: string | null }> {
+  const c = creds;
+  const pollAttempts = opts?.pollAttempts ?? 10;
+  const pollMs = opts?.pollMs ?? 2000;
+
+  try {
+    const body: Record<string, unknown> = {
+      instanceName,
+      qrcode: false,
+      integration: "WHATSAPP-BAILEYS",
+    };
+    const nd = opts?.nomeDispositivo?.trim();
+    if (nd) {
+      body.deviceName = nd;
+    }
+    await fetch(`${c.baseUrl}/instance/create`, {
+      method: "POST",
+      headers: headers(c.apiKey),
+      body: JSON.stringify(body),
+    });
+  } catch {
+    /* instância pode já existir */
+  }
+
+  for (let i = 0; i < pollAttempts; i++) {
+    if (i > 0) {
+      await new Promise((r) => setTimeout(r, pollMs));
+    }
+    const { phone, state } = await fetchEvolutionConnectionInfo(instanceName, creds);
+    if (phone) {
+      return { phone, state };
+    }
+    if (state === "open") {
+      const again = await fetchEvolutionConnectionInfo(instanceName, creds);
+      if (again.phone) {
+        return { phone: again.phone, state: again.state };
+      }
+    }
+  }
+
+  return fetchEvolutionConnectionInfo(instanceName, creds);
+}
+
 /** Estado da conexão e número (quando conectado) */
 export async function fetchEvolutionConnectionInfo(
   instanceName: string,

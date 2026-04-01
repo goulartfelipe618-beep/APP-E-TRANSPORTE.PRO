@@ -22,6 +22,8 @@ type Props = {
   showRemover?: boolean;
   /** Credenciais do painel (oficial) ou undefined para usar só .env no comunicador pessoal */
   evolutionCreds?: EvolutionCreds | null;
+  /** Comunicador oficial: sem QR — só status após conexão automática */
+  hideQr?: boolean;
 };
 
 export function ComunicadorEvolutionSection({
@@ -36,6 +38,7 @@ export function ComunicadorEvolutionSection({
   onRemover,
   showRemover,
   evolutionCreds,
+  hideQr,
 }: Props) {
   const img = qrSrc(row?.qr_code_base64 ?? null);
   const envOk = evolutionEnvConfigured(evolutionCreds ?? undefined);
@@ -67,7 +70,7 @@ export function ComunicadorEvolutionSection({
         </Button>
       </CardHeader>
       <CardContent className="space-y-4">
-        {!readOnly && !envOk && (
+        {!readOnly && !hideQr && !envOk && (
           <Alert>
             <Smartphone className="h-4 w-4" />
             <AlertTitle>Evolution API não configurada no front-end</AlertTitle>
@@ -78,45 +81,52 @@ export function ComunicadorEvolutionSection({
             </AlertDescription>
           </Alert>
         )}
+        {hideQr && !readOnly && (
+          <p className="text-sm text-muted-foreground">
+            A conexão com a Evolution é feita ao salvar os dados acima; o número sincronizado aparece aqui e para todos os motoristas.
+          </p>
+        )}
         {readOnly && !row?.telefone_conectado && !img && !loading && (
           <p className="text-sm text-muted-foreground">
-            Quando o administrador master salvar a Evolution e conectar o WhatsApp oficial, o número aparecerá aqui para todos os motoristas executivos.
+            Quando o administrador master salvar os dados da Evolution, o número oficial aparecerá aqui automaticamente para todos os motoristas executivos.
           </p>
         )}
 
-        <div className="flex flex-col items-center gap-4 py-2 sm:flex-row sm:items-start sm:justify-center">
-          <div className="flex h-44 w-44 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-muted/30">
-            {img ? (
-              <img src={img} alt="QR Code WhatsApp" className="max-h-full max-w-full object-contain" />
-            ) : (
-              <Smartphone className="h-16 w-16 text-muted-foreground" />
-            )}
-          </div>
-          <div className="flex flex-1 flex-col gap-2 text-center sm:text-left">
-            <p className="text-sm text-muted-foreground">
-              Escaneie com o WhatsApp no celular. O QR expira; gere novamente se necessário.
-            </p>
-            {!readOnly && (
-              <div className="flex flex-wrap justify-center gap-2 sm:justify-start">
-                <Button type="button" className="bg-primary text-primary-foreground" onClick={() => void onGerarQr()} disabled={busy || loading}>
-                  {busy ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Smartphone className="h-4 w-4 mr-2" />}
-                  Gerar QR Code
-                </Button>
-                {showRemover && onRemover ? (
-                  <Button type="button" variant="destructive" onClick={() => void onRemover()} disabled={busy || loading}>
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    Remover comunicador
-                  </Button>
-                ) : null}
-              </div>
-            )}
-            {readOnly && (
-              <p className="text-xs text-muted-foreground">
-                Apenas o administrador master gera o QR do comunicador oficial. Você pode usar este número quando estiver conectado.
+        {hideQr ? null : (
+          <div className="flex flex-col items-center gap-4 py-2 sm:flex-row sm:items-start sm:justify-center">
+            <div className="flex h-44 w-44 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-muted/30">
+              {img ? (
+                <img src={img} alt="QR Code WhatsApp" className="max-h-full max-w-full object-contain" />
+              ) : (
+                <Smartphone className="h-16 w-16 text-muted-foreground" />
+              )}
+            </div>
+            <div className="flex flex-1 flex-col gap-2 text-center sm:text-left">
+              <p className="text-sm text-muted-foreground">
+                Escaneie com o WhatsApp no celular. O QR expira; gere novamente se necessário.
               </p>
-            )}
+              {!readOnly && (
+                <div className="flex flex-wrap justify-center gap-2 sm:justify-start">
+                  <Button type="button" className="bg-primary text-primary-foreground" onClick={() => void onGerarQr()} disabled={busy || loading}>
+                    {busy ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Smartphone className="h-4 w-4 mr-2" />}
+                    Gerar QR Code
+                  </Button>
+                  {showRemover && onRemover ? (
+                    <Button type="button" variant="destructive" onClick={() => void onRemover()} disabled={busy || loading}>
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Remover comunicador
+                    </Button>
+                  ) : null}
+                </div>
+              )}
+              {readOnly && (
+                <p className="text-xs text-muted-foreground">
+                  O comunicador oficial conecta automaticamente pelo administrador; use o número quando estiver disponível.
+                </p>
+              )}
+            </div>
           </div>
-        </div>
+        )}
       </CardContent>
     </Card>
   );
