@@ -220,17 +220,11 @@ export default function ComunicarDialog({
     if (solicitacaoPresetKeyRef.current === key) return;
     solicitacaoPresetKeyRef.current = key;
 
-    const nome = String((dadosRef.current as { nome_cliente?: string }).nome_cliente || "").trim() || "Cliente";
-    if (o === "transfer_solicitacao") {
-      setMsgAcima(
-        `Olá ${nome}, recebemos a sua solicitação de viagem!\n\nDetalhes da viagem:`,
-      );
-    } else {
-      setMsgAcima(
-        `Olá ${nome}, recebemos a sua solicitação de viagem em grupo!\n\nDetalhes da viagem:`,
-      );
-    }
-    setMsgAbaixo("Em breve um de nossos motoristas entrará em contato!");
+    const nomeCliente = String((dadosRef.current as { nome_cliente?: string }).nome_cliente || "").trim() || "Cliente";
+    setMsgAcima(
+      `Olá ${nomeCliente}, recebemos a sua solicitação de viagem!\n\ndetalhes da viagem:`,
+    );
+    setMsgAbaixo("Em breve um de nossos motoristas entrerá em contato!");
   }, [open, origemMotoristaWebhook, dadosFingerprint]);
 
   const isSolicitacaoN8n =
