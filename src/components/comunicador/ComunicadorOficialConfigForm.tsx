@@ -57,7 +57,7 @@ export function ComunicadorOficialConfigForm({ values, onChange, onSubmit, savin
             <Label htmlFor="evo-instance">Nome da instância</Label>
             <Input
               id="evo-instance"
-              placeholder="ex.: etp-oficial"
+              placeholder="ex.: etp-oficial (mesmo nome na Evolution, não use UUID)"
               value={values.instance_name}
               onChange={(e) => onChange("instance_name", e.target.value)}
               disabled={disabled}

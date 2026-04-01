@@ -8,8 +8,13 @@ export type EvolutionCreds = {
   apiKey: string;
 };
 
-function normalizeBase(url: string): string {
-  return url.trim().replace(/\/$/, "");
+/** Remove barras finais e evita // entre host e path (ex.: https://evo.com/ + /instance → sem //) */
+export function normalizeBase(url: string): string {
+  let u = url.trim();
+  while (u.endsWith("/")) {
+    u = u.slice(0, -1);
+  }
+  return u;
 }
 
 function envBase(): string | undefined {
@@ -36,11 +41,27 @@ export function evolutionEnvConfigured(override?: EvolutionCreds | null): boolea
   return resolveEvolutionCreds(override) !== null;
 }
 
-function headers(apiKey: string): Record<string, string> {
-  return {
+/** Evolution aceita apikey; alguns proxies também Bearer */
+function evolutionHeaders(apiKey: string, jsonBody: boolean): Record<string, string> {
+  const h: Record<string, string> = {
     apikey: apiKey,
-    "Content-Type": "application/json",
+    Authorization: `Bearer ${apiKey}`,
   };
+  if (jsonBody) {
+    h["Content-Type"] = "application/json";
+  }
+  return h;
+}
+
+function evolutionGetHeaders(apiKey: string): Record<string, string> {
+  return evolutionHeaders(apiKey, false);
+}
+
+/** Junta base + path sem barra dupla */
+function apiUrl(base: string, path: string): string {
+  const b = normalizeBase(base);
+  const p = path.startsWith("/") ? path : `/${path}`;
+  return `${b}${p}`;
 }
 
 /** Extrai número exibível a partir de JID ou string só dígitos */
@@ -100,6 +121,41 @@ function extractState(data: unknown): string | null {
   return null;
 }
 
+/** Lista instâncias e tenta achar telefone/estado pelo nome */
+async function fetchPhoneFromInstancesList(
+  baseUrl: string,
+  apiKey: string,
+  instanceName: string,
+): Promise<{ phone: string | null; state: string | null }> {
+  try {
+    const res2 = await fetch(apiUrl(baseUrl, "/instance/fetchInstances"), {
+      headers: evolutionGetHeaders(apiKey),
+    });
+    if (!res2.ok) return { phone: null, state: null };
+    const list = (await res2.json()) as unknown;
+    const arr = Array.isArray(list) ? list : [list];
+    let phone: string | null = null;
+    let state: string | null = null;
+    for (const item of arr) {
+      const o =
+        item && typeof item === "object" && "instance" in (item as object)
+          ? (item as { instance?: unknown }).instance
+          : item;
+      if (o && typeof o === "object") {
+        const name = (o as { instanceName?: string }).instanceName;
+        if (name === instanceName) {
+          phone = extractPhoneFromUnknown(o) ?? phone;
+          state = extractState(o) ?? state;
+        }
+      }
+      phone = phone ?? extractPhoneFromUnknown(item);
+    }
+    return { phone, state };
+  } catch {
+    return { phone: null, state: null };
+  }
+}
+
 /** Tenta criar instância e retorna QR em base64 */
 export async function fetchEvolutionQrCode(
   instanceName: string,
@@ -115,18 +171,22 @@ export async function fetchEvolutionQrCode(
   }
 
   try {
-    await fetch(`${c.baseUrl}/instance/create`, {
+    const createRes = await fetch(apiUrl(c.baseUrl, "/instance/create"), {
       method: "POST",
-      headers: headers(c.apiKey),
+      headers: evolutionHeaders(c.apiKey, true),
       body: JSON.stringify({
         instanceName,
         qrcode: true,
         integration: "WHATSAPP-BAILEYS",
       }),
     });
+    if (!createRes.ok && createRes.status !== 409) {
+      const t = await createRes.text();
+      return { base64: null, error: "http", detail: `${createRes.status}: ${t.slice(0, 200)}` };
+    }
 
-    const connectRes = await fetch(`${c.baseUrl}/instance/connect/${encodeURIComponent(instanceName)}`, {
-      headers: { apikey: c.apiKey },
+    const connectRes = await fetch(apiUrl(c.baseUrl, `/instance/connect/${encodeURIComponent(instanceName)}`), {
+      headers: evolutionGetHeaders(c.apiKey),
     });
 
     if (!connectRes.ok) {
@@ -147,19 +207,34 @@ export async function fetchEvolutionQrCode(
   }
 }
 
+export type EnsureInstanceResult = {
+  phone: string | null;
+  state: string | null;
+  /** Status HTTP do POST /instance/create (útil para diagnosticar 401) */
+  createHttpStatus?: number;
+  /** Mensagem curta se create falhou */
+  createErrorHint?: string;
+};
+
 /**
  * Registra a instância na Evolution sem solicitar QR no fluxo (qrcode: false)
  * e consulta o estado várias vezes até obter número ou esgotar tentativas.
- * Adequado quando o pareamento já foi feito no servidor Evolution ou a linha já está ativa.
  */
 export async function ensureInstanceAndPollConnection(
   instanceName: string,
   creds: EvolutionCreds,
   opts?: { pollAttempts?: number; pollMs?: number; nomeDispositivo?: string | null },
-): Promise<{ phone: string | null; state: string | null }> {
-  const c = creds;
+): Promise<EnsureInstanceResult> {
+  const c = resolveEvolutionCreds(creds);
+  if (!c) {
+    return { phone: null, state: null, createErrorHint: "Credenciais inválidas." };
+  }
+
   const pollAttempts = opts?.pollAttempts ?? 10;
   const pollMs = opts?.pollMs ?? 2000;
+
+  let createHttpStatus: number | undefined;
+  let createErrorHint: string | undefined;
 
   try {
     const body: Record<string, unknown> = {
@@ -171,32 +246,43 @@ export async function ensureInstanceAndPollConnection(
     if (nd) {
       body.deviceName = nd;
     }
-    await fetch(`${c.baseUrl}/instance/create`, {
+    const createRes = await fetch(apiUrl(c.baseUrl, "/instance/create"), {
       method: "POST",
-      headers: headers(c.apiKey),
+      headers: evolutionHeaders(c.apiKey, true),
       body: JSON.stringify(body),
     });
-  } catch {
-    /* instância pode já existir */
+    createHttpStatus = createRes.status;
+    if (!createRes.ok && createRes.status !== 409) {
+      const t = await createRes.text();
+      if (createRes.status === 401) {
+        createErrorHint =
+          "401: API Key inválida ou não autorizada. Confira a Global API Key no painel da Evolution (AUTHENTICATION_API_KEY).";
+      } else {
+        createErrorHint = `${createRes.status}: ${t.slice(0, 160)}`;
+      }
+    }
+  } catch (e) {
+    createErrorHint = e instanceof Error ? e.message : String(e);
   }
 
   for (let i = 0; i < pollAttempts; i++) {
     if (i > 0) {
       await new Promise((r) => setTimeout(r, pollMs));
     }
-    const { phone, state } = await fetchEvolutionConnectionInfo(instanceName, creds);
+    const { phone, state } = await fetchEvolutionConnectionInfo(instanceName, c);
     if (phone) {
-      return { phone, state };
+      return { phone, state, createHttpStatus, createErrorHint };
     }
     if (state === "open") {
-      const again = await fetchEvolutionConnectionInfo(instanceName, creds);
+      const again = await fetchEvolutionConnectionInfo(instanceName, c);
       if (again.phone) {
-        return { phone: again.phone, state: again.state };
+        return { phone: again.phone, state: again.state, createHttpStatus, createErrorHint };
       }
     }
   }
 
-  return fetchEvolutionConnectionInfo(instanceName, creds);
+  const last = await fetchEvolutionConnectionInfo(instanceName, c);
+  return { ...last, createHttpStatus, createErrorHint };
 }
 
 /** Estado da conexão e número (quando conectado) */
@@ -215,14 +301,17 @@ export async function fetchEvolutionConnectionInfo(
 
   try {
     const res = await fetch(
-      `${c.baseUrl}/instance/connectionState/${encodeURIComponent(instanceName)}`,
-      { headers: { apikey: c.apiKey } },
+      apiUrl(c.baseUrl, `/instance/connectionState/${encodeURIComponent(instanceName)}`),
+      { headers: evolutionGetHeaders(c.apiKey) },
     );
     const text = await res.text();
     let data: unknown;
     try {
       data = JSON.parse(text) as unknown;
     } catch {
+      if (res.status === 404) {
+        return fetchPhoneFromInstancesList(c.baseUrl, c.apiKey, instanceName);
+      }
       return { phone: null, state: null, detail: text.slice(0, 200) };
     }
 
@@ -230,27 +319,15 @@ export async function fetchEvolutionConnectionInfo(
     let state = extractState(data);
 
     if (!phone && res.ok) {
-      const res2 = await fetch(`${c.baseUrl}/instance/fetchInstances`, {
-        headers: { apikey: c.apiKey },
-      });
-      if (res2.ok) {
-        const list = (await res2.json()) as unknown;
-        const arr = Array.isArray(list) ? list : [list];
-        for (const item of arr) {
-          const o =
-            item && typeof item === "object" && "instance" in (item as object)
-              ? (item as { instance?: unknown }).instance
-              : item;
-          if (o && typeof o === "object") {
-            const name = (o as { instanceName?: string }).instanceName;
-            if (name === instanceName || !instanceName) {
-              phone = extractPhoneFromUnknown(o) ?? phone;
-              if (!state) state = extractState(o);
-            }
-          }
-          phone = phone ?? extractPhoneFromUnknown(item);
-        }
-      }
+      const fromList = await fetchPhoneFromInstancesList(c.baseUrl, c.apiKey, instanceName);
+      phone = phone ?? fromList.phone;
+      state = state ?? fromList.state;
+    }
+
+    if (!phone && (res.status === 404 || !res.ok)) {
+      const fromList = await fetchPhoneFromInstancesList(c.baseUrl, c.apiKey, instanceName);
+      phone = fromList.phone;
+      state = fromList.state ?? state;
     }
 
     return { phone, state };

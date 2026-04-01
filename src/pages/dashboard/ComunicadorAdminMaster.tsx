@@ -117,8 +117,12 @@ export default function ComunicadorAdminMasterPage() {
         if (iErr) throw iErr;
       }
 
+      if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(inst)) {
+        toast.warning("O “Nome da instância” parece um UUID. Na Evolution o nome da instância é um identificador curto (ex.: etp-oficial), não um ID do sistema.");
+      }
+
       const creds: EvolutionCreds = { baseUrl: url, apiKey: key };
-      const { phone, state } = await ensureInstanceAndPollConnection(inst, creds, {
+      const { phone, state, createErrorHint } = await ensureInstanceAndPollConnection(inst, creds, {
         nomeDispositivo: oficialForm.nome_dispositivo.trim() || null,
       });
       const connected = Boolean(phone) || state === "open";
@@ -129,8 +133,12 @@ export default function ComunicadorAdminMasterPage() {
       });
       if (phone) {
         toast.success(`Número oficial disponível para todos: ${formatPhoneBrDisplay(phone)}`);
+      } else if (createErrorHint) {
+        toast.error(createErrorHint, {
+          description: "Confira a URL (sem barra no final), a Global API Key no painel da Evolution e o nome exato da instância.",
+        });
       } else {
-        toast.message("Configuração salva. A instância foi registrada; quando a Evolution reportar o número conectado, use “Salvar” de novo ou “Atualizar página”.", {
+        toast.message("Configuração salva. Quando a Evolution reportar o número conectado, use “Salvar” de novo.", {
           description: "Não é necessário escanear QR Code neste painel.",
         });
       }
