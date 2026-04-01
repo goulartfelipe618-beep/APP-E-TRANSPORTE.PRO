@@ -171,6 +171,7 @@ export default function MotoristaSolicitacoesPage() {
           dados={comunicarDados}
           telefone={comunicarDados.telefone}
           titulo="Comunicar — Solicitação de Motorista"
+          webhookTipo="motorista_intake"
           onGerarPDF={() => generateSolicitacaoMotoristaPDF(comunicarDados)}
         />
       )}

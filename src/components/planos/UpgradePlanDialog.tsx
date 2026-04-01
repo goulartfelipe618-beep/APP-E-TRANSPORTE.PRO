@@ -158,14 +158,13 @@ export default function UpgradePlanDialog({
               variant={selfServiceUpgrade ? "outline" : "default"}
               className="w-full"
               onClick={() => {
-                const msg = encodeURIComponent(
-                  `Olá! Gostaria de fazer upgrade para o plano ${PLAN_LABELS[requiredPlan]}.`,
-                );
-                window.open(`https://wa.me/?text=${msg}`, "_blank");
+                toast.message("Contato pelo painel", {
+                  description: `Para upgrade ao plano ${PLAN_LABELS[requiredPlan]}, use o menu Tickets ou fale com o administrador pelos canais oficiais do sistema.`,
+                });
                 onOpenChange(false);
               }}
             >
-              Solicitar via WhatsApp
+              Solicitar contato
             </Button>
           </div>
         </div>

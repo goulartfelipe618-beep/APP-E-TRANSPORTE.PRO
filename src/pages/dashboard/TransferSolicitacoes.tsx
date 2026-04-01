@@ -172,7 +172,7 @@ export default function TransferSolicitacoesPage() {
           telefone={comunicarDados.contato}
           titulo="Comunicar — Solicitação Transfer"
           onGerarPDF={() => generateSolicitacaoTransferPDF(comunicarDados)}
-          origemMotoristaWebhook="transfer_solicitacao"
+          webhookTipo="transfer_solicitacao"
         />
       )}
     </div>

@@ -158,7 +158,7 @@ export default function GruposSolicitacoesPage() {
           telefone={comunicarDados.whatsapp}
           titulo="Comunicar — Solicitação de Grupo"
           onGerarPDF={() => generateSolicitacaoGrupoPDF(comunicarDados)}
-          origemMotoristaWebhook="grupo_solicitacao"
+          webhookTipo="grupo_solicitacao"
         />
       )}
     </div>

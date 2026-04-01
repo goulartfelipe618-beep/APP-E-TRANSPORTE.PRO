@@ -1,27 +1,21 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { ComunicadorRow } from "@/hooks/useComunicadoresEvolution";
 
-/** Solicitações Transfer / Grupo (painel Comunicar) */
-const DEFAULT_WEBHOOK_SOLICITACAO =
-  "https://n8n.e-transporte.pro/webhook/7ed2848a-93d3-4659-a271-8bfc2f10ec77";
+/** Tipos alinhados às colunas em `sistema_webhooks_comunicacao` e à Edge Function `comunicar-webhook-dispatch`. */
+export type WebhookComunicacaoTipo =
+  | "transfer_solicitacao"
+  | "transfer_reserva"
+  | "grupo_solicitacao"
+  | "grupo_reserva"
+  | "motorista_intake"
+  | "motoristas_cadastrados"
+  | "geolocalizacao";
 
-/** Reservas oficiais Transfer / Grupo (manuais ou convertidas de solicitação) */
-const DEFAULT_WEBHOOK_RESERVA =
-  "https://n8n.e-transporte.pro/webhook/ce5a105a-73a0-4794-af7b-a5bbb583a6fc";
-
-export function getN8nComunicarWebhookUrlSolicitacao(): string {
-  return (
-    (import.meta.env.VITE_N8N_COMUNICAR_WEBHOOK_URL as string | undefined)?.trim() ||
-    DEFAULT_WEBHOOK_SOLICITACAO
-  );
-}
-
-export function getN8nComunicarWebhookUrlReserva(): string {
-  return (
-    (import.meta.env.VITE_N8N_COMUNICAR_RESERVA_WEBHOOK_URL as string | undefined)?.trim() ||
-    DEFAULT_WEBHOOK_RESERVA
-  );
-}
+/** @deprecated use WebhookComunicacaoTipo */
+export type OrigemComunicarMotorista = Exclude<
+  WebhookComunicacaoTipo,
+  "motorista_intake" | "motoristas_cadastrados" | "geolocalizacao"
+>;
 
 /** JSON-safe: datas e tipos estranhos viram string */
 export function jsonSafeRecord(obj: Record<string, unknown>): Record<string, unknown> {
@@ -30,16 +24,6 @@ export function jsonSafeRecord(obj: Record<string, unknown>): Record<string, unk
   } catch {
     return { _erro_serializacao: true, raw: String(obj) };
   }
-}
-
-export type OrigemComunicarMotorista =
-  | "transfer_solicitacao"
-  | "grupo_solicitacao"
-  | "transfer_reserva"
-  | "grupo_reserva";
-
-function isOrigemReserva(origem: string): boolean {
-  return origem === "transfer_reserva" || origem === "grupo_reserva";
 }
 
 export async function fetchMotoristaPainelSnapshot(): Promise<Record<string, unknown>> {
@@ -99,25 +83,19 @@ export function buildComunicadorSnapshot(
 }
 
 /**
- * Envia o payload ao n8n via Edge Function (servidor → n8n), evitando CORS no browser.
- * O destino do webhook depende de `body.origem` (solicitação vs reserva).
+ * Envia o payload ao webhook configurado pelo Admin Master (URL no banco, nunca no cliente).
  */
-export async function postMotoristaComunicarWebhook(body: Record<string, unknown>): Promise<void> {
-  const origem = String(body.origem ?? "");
-  const targetUrl = isOrigemReserva(origem)
-    ? getN8nComunicarWebhookUrlReserva()
-    : getN8nComunicarWebhookUrlSolicitacao();
-
-  const { data, error } = await supabase.functions.invoke("n8n-comunicar-proxy", {
-    body: {
-      payload: body,
-      webhookUrl: targetUrl,
-    },
+export async function dispatchComunicarWebhook(
+  tipo: WebhookComunicacaoTipo,
+  payload: Record<string, unknown>,
+): Promise<void> {
+  const { data, error } = await supabase.functions.invoke("comunicar-webhook-dispatch", {
+    body: { tipo, payload },
   });
   if (error) {
     throw new Error(
       error.message ||
-        "Deploy: supabase functions deploy n8n-comunicar-proxy",
+        "Configure os webhooks em Admin → Comunicador e faça deploy da função comunicar-webhook-dispatch.",
     );
   }
   if (data && typeof data === "object" && "error" in data) {
@@ -125,6 +103,6 @@ export async function postMotoristaComunicarWebhook(body: Record<string, unknown
   }
   const pack = data as { ok?: boolean; status?: number };
   if (!pack?.ok) {
-    throw new Error(`Webhook n8n status ${pack?.status ?? "?"}`);
+    throw new Error(`Webhook retornou status ${pack?.status ?? "?"}`);
   }
 }

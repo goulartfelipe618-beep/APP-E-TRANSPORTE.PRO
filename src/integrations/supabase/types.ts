@@ -1129,6 +1129,42 @@ export type Database = {
         }
         Relationships: []
       }
+      sistema_webhooks_comunicacao: {
+        Row: {
+          geolocalizacao_url: string | null
+          grupo_reserva_url: string | null
+          grupo_solicitacao_url: string | null
+          id: string
+          motorista_intake_url: string | null
+          motoristas_cadastrados_url: string | null
+          transfer_reserva_url: string | null
+          transfer_solicitacao_url: string | null
+          updated_at: string
+        }
+        Insert: {
+          geolocalizacao_url?: string | null
+          grupo_reserva_url?: string | null
+          grupo_solicitacao_url?: string | null
+          id?: string
+          motorista_intake_url?: string | null
+          motoristas_cadastrados_url?: string | null
+          transfer_reserva_url?: string | null
+          transfer_solicitacao_url?: string | null
+          updated_at?: string
+        }
+        Update: {
+          geolocalizacao_url?: string | null
+          grupo_reserva_url?: string | null
+          grupo_solicitacao_url?: string | null
+          id?: string
+          motorista_intake_url?: string | null
+          motoristas_cadastrados_url?: string | null
+          transfer_reserva_url?: string | null
+          transfer_solicitacao_url?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       solicitacoes_acesso: {
         Row: {
           cidade: string | null

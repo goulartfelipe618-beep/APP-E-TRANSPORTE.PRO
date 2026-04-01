@@ -20,6 +20,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Tables } from "@/integrations/supabase/types";
+import { dispatchComunicarWebhook, fetchMotoristaPainelSnapshot, jsonSafeRecord } from "@/lib/n8nComunicarWebhook";
 
 type ReservaTransfer = Tables<"reservas_transfer">;
 type ReservaGrupo = Tables<"reservas_grupos">;
@@ -42,9 +43,14 @@ function labelGrupo(r: ReservaGrupo) {
 export default function TransferGeolocalizacaoPage() {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
   const [reservasTransfer, setReservasTransfer] = useState<ReservaTransfer[]>([]);
   const [reservasGrupos, setReservasGrupos] = useState<ReservaGrupo[]>([]);
   const [reservaKey, setReservaKey] = useState<string>("");
+  const [categoria, setCategoria] = useState<"cliente" | "motorista">("cliente");
+  const [nomeOpcional, setNomeOpcional] = useState("");
+  const [telefoneOpcional, setTelefoneOpcional] = useState("");
+  const [observacoes, setObservacoes] = useState("");
 
   const loadReservas = useCallback(async () => {
     setLoading(true);
@@ -73,10 +79,53 @@ export default function TransferGeolocalizacaoPage() {
     if (open) {
       loadReservas();
       setReservaKey("");
+      setCategoria("cliente");
+      setNomeOpcional("");
+      setTelefoneOpcional("");
+      setObservacoes("");
     }
   }, [open, loadReservas]);
 
   const totalReservas = reservasTransfer.length + reservasGrupos.length;
+
+  const handleCriarLink = async () => {
+    if (!reservaKey || reservaKey === "__empty__") return;
+    const parts = reservaKey.split(":");
+    if (parts.length !== 2) return;
+    const [kind, id] = parts as [string, string];
+    const isTransfer = kind === "transfer";
+    const reservaTransfer = isTransfer ? reservasTransfer.find((r) => r.id === id) : undefined;
+    const reservaGrupo = !isTransfer ? reservasGrupos.find((r) => r.id === id) : undefined;
+    const reservaSnapshot = reservaTransfer
+      ? jsonSafeRecord(reservaTransfer as unknown as Record<string, unknown>)
+      : reservaGrupo
+        ? jsonSafeRecord(reservaGrupo as unknown as Record<string, unknown>)
+        : {};
+
+    setSubmitting(true);
+    try {
+      const motorista = await fetchMotoristaPainelSnapshot();
+      await dispatchComunicarWebhook("geolocalizacao", {
+        evento: "criar_link_rastreamento",
+        momento: new Date().toISOString(),
+        tipo_reserva: isTransfer ? "transfer" : "grupo",
+        reserva_id: id,
+        categoria_rastreamento: categoria,
+        nome_opcional: nomeOpcional.trim() || null,
+        telefone_opcional: telefoneOpcional.replace(/\D/g, "") || null,
+        observacoes: observacoes.trim() || null,
+        reserva: reservaSnapshot,
+        motorista_painel: motorista,
+      });
+      toast.success("Dados enviados ao webhook de geolocalização.");
+      setOpen(false);
+    } catch (e) {
+      console.error(e);
+      toast.error(e instanceof Error ? e.message : "Falha ao enviar ao webhook.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -94,7 +143,7 @@ export default function TransferGeolocalizacaoPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Geolocalização de Clientes</h1>
-          <p className="text-muted-foreground">Gere links para rastrear a localização do cliente durante a viagem</p>
+          <p className="text-muted-foreground">Envio dos dados de rastreamento apenas via webhook configurado em Admin → Comunicador</p>
         </div>
         <Button onClick={() => setOpen(true)}><Plus className="h-4 w-4 mr-2" /> Novo Link</Button>
       </div>
@@ -173,7 +222,7 @@ export default function TransferGeolocalizacaoPage() {
             </div>
             <div>
               <Label>Categoria *</Label>
-              <Select defaultValue="cliente">
+              <Select value={categoria} onValueChange={(v) => setCategoria(v as "cliente" | "motorista")}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="cliente">Cliente</SelectItem>
@@ -181,11 +230,11 @@ export default function TransferGeolocalizacaoPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div><Label>Nome (opcional)</Label><Input placeholder="Ex: João Silva" /></div>
-            <div><Label>Telefone (opcional)</Label><Input placeholder="(__) _____-____" /></div>
-            <div><Label>Observações (opcional)</Label><Textarea placeholder="Digite observações sobre o rastreamento..." /></div>
-            <Button className="w-full" disabled={!reservaKey || loading}>
-              Criar Link
+            <div><Label>Nome (opcional)</Label><Input placeholder="Ex: João Silva" value={nomeOpcional} onChange={(e) => setNomeOpcional(e.target.value)} /></div>
+            <div><Label>Telefone (opcional)</Label><Input placeholder="(__) _____-____" value={telefoneOpcional} onChange={(e) => setTelefoneOpcional(e.target.value)} /></div>
+            <div><Label>Observações (opcional)</Label><Textarea placeholder="Digite observações sobre o rastreamento..." value={observacoes} onChange={(e) => setObservacoes(e.target.value)} /></div>
+            <Button className="w-full" disabled={!reservaKey || loading || submitting} onClick={() => void handleCriarLink()}>
+              {submitting ? "Enviando…" : "Criar Link"}
             </Button>
           </div>
         </DialogContent>

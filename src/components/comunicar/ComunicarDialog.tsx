@@ -4,32 +4,27 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { MessageSquare, FileDown, Send } from "lucide-react";
 import { toast } from "sonner";
 import { useComunicadoresEvolution } from "@/hooks/useComunicadoresEvolution";
 import type { ComunicadorRow } from "@/hooks/useComunicadoresEvolution";
-import { formatPhoneBrDisplay } from "@/lib/evolutionApi";
 import {
   buildComunicadorSnapshot,
+  dispatchComunicarWebhook,
   fetchMotoristaPainelSnapshot,
   jsonSafeRecord,
-  postMotoristaComunicarWebhook,
-  type OrigemComunicarMotorista,
+  type WebhookComunicacaoTipo,
 } from "@/lib/n8nComunicarWebhook";
 
 interface ComunicarDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  dados: Record<string, any>;
+  dados: Record<string, unknown>;
   telefone: string | null;
   titulo: string;
   onGerarPDF?: () => void;
-  /**
-   * Só solicitações Transfer / Grupo: envia ao webhook n8n e pré-preenche textos.
-   * Reservas não usam este prop (outro fluxo/webhook).
-   */
-  origemMotoristaWebhook?: OrigemComunicarMotorista | null;
+  /** Destino do envio conforme painel Admin Master → Comunicador (obrigatório para envio). */
+  webhookTipo: WebhookComunicacaoTipo | null;
 }
 
 const labelMap: Record<string, string> = {
@@ -89,17 +84,6 @@ const ignoredKeys = ["id", "user_id", "created_at", "updated_at", "veiculo_id", 
 
 type CanalEnvio = "oficial" | "proprio";
 
-function sufixoCanal(canal: CanalEnvio, temOficial: boolean, temProprio: boolean): string {
-  if (temOficial && temProprio) {
-    return canal === "oficial"
-      ? "\n\n_Enviado pela linha oficial E-Transporte.pro._"
-      : "\n\n_Enviado pelo meu WhatsApp (motorista)._";
-  }
-  if (temOficial && !temProprio) return "\n\n_Enviado pela linha oficial E-Transporte.pro._";
-  if (!temOficial && temProprio) return "\n\n_Enviado pelo meu WhatsApp (motorista)._";
-  return "";
-}
-
 export default function ComunicarDialog({
   open,
   onOpenChange,
@@ -107,26 +91,32 @@ export default function ComunicarDialog({
   telefone,
   titulo,
   onGerarPDF,
-  origemMotoristaWebhook = null,
+  webhookTipo = null,
 }: ComunicarDialogProps) {
   const dadosRef = useRef(dados);
   dadosRef.current = dados;
 
-  const { sistema, own, loading: loadingCanais } = useComunicadoresEvolution();
+  const { sistema, own } = useComunicadoresEvolution();
   const sistemaRef = useRef<ComunicadorRow | null>(null);
   const ownRef = useRef<ComunicadorRow | null>(null);
   const canalRef = useRef<CanalEnvio>("oficial");
   sistemaRef.current = sistema;
   ownRef.current = own;
-  const [msgAcima, setMsgAcima] = useState("");
-  const [msgAbaixo, setMsgAbaixo] = useState("");
-  const [selectedVars, setSelectedVars] = useState<Set<string>>(new Set());
-  const [canal, setCanal] = useState<CanalEnvio>("oficial");
 
   const telOficial = sistema?.telefone_conectado?.trim() || null;
   const telProprio = own?.telefone_conectado?.trim() || null;
   const temOficial = Boolean(telOficial);
   const temProprio = Boolean(telProprio);
+
+  useEffect(() => {
+    if (temProprio && temOficial) canalRef.current = "proprio";
+    else if (temProprio) canalRef.current = "proprio";
+    else if (temOficial) canalRef.current = "oficial";
+  }, [temProprio, temOficial]);
+
+  const [msgAcima, setMsgAcima] = useState("");
+  const [msgAbaixo, setMsgAbaixo] = useState("");
+  const [selectedVars, setSelectedVars] = useState<Set<string>>(new Set());
 
   const availableVars = useMemo(
     () =>
@@ -136,25 +126,12 @@ export default function ComunicarDialog({
     [dados],
   );
 
-  /** Evita re-selecionar tudo a cada render do pai; só quando abre ou troca o registro */
   const dadosFingerprint = useMemo(() => {
     const rowId = (dados as { id?: string }).id;
     if (rowId != null && rowId !== "") return `id:${rowId}`;
     return availableVars.map((v) => `${v.key}=${v.value}`).join("\u0001");
   }, [dados, availableVars]);
 
-  useEffect(() => {
-    if (!open) return;
-    if (temProprio && temOficial) setCanal("proprio");
-    else if (temProprio) setCanal("proprio");
-    else if (temOficial) setCanal("oficial");
-  }, [open, temProprio, temOficial]);
-
-  useEffect(() => {
-    canalRef.current = canal;
-  }, [canal]);
-
-  /** Clique em Comunicar: notifica n8n com todos os dados + motorista + comunicador (canal após hidratar) */
   const abertoWebhookDoneRef = useRef<string | null>(null);
   const abertoWebhookScheduledRef = useRef<string | null>(null);
   useEffect(() => {
@@ -163,24 +140,24 @@ export default function ComunicarDialog({
       abertoWebhookScheduledRef.current = null;
       return;
     }
-    if (!origemMotoristaWebhook) return;
-    /** Reservas: apenas um envio ao confirmar (sem WhatsApp), não dispara ao abrir o modal */
-    if (origemMotoristaWebhook === "transfer_reserva" || origemMotoristaWebhook === "grupo_reserva") {
+    if (!webhookTipo) return;
+    if (webhookTipo === "transfer_reserva" || webhookTipo === "grupo_reserva") {
       return;
     }
 
-    const key = `${origemMotoristaWebhook}:${dadosFingerprint}`;
+    const key = `${webhookTipo}:${dadosFingerprint}`;
     if (abertoWebhookDoneRef.current === key || abertoWebhookScheduledRef.current === key) return;
     abertoWebhookScheduledRef.current = key;
 
     let cancelled = false;
     const t = window.setTimeout(async () => {
-      if (cancelled || !origemMotoristaWebhook) return;
+      if (cancelled || !webhookTipo) return;
       try {
         const motorista = await fetchMotoristaPainelSnapshot();
-        await postMotoristaComunicarWebhook({
+        await dispatchComunicarWebhook(webhookTipo, {
           evento: "comunicar_dialogo_aberto",
-          origem: origemMotoristaWebhook,
+          webhook_tipo: webhookTipo,
+          origem: webhookTipo,
           momento: new Date().toISOString(),
           titulo_modal: titulo,
           telefone_cliente: telefone?.replace(/\D/g, "") || null,
@@ -201,7 +178,7 @@ export default function ComunicarDialog({
       cancelled = true;
       clearTimeout(t);
     };
-  }, [open, origemMotoristaWebhook, dadosFingerprint, titulo, telefone]);
+  }, [open, webhookTipo, dadosFingerprint, titulo, telefone]);
 
   useEffect(() => {
     if (!open) return;
@@ -217,7 +194,7 @@ export default function ComunicarDialog({
       solicitacaoPresetKeyRef.current = null;
       return;
     }
-    const o = origemMotoristaWebhook;
+    const o = webhookTipo;
     if (o !== "transfer_solicitacao" && o !== "grupo_solicitacao") return;
 
     const key = `${o}:${dadosFingerprint}`;
@@ -229,14 +206,12 @@ export default function ComunicarDialog({
       `Olá ${nomeCliente}, recebemos a sua solicitação de viagem!\n\ndetalhes da viagem:`,
     );
     setMsgAbaixo("Em breve um de nossos motoristas entrerá em contato!");
-  }, [open, origemMotoristaWebhook, dadosFingerprint]);
+  }, [open, webhookTipo, dadosFingerprint]);
 
   const isSolicitacaoN8n =
-    origemMotoristaWebhook === "transfer_solicitacao" || origemMotoristaWebhook === "grupo_solicitacao";
+    webhookTipo === "transfer_solicitacao" || webhookTipo === "grupo_solicitacao";
 
-  /** Reservas oficiais: só envio ao webhook n8n, sem abrir WhatsApp */
-  const isReservaN8n =
-    origemMotoristaWebhook === "transfer_reserva" || origemMotoristaWebhook === "grupo_reserva";
+  const isReservaN8n = webhookTipo === "transfer_reserva" || webhookTipo === "grupo_reserva";
 
   const toggleVar = (key: string) => {
     setSelectedVars((prev) => {
@@ -252,7 +227,7 @@ export default function ComunicarDialog({
     if (msgAcima.trim()) parts.push(msgAcima.trim());
 
     if (selectedVars.size > 0) {
-      parts.push(""); // empty line
+      parts.push("");
       for (const v of availableVars) {
         if (selectedVars.has(v.key)) {
           parts.push(`*${v.label}:* ${v.value}`);
@@ -261,7 +236,7 @@ export default function ComunicarDialog({
     }
 
     if (msgAbaixo.trim()) {
-      parts.push(""); // empty line
+      parts.push("");
       parts.push(msgAbaixo.trim());
     }
 
@@ -270,6 +245,11 @@ export default function ComunicarDialog({
 
   const handleEnviar = () => {
     void (async () => {
+      if (!webhookTipo) {
+        toast.error("Tipo de webhook não definido para esta tela.");
+        return;
+      }
+
       const base = buildMessage();
       if (!base.trim()) {
         toast.error("Escreva uma mensagem ou selecione variáveis.");
@@ -277,55 +257,35 @@ export default function ComunicarDialog({
       }
 
       const phone = telefone?.replace(/\D/g, "") || "";
-      const suffix = sufixoCanal(canal, temOficial, temProprio);
-      const message = base + suffix;
+      const message = base;
 
-      if (origemMotoristaWebhook) {
-        try {
-          const motorista = await fetchMotoristaPainelSnapshot();
-          await postMotoristaComunicarWebhook({
-            evento: isReservaN8n ? "comunicar_reserva_webhook" : "comunicar_envio_whatsapp",
-            origem: origemMotoristaWebhook,
-            momento: new Date().toISOString(),
-            titulo_modal: titulo,
-            telefone_cliente: phone || null,
-            telefone_cliente_disponivel: Boolean(phone),
-            dados_registro: jsonSafeRecord(dadosRef.current as Record<string, unknown>),
-            variaveis_chaves_incluidas: [...selectedVars],
-            mensagem_whatsapp_completa: message,
-            mensagem_partes: {
-              inicial: msgAcima,
-              final: msgAbaixo,
-              sufixo_canal: suffix,
-            },
-            motorista_painel: motorista,
-            comunicador: buildComunicadorSnapshot(canal, sistema, own),
-          });
-        } catch (e) {
-          console.error(e);
-          toast.error("Falha ao notificar o n8n.");
-          return;
-        }
-      }
-
-      if (isReservaN8n) {
-        toast.success("Dados da reserva enviados ao n8n.");
-        onOpenChange(false);
-        return;
-      }
-
-      if (phone) {
-        const url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
-        window.open(url, "_blank");
-      } else if (origemMotoristaWebhook) {
-        toast.message("Dados enviados ao n8n.", {
-          description: "Não há telefone do cliente neste registro para abrir o WhatsApp.",
+      try {
+        const motorista = await fetchMotoristaPainelSnapshot();
+        await dispatchComunicarWebhook(webhookTipo, {
+          evento: isReservaN8n ? "comunicar_reserva_webhook" : "comunicar_envio_webhook",
+          webhook_tipo: webhookTipo,
+          origem: webhookTipo,
+          momento: new Date().toISOString(),
+          titulo_modal: titulo,
+          telefone_cliente: phone || null,
+          telefone_cliente_disponivel: Boolean(phone),
+          dados_registro: jsonSafeRecord(dadosRef.current as Record<string, unknown>),
+          variaveis_chaves_incluidas: [...selectedVars],
+          mensagem_completa: message,
+          mensagem_partes: {
+            inicial: msgAcima,
+            final: msgAbaixo,
+          },
+          motorista_painel: motorista,
+          comunicador: buildComunicadorSnapshot(canalRef.current, sistema, own),
         });
-      } else {
-        toast.error("Telefone não disponível.");
+      } catch (e) {
+        console.error(e);
+        toast.error(e instanceof Error ? e.message : "Falha ao enviar ao webhook.");
         return;
       }
 
+      toast.success(isReservaN8n ? "Dados da reserva enviados." : "Dados enviados.");
       onOpenChange(false);
     })();
   };
@@ -341,55 +301,11 @@ export default function ComunicarDialog({
         </DialogHeader>
 
         <div className="space-y-4">
-          {/* Sempre no topo: escolha do comunicador */}
-          <div className="space-y-3 rounded-lg border border-primary/25 bg-muted/30 p-3">
-            <Label className="text-foreground text-base">Comunicador</Label>
-            {loadingCanais ? (
-              <p className="text-sm text-muted-foreground">Carregando canais…</p>
-            ) : temOficial && temProprio ? (
-              <RadioGroup value={canal} onValueChange={(v) => setCanal(v as CanalEnvio)} className="grid gap-3">
-                <div className="flex items-start gap-3 rounded-md border border-transparent px-1 py-0.5 has-[:checked]:border-primary/40 has-[:checked]:bg-primary/5">
-                  <RadioGroupItem value="proprio" id="canal-proprio" className="mt-1" />
-                  <Label htmlFor="canal-proprio" className="cursor-pointer font-normal leading-snug">
-                    <span className="font-medium text-foreground">Meu WhatsApp</span>
-                    <span className="block text-xs text-muted-foreground font-mono">{formatPhoneBrDisplay(telProprio!)}</span>
-                  </Label>
-                </div>
-                <div className="flex items-start gap-3 rounded-md border border-transparent px-1 py-0.5 has-[:checked]:border-primary/40 has-[:checked]:bg-primary/5">
-                  <RadioGroupItem value="oficial" id="canal-oficial" className="mt-1" />
-                  <Label htmlFor="canal-oficial" className="cursor-pointer font-normal leading-snug">
-                    <span className="font-medium text-foreground">Linha oficial da plataforma</span>
-                    <span className="block text-xs text-muted-foreground font-mono">{formatPhoneBrDisplay(telOficial!)}</span>
-                  </Label>
-                </div>
-              </RadioGroup>
-            ) : temOficial || temProprio ? (
-              <p className="text-sm text-muted-foreground">
-                {temOficial && (
-                  <>
-                    <span className="font-medium text-foreground">Linha oficial</span> — {formatPhoneBrDisplay(telOficial!)}
-                  </>
-                )}
-                {temOficial && temProprio ? <span className="mx-1">·</span> : null}
-                {temProprio && (
-                  <>
-                    <span className="font-medium text-foreground">Meu WhatsApp</span> — {formatPhoneBrDisplay(telProprio!)}
-                  </>
-                )}
-              </p>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                Nenhum número de comunicador sincronizado. Configure em <strong className="text-foreground">Sistema → Comunicador</strong>. A mensagem será enviada sem rodapé de canal.
-              </p>
-            )}
-            {(temOficial || temProprio) && (
-              <p className="text-xs text-muted-foreground leading-relaxed">
-                O link abre a conversa com o <strong className="text-foreground">cliente</strong>. Use o WhatsApp já logado na linha escolhida.
-              </p>
-            )}
-          </div>
+          <p className="text-sm text-muted-foreground rounded-lg border border-border bg-muted/40 p-3">
+            O envio é feito apenas para o webhook configurado pelo administrador master. Nenhum aplicativo externo (como
+            WhatsApp) será aberto.
+          </p>
 
-          {/* Message above */}
           <div className="space-y-1.5">
             <Label>Mensagem inicial {isSolicitacaoN8n ? "(acima das variáveis)" : ""}</Label>
             {isSolicitacaoN8n ? (
@@ -409,7 +325,6 @@ export default function ComunicarDialog({
             />
           </div>
 
-          {/* Variable selector — todas marcadas ao abrir; clique para retirar da mensagem */}
           <div className="space-y-2">
             <div className="space-y-1">
               <Label>Variáveis do registro</Label>
@@ -432,7 +347,6 @@ export default function ComunicarDialog({
             </div>
           </div>
 
-          {/* Message below */}
           <div className="space-y-1.5">
             <Label>Mensagem final {isSolicitacaoN8n ? "(abaixo das variáveis)" : ""}</Label>
             {isSolicitacaoN8n ? (
@@ -450,26 +364,27 @@ export default function ComunicarDialog({
             />
           </div>
 
-          {/* Preview */}
           {(msgAcima || selectedVars.size > 0 || msgAbaixo) && (
             <div className="space-y-1.5">
               <Label className="text-xs text-muted-foreground">Pré-visualização</Label>
               <div className="rounded-lg border border-border bg-card p-3 text-sm whitespace-pre-wrap max-h-[150px] overflow-y-auto">
-                {buildMessage() + sufixoCanal(canal, temOficial, temProprio)}
+                {buildMessage()}
               </div>
             </div>
           )}
 
-          {/* Actions */}
           <div className="flex gap-2 pt-2 border-t border-border">
             {onGerarPDF && (
               <Button variant="outline" onClick={onGerarPDF} className="flex-1">
                 <FileDown className="h-4 w-4 mr-2" /> Gerar PDF
               </Button>
             )}
-            <Button onClick={handleEnviar} className="flex-1" disabled={loadingCanais}>
-              <Send className="h-4 w-4 mr-2" />{" "}
-              {isReservaN8n ? "Enviar ao n8n" : "Enviar via WhatsApp"}
+            <Button
+              onClick={handleEnviar}
+              className="flex-1"
+              disabled={!webhookTipo}
+            >
+              <Send className="h-4 w-4 mr-2" /> Enviar
             </Button>
           </div>
         </div>

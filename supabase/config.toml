@@ -17,3 +17,7 @@ verify_jwt = false
 # Proxy para webhook n8n (evita CORS do navegador → n8n).
 [functions.n8n-comunicar-proxy]
 verify_jwt = false
+
+# Destino de webhook por tipo (lê URLs do banco — Admin Master).
+[functions.comunicar-webhook-dispatch]
+verify_jwt = false
