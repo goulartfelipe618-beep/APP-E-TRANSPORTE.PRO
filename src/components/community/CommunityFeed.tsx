@@ -9,7 +9,18 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Heart, MessageCircle, Pencil, Trash2, RefreshCw, ImagePlus, Video, Tags } from "lucide-react";
+import { Heart, MessageCircle, Pencil, Trash2, RefreshCw, ImagePlus, Video, Tags, MoreHorizontal } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useConfiguracoes } from "@/contexts/ConfiguracoesContext";
 
 type CommunityProfile = {
@@ -62,11 +73,6 @@ type CommunityCategory = {
   created_by_user_id: string;
 };
 
-type Props = {
-  title: string;
-  subtitle: string;
-};
-
 function displayName(profile?: CommunityProfile) {
   if (!profile) return "Usuário";
   return profile.nome_completo || profile.nome_projeto || "Usuário";
@@ -79,7 +85,7 @@ function initialsFromName(name: string) {
   return `${parts[0][0] || ""}${parts[parts.length - 1][0] || ""}`.toUpperCase();
 }
 
-export default function CommunityFeed({ title, subtitle }: Props) {
+export default function CommunityFeed() {
   const { config } = useConfiguracoes();
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [isAdminMaster, setIsAdminMaster] = useState(false);
@@ -107,6 +113,7 @@ export default function CommunityFeed({ title, subtitle }: Props) {
   const [newCategoryName, setNewCategoryName] = useState("");
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
   const [editingCategoryName, setEditingCategoryName] = useState("");
+  const [pendingDeletePost, setPendingDeletePost] = useState<CommunityPost | null>(null);
 
   const getImageDimensions = (file: File) =>
     new Promise<{ width: number; height: number }>((resolve, reject) => {
@@ -392,6 +399,12 @@ export default function CommunityFeed({ title, subtitle }: Props) {
     void fetchAll();
   };
 
+  const confirmDeletePost = async () => {
+    if (!pendingDeletePost) return;
+    await handleDeletePost(pendingDeletePost);
+    setPendingDeletePost(null);
+  };
+
   const handleToggleLike = async (postId: string) => {
     if (!currentUserId) return;
     const liked = likes.some((l) => l.post_id === postId && l.user_id === currentUserId);
@@ -449,21 +462,14 @@ export default function CommunityFeed({ title, subtitle }: Props) {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground uppercase">{title}</h1>
-          <p className="text-muted-foreground">{subtitle}</p>
-        </div>
-        <Button variant="outline" size="icon" onClick={() => void fetchAll()} title="Atualizar feed">
-          <RefreshCw className="h-4 w-4" />
-        </Button>
-      </div>
-
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="space-y-6">
+        <div className="mx-auto w-full max-w-3xl space-y-6 xl:mx-0">
           <Card>
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <p className="font-semibold text-foreground">Nova publicação</p>
+              <Button variant="outline" size="icon" onClick={() => void fetchAll()} title="Atualizar feed">
+                <RefreshCw className="h-4 w-4" />
+              </Button>
             </CardHeader>
             <CardContent className="space-y-4">
               <Textarea
@@ -563,26 +569,31 @@ export default function CommunityFeed({ title, subtitle }: Props) {
                         </div>
                       </div>
                       {canEditOrDeletePost(post) && (
-                        <div className="flex items-center gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => {
-                              setEditingPostId(post.id);
-                              setEditingContent(post.content);
-                            }}
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="text-destructive hover:text-destructive"
-                            onClick={() => void handleDeletePost(post)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                              onClick={() => {
+                                setEditingPostId(post.id);
+                                setEditingContent(post.content);
+                              }}
+                            >
+                              <Pencil className="mr-2 h-4 w-4" />
+                              Editar
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              className="text-destructive focus:text-destructive"
+                              onClick={() => setPendingDeletePost(post)}
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Excluir
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       )}
                     </div>
                   </CardHeader>
@@ -609,14 +620,14 @@ export default function CommunityFeed({ title, subtitle }: Props) {
                     </div>
 
                     {postMedia.length > 0 && (
-                      <div className="grid gap-3 md:grid-cols-2">
+                      <div className="-mx-6 space-y-0">
                         {postMedia.map((item) =>
                           item.media_type === "image" ? (
-                            <div key={item.id} className="overflow-hidden rounded-lg border border-border bg-black/70 p-2">
-                              <img src={item.media_url} alt="Mídia da publicação" className="h-auto w-full object-contain" />
+                            <div key={item.id} className="overflow-hidden border-y border-border bg-black">
+                              <img src={item.media_url} alt="Mídia da publicação" className="block h-auto w-full object-contain" />
                             </div>
                           ) : (
-                            <div key={item.id} className="overflow-hidden rounded-lg border border-border">
+                            <div key={item.id} className="overflow-hidden border-y border-border">
                               <video src={item.media_url} controls className="h-56 w-full bg-black object-contain" />
                             </div>
                           ),
@@ -795,6 +806,26 @@ export default function CommunityFeed({ title, subtitle }: Props) {
           )}
         </aside>
       </div>
+
+      <AlertDialog open={!!pendingDeletePost} onOpenChange={(open) => !open && setPendingDeletePost(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir publicação?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação não pode ser desfeita. A publicação será removida permanentemente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => void confirmDeletePost()}
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
