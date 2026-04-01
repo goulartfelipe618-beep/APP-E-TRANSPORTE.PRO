@@ -1,11 +1,26 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { ComunicadorRow } from "@/hooks/useComunicadoresEvolution";
 
-const DEFAULT_WEBHOOK =
+/** Solicitações Transfer / Grupo (painel Comunicar) */
+const DEFAULT_WEBHOOK_SOLICITACAO =
   "https://n8n.e-transporte.pro/webhook/7ed2848a-93d3-4659-a271-8bfc2f10ec77";
 
-export function getN8nComunicarWebhookUrl(): string {
-  return (import.meta.env.VITE_N8N_COMUNICAR_WEBHOOK_URL as string | undefined)?.trim() || DEFAULT_WEBHOOK;
+/** Reservas oficiais Transfer / Grupo (manuais ou convertidas de solicitação) */
+const DEFAULT_WEBHOOK_RESERVA =
+  "https://n8n.e-transporte.pro/webhook/ce5a105a-73a0-4794-af7b-a5bbb583a6fc";
+
+export function getN8nComunicarWebhookUrlSolicitacao(): string {
+  return (
+    (import.meta.env.VITE_N8N_COMUNICAR_WEBHOOK_URL as string | undefined)?.trim() ||
+    DEFAULT_WEBHOOK_SOLICITACAO
+  );
+}
+
+export function getN8nComunicarWebhookUrlReserva(): string {
+  return (
+    (import.meta.env.VITE_N8N_COMUNICAR_RESERVA_WEBHOOK_URL as string | undefined)?.trim() ||
+    DEFAULT_WEBHOOK_RESERVA
+  );
 }
 
 /** JSON-safe: datas e tipos estranhos viram string */
@@ -17,8 +32,15 @@ export function jsonSafeRecord(obj: Record<string, unknown>): Record<string, unk
   }
 }
 
-/** Só solicitações (Transfer / Grupo). Reservas usam outro fluxo/webhook. */
-export type OrigemComunicarMotorista = "transfer_solicitacao" | "grupo_solicitacao";
+export type OrigemComunicarMotorista =
+  | "transfer_solicitacao"
+  | "grupo_solicitacao"
+  | "transfer_reserva"
+  | "grupo_reserva";
+
+function isOrigemReserva(origem: string): boolean {
+  return origem === "transfer_reserva" || origem === "grupo_reserva";
+}
 
 export async function fetchMotoristaPainelSnapshot(): Promise<Record<string, unknown>> {
   const { data: { user } } = await supabase.auth.getUser();
@@ -78,14 +100,18 @@ export function buildComunicadorSnapshot(
 
 /**
  * Envia o payload ao n8n via Edge Function (servidor → n8n), evitando CORS no browser.
- * Opcionalmente `webhookUrl` no env do front para staging/outro fluxo (mesmo host permitido).
+ * O destino do webhook depende de `body.origem` (solicitação vs reserva).
  */
 export async function postMotoristaComunicarWebhook(body: Record<string, unknown>): Promise<void> {
-  const urlOverride = getN8nComunicarWebhookUrl();
+  const origem = String(body.origem ?? "");
+  const targetUrl = isOrigemReserva(origem)
+    ? getN8nComunicarWebhookUrlReserva()
+    : getN8nComunicarWebhookUrlSolicitacao();
+
   const { data, error } = await supabase.functions.invoke("n8n-comunicar-proxy", {
     body: {
       payload: body,
-      ...(urlOverride !== DEFAULT_WEBHOOK ? { webhookUrl: urlOverride } : {}),
+      webhookUrl: targetUrl,
     },
   });
   if (error) {
