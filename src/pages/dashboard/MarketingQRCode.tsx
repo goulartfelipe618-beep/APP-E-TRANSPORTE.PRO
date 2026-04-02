@@ -3,11 +3,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Switch } from "@/components/ui/switch";
-import { RefreshCw, Plus, Download, Copy, ExternalLink, Eye, EyeOff } from "lucide-react";
+import { RefreshCw, Plus, Download, Copy, ExternalLink, Eye, EyeOff, Sparkles } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { QRCodeCanvas } from "qrcode.react";
@@ -27,6 +27,21 @@ interface QRCode {
   created_at: string;
 }
 
+/** Fonte para o diálogo de download (QR salvo ou link rápido). */
+interface QrDownloadSource {
+  url_destino: string;
+  titulo: string;
+}
+
+function isValidHttpUrl(s: string): boolean {
+  try {
+    const u = new URL(s.trim());
+    return u.protocol === "http:" || u.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
 export default function MarketingQRCodePage() {
   const [qrCodes, setQrCodes] = useState<QRCode[]>([]);
   const [loading, setLoading] = useState(true);
@@ -36,16 +51,22 @@ export default function MarketingQRCodePage() {
   const [saving, setSaving] = useState(false);
 
   const [downloadOpen, setDownloadOpen] = useState(false);
-  const [downloadTarget, setDownloadTarget] = useState<QRCode | null>(null);
+  const [downloadTarget, setDownloadTarget] = useState<QrDownloadSource | null>(null);
   const [sizeId, setSizeId] = useState<QrExportSizeId>("medio");
   const [scheme, setScheme] = useState<QrColorScheme>("light");
   const [solidBackground, setSolidBackground] = useState(true);
   const [downloading, setDownloading] = useState(false);
 
+  const [quickUrl, setQuickUrl] = useState("");
+  const [quickTitulo, setQuickTitulo] = useState("");
+
   const fetchQRCodes = async () => {
     setLoading(true);
     const { data: { session } } = await supabase.auth.getSession();
-    if (!session) return;
+    if (!session) {
+      setLoading(false);
+      return;
+    }
 
     const { data, error } = await supabase
       .from("qr_codes" as any)
@@ -53,7 +74,15 @@ export default function MarketingQRCodePage() {
       .eq("user_id", session.user.id)
       .order("created_at", { ascending: false });
 
-    if (!error && data) setQrCodes(data as any);
+    if (error) {
+      console.error(error);
+      toast.error("Não foi possível carregar os QR Codes.", {
+        description: error.message || "Verifique permissões do banco (tabela qr_codes).",
+      });
+      setQrCodes([]);
+    } else if (data) {
+      setQrCodes(data as any);
+    }
     setLoading(false);
   };
 
@@ -88,7 +117,7 @@ export default function MarketingQRCodePage() {
     } as any);
 
     if (error) {
-      toast.error("Erro ao criar QR Code");
+      toast.error("Erro ao criar QR Code", { description: error.message });
     } else {
       toast.success("QR Code criado com sucesso!");
       setTitulo("");
@@ -108,6 +137,8 @@ export default function MarketingQRCodePage() {
     if (!error) {
       toast.success(qr.ativo ? "QR Code ocultado" : "QR Code reativado");
       fetchQRCodes();
+    } else {
+      toast.error("Não foi possível atualizar", { description: error.message });
     }
   };
 
@@ -116,12 +147,28 @@ export default function MarketingQRCodePage() {
     toast.success("Link copiado!");
   };
 
-  const openDownloadDialog = (qr: QRCode) => {
-    setDownloadTarget(qr);
+  const openDownloadDialog = (source: QrDownloadSource) => {
+    setDownloadTarget(source);
     setSizeId("medio");
     setScheme("light");
     setSolidBackground(true);
     setDownloadOpen(true);
+  };
+
+  const openQuickDownloadDialog = () => {
+    const u = quickUrl.trim();
+    if (!u) {
+      toast.error("Cole um link (https://…)");
+      return;
+    }
+    if (!isValidHttpUrl(u)) {
+      toast.error("Use um endereço válido começando com http:// ou https://");
+      return;
+    }
+    openDownloadDialog({
+      url_destino: u,
+      titulo: quickTitulo.trim() || "qr-rapido",
+    });
   };
 
   const handleDownload = async () => {
@@ -135,7 +182,7 @@ export default function MarketingQRCodePage() {
           scheme,
           solidBackground,
         },
-        downloadTarget.titulo || downloadTarget.slug,
+        downloadTarget.titulo,
       );
       toast.success("Download iniciado.");
       setDownloadOpen(false);
@@ -146,6 +193,8 @@ export default function MarketingQRCodePage() {
       setDownloading(false);
     }
   };
+
+  const quickPreviewUrl = quickUrl.trim() && isValidHttpUrl(quickUrl.trim()) ? quickUrl.trim() : "";
 
   return (
     <div className="space-y-6">
@@ -197,17 +246,67 @@ export default function MarketingQRCodePage() {
         </div>
       </div>
 
+      <Card className="border-primary/30 bg-card">
+        <CardHeader className="pb-2">
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-5 w-5 text-primary" />
+            <CardTitle className="text-lg">Baixar QR Code (sem salvar)</CardTitle>
+          </div>
+          <CardDescription>
+            Escolha tamanho (512 / 1048 / 2048 px), cores (fundo branco+QR preto ou fundo preto+QR branco) e com ou sem
+            fundo transparente — funciona mesmo sem criar um QR na lista abaixo.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="quick-url">Link para codificar *</Label>
+              <Input
+                id="quick-url"
+                type="url"
+                placeholder="https://seusite.com/promo"
+                value={quickUrl}
+                onChange={(e) => setQuickUrl(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="quick-tit">Nome do arquivo (opcional)</Label>
+              <Input
+                id="quick-tit"
+                placeholder="Ex: campanha-instagram"
+                value={quickTitulo}
+                onChange={(e) => setQuickTitulo(e.target.value)}
+              />
+            </div>
+          </div>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            {quickPreviewUrl ? (
+              <div className="flex justify-center rounded-lg border border-border bg-white p-3 w-fit">
+                <QRCodeCanvas value={quickPreviewUrl} size={120} level="H" includeMargin />
+              </div>
+            ) : (
+              <div className="h-[152px] w-[152px] rounded-lg border border-dashed border-muted-foreground/40 flex items-center justify-center text-xs text-muted-foreground text-center px-2">
+                Prévia após colar o link
+              </div>
+            )}
+            <Button type="button" onClick={openQuickDownloadDialog} className="sm:ml-auto">
+              <Download className="h-4 w-4 mr-2" />
+              Escolher tamanho, cores e baixar PNG
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
       <Dialog open={downloadOpen} onOpenChange={setDownloadOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto z-[200]">
           <DialogHeader>
             <DialogTitle>Baixar QR Code em PNG</DialogTitle>
           </DialogHeader>
           {downloadTarget && (
             <div className="space-y-5 pt-4">
-              <p className="text-sm text-muted-foreground">
-                <span className="font-medium text-foreground">{downloadTarget.titulo}</span>
-                <br />
-                <span className="truncate block">{downloadTarget.url_destino}</span>
+              <p className="text-sm text-muted-foreground break-all">
+                <span className="font-medium text-foreground block truncate">{downloadTarget.titulo}</span>
+                {downloadTarget.url_destino}
               </p>
 
               <div className="space-y-2">
@@ -218,20 +317,20 @@ export default function MarketingQRCodePage() {
                   className="grid gap-2"
                 >
                   <div className="flex items-center space-x-2 rounded-lg border border-border px-3 py-2 has-[:checked]:border-primary/50 has-[:checked]:bg-primary/5">
-                    <RadioGroupItem value="pequeno" id="sz-peq" />
-                    <Label htmlFor="sz-peq" className="cursor-pointer font-normal flex-1">
+                    <RadioGroupItem value="pequeno" id="dl-sz-peq" />
+                    <Label htmlFor="dl-sz-peq" className="cursor-pointer font-normal flex-1">
                       Pequeno — <span className="font-mono text-xs">512 × 512</span> px
                     </Label>
                   </div>
                   <div className="flex items-center space-x-2 rounded-lg border border-border px-3 py-2 has-[:checked]:border-primary/50 has-[:checked]:bg-primary/5">
-                    <RadioGroupItem value="medio" id="sz-med" />
-                    <Label htmlFor="sz-med" className="cursor-pointer font-normal flex-1">
+                    <RadioGroupItem value="medio" id="dl-sz-med" />
+                    <Label htmlFor="dl-sz-med" className="cursor-pointer font-normal flex-1">
                       Médio — <span className="font-mono text-xs">1048 × 1048</span> px
                     </Label>
                   </div>
                   <div className="flex items-center space-x-2 rounded-lg border border-border px-3 py-2 has-[:checked]:border-primary/50 has-[:checked]:bg-primary/5">
-                    <RadioGroupItem value="grande" id="sz-gra" />
-                    <Label htmlFor="sz-gra" className="cursor-pointer font-normal flex-1">
+                    <RadioGroupItem value="grande" id="dl-sz-gra" />
+                    <Label htmlFor="dl-sz-gra" className="cursor-pointer font-normal flex-1">
                       Grande — <span className="font-mono text-xs">2048 × 2048</span> px
                     </Label>
                   </div>
@@ -246,14 +345,14 @@ export default function MarketingQRCodePage() {
                   className="grid gap-2"
                 >
                   <div className="flex items-center space-x-2 rounded-lg border border-border px-3 py-2 has-[:checked]:border-primary/50 has-[:checked]:bg-primary/5">
-                    <RadioGroupItem value="light" id="cl-light" />
-                    <Label htmlFor="cl-light" className="cursor-pointer font-normal flex-1">
+                    <RadioGroupItem value="light" id="dl-cl-light" />
+                    <Label htmlFor="dl-cl-light" className="cursor-pointer font-normal flex-1">
                       Fundo branco e QR preto
                     </Label>
                   </div>
                   <div className="flex items-center space-x-2 rounded-lg border border-border px-3 py-2 has-[:checked]:border-primary/50 has-[:checked]:bg-primary/5">
-                    <RadioGroupItem value="dark" id="cl-dark" />
-                    <Label htmlFor="cl-dark" className="cursor-pointer font-normal flex-1">
+                    <RadioGroupItem value="dark" id="dl-cl-dark" />
+                    <Label htmlFor="dl-cl-dark" className="cursor-pointer font-normal flex-1">
                       Fundo preto e QR branco
                     </Label>
                   </div>
@@ -262,14 +361,14 @@ export default function MarketingQRCodePage() {
 
               <div className="flex items-center justify-between gap-4 rounded-lg border border-border px-3 py-3">
                 <div className="space-y-0.5">
-                  <Label htmlFor="solid-bg" className="text-base">
+                  <Label htmlFor="dl-solid-bg" className="text-base">
                     Fundo sólido
                   </Label>
                   <p className="text-xs text-muted-foreground">
                     Desligue para PNG com fundo transparente (apenas os módulos do QR).
                   </p>
                 </div>
-                <Switch id="solid-bg" checked={solidBackground} onCheckedChange={setSolidBackground} />
+                <Switch id="dl-solid-bg" checked={solidBackground} onCheckedChange={setSolidBackground} />
               </div>
 
               <div className="flex gap-2 pt-2">
@@ -290,8 +389,13 @@ export default function MarketingQRCodePage() {
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
         </div>
       ) : qrCodes.length === 0 ? (
-        <div className="rounded-xl border border-border bg-card p-6 text-center">
-          <p className="text-sm text-muted-foreground">Nenhum QR Code criado ainda.</p>
+        <div className="rounded-xl border border-border bg-card p-6 text-center space-y-2">
+          <p className="text-sm text-muted-foreground">Nenhum QR Code salvo na lista ainda.</p>
+          <p className="text-xs text-muted-foreground">
+            Use o bloco <strong className="text-foreground">Baixar QR Code (sem salvar)</strong> acima para exportar PNG
+            com todas as opções, ou clique em <strong className="text-foreground">Novo QR Code</strong> para guardar um
+            link permanente.
+          </p>
         </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -322,7 +426,13 @@ export default function MarketingQRCodePage() {
                   <Button variant="outline" size="sm" onClick={() => copyLink(qr.url_destino)}>
                     <Copy className="h-3.5 w-3.5 mr-1" /> Copiar Link
                   </Button>
-                  <Button variant="outline" size="sm" onClick={() => openDownloadDialog(qr)}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      openDownloadDialog({ url_destino: qr.url_destino, titulo: qr.titulo || qr.slug })
+                    }
+                  >
                     <Download className="h-3.5 w-3.5 mr-1" /> Baixar
                   </Button>
                   <Button variant="outline" size="sm" onClick={() => window.open(qr.url_destino, "_blank")}>
