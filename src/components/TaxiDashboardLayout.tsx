@@ -47,7 +47,7 @@ function TaxiContent() {
           </div>
         </header>
         <main className="flex-1 bg-background p-6 overflow-auto">
-          <PageLoader pageKey={activePage}>
+          <PageLoader pageKey={activePage} showLoaderOnPages={["home"]}>
             <PageComponent key={activePage} />
           </PageLoader>
         </main>
