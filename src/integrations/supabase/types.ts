@@ -1276,11 +1276,14 @@ export type Database = {
           cnh: string | null
           cpf: string | null
           created_at: string
+          dados_webhook: Json
           email: string | null
           email_had_account_at_intake: boolean
+          estado: string | null
           id: string
           lead_user_id: string | null
           mensagem: string | null
+          mensagem_observacoes: string | null
           nome: string
           status: string
           telefone: string | null
@@ -1292,11 +1295,14 @@ export type Database = {
           cnh?: string | null
           cpf?: string | null
           created_at?: string
+          dados_webhook?: Json
           email?: string | null
           email_had_account_at_intake?: boolean
+          estado?: string | null
           id?: string
           lead_user_id?: string | null
           mensagem?: string | null
+          mensagem_observacoes?: string | null
           nome: string
           status?: string
           telefone?: string | null
@@ -1308,11 +1314,14 @@ export type Database = {
           cnh?: string | null
           cpf?: string | null
           created_at?: string
+          dados_webhook?: Json
           email?: string | null
           email_had_account_at_intake?: boolean
+          estado?: string | null
           id?: string
           lead_user_id?: string | null
           mensagem?: string | null
+          mensagem_observacoes?: string | null
           nome?: string
           status?: string
           telefone?: string | null

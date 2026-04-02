@@ -60,7 +60,7 @@ export default function ContratoComoPdfPreview({
         style={{ fontFamily: "Helvetica, Arial, sans-serif" }}
       >
         {cab?.razao_social ? (
-          <div className="-mx-6 md:-mx-8 -mt-6 md:-mt-8 mb-6 flex flex-col gap-3 rounded-t-xl bg-black px-6 py-4 text-white sm:flex-row sm:items-center sm:justify-between sm:gap-5">
+          <div className="-mx-6 md:-mx-8 -mt-6 md:-mt-8 mb-0 flex flex-col gap-3 rounded-t-xl bg-black px-6 py-4 text-white sm:flex-row sm:items-center sm:justify-between sm:gap-5">
             <div className="min-w-0 flex-1">
               <h2 className="text-[13pt] font-bold leading-tight">{cab.razao_social}</h2>
               <div className="mt-1.5 space-y-1 text-[7.5pt] text-neutral-300">
@@ -101,17 +101,25 @@ export default function ContratoComoPdfPreview({
           </p>
         )}
 
-        <h1 className="text-[16pt] font-bold text-neutral-900 leading-tight">Contrato de Prestação de Serviço</h1>
-        <div className="mt-2 text-[9pt] text-neutral-500">
-          <p>
-            Reserva Nº <span className="text-neutral-700">000</span>
-            <span className="mx-8" />
-            ID: <span className="font-mono text-neutral-700">00000000</span>
-          </p>
-          <p className="mt-1">Gerado em {new Date().toLocaleString("pt-BR")}</p>
+        <div
+          className={
+            cab?.razao_social
+              ? "-mx-6 md:-mx-8 mb-6 rounded-b-xl bg-black px-6 py-4 text-white"
+              : "-mx-6 md:-mx-8 mb-6 rounded-xl bg-black px-6 py-4 text-white"
+          }
+        >
+          <h1 className="text-[16pt] font-bold leading-tight text-white">Contrato de Prestação de Serviço</h1>
+          <div className="mt-2 text-[9pt] text-neutral-300">
+            <p>
+              Reserva Nº <span className="text-white">000</span>
+              <span className="mx-4" aria-hidden="true" />
+              ID: <span className="font-mono text-neutral-200">00000000</span>
+            </p>
+            <p className="mt-1">Gerado em {new Date().toLocaleString("pt-BR")}</p>
+          </div>
         </div>
 
-        <div className="mt-6 space-y-6">
+        <div className="space-y-6">
           {modelo?.trim() ? (
             <section>
               <h3 className="text-[10pt] font-bold text-neutral-900 border-b border-neutral-200 pb-1 mb-2">

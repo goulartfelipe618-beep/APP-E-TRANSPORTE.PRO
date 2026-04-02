@@ -161,7 +161,12 @@ async function loadLogoForPdf(url: string | null | undefined): Promise<LogoPdf |
 // ─── Reusable PDF Sections ──────────────────────────────────
 
 /** Cabeçalho institucional: fundo preto, texto claro, logo à direita (informações contratuais). */
-async function addCompanyHeader(doc: jsPDF, cab: any, startY: number): Promise<number> {
+async function addCompanyHeader(
+  doc: jsPDF,
+  cab: any,
+  startY: number,
+  trailingGap: number = SP.sectionGap,
+): Promise<number> {
   if (!cab || !cab.razao_social) return startY;
 
   const INNER = 4;
@@ -242,28 +247,55 @@ async function addCompanyHeader(doc: jsPDF, cab: any, startY: number): Promise<n
   }
 
   doc.setTextColor(0, 0, 0);
-  return boxTop + headerH + SP.sectionGap;
+  return boxTop + headerH + trailingGap;
 }
 
-function addPageTitle(doc: jsPDF, titulo: string, numReserva: number | string, reservaId: string, y: number): number {
+/** Título do documento (Confirmação / Contrato): faixa preta largura útil, texto branco — alinhado ao cabeçalho da empresa. */
+function addPageTitle(doc: jsPDF, titulo: string, numReserva: number | string, reservaId: string, startY: number): number {
+  const INNER = 4;
+  const TITLE_LH = 6.5;
+  const META_LH = 4.2;
+  const textMaxW = CONTENT_W - 2 * INNER;
+
   doc.setFontSize(FS.pageTitle);
   doc.setFont("helvetica", "bold");
-  setColor(doc, CLR.dark);
-  doc.text(titulo, MARGIN, y);
-  y += 8;
+  const titleLines = doc.splitTextToSize(titulo, textMaxW);
+
+  const meta1 = `Reserva Nº ${numReserva}   •   ID: ${String(reservaId).substring(0, 8).toUpperCase()}`;
+  const meta2 = `Gerado em ${new Date().toLocaleString("pt-BR")}`;
 
   doc.setFontSize(FS.subtitle);
   doc.setFont("helvetica", "normal");
-  setColor(doc, CLR.muted);
-  doc.text(`Reserva Nº ${numReserva}`, MARGIN, y);
-  const idText = `ID: ${String(reservaId).substring(0, 8).toUpperCase()}`;
-  doc.text(idText, MARGIN + 65, y);
-  y += 5;
-  doc.text(`Gerado em ${new Date().toLocaleString("pt-BR")}`, MARGIN, y);
-  setColor(doc, CLR.black);
-  y += SP.sectionGap;
+  const meta1Lines = doc.splitTextToSize(meta1, textMaxW);
 
-  return y;
+  const titleH = titleLines.length * TITLE_LH;
+  const metaH = meta1Lines.length * META_LH + META_LH;
+  const headerH = INNER + titleH + 3 + metaH + INNER;
+
+  const boxTop = startY;
+  doc.setFillColor(0, 0, 0);
+  doc.roundedRect(MARGIN, boxTop, CONTENT_W, headerH, 2, 2, "F");
+
+  let ty = boxTop + INNER + 5;
+  doc.setFontSize(FS.pageTitle);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(255, 255, 255);
+  for (const line of titleLines) {
+    doc.text(line, MARGIN + INNER, ty);
+    ty += TITLE_LH;
+  }
+  ty += 2;
+  doc.setFontSize(FS.subtitle);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(220, 220, 220);
+  for (const line of meta1Lines) {
+    doc.text(line, MARGIN + INNER, ty);
+    ty += META_LH;
+  }
+  doc.text(meta2, MARGIN + INNER, ty);
+
+  doc.setTextColor(0, 0, 0);
+  return boxTop + headerH + SP.sectionGap;
 }
 
 async function addFullHeader(
@@ -274,7 +306,7 @@ async function addFullHeader(
   reservaId: string,
 ): Promise<number> {
   let y = MARGIN;
-  y = await addCompanyHeader(doc, cab, y);
+  y = await addCompanyHeader(doc, cab, y, 0);
   y = addPageTitle(doc, titulo, numReserva, reservaId, y);
   return y;
 }

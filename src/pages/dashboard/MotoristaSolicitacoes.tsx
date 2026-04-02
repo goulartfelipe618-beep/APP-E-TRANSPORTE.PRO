@@ -1,14 +1,16 @@
 import { useState, useEffect, useCallback } from "react";
-import { RefreshCw, Download, Eye, MessageSquare } from "lucide-react";
+import { RefreshCw, Download, Eye, MessageSquare, UserCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import DetalhesSolicitacaoMotoristaSheet from "@/components/solicitacoes/DetalhesSolicitacaoMotoristaSheet";
-import CadastrarMotoristaDialog from "@/components/motoristas/CadastrarMotoristaDialog";
 import ComunicarDialog from "@/components/comunicar/ComunicarDialog";
 import { generateSolicitacaoMotoristaPDF } from "@/lib/pdfGenerator";
+import { useActivePage } from "@/contexts/ActivePageContext";
+import { MOTORISTA_FROM_SOLICITACAO_KEY, type MotoristaInitialData } from "@/lib/motoristaFromSolicitacao";
+import type { Json } from "@/integrations/supabase/types";
 
 interface Solicitacao {
   id: string;
@@ -18,28 +20,25 @@ interface Solicitacao {
   cpf: string | null;
   cnh: string | null;
   cidade: string | null;
+  estado: string | null;
   mensagem: string | null;
+  mensagem_observacoes: string | null;
+  dados_webhook: Json | null;
   status: string;
   created_at: string;
 }
 
-export interface MotoristaInitialData {
-  nome?: string;
-  email?: string;
-  telefone?: string;
-  cpf?: string;
-  cnh?: string;
-  cidade?: string;
-  solicitacao_id?: string;
+function dadosWebhookToRecord(dw: Json | null): Record<string, unknown> | null {
+  if (dw && typeof dw === "object" && !Array.isArray(dw)) return dw as Record<string, unknown>;
+  return null;
 }
 
 export default function MotoristaSolicitacoesPage() {
+  const { setActivePage } = useActivePage();
   const [solicitacoes, setSolicitacoes] = useState<Solicitacao[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Solicitacao | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [initialData, setInitialData] = useState<MotoristaInitialData | null>(null);
   const [comunicarOpen, setComunicarOpen] = useState(false);
   const [comunicarDados, setComunicarDados] = useState<Solicitacao | null>(null);
 
@@ -49,11 +48,13 @@ export default function MotoristaSolicitacoesPage() {
       .select("*")
       .order("created_at", { ascending: false });
     if (error) toast.error("Erro ao carregar solicitações");
-    else setSolicitacoes(data || []);
+    else setSolicitacoes((data as Solicitacao[]) || []);
     setLoading(false);
   }, []);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   const handleVisualizar = (s: Solicitacao) => {
     setSelected(s);
@@ -61,26 +62,28 @@ export default function MotoristaSolicitacoesPage() {
   };
 
   const handleConverter = (s: Solicitacao) => {
-    const data: MotoristaInitialData = {
+    const payload: MotoristaInitialData = {
+      solicitacao_id: s.id,
       nome: s.nome,
       email: s.email || undefined,
       telefone: s.telefone || undefined,
       cpf: s.cpf || undefined,
       cnh: s.cnh || undefined,
       cidade: s.cidade || undefined,
-      solicitacao_id: s.id,
+      estado: s.estado || undefined,
+      mensagem_observacoes: s.mensagem_observacoes || s.mensagem || undefined,
+      dados_webhook: dadosWebhookToRecord(s.dados_webhook),
     };
-    setInitialData(data);
-    setSheetOpen(false);
-    setTimeout(() => setDialogOpen(true), 350);
-  };
-
-  const handleCadastrado = async () => {
-    if (initialData?.solicitacao_id) {
-      await supabase.from("solicitacoes_motoristas").update({ status: "cadastrado" }).eq("id", initialData.solicitacao_id);
+    try {
+      sessionStorage.setItem(MOTORISTA_FROM_SOLICITACAO_KEY, JSON.stringify(payload));
+    } catch {
+      toast.error("Não foi possível preparar o cadastro. Tente de novo.");
+      return;
     }
-    setInitialData(null);
-    fetchData();
+    setSheetOpen(false);
+    setSelected(null);
+    toast.message("Abrindo Cadastros — preencha todos os dados do motorista e do veículo.");
+    setActivePage("motoristas/cadastros");
   };
 
   const handleComunicar = (s: Solicitacao) => {
@@ -88,24 +91,32 @@ export default function MotoristaSolicitacoesPage() {
     setComunicarOpen(true);
   };
 
+  const podeConverter = (status: string) => status !== "cadastrado";
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Solicitações de Motoristas</h1>
-          <p className="text-muted-foreground">Solicitações recebidas de pessoas que desejam ser motoristas parceiros ({solicitacoes.length})</p>
+          <p className="text-muted-foreground">
+            Solicitações recebidas de pessoas que desejam ser motoristas parceiros ({solicitacoes.length})
+          </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="icon" onClick={fetchData}><RefreshCw className="h-4 w-4" /></Button>
-          <Button variant="outline"><Download className="h-4 w-4 mr-2" /> Exportar CSV</Button>
+          <Button variant="outline" size="icon" onClick={fetchData}>
+            <RefreshCw className="h-4 w-4" />
+          </Button>
+          <Button variant="outline">
+            <Download className="mr-2 h-4 w-4" /> Exportar CSV
+          </Button>
         </div>
       </div>
 
-      <div className="rounded-xl border border-border bg-card overflow-hidden">
+      <div className="overflow-hidden rounded-xl border border-border bg-card">
         {loading ? (
-          <p className="text-sm text-muted-foreground p-6">Carregando...</p>
+          <p className="p-6 text-sm text-muted-foreground">Carregando...</p>
         ) : solicitacoes.length === 0 ? (
-          <p className="text-sm text-muted-foreground p-6 text-center">Nenhuma solicitação recebida.</p>
+          <p className="p-6 text-center text-sm text-muted-foreground">Nenhuma solicitação recebida.</p>
         ) : (
           <Table>
             <TableHeader>
@@ -116,9 +127,10 @@ export default function MotoristaSolicitacoesPage() {
                 <TableHead>CPF</TableHead>
                 <TableHead>CNH</TableHead>
                 <TableHead>Cidade</TableHead>
+                <TableHead>UF</TableHead>
                 <TableHead>Data</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead className="w-[100px]">Ações</TableHead>
+                <TableHead className="w-[120px]">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -130,13 +142,21 @@ export default function MotoristaSolicitacoesPage() {
                   <TableCell className="text-sm">{s.cpf || "—"}</TableCell>
                   <TableCell className="text-sm">{s.cnh || "—"}</TableCell>
                   <TableCell className="text-sm">{s.cidade || "—"}</TableCell>
+                  <TableCell className="text-sm">{s.estado || "—"}</TableCell>
                   <TableCell className="text-sm">{new Date(s.created_at).toLocaleDateString("pt-BR")}</TableCell>
-                  <TableCell><Badge variant="outline">{s.status}</Badge></TableCell>
+                  <TableCell>
+                    <Badge variant="outline">{s.status}</Badge>
+                  </TableCell>
                   <TableCell>
                     <div className="flex gap-1">
                       <Button variant="ghost" size="icon" onClick={() => handleVisualizar(s)} title="Visualizar">
                         <Eye className="h-4 w-4" />
                       </Button>
+                      {podeConverter(s.status) && (
+                        <Button variant="ghost" size="icon" onClick={() => handleConverter(s)} title="Converter em cadastro">
+                          <UserCheck className="h-4 w-4" />
+                        </Button>
+                      )}
                       <Button variant="ghost" size="icon" onClick={() => handleComunicar(s)} title="Comunicar">
                         <MessageSquare className="h-4 w-4" />
                       </Button>
@@ -155,13 +175,6 @@ export default function MotoristaSolicitacoesPage() {
         onOpenChange={setSheetOpen}
         onConverter={handleConverter}
         onComunicar={handleComunicar}
-      />
-
-      <CadastrarMotoristaDialog
-        open={dialogOpen}
-        onOpenChange={(open) => { setDialogOpen(open); if (!open) setInitialData(null); }}
-        onCreated={handleCadastrado}
-        initialData={initialData}
       />
 
       {comunicarDados && (

@@ -65,7 +65,7 @@ const labelToColumn: Record<string, Record<string, string>> = {
     "Data de Nascimento": "_data_nascimento",
     "Endereço Completo": "_endereco",
     "Cidade": "cidade",
-    "Estado": "_estado",
+    "Estado": "estado",
     "Número da CNH": "cnh",
     "Categoria da CNH": "_categoria_cnh",
     "Possui Veículo (sim/não)": "_possui_veiculo",
@@ -74,7 +74,7 @@ const labelToColumn: Record<string, Record<string, string>> = {
     "Ano do Veículo": "_ano_veiculo",
     "Placa do Veículo": "_placa_veiculo",
     "Experiência": "_experiencia",
-    "Mensagem / Observações": "mensagem",
+    "Mensagem / Observações": "mensagem_observacoes",
   },
 };
 
@@ -202,8 +202,9 @@ Deno.serve(async (req) => {
     const savedMappings = (automacao.mappings || {}) as Record<string, Record<string, string>>;
     const columnMap = labelToColumn[tipo] || {};
 
-    // Collect all mapping tabs into one flat map: dbColumn -> resolved value
+    // Collect all mapping tabs: colunas reais em resolvedData; campos "_" (extras) em resolvedExtras
     const resolvedData: Record<string, any> = {};
+    const resolvedExtras: Record<string, any> = {};
 
     for (const tabKey of Object.keys(savedMappings)) {
       const tabMappings = savedMappings[tabKey];
@@ -212,13 +213,16 @@ Deno.serve(async (req) => {
       for (const [friendlyLabel, incomingPath] of Object.entries(tabMappings)) {
         if (!incomingPath) continue;
         const dbColumn = columnMap[friendlyLabel];
-        if (!dbColumn || dbColumn.startsWith("_")) continue;
+        if (!dbColumn) continue;
 
         const value = resolveValue(body, incomingPath);
-        if (value !== undefined && value !== null && value !== "") {
-          if (!resolvedData[dbColumn]) {
-            resolvedData[dbColumn] = value;
-          }
+        if (value === undefined || value === null || value === "") continue;
+
+        if (dbColumn.startsWith("_")) {
+          const key = dbColumn.slice(1);
+          if (resolvedExtras[key] === undefined) resolvedExtras[key] = value;
+        } else {
+          if (!resolvedData[dbColumn]) resolvedData[dbColumn] = value;
         }
       }
     }
@@ -299,14 +303,25 @@ Deno.serve(async (req) => {
       const { error } = await supabase.from("solicitacoes_grupos").insert(record);
       insertError = error;
     } else if (tipo === "motorista") {
-      // 1) Compute lead fields
+      // 1) Campos principais (mapeamento + fallback no corpo JSON)
       const leadNome: string = resolvedData.nome || body.nome_completo || body.nome || "Sem nome";
       const leadEmail: string | null = resolvedData.email || body.email || null;
-      const leadTelefone: string | null = resolvedData.telefone || body.telefone || body.whatsapp || null;
+      const leadTelefone: string | null =
+        resolvedData.telefone || body.telefone || body.whatsapp || body.telefone_whatsapp || null;
       const leadCidade: string | null = resolvedData.cidade || body.cidade || body.cidade_nome || null;
-      const leadMensagemBase: string | null = resolvedData.mensagem || body.mensagem_observacoes || body.mensagem || null;
-      const leadEstado: string | null = resolvedData.estado || body.estado || body.uf || null;
-      const leadEmpresa: string | null = resolvedData.nome_empresa || body.nome_empresa || body.empresa || null;
+      const leadEstado: string | null =
+        resolvedData.estado || body.estado || body.uf || body.sigla_estado || body.state || null;
+      const leadMensagemObs: string | null =
+        resolvedData.mensagem_observacoes ||
+        resolvedData.mensagem ||
+        body.mensagem_observacoes ||
+        body.mensagem ||
+        body.observacoes ||
+        body.mensagem_obs ||
+        null;
+
+      const leadEmpresa: string | null =
+        resolvedData.nome_empresa || body.nome_empresa || body.empresa || null;
       const leadOrigem: string | null =
         resolvedData.origem ||
         body.origem ||
@@ -319,15 +334,36 @@ Deno.serve(async (req) => {
         body.origem_outro ||
         body.outro ||
         null;
-      const leadMensagem = [
-        leadMensagemBase,
-        leadEstado ? `Estado: ${leadEstado}` : null,
-        leadEmpresa ? `Empresa: ${leadEmpresa}` : null,
-        leadOrigem ? `Origem: ${Array.isArray(leadOrigem) ? leadOrigem.join(", ") : String(leadOrigem)}` : null,
-        leadEspecificacao ? `Especificação: ${leadEspecificacao}` : null,
-      ]
-        .filter(Boolean)
-        .join("\n");
+
+      const extrasMerged: Record<string, any> = { ...resolvedExtras };
+      const bodyExtraKeys = [
+        "data_nascimento",
+        "endereco",
+        "categoria_cnh",
+        "possui_veiculo",
+        "marca_veiculo",
+        "modelo_veiculo",
+        "ano_veiculo",
+        "placa_veiculo",
+        "experiencia",
+        "rg",
+        "cep",
+        "numero_cnh",
+      ];
+      for (const k of bodyExtraKeys) {
+        const v = (body as Record<string, unknown>)[k];
+        if (v !== undefined && v !== null && v !== "" && extrasMerged[k] === undefined) {
+          extrasMerged[k] = v;
+        }
+      }
+      if (leadOrigem != null && leadOrigem !== "") {
+        extrasMerged.origem_captacao = Array.isArray(leadOrigem) ? leadOrigem.join(", ") : String(leadOrigem);
+      }
+      if (leadEmpresa != null && leadEmpresa !== "") extrasMerged.nome_empresa_lead = leadEmpresa;
+      if (leadEspecificacao != null && leadEspecificacao !== "") {
+        extrasMerged.especificacao_origem = leadEspecificacao;
+      }
+
       // Cadastro pelo site: solicitação sempre em FREE com login liberado (plano pago só no admin ou upgrade no painel).
       const leadPlano = "free";
 
@@ -449,7 +485,11 @@ Deno.serve(async (req) => {
         cpf: resolvedData.cpf || body.cpf || null,
         cnh: resolvedData.cnh || body.numero_cnh || null,
         cidade: leadCidade,
-        mensagem: leadMensagem || null,
+        estado: leadEstado,
+        mensagem_observacoes: leadMensagemObs,
+        // Legado / telas antigas: espelha observações sem misturar estado
+        mensagem: leadMensagemObs,
+        dados_webhook: Object.keys(extrasMerged).length > 0 ? extrasMerged : {},
         status: "testando",
         email_had_account_at_intake: emailHadAccountAtIntake,
       };
