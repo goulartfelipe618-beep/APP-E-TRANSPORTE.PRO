@@ -1,8 +1,13 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const corsHeaders = {
+/**
+ * Mesmo conjunto que `@supabase/supabase-js/cors` (inclui Allow-Methods).
+ * Sem `Access-Control-Allow-Methods`, o preflight do POST falha no browser.
+ */
+const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
 };
 
 const ROW_ID = "00000000-0000-0000-0000-000000000001";
@@ -53,7 +58,7 @@ function assertSafeHttps(url: string): string {
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+    return new Response(null, { status: 204, headers: corsHeaders });
   }
 
   if (req.method !== "POST") {
