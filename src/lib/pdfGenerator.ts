@@ -92,17 +92,29 @@ function wrappedText(doc: jsPDF, text: string, x: number, y: number, maxW: numbe
 
 // ─── Data fetchers ──────────────────────────────────────────
 
-async function fetchContrato(tipo: "transfer" | "grupos") {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
-  const { data } = await supabase.from("contratos").select("*").eq("user_id", user.id).eq("tipo", tipo).maybeSingle();
+/**
+ * Contrato e cabeçalho pertencem ao dono da operação (`user_id` da reserva).
+ * Quem gera o PDF pode ser motorista ou outro perfil — não usar só auth.getUser().
+ */
+async function fetchContrato(tipo: "transfer" | "grupos", ownerUserId?: string | null) {
+  let uid = ownerUserId ?? null;
+  if (!uid) {
+    const { data: { user } } = await supabase.auth.getUser();
+    uid = user?.id ?? null;
+  }
+  if (!uid) return null;
+  const { data } = await supabase.from("contratos").select("*").eq("user_id", uid).eq("tipo", tipo).maybeSingle();
   return data;
 }
 
-async function fetchCabecalho() {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
-  const { data } = await supabase.from("cabecalho_contratual" as any).select("*").eq("user_id", user.id).maybeSingle();
+async function fetchCabecalho(ownerUserId?: string | null) {
+  let uid = ownerUserId ?? null;
+  if (!uid) {
+    const { data: { user } } = await supabase.auth.getUser();
+    uid = user?.id ?? null;
+  }
+  if (!uid) return null;
+  const { data } = await supabase.from("cabecalho_contratual" as any).select("*").eq("user_id", uid).maybeSingle();
   return data as any;
 }
 
@@ -390,7 +402,11 @@ async function buildTransferReservaPdfDocument(reservaId: string): Promise<{ doc
   const { data: r } = await supabase.from("reservas_transfer").select("*").eq("id", reservaId).single();
   if (!r) return null;
 
-  const [contrato, cabecalho] = await Promise.all([fetchContrato("transfer"), fetchCabecalho()]);
+  const ownerId = r.user_id;
+  const [contrato, cabecalho] = await Promise.all([
+    fetchContrato("transfer", ownerId),
+    fetchCabecalho(ownerId),
+  ]);
   const doc = new jsPDF();
   const numReserva = (r as any).numero_reserva || r.id.substring(0, 6).toUpperCase();
   const filename = `reserva-transfer-${numReserva}-${r.nome_completo.replace(/\s/g, "_")}.pdf`;
@@ -546,7 +562,11 @@ async function buildGrupoReservaPdfDocument(reservaId: string): Promise<{ doc: j
   const { data: r } = await supabase.from("reservas_grupos").select("*").eq("id", reservaId).single();
   if (!r) return null;
 
-  const [contrato, cabecalho] = await Promise.all([fetchContrato("grupos"), fetchCabecalho()]);
+  const ownerId = r.user_id;
+  const [contrato, cabecalho] = await Promise.all([
+    fetchContrato("grupos", ownerId),
+    fetchCabecalho(ownerId),
+  ]);
   const doc = new jsPDF();
   const numReserva = (r as any).numero_reserva || r.id.substring(0, 6).toUpperCase();
   const filename = `reserva-grupo-${numReserva}-${r.nome_completo.replace(/\s/g, "_")}.pdf`;
