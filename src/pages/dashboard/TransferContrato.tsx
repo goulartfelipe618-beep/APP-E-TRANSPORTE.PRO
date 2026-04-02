@@ -4,6 +4,7 @@ import { Save, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import CabecalhoContratual from "@/components/contratos/CabecalhoContratual";
+import ContratoComoPdfPreview from "@/components/contratos/ContratoComoPdfPreview";
 
 const DEFAULT_MODELO = `1. DAS PARTES
 1.1. O presente contrato é celebrado entre as partes abaixo qualificadas.
@@ -80,7 +81,9 @@ export default function TransferContratoPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Contrato de Transfer</h1>
-          <p className="text-muted-foreground">Modelo de contrato para serviços de transfer. Este contrato aparecerá no PDF de confirmação de reserva.</p>
+          <p className="text-muted-foreground">
+            O conteúdo abaixo é o mesmo bloco de contrato que entra no PDF de confirmação (página(s) após a confirmação, mesmo arquivo A4). Edite os textos na seção no final da página.
+          </p>
         </div>
         <Button onClick={handleSave} disabled={saving || !loaded}>
           {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
@@ -90,8 +93,12 @@ export default function TransferContratoPage() {
 
       <CabecalhoContratual />
 
+      <ContratoComoPdfPreview modelo={modelo} politica={politica} clausulas={clausulas} />
+
       <div className="rounded-xl border border-border bg-card p-6">
-        <h3 className="font-semibold text-foreground mb-3">Modelo de Contrato</h3>
+        <h3 className="font-semibold text-foreground mb-1">Editar textos do contrato</h3>
+        <p className="text-sm text-muted-foreground mb-4">Alterações refletem imediatamente na pré-visualização e no PDF ao gerar a confirmação.</p>
+        <h4 className="text-sm font-medium text-foreground mb-2">Modelo de Contrato</h4>
         <textarea
           className="w-full h-48 bg-muted rounded-lg p-4 text-sm text-foreground font-mono resize-y border-0 focus:outline-none focus:ring-2 focus:ring-primary/20"
           value={modelo}
@@ -100,7 +107,7 @@ export default function TransferContratoPage() {
       </div>
 
       <div className="rounded-xl border border-border bg-card p-6">
-        <h3 className="font-semibold text-foreground mb-1">Política de Cancelamento</h3>
+        <h4 className="text-sm font-medium text-foreground mb-1">Política de Cancelamento</h4>
         <p className="text-sm text-muted-foreground mb-3">Regras para cancelamento e reembolso do serviço</p>
         <textarea
           className="w-full h-40 bg-muted rounded-lg p-4 text-sm text-foreground font-mono resize-y border-0 focus:outline-none focus:ring-2 focus:ring-primary/20"
@@ -110,7 +117,7 @@ export default function TransferContratoPage() {
       </div>
 
       <div className="rounded-xl border border-border bg-card p-6">
-        <h3 className="font-semibold text-foreground mb-1">Cláusulas Adicionais</h3>
+        <h4 className="text-sm font-medium text-foreground mb-1">Cláusulas Adicionais</h4>
         <p className="text-sm text-muted-foreground mb-3">Disposições finais e informações complementares</p>
         <textarea
           className="w-full h-40 bg-muted rounded-lg p-4 text-sm text-foreground font-mono resize-y border-0 focus:outline-none focus:ring-2 focus:ring-primary/20"
