@@ -385,13 +385,15 @@ function addTimeRow(doc: jsPDF, entries: { label: string; value: string }[], y: 
 //  TRANSFER PDF
 // ═══════════════════════════════════════════════════════════
 
-export async function generateTransferPDF(reservaId: string) {
+/** Documento de confirmação (mesmo do download); use para base64 no webhook. */
+async function buildTransferReservaPdfDocument(reservaId: string): Promise<{ doc: jsPDF; filename: string } | null> {
   const { data: r } = await supabase.from("reservas_transfer").select("*").eq("id", reservaId).single();
-  if (!r) return;
+  if (!r) return null;
 
   const [contrato, cabecalho] = await Promise.all([fetchContrato("transfer"), fetchCabecalho()]);
   const doc = new jsPDF();
   const numReserva = (r as any).numero_reserva || r.id.substring(0, 6).toUpperCase();
+  const filename = `reserva-transfer-${numReserva}-${r.nome_completo.replace(/\s/g, "_")}.pdf`;
 
   // ── Page 1: Confirmation ──
   let y = addFullHeader(doc, cabecalho, "Confirmação da Reserva", numReserva, r.id);
@@ -516,20 +518,38 @@ export async function generateTransferPDF(reservaId: string) {
   // ── Footer on all pages ──
   addFooter(doc, cabecalho);
 
-  doc.save(`reserva-transfer-${numReserva}-${r.nome_completo.replace(/\s/g, "_")}.pdf`);
+  return { doc, filename };
+}
+
+export async function generateTransferPDF(reservaId: string) {
+  const built = await buildTransferReservaPdfDocument(reservaId);
+  if (!built) return;
+  built.doc.save(built.filename);
+}
+
+/** Base64 do PDF de confirmação (para envio no webhook Comunicar — reserva Transfer). */
+export async function getTransferReservaPdfBase64(
+  reservaId: string,
+): Promise<{ base64: string; filename: string } | null> {
+  const built = await buildTransferReservaPdfDocument(reservaId);
+  if (!built) return null;
+  const dataUri = built.doc.output("datauristring") as string;
+  const base64 = dataUri.includes(",") ? dataUri.split(",")[1]! : dataUri;
+  return { base64, filename: built.filename };
 }
 
 // ═══════════════════════════════════════════════════════════
 //  GRUPO PDF
 // ═══════════════════════════════════════════════════════════
 
-export async function generateGrupoPDF(reservaId: string) {
+async function buildGrupoReservaPdfDocument(reservaId: string): Promise<{ doc: jsPDF; filename: string } | null> {
   const { data: r } = await supabase.from("reservas_grupos").select("*").eq("id", reservaId).single();
-  if (!r) return;
+  if (!r) return null;
 
   const [contrato, cabecalho] = await Promise.all([fetchContrato("grupos"), fetchCabecalho()]);
   const doc = new jsPDF();
   const numReserva = (r as any).numero_reserva || r.id.substring(0, 6).toUpperCase();
+  const filename = `reserva-grupo-${numReserva}-${r.nome_completo.replace(/\s/g, "_")}.pdf`;
 
   // ── Page 1: Confirmation ──
   let y = addFullHeader(doc, cabecalho, "Confirmação da Reserva", numReserva, r.id);
@@ -619,7 +639,24 @@ export async function generateGrupoPDF(reservaId: string) {
   // ── Footer on all pages ──
   addFooter(doc, cabecalho);
 
-  doc.save(`reserva-grupo-${numReserva}-${r.nome_completo.replace(/\s/g, "_")}.pdf`);
+  return { doc, filename };
+}
+
+export async function generateGrupoPDF(reservaId: string) {
+  const built = await buildGrupoReservaPdfDocument(reservaId);
+  if (!built) return;
+  built.doc.save(built.filename);
+}
+
+/** Base64 do PDF de confirmação (para envio no webhook Comunicar — reserva Grupo). */
+export async function getGrupoReservaPdfBase64(
+  reservaId: string,
+): Promise<{ base64: string; filename: string } | null> {
+  const built = await buildGrupoReservaPdfDocument(reservaId);
+  if (!built) return null;
+  const dataUri = built.doc.output("datauristring") as string;
+  const base64 = dataUri.includes(",") ? dataUri.split(",")[1]! : dataUri;
+  return { base64, filename: built.filename };
 }
 
 // ═══════════════════════════════════════════════════════════

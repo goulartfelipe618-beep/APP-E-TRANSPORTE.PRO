@@ -7,7 +7,7 @@ import CriarReservaTransferDialog from "@/components/transfer/CriarReservaTransf
 import DetalhesReservaTransferSheet from "@/components/reservas/DetalhesReservaTransferSheet";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { generateTransferPDF } from "@/lib/pdfGenerator";
+import { generateTransferPDF, getTransferReservaPdfBase64 } from "@/lib/pdfGenerator";
 import ComunicarDialog from "@/components/comunicar/ComunicarDialog";
 import { Tables } from "@/integrations/supabase/types";
 
@@ -147,6 +147,7 @@ export default function TransferReservasPage() {
           titulo="Comunicar — Reserva Transfer"
           onGerarPDF={() => generateTransferPDF(comunicarDados.id)}
           webhookTipo="transfer_reserva"
+          getConfirmacaoReservaPdfBase64={() => getTransferReservaPdfBase64(comunicarDados.id)}
         />
       )}
     </div>

@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { MessageSquare, FileDown, Send } from "lucide-react";
+import { FileDown, Loader2, MessageSquare, Send } from "lucide-react";
 import { toast } from "sonner";
 import { useComunicadoresEvolution } from "@/hooks/useComunicadoresEvolution";
 import type { ComunicadorRow } from "@/hooks/useComunicadoresEvolution";
@@ -25,6 +25,10 @@ interface ComunicarDialogProps {
   onGerarPDF?: () => void;
   /** Destino do envio conforme painel Admin Master → Comunicador (obrigatório para envio). */
   webhookTipo: WebhookComunicacaoTipo | null;
+  /**
+   * Gera o PDF de confirmação da reserva (Transfer/Grupo) em base64 para anexar ao mesmo payload do webhook.
+   */
+  getConfirmacaoReservaPdfBase64?: () => Promise<{ base64: string; filename: string } | null>;
 }
 
 const labelMap: Record<string, string> = {
@@ -99,9 +103,12 @@ export default function ComunicarDialog({
   titulo,
   onGerarPDF,
   webhookTipo = null,
+  getConfirmacaoReservaPdfBase64,
 }: ComunicarDialogProps) {
   const dadosRef = useRef(dados);
   dadosRef.current = dados;
+
+  const [enviando, setEnviando] = useState(false);
 
   const { sistema, own } = useComunicadoresEvolution();
   const sistemaRef = useRef<ComunicadorRow | null>(null);
@@ -288,7 +295,22 @@ export default function ComunicarDialog({
       const phone = telefone?.replace(/\D/g, "") || "";
       const message = base;
 
+      setEnviando(true);
       try {
+        let confirmacaoPdf: { base64: string; filename: string; mime_type: string } | null = null;
+        if (isReservaN8n && getConfirmacaoReservaPdfBase64) {
+          const pdf = await getConfirmacaoReservaPdfBase64();
+          if (!pdf?.base64) {
+            toast.error("Não foi possível gerar o PDF de confirmação da reserva.");
+            return;
+          }
+          confirmacaoPdf = {
+            base64: pdf.base64,
+            filename: pdf.filename,
+            mime_type: "application/pdf",
+          };
+        }
+
         const motorista = await fetchMotoristaPainelSnapshot();
         await dispatchComunicarWebhook(webhookTipo, {
           evento: isReservaN8n ? "comunicar_reserva_webhook" : "comunicar_envio_webhook",
@@ -307,11 +329,14 @@ export default function ComunicarDialog({
           },
           motorista_painel: motorista,
           comunicador: buildComunicadorSnapshot(canalRef.current, sistema, own),
+          confirmacao_reserva_pdf: confirmacaoPdf,
         });
       } catch (e) {
         console.error(e);
         toast.error(e instanceof Error ? e.message : "Falha ao enviar ao webhook.");
         return;
+      } finally {
+        setEnviando(false);
       }
 
       toast.success(isReservaN8n ? "Dados da reserva enviados." : "Dados enviados.");
@@ -334,6 +359,14 @@ export default function ComunicarDialog({
             O envio é feito apenas para o webhook configurado pelo administrador master. Nenhum aplicativo externo (como
             WhatsApp) será aberto.
           </p>
+
+          {isReservaN8n && getConfirmacaoReservaPdfBase64 ? (
+            <p className="text-sm text-muted-foreground rounded-lg border border-primary/25 bg-primary/5 p-3">
+              Ao clicar em Enviar, o <strong className="text-foreground">PDF de confirmação da reserva</strong> (o mesmo
+              gerado em &quot;Gerar PDF&quot;) será incluído no payload do webhook em{" "}
+              <span className="font-mono text-xs">base64</span>, para o n8n ou outro destino processar.
+            </p>
+          ) : null}
 
           <div className="space-y-1.5">
             <Label>Mensagem inicial {hasTextoPrePreenchido ? "(acima das variáveis)" : ""}</Label>
@@ -411,9 +444,14 @@ export default function ComunicarDialog({
             <Button
               onClick={handleEnviar}
               className="flex-1"
-              disabled={!webhookTipo}
+              disabled={!webhookTipo || enviando}
             >
-              <Send className="h-4 w-4 mr-2" /> Enviar
+              {enviando ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Send className="h-4 w-4 mr-2" />
+              )}
+              {enviando ? "Enviando…" : "Enviar"}
             </Button>
           </div>
         </div>

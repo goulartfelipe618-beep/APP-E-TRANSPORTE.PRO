@@ -7,7 +7,7 @@ import CriarReservaGrupoDialog from "@/components/grupos/CriarReservaGrupoDialog
 import DetalhesReservaGrupoSheet from "@/components/reservas/DetalhesReservaGrupoSheet";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { generateGrupoPDF } from "@/lib/pdfGenerator";
+import { generateGrupoPDF, getGrupoReservaPdfBase64 } from "@/lib/pdfGenerator";
 import ComunicarDialog from "@/components/comunicar/ComunicarDialog";
 import { Tables } from "@/integrations/supabase/types";
 
@@ -149,6 +149,7 @@ export default function GruposReservasPage() {
           titulo="Comunicar — Reserva de Grupo"
           onGerarPDF={() => generateGrupoPDF(comunicarDados.id)}
           webhookTipo="grupo_reserva"
+          getConfirmacaoReservaPdfBase64={() => getGrupoReservaPdfBase64(comunicarDados.id)}
         />
       )}
     </div>
