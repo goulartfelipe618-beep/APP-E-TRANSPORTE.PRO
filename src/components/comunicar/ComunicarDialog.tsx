@@ -84,6 +84,13 @@ const ignoredKeys = ["id", "user_id", "created_at", "updated_at", "veiculo_id", 
 
 type CanalEnvio = "oficial" | "proprio";
 
+function nomeClienteParaComunicar(dados: Record<string, unknown>): string {
+  const d = dados as { nome_cliente?: string; nome_completo?: string; nome?: string };
+  const raw =
+    String(d.nome_completo ?? d.nome_cliente ?? d.nome ?? "").trim() || "Cliente";
+  return raw;
+}
+
 export default function ComunicarDialog({
   open,
   onOpenChange,
@@ -201,17 +208,39 @@ export default function ComunicarDialog({
     if (solicitacaoPresetKeyRef.current === key) return;
     solicitacaoPresetKeyRef.current = key;
 
-    const nomeCliente = String((dadosRef.current as { nome_cliente?: string }).nome_cliente || "").trim() || "Cliente";
+    const nomeCliente = nomeClienteParaComunicar(dadosRef.current as Record<string, unknown>);
     setMsgAcima(
       `Olá ${nomeCliente}, recebemos a sua solicitação de viagem!\n\ndetalhes da viagem:`,
     );
     setMsgAbaixo("Em breve um de nossos motoristas entrerá em contato!");
   }, [open, webhookTipo, dadosFingerprint]);
 
+  const reservaPresetKeyRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!open) {
+      reservaPresetKeyRef.current = null;
+      return;
+    }
+    const o = webhookTipo;
+    if (o !== "transfer_reserva" && o !== "grupo_reserva") return;
+
+    const key = `${o}:${dadosFingerprint}`;
+    if (reservaPresetKeyRef.current === key) return;
+    reservaPresetKeyRef.current = key;
+
+    const nome = nomeClienteParaComunicar(dadosRef.current as Record<string, unknown>);
+    setMsgAcima(
+      `Olá ${nome}, a sua reserva está confirmada!\nDetalhes da reserva:`,
+    );
+    setMsgAbaixo("Em breve o motorista entrará em contato!");
+  }, [open, webhookTipo, dadosFingerprint]);
+
   const isSolicitacaoN8n =
     webhookTipo === "transfer_solicitacao" || webhookTipo === "grupo_solicitacao";
 
   const isReservaN8n = webhookTipo === "transfer_reserva" || webhookTipo === "grupo_reserva";
+
+  const hasTextoPrePreenchido = isSolicitacaoN8n || isReservaN8n;
 
   const toggleVar = (key: string) => {
     setSelectedVars((prev) => {
@@ -307,21 +336,21 @@ export default function ComunicarDialog({
           </p>
 
           <div className="space-y-1.5">
-            <Label>Mensagem inicial {isSolicitacaoN8n ? "(acima das variáveis)" : ""}</Label>
-            {isSolicitacaoN8n ? (
+            <Label>Mensagem inicial {hasTextoPrePreenchido ? "(acima das variáveis)" : ""}</Label>
+            {hasTextoPrePreenchido ? (
               <p className="text-xs text-muted-foreground">
                 Texto sugerido com o nome do cliente; você pode editar ou apagar por completo.
               </p>
             ) : null}
             <Textarea
               placeholder={
-                isSolicitacaoN8n
+                hasTextoPrePreenchido
                   ? "Saudação e introdução antes dos detalhes…"
                   : "Escreva uma saudação ou mensagem inicial…"
               }
               value={msgAcima}
               onChange={(e) => setMsgAcima(e.target.value)}
-              rows={isSolicitacaoN8n ? 5 : 3}
+              rows={hasTextoPrePreenchido ? 5 : 3}
             />
           </div>
 
@@ -348,19 +377,19 @@ export default function ComunicarDialog({
           </div>
 
           <div className="space-y-1.5">
-            <Label>Mensagem final {isSolicitacaoN8n ? "(abaixo das variáveis)" : ""}</Label>
-            {isSolicitacaoN8n ? (
+            <Label>Mensagem final {hasTextoPrePreenchido ? "(abaixo das variáveis)" : ""}</Label>
+            {hasTextoPrePreenchido ? (
               <p className="text-xs text-muted-foreground">
                 Texto sugerido de encerramento; você pode editar ou apagar por completo.
               </p>
             ) : null}
             <Textarea
               placeholder={
-                isSolicitacaoN8n ? "Encerramento da mensagem…" : "Escreva uma mensagem de encerramento…"
+                hasTextoPrePreenchido ? "Encerramento da mensagem…" : "Escreva uma mensagem de encerramento…"
               }
               value={msgAbaixo}
               onChange={(e) => setMsgAbaixo(e.target.value)}
-              rows={isSolicitacaoN8n ? 4 : 3}
+              rows={hasTextoPrePreenchido ? 4 : 3}
             />
           </div>
 
