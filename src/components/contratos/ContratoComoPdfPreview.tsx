@@ -9,6 +9,7 @@ interface CabRow {
   telefone: string;
   whatsapp: string;
   email_oficial: string;
+  logo_contratual_url?: string | null;
 }
 
 interface ContratoComoPdfPreviewProps {
@@ -59,33 +60,41 @@ export default function ContratoComoPdfPreview({
         style={{ fontFamily: "Helvetica, Arial, sans-serif" }}
       >
         {cab?.razao_social ? (
-          <>
-            <h2 className="text-[13pt] font-bold text-neutral-900 leading-tight">{cab.razao_social}</h2>
-            <div className="mt-1.5 text-[7.5pt] text-neutral-600 space-y-1">
-              {(cab.cnpj || cab.endereco_sede) && (
-                <p>
-                  {cab.cnpj ? `CNPJ: ${cab.cnpj}` : null}
-                  {cab.cnpj && cab.endereco_sede ? "   •   " : null}
-                  {cab.endereco_sede || null}
-                </p>
-              )}
-              {(cab.telefone || cab.whatsapp || cab.email_oficial) && (
-                <p>
-                  {[
-                    cab.telefone ? `Tel: ${cab.telefone}` : null,
-                    cab.whatsapp ? `WhatsApp: ${cab.whatsapp}` : null,
-                    cab.email_oficial || null,
-                  ]
-                    .filter(Boolean)
-                    .join("   •   ")}
-                </p>
-              )}
-              {cab.representante_legal ? (
-                <p>Representante Legal: {cab.representante_legal}</p>
-              ) : null}
+          <div className="-mx-6 md:-mx-8 -mt-6 md:-mt-8 mb-6 flex flex-col gap-3 rounded-t-xl bg-black px-6 py-4 text-white sm:flex-row sm:items-center sm:justify-between sm:gap-5">
+            <div className="min-w-0 flex-1">
+              <h2 className="text-[13pt] font-bold leading-tight">{cab.razao_social}</h2>
+              <div className="mt-1.5 space-y-1 text-[7.5pt] text-neutral-300">
+                {(cab.cnpj || cab.endereco_sede) && (
+                  <p>
+                    {cab.cnpj ? `CNPJ: ${cab.cnpj}` : null}
+                    {cab.cnpj && cab.endereco_sede ? "   •   " : null}
+                    {cab.endereco_sede || null}
+                  </p>
+                )}
+                {(cab.telefone || cab.whatsapp || cab.email_oficial) && (
+                  <p>
+                    {[
+                      cab.telefone ? `Tel: ${cab.telefone}` : null,
+                      cab.whatsapp ? `WhatsApp: ${cab.whatsapp}` : null,
+                      cab.email_oficial || null,
+                    ]
+                      .filter(Boolean)
+                      .join("   •   ")}
+                  </p>
+                )}
+                {cab.representante_legal ? (
+                  <p>Representante Legal: {cab.representante_legal}</p>
+                ) : null}
+              </div>
             </div>
-            <div className="mt-2 border-t border-neutral-300 pt-3" />
-          </>
+            {cab.logo_contratual_url ? (
+              <img
+                src={cab.logo_contratual_url}
+                alt=""
+                className="mx-auto max-h-[88px] w-auto max-w-[140px] shrink-0 object-contain sm:mx-0"
+              />
+            ) : null}
+          </div>
         ) : (
           <p className="text-sm text-neutral-500 italic mb-4">
             Preencha o cabeçalho contratual em Configurações para ver a mesma identidade visual do PDF.

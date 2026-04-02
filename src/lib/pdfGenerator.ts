@@ -118,44 +118,131 @@ async function fetchCabecalho(ownerUserId?: string | null) {
   return data as any;
 }
 
+// ─── Logo (informações contratuais) ─────────────────────────
+
+type LogoPdf = { dataUrl: string; format: "PNG" | "JPEG" | "WEBP"; w: number; h: number };
+
+function fitLogoSize(nw: number, nh: number, maxW: number, maxH: number) {
+  if (!nw || !nh) return { w: maxW, h: maxH };
+  const s = Math.min(maxW / nw, maxH / nh, 1);
+  return { w: nw * s, h: nh * s };
+}
+
+async function loadLogoForPdf(url: string | null | undefined): Promise<LogoPdf | null> {
+  if (!url?.trim()) return null;
+  try {
+    const res = await fetch(url, { mode: "cors" });
+    if (!res.ok) return null;
+    const blob = await res.blob();
+    const dataUrl = await new Promise<string>((resolve, reject) => {
+      const fr = new FileReader();
+      fr.onload = () => resolve(fr.result as string);
+      fr.onerror = reject;
+      fr.readAsDataURL(blob);
+    });
+    const dims = await new Promise<{ w: number; h: number }>((resolve) => {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => resolve({ w: img.naturalWidth, h: img.naturalHeight });
+      img.onerror = () => resolve({ w: 1, h: 1 });
+      img.src = dataUrl;
+    });
+    const mime = blob.type || "";
+    let format: "PNG" | "JPEG" | "WEBP" = "PNG";
+    if (mime.includes("jpeg") || mime.includes("jpg")) format = "JPEG";
+    else if (mime.includes("webp")) format = "WEBP";
+    else if (mime.includes("png")) format = "PNG";
+    return { dataUrl, format, w: dims.w, h: dims.h };
+  } catch {
+    return null;
+  }
+}
+
 // ─── Reusable PDF Sections ──────────────────────────────────
 
-function addCompanyHeader(doc: jsPDF, cab: any, startY: number): number {
+/** Cabeçalho institucional: fundo preto, texto claro, logo à direita (informações contratuais). */
+async function addCompanyHeader(doc: jsPDF, cab: any, startY: number): Promise<number> {
   if (!cab || !cab.razao_social) return startY;
-  let y = startY;
+
+  const INNER = 4;
+  const LOGO_MAX_W = 36;
+  const LOGO_MAX_H = 22;
+  const LOGO_GAP = 5;
+  const NAME_LINE = 5.5;
+  const DETAIL_LINE = 4;
+
+  const logoInfo = await loadLogoForPdf(cab.logo_contratual_url as string | undefined);
+  const textMaxW = CONTENT_W - 2 * INNER - (logoInfo ? LOGO_MAX_W + LOGO_GAP : 0);
 
   doc.setFontSize(FS.companyName);
   doc.setFont("helvetica", "bold");
-  setColor(doc, CLR.dark);
-  doc.text(cab.razao_social, MARGIN, y);
-  y += 6;
-
-  doc.setFontSize(FS.companyDetail);
-  doc.setFont("helvetica", "normal");
-  setColor(doc, CLR.muted);
+  const nameLines = doc.splitTextToSize(String(cab.razao_social), textMaxW);
 
   const row1: string[] = [];
   if (cab.cnpj) row1.push(`CNPJ: ${cab.cnpj}`);
   if (cab.endereco_sede) row1.push(cab.endereco_sede);
-  if (row1.length) { doc.text(row1.join("   •   "), MARGIN, y); y += 4; }
-
   const row2: string[] = [];
   if (cab.telefone) row2.push(`Tel: ${cab.telefone}`);
   if (cab.whatsapp) row2.push(`WhatsApp: ${cab.whatsapp}`);
   if (cab.email_oficial) row2.push(cab.email_oficial);
-  if (row2.length) { doc.text(row2.join("   •   "), MARGIN, y); y += 4; }
 
+  doc.setFontSize(FS.companyDetail);
+  doc.setFont("helvetica", "normal");
+  const detailLines: string[] = [];
+  if (row1.length) detailLines.push(...doc.splitTextToSize(row1.join("   •   "), textMaxW));
+  if (row2.length) detailLines.push(...doc.splitTextToSize(row2.join("   •   "), textMaxW));
   if (cab.representante_legal) {
-    doc.text(`Representante Legal: ${cab.representante_legal}`, MARGIN, y);
-    y += 4;
+    detailLines.push(...doc.splitTextToSize(`Representante Legal: ${cab.representante_legal}`, textMaxW));
   }
 
-  setColor(doc, CLR.black);
-  y += 2;
-  drawLine(doc, MARGIN, y, PAGE_W - MARGIN, CLR.line);
-  y += SP.sectionGap;
+  const nameBlockH = nameLines.length * NAME_LINE;
+  const detailBlockH = detailLines.length * DETAIL_LINE;
+  const gapNameDetail = detailLines.length ? 2 : 0;
+  let headerH = INNER + nameBlockH + gapNameDetail + detailBlockH + INNER;
 
-  return y;
+  if (logoInfo) {
+    const { h } = fitLogoSize(logoInfo.w, logoInfo.h, LOGO_MAX_W, LOGO_MAX_H);
+    headerH = Math.max(headerH, INNER + h + INNER);
+  }
+
+  const boxTop = startY;
+  doc.setFillColor(0, 0, 0);
+  doc.roundedRect(MARGIN, boxTop, PAGE_W - 2 * MARGIN, headerH, 2, 2, "F");
+
+  let ty = boxTop + INNER + 4;
+  doc.setFontSize(FS.companyName);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(255, 255, 255);
+  for (const line of nameLines) {
+    doc.text(line, MARGIN + INNER, ty);
+    ty += NAME_LINE;
+  }
+  if (detailLines.length) ty += gapNameDetail;
+  doc.setFontSize(FS.companyDetail);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(230, 230, 230);
+  for (const line of detailLines) {
+    doc.text(line, MARGIN + INNER, ty);
+    ty += DETAIL_LINE;
+  }
+
+  if (logoInfo) {
+    const { w: lw, h: lh } = fitLogoSize(logoInfo.w, logoInfo.h, LOGO_MAX_W, LOGO_MAX_H);
+    const logoX = PAGE_W - MARGIN - INNER - lw;
+    const logoY = boxTop + (headerH - lh) / 2;
+    try {
+      doc.addImage(logoInfo.dataUrl, logoInfo.format, logoX, logoY, lw, lh);
+    } catch {
+      try {
+        doc.addImage(logoInfo.dataUrl, "PNG", logoX, logoY, lw, lh);
+      } catch {
+        /* ignora logo se formato não suportado */
+      }
+    }
+  }
+
+  doc.setTextColor(0, 0, 0);
+  return boxTop + headerH + SP.sectionGap;
 }
 
 function addPageTitle(doc: jsPDF, titulo: string, numReserva: number | string, reservaId: string, y: number): number {
@@ -179,9 +266,15 @@ function addPageTitle(doc: jsPDF, titulo: string, numReserva: number | string, r
   return y;
 }
 
-function addFullHeader(doc: jsPDF, cab: any, titulo: string, numReserva: number | string, reservaId: string): number {
+async function addFullHeader(
+  doc: jsPDF,
+  cab: any,
+  titulo: string,
+  numReserva: number | string,
+  reservaId: string,
+): Promise<number> {
   let y = MARGIN;
-  y = addCompanyHeader(doc, cab, y);
+  y = await addCompanyHeader(doc, cab, y);
   y = addPageTitle(doc, titulo, numReserva, reservaId, y);
   return y;
 }
@@ -357,14 +450,18 @@ function addFooter(doc: jsPDF, cab: any) {
 
 // ─── Contract pages (shared logic) ─────────────────────────
 
-function addContractPages(
-  doc: jsPDF, contrato: any, cabecalho: any,
-  numReserva: number | string, reservaId: string, clientName: string
+async function addContractPages(
+  doc: jsPDF,
+  contrato: any,
+  cabecalho: any,
+  numReserva: number | string,
+  reservaId: string,
+  clientName: string,
 ) {
   if (!contrato || (!contrato.modelo_contrato && !contrato.politica_cancelamento && !contrato.clausulas_adicionais)) return;
 
   doc.addPage();
-  let y = addFullHeader(doc, cabecalho, "Contrato de Prestação de Serviço", numReserva, reservaId);
+  let y = await addFullHeader(doc, cabecalho, "Contrato de Prestação de Serviço", numReserva, reservaId);
 
   if (contrato.modelo_contrato) y = addContractText(doc, "CONTRATO", contrato.modelo_contrato, y);
   if (contrato.politica_cancelamento) y = addContractText(doc, "POLÍTICA DE CANCELAMENTO", contrato.politica_cancelamento, y);
@@ -412,7 +509,7 @@ async function buildTransferReservaPdfDocument(reservaId: string): Promise<{ doc
   const filename = `reserva-transfer-${numReserva}-${r.nome_completo.replace(/\s/g, "_")}.pdf`;
 
   // ── Page 1: Confirmation ──
-  let y = addFullHeader(doc, cabecalho, "Confirmação da Reserva", numReserva, r.id);
+  let y = await addFullHeader(doc, cabecalho, "Confirmação da Reserva", numReserva, r.id);
 
   // Section: Service Info
   y = addSectionTitle(doc, "INFORMAÇÕES DO SERVIÇO", y);
@@ -529,7 +626,7 @@ async function buildTransferReservaPdfDocument(reservaId: string): Promise<{ doc
   }
 
   // ── Contract pages ──
-  addContractPages(doc, contrato, cabecalho, numReserva, r.id, r.nome_completo);
+  await addContractPages(doc, contrato, cabecalho, numReserva, r.id, r.nome_completo);
 
   // ── Footer on all pages ──
   addFooter(doc, cabecalho);
@@ -572,7 +669,7 @@ async function buildGrupoReservaPdfDocument(reservaId: string): Promise<{ doc: j
   const filename = `reserva-grupo-${numReserva}-${r.nome_completo.replace(/\s/g, "_")}.pdf`;
 
   // ── Page 1: Confirmation ──
-  let y = addFullHeader(doc, cabecalho, "Confirmação da Reserva", numReserva, r.id);
+  let y = await addFullHeader(doc, cabecalho, "Confirmação da Reserva", numReserva, r.id);
 
   // Section: Service Info
   y = addSectionTitle(doc, "INFORMAÇÕES DO SERVIÇO", y);
@@ -654,7 +751,7 @@ async function buildGrupoReservaPdfDocument(reservaId: string): Promise<{ doc: j
   y = addTwoColumnFields(doc, detailsLeft, detailsRight, y);
 
   // ── Contract pages ──
-  addContractPages(doc, contrato, cabecalho, numReserva, r.id, r.nome_completo);
+  await addContractPages(doc, contrato, cabecalho, numReserva, r.id, r.nome_completo);
 
   // ── Footer on all pages ──
   addFooter(doc, cabecalho);
@@ -689,7 +786,7 @@ export async function generateSolicitacaoTransferPDF(solicitacao: Record<string,
   const s = solicitacao;
 
   let y = MARGIN;
-  y = addCompanyHeader(doc, cabecalho, y);
+  y = await addCompanyHeader(doc, cabecalho, y);
 
   // Title
   doc.setFontSize(FS.pageTitle);
@@ -789,7 +886,7 @@ export async function generateSolicitacaoGrupoPDF(solicitacao: Record<string, an
   const s = solicitacao;
 
   let y = MARGIN;
-  y = addCompanyHeader(doc, cabecalho, y);
+  y = await addCompanyHeader(doc, cabecalho, y);
 
   doc.setFontSize(FS.pageTitle);
   doc.setFont("helvetica", "bold");
@@ -853,7 +950,7 @@ export async function generateSolicitacaoMotoristaPDF(solicitacao: Record<string
   const s = solicitacao;
 
   let y = MARGIN;
-  y = addCompanyHeader(doc, cabecalho, y);
+  y = await addCompanyHeader(doc, cabecalho, y);
 
   doc.setFontSize(FS.pageTitle);
   doc.setFont("helvetica", "bold");
