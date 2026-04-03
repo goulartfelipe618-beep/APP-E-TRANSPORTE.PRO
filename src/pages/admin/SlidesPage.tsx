@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Plus, Pencil, Trash2, ArrowUp, ArrowDown, Image as ImageIcon } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { cn } from "@/lib/utils";
 
 interface Slide {
   id: string;
@@ -22,6 +23,10 @@ interface Slide {
   mostrar_texto: boolean;
 }
 
+/** Banner do topo da página Comunidade (obrigatório para imagens enviadas por arquivo). */
+const COMUNIDADE_BANNER_W = 1922;
+const COMUNIDADE_BANNER_H = 330;
+
 const PAGINAS = [
   { value: "home", label: "Home (Motorista)" },
   { value: "home_taxi", label: "Home (Taxista)" },
@@ -32,7 +37,24 @@ const PAGINAS = [
   { value: "disparador", label: "Disparador" },
   { value: "mentoria", label: "Mentoria" },
   { value: "empty_legs", label: "Empty Legs" },
+  { value: "comunidade", label: "Comunidade" },
 ];
+
+function getImageDimensions(file: File) {
+  return new Promise<{ width: number; height: number }>((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      resolve({ width: img.width, height: img.height });
+      URL.revokeObjectURL(url);
+    };
+    img.onerror = () => {
+      reject(new Error("Não foi possível ler a imagem"));
+      URL.revokeObjectURL(url);
+    };
+    img.src = url;
+  });
+}
 
 export default function SlidesPage() {
   const [slides, setSlides] = useState<Slide[]>([]);
@@ -73,6 +95,22 @@ export default function SlidesPage() {
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (paginaSelecionada === "comunidade") {
+      try {
+        const dims = await getImageDimensions(file);
+        if (dims.width !== COMUNIDADE_BANNER_W || dims.height !== COMUNIDADE_BANNER_H) {
+          toast.error(
+            `O banner da Comunidade deve ter exatamente ${COMUNIDADE_BANNER_W}×${COMUNIDADE_BANNER_H}px (recebido: ${dims.width}×${dims.height}).`,
+          );
+          e.target.value = "";
+          return;
+        }
+      } catch {
+        toast.error("Não foi possível validar a imagem.");
+        e.target.value = "";
+        return;
+      }
+    }
     setUploading(true);
     const ext = file.name.split(".").pop();
     const path = `slides/${Date.now()}.${ext}`;
@@ -245,12 +283,32 @@ export default function SlidesPage() {
             )}
             <div>
               <Label>Imagem</Label>
+              {paginaSelecionada === "comunidade" && (
+                <p className="mb-2 text-xs text-muted-foreground">
+                  Banner da Comunidade: envie arquivos com dimensões exatas de{" "}
+                  <span className="font-mono text-foreground">
+                    {COMUNIDADE_BANNER_W} × {COMUNIDADE_BANNER_H} px
+                  </span>
+                  . Outras medidas serão recusadas.
+                </p>
+              )}
               {form.imagem_url && (
-                <img src={form.imagem_url} alt="Preview" className="h-32 w-full rounded-lg object-cover mb-2" />
+                <img
+                  src={form.imagem_url}
+                  alt="Preview"
+                  className={cn(
+                    "mb-2 w-full rounded-lg object-cover",
+                    paginaSelecionada === "comunidade" ? "aspect-[1922/330] max-h-40" : "h-32",
+                  )}
+                />
               )}
               <Input type="file" accept="image/*" onChange={handleImageUpload} disabled={uploading} />
               {uploading && <p className="text-xs text-muted-foreground mt-1">Enviando...</p>}
-              <p className="text-xs text-muted-foreground mt-1">Ou cole a URL da imagem diretamente:</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {paginaSelecionada === "comunidade"
+                  ? "Ou cole a URL de uma imagem já hospedada nessas dimensões:"
+                  : "Ou cole a URL da imagem diretamente:"}
+              </p>
               <Input value={form.imagem_url} onChange={(e) => setForm((f) => ({ ...f, imagem_url: e.target.value }))} placeholder="https://..." className="mt-1" />
             </div>
             <div>

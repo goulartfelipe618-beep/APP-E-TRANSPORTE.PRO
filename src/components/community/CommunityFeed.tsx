@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import SlideCarousel from "@/components/SlideCarousel";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -462,6 +463,10 @@ export default function CommunityFeed() {
 
   return (
     <div className="space-y-6">
+      <div className="-mx-6 -mt-6">
+        <SlideCarousel pagina="comunidade" variant="banner" />
+      </div>
+
       <div className="flex flex-col gap-6 xl:flex-row xl:items-start">
         <div className="flex min-w-0 flex-1 justify-center xl:min-h-0">
           <div className="mx-auto w-full max-w-3xl space-y-6">

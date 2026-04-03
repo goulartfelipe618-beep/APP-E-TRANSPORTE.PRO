@@ -1,27 +1,52 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { cn } from "@/lib/utils";
 
-interface SlideData {
+export interface SlideCarouselSlide {
   id: string;
   titulo: string;
   subtitulo: string;
   imagem_url: string;
   mostrar_texto: boolean;
-  link_url: string;
+  link_url: string | null;
 }
 
 interface SlideCarouselProps {
   pagina: string;
-  fallbackSlides?: { titulo: string; subtitulo: string; imagem_url?: string; mostrar_texto?: boolean; link_url?: string }[];
+  fallbackSlides?: {
+    titulo: string;
+    subtitulo: string;
+    imagem_url?: string;
+    mostrar_texto?: boolean;
+    link_url?: string;
+  }[];
+  /** Banner largo (proporção 1922×330) para topo da Comunidade. */
+  variant?: "default" | "banner";
+  /** Quando definido, não busca no Supabase (útil para testes). */
+  slidesOverride?: SlideCarouselSlide[];
+  className?: string;
 }
 
-export default function SlideCarousel({ pagina, fallbackSlides }: SlideCarouselProps) {
+export default function SlideCarousel({
+  pagina,
+  fallbackSlides,
+  variant = "default",
+  slidesOverride,
+  className,
+}: SlideCarouselProps) {
   const [currentSlide, setCurrentSlide] = useState(0);
-  const [slides, setSlides] = useState<SlideData[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [slides, setSlides] = useState<SlideCarouselSlide[]>([]);
+  const [loading, setLoading] = useState(slidesOverride === undefined);
 
   useEffect(() => {
+    if (slidesOverride !== undefined) {
+      setSlides(slidesOverride);
+      setLoading(false);
+      return;
+    }
+
+    let cancelled = false;
     const fetchSlides = async () => {
       const { data } = await supabase
         .from("slides")
@@ -30,17 +55,31 @@ export default function SlideCarousel({ pagina, fallbackSlides }: SlideCarouselP
         .eq("ativo", true)
         .order("ordem", { ascending: true });
 
+      if (cancelled) return;
       if (data && data.length > 0) {
-        setSlides(data as SlideData[]);
+        setSlides(data as SlideCarouselSlide[]);
+      } else {
+        setSlides([]);
       }
       setLoading(false);
     };
-    fetchSlides();
-  }, [pagina]);
+    void fetchSlides();
+    return () => {
+      cancelled = true;
+    };
+  }, [pagina, slidesOverride]);
 
-  const displaySlides = slides.length > 0
-    ? slides
-    : (fallbackSlides || []).map((s, i) => ({ id: `fallback-${i}`, ...s }));
+  const displaySlides = useMemo(() => {
+    if (slides.length > 0) return slides;
+    return (fallbackSlides || []).map((s, i) => ({
+      id: `fallback-${i}`,
+      titulo: s.titulo,
+      subtitulo: s.subtitulo,
+      imagem_url: s.imagem_url || "",
+      mostrar_texto: s.mostrar_texto ?? false,
+      link_url: s.link_url ?? null,
+    }));
+  }, [slides, fallbackSlides]);
 
   const nextSlide = useCallback(() => {
     setCurrentSlide((c) => (c < displaySlides.length - 1 ? c + 1 : 0));
@@ -48,7 +87,10 @@ export default function SlideCarousel({ pagina, fallbackSlides }: SlideCarouselP
 
   const prevSlide = () => setCurrentSlide((c) => (c > 0 ? c - 1 : displaySlides.length - 1));
 
-  // Auto-play every 5 seconds
+  useEffect(() => {
+    setCurrentSlide(0);
+  }, [displaySlides.length, pagina]);
+
   useEffect(() => {
     if (displaySlides.length <= 1) return;
     const timer = setInterval(nextSlide, 5000);
@@ -58,10 +100,14 @@ export default function SlideCarousel({ pagina, fallbackSlides }: SlideCarouselP
   if (loading || displaySlides.length === 0) return null;
 
   const currentSlideData = displaySlides[currentSlide];
-  const showText = currentSlideData?.mostrar_texto && (currentSlideData.titulo || currentSlideData.subtitulo);
+  const showText =
+    variant !== "banner" &&
+    currentSlideData?.mostrar_texto &&
+    (currentSlideData.titulo || currentSlideData.subtitulo);
   const linkUrl = currentSlideData?.link_url;
+  const isBanner = variant === "banner";
 
-  const renderSlide = (slide: typeof displaySlides[0], index: number) => {
+  const renderSlide = (slide: (typeof displaySlides)[0], index: number) => {
     const isActive = index === currentSlide;
     const hasImage = !!slide?.imagem_url;
 
@@ -69,10 +115,27 @@ export default function SlideCarousel({ pagina, fallbackSlides }: SlideCarouselP
       <img
         src={slide.imagem_url}
         alt={slide.titulo || "Slide"}
-        className="w-full h-auto block"
+        className={
+          isBanner
+            ? "h-full w-full object-cover object-center"
+            : "h-auto w-full max-w-full block"
+        }
       />
     ) : (
-      <div className="h-72 bg-gradient-to-r from-primary/80 to-primary" />
+      <div
+        className={cn(
+          "bg-gradient-to-r from-primary/80 to-primary",
+          isBanner ? "h-full min-h-[8rem] w-full" : "h-72 w-full",
+        )}
+      />
+    );
+
+    const inner = linkUrl && isActive ? (
+      <a href={linkUrl} target="_blank" rel="noopener noreferrer" className={cn("block", isBanner && "h-full w-full")}>
+        {imageEl}
+      </a>
+    ) : (
+      imageEl
     );
 
     return (
@@ -81,66 +144,68 @@ export default function SlideCarousel({ pagina, fallbackSlides }: SlideCarouselP
         className="absolute inset-0 transition-opacity duration-700 ease-in-out"
         style={{ opacity: isActive ? 1 : 0, pointerEvents: isActive ? "auto" : "none" }}
       >
-        {linkUrl && isActive ? (
-          <a href={linkUrl} target="_blank" rel="noopener noreferrer" className="block cursor-pointer">
-            {imageEl}
-          </a>
-        ) : (
-          imageEl
-        )}
+        {inner}
       </div>
     );
   };
 
   return (
-    <div className="relative rounded-xl overflow-hidden w-full">
-      {/* Container that sizes based on first image */}
-      <div className="relative">
-        {/* Invisible first image to set height */}
-        {displaySlides[0]?.imagem_url ? (
-          <img src={displaySlides[0].imagem_url} alt="" className="w-full h-auto block invisible" />
-        ) : (
-          <div className="h-72 invisible" />
+    <div
+      className={cn(
+        "relative w-full overflow-hidden",
+        isBanner ? "aspect-[1922/330] rounded-none rounded-b-xl border-b border-border bg-muted/30" : "rounded-xl",
+        className,
+      )}
+    >
+      <div className={cn("relative", isBanner ? "absolute inset-0 h-full w-full" : "")}>
+        {!isBanner && (
+          <>
+            {displaySlides[0]?.imagem_url ? (
+              <img src={displaySlides[0].imagem_url} alt="" className="block h-auto w-full invisible" />
+            ) : (
+              <div className="invisible h-72" />
+            )}
+          </>
         )}
-        {/* Slides overlay */}
         {displaySlides.map((s, i) => renderSlide(s, i))}
       </div>
 
-      {/* Overlay com texto */}
       {showText && (
-        <div className="absolute inset-0 bg-gradient-to-r from-black/70 to-transparent flex items-center px-12 transition-opacity duration-700">
+        <div className="absolute inset-0 flex items-center bg-gradient-to-r from-black/70 to-transparent px-12 transition-opacity duration-700">
           <div className="max-w-lg">
             {currentSlideData.titulo && (
-              <h2 className="text-3xl font-bold text-white mb-2">{currentSlideData.titulo}</h2>
+              <h2 className="mb-2 text-3xl font-bold text-white">{currentSlideData.titulo}</h2>
             )}
-            {currentSlideData.subtitulo && (
-              <p className="text-white/80">{currentSlideData.subtitulo}</p>
-            )}
+            {currentSlideData.subtitulo && <p className="text-white/80">{currentSlideData.subtitulo}</p>}
           </div>
         </div>
       )}
 
-      {/* Navegação */}
       {displaySlides.length > 1 && (
         <>
           <button
+            type="button"
             onClick={prevSlide}
-            className="absolute left-4 top-1/2 -translate-y-1/2 bg-black/50 rounded-full p-2 text-white hover:bg-black/70 transition-colors"
+            className="absolute left-4 top-1/2 z-10 -translate-y-1/2 rounded-full bg-black/50 p-2 text-white transition-colors hover:bg-black/70"
           >
             <ChevronLeft className="h-5 w-5" />
           </button>
           <button
+            type="button"
             onClick={nextSlide}
-            className="absolute right-4 top-1/2 -translate-y-1/2 bg-black/50 rounded-full p-2 text-white hover:bg-black/70 transition-colors"
+            className="absolute right-4 top-1/2 z-10 -translate-y-1/2 rounded-full bg-black/50 p-2 text-white transition-colors hover:bg-black/70"
           >
             <ChevronRight className="h-5 w-5" />
           </button>
-          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
+          <div className="absolute bottom-4 left-1/2 z-10 flex -translate-x-1/2 gap-2">
             {displaySlides.map((_, i) => (
               <button
                 key={i}
+                type="button"
                 onClick={() => setCurrentSlide(i)}
-                className={`h-2.5 w-2.5 rounded-full transition-all duration-500 ${i === currentSlide ? 'bg-white scale-110' : 'bg-white/40'}`}
+                className={`h-2.5 w-2.5 rounded-full transition-all duration-500 ${
+                  i === currentSlide ? "scale-110 bg-white" : "bg-white/40"
+                }`}
               />
             ))}
           </div>

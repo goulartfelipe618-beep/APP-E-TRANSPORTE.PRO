@@ -11,6 +11,7 @@ export const FROTA_SLIDE_LOADER_PAGES = [
   "disparador",
   "mentoria",
   "empty-legs",
+  "comunidade",
 ] as const;
 
 interface PageLoaderProps {
