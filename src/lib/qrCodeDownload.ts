@@ -3,7 +3,7 @@ import QRCode from "qrcode";
 /** Tamanhos de exportação (px). */
 export const QR_EXPORT_SIZES = {
   pequeno: 512,
-  medio: 1048,
+  medio: 1024,
   grande: 2048,
 } as const;
 
