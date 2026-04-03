@@ -1,64 +1,197 @@
-import { Mail, Globe, Search, ShoppingCart, Users, BarChart3, Car, ArrowLeftRight, Handshake, ShieldCheck, AlertTriangle, CheckCircle2, Settings, CircleDot, Check } from "lucide-react";
-import { useState, useEffect } from "react";
+import {
+  Mail,
+  Globe,
+  Search,
+  Users,
+  BarChart3,
+  Car,
+  ArrowLeftRight,
+  Handshake,
+  ShieldCheck,
+  AlertTriangle,
+  CheckCircle2,
+  Settings,
+  CircleDot,
+  Home as HomeIcon,
+  Bell,
+  Activity,
+  MapPin,
+  FileText,
+  BookOpen,
+  ClipboardList,
+  UserCheck,
+  Plane,
+  GraduationCap,
+  Megaphone,
+  Map,
+  Monitor,
+  StickyNote,
+  ChevronRight,
+} from "lucide-react";
+import { useState, useEffect, useMemo, type LucideIcon } from "react";
 import luxuryCar from "@/assets/luxury-car.jpg";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import SlideCarousel from "@/components/SlideCarousel";
 import { useActivePage } from "@/contexts/ActivePageContext";
-import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
 import {
   persistNetworkAceitoNao,
   persistNetworkAceitoSim,
   persistNetworkRetornoSolicitado,
 } from "@/lib/networkNacionalPrefs";
+import { cn } from "@/lib/utils";
 
-const tools = [
-  { icon: Mail, title: "E-mail Profissional", desc: "Crie e-mails corporativos com o domínio da sua empresa para credibilidade total." },
-  { icon: Globe, title: "Criação de Website", desc: "Tenha seu site profissional no ar em minutos, com design exclusivo para transporte." },
-  { icon: Search, title: "Google Meu Negócio", desc: "Apareça no Google Maps e nas buscas locais com perfil verificado." },
-  { icon: ShoppingCart, title: "Domínio Oficial", desc: "Registre seu domínio .com.br direto pela plataforma com planos acessíveis." },
-  { icon: Users, title: "Network", desc: "Publique e acompanhe oportunidades de viagens compartilhadas com outros motoristas da plataforma." },
-  { icon: BarChart3, title: "Métricas & Análises", desc: "Acompanhe KPIs, volume de corridas e desempenho da sua operação em tempo real." },
-  { icon: Car, title: "Gestão de Veículos", desc: "Cadastre e controle sua frota com documentação, status e manutenção." },
-  { icon: ArrowLeftRight, title: "Transfer & Reservas", desc: "Gerencie solicitações, reservas e contratos de transfer executivo." },
-  { icon: Handshake, title: "Parcerias & Motoristas", desc: "Cadastre motoristas, parceiros e gerencie a operação colaborativa." },
-];
+type ToolDef = { title: string; page: string; desc: string; icon: LucideIcon };
+
+type Subsection = { title: string; items: ToolDef[] };
+
+type MajorSection = { id: string; label: string; subsections: Subsection[] };
+
+function buildHomeSections(showNetwork: boolean): MajorSection[] {
+  const principal: Subsection[] = [
+    {
+      title: "Painel",
+      items: [
+        { title: "Atualizações", page: "atualizacoes", desc: "Novidades da plataforma e avisos importantes.", icon: Bell },
+        { title: "Métricas", page: "metricas", desc: "Indicadores e desempenho da operação.", icon: Activity },
+        { title: "Abrangência", page: "abrangencia", desc: "Área de atuação e presença no mapa.", icon: MapPin },
+      ],
+    },
+    {
+      title: "Transfer",
+      items: [
+        { title: "Solicitações", page: "transfer/solicitacoes", desc: "Pedidos e orçamentos de transfer.", icon: FileText },
+        { title: "Reservas", page: "transfer/reservas", desc: "Reservas confirmadas e contratos.", icon: BookOpen },
+        { title: "Contrato", page: "transfer/contrato", desc: "Modelo de contrato e políticas do produto Transfer.", icon: ClipboardList },
+      ],
+    },
+    {
+      title: "Grupos",
+      items: [
+        { title: "Solicitações", page: "grupos/solicitacoes", desc: "Pedidos para transporte em grupo.", icon: FileText },
+        { title: "Reservas", page: "grupos/reservas", desc: "Reservas e valores de grupos.", icon: BookOpen },
+        { title: "Contrato", page: "grupos/contrato", desc: "Contrato e termos para grupos.", icon: ClipboardList },
+      ],
+    },
+    {
+      title: "Motoristas",
+      items: [
+        { title: "Cadastros", page: "motoristas/cadastros", desc: "Motoristas parceiros e fichas completas.", icon: UserCheck },
+        { title: "Parcerias", page: "motoristas/parcerias", desc: "Rede de parceiros e acordos.", icon: Handshake },
+        { title: "Solicitações", page: "motoristas/solicitacoes", desc: "Novos contatos que querem dirigir na operação.", icon: ClipboardList },
+      ],
+    },
+    {
+      title: "Frota e oportunidades",
+      items: [
+        { title: "Veículos", page: "veiculos", desc: "Cadastro e gestão da frota.", icon: Car },
+        { title: "Empty Legs", page: "empty-legs", desc: "Trechos e oportunidades de retorno.", icon: Plane },
+        { title: "Mentoria", page: "mentoria", desc: "Conteúdos e trilha de desenvolvimento.", icon: GraduationCap },
+      ],
+    },
+  ];
+
+  const ferramentasItems: ToolDef[] = [
+    { title: "Campanhas — Ativos", page: "campanhas/ativos", desc: "Páginas e campanhas de captação ativas.", icon: Globe },
+    { title: "Campanhas — Leads", page: "campanhas/leads", desc: "Leads gerados pelas campanhas.", icon: UserCheck },
+    { title: "Geolocalização", page: "transfer/geolocalizacao", desc: "Rastreamento e envio de posição ao cliente.", icon: Map },
+    { title: "Receptivos", page: "marketing/receptivos", desc: "Materiais e páginas para receptivo.", icon: Globe },
+    { title: "QR Codes", page: "marketing/qrcode", desc: "QR Codes para divulgação e acesso rápido.", icon: Search },
+    ...(showNetwork
+      ? [{ title: "Network", page: "network", desc: "Oportunidades de viagens com outros motoristas.", icon: Globe } as ToolDef]
+      : []),
+    { title: "Comunidade", page: "comunidade", desc: "Canal com a comunidade da plataforma.", icon: Users },
+    { title: "Google", page: "google", desc: "Presença no Google Meu Negócio e buscas.", icon: Search },
+    { title: "E-mail Business", page: "email-business", desc: "E-mail profissional com domínio próprio.", icon: Mail },
+    { title: "Website", page: "website", desc: "Site institucional integrado à operação.", icon: Monitor },
+    { title: "Disparador", page: "disparador", desc: "Envio de mensagens em massa (WhatsApp dedicado).", icon: Megaphone },
+  ];
+
+  const configuracao: Subsection[] = [
+    {
+      title: "Sistema",
+      items: [
+        { title: "Configurações", page: "sistema/configuracoes", desc: "Dados da empresa, perfil e preferências.", icon: Settings },
+        { title: "Automações", page: "sistema/automacoes", desc: "Webhooks e integrações automatizadas.", icon: Globe },
+        { title: "Comunicador", page: "sistema/comunicador", desc: "Canais WhatsApp oficiais e próprios.", icon: Monitor },
+      ],
+    },
+    {
+      title: "Suporte interno",
+      items: [
+        { title: "Anotações", page: "anotacoes", desc: "Notas e lembretes da operação.", icon: StickyNote },
+        { title: "Tickets", page: "tickets", desc: "Chamados e solicitações de suporte.", icon: ClipboardList },
+      ],
+    },
+  ];
+
+  return [
+    { id: "principal", label: "Principal", subsections: principal },
+    {
+      id: "ferramentas",
+      label: "Ferramentas",
+      subsections: [{ title: "Marketing e operação", items: ferramentasItems }],
+    },
+    { id: "config", label: "Configurações", subsections: configuracao },
+  ];
+}
+
+function ToolCard({ tool, onOpen }: { tool: ToolDef; onOpen: (page: string) => void }) {
+  const Icon = tool.icon;
+  return (
+    <button
+      type="button"
+      onClick={() => onOpen(tool.page)}
+      className={cn(
+        "group flex w-full items-start gap-4 rounded-xl border border-border bg-card p-4 text-left transition-all",
+        "hover:border-primary/35 hover:bg-muted/40 hover:shadow-sm",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
+      )}
+    >
+      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-muted/80 text-foreground/80 ring-1 ring-border/60 group-hover:bg-primary/10 group-hover:text-primary">
+        <Icon className="h-5 w-5" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-start justify-between gap-2">
+          <h3 className="font-semibold leading-snug text-foreground">{tool.title}</h3>
+          <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+        </div>
+        <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{tool.desc}</p>
+      </div>
+    </button>
+  );
+}
 
 export default function HomePage() {
   const { setActivePage } = useActivePage();
   const [networkAceito, setNetworkAceito] = useState<boolean | null>(null);
   const [mostrarRegras, setMostrarRegras] = useState(false);
   const [primeirosPassosConcluidos, setPrimeirosPassosConcluidos] = useState<boolean | null>(null);
+  const [menuNetwork, setMenuNetwork] = useState(() => localStorage.getItem("network_nacional_aceito") === "sim");
 
   const CAMPOS_PERFIL_OBRIGATORIOS = ["nome_completo", "nome_empresa", "cnpj", "telefone", "email", "cidade"];
   const CAMPOS_CONTRATUAIS_OBRIGATORIOS = ["razao_social", "cnpj", "endereco_sede", "telefone", "whatsapp", "email_oficial"];
 
+  const sections = useMemo(() => buildHomeSections(menuNetwork), [menuNetwork]);
+
   const checkPrimeirosPassos = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     if (!user) return;
 
-    const { data: perfilData } = await supabase
-        .from("configuracoes" as any)
-        .select("*")
-        .eq("user_id", user.id)
-        .maybeSingle();
+    const { data: perfilData } = await supabase.from("configuracoes" as any).select("*").eq("user_id", user.id).maybeSingle();
 
-    const { data: contratualData } = await supabase
-      .from("cabecalho_contratual" as any)
-      .select("*")
-      .eq("user_id", user.id)
-      .maybeSingle();
+    const { data: contratualData } = await supabase.from("cabecalho_contratual" as any).select("*").eq("user_id", user.id).maybeSingle();
 
     const perfil = (perfilData || {}) as any;
     const contratual = (contratualData || {}) as any;
 
-    const perfilCompleto = CAMPOS_PERFIL_OBRIGATORIOS.every(
-      (campo) => perfil[campo] && String(perfil[campo]).trim() !== ""
-    );
+    const perfilCompleto = CAMPOS_PERFIL_OBRIGATORIOS.every((campo) => perfil[campo] && String(perfil[campo]).trim() !== "");
     const contratualCompleto = CAMPOS_CONTRATUAIS_OBRIGATORIOS.every(
-      (campo) => contratual[campo] && String(contratual[campo]).trim() !== ""
+      (campo) => contratual[campo] && String(contratual[campo]).trim() !== "",
     );
 
     setPrimeirosPassosConcluidos(perfilCompleto && contratualCompleto);
@@ -79,9 +212,13 @@ export default function HomePage() {
   }, []);
 
   useEffect(() => {
+    const syncMenuNetwork = () => {
+      setMenuNetwork(localStorage.getItem("network_nacional_aceito") === "sim");
+    };
     const checkNetworkStatus = () => {
       const status = localStorage.getItem("network_nacional_aceito");
       const saida = localStorage.getItem("network_saida_data");
+      syncMenuNetwork();
       if (status === "sim") {
         setNetworkAceito(true);
       } else if (status === "nao") {
@@ -99,6 +236,8 @@ export default function HomePage() {
       }
     };
     checkNetworkStatus();
+    window.addEventListener("network-status-changed", syncMenuNetwork);
+    return () => window.removeEventListener("network-status-changed", syncMenuNetwork);
   }, []);
 
   const handleAceitarNetwork = () => {
@@ -113,6 +252,7 @@ export default function HomePage() {
       toast.error("Não foi possível salvar no servidor. A preferência ficou apenas neste dispositivo.");
     }
     setNetworkAceito(true);
+    setMenuNetwork(true);
     setMostrarRegras(false);
     window.dispatchEvent(new Event("network-status-changed"));
   };
@@ -124,56 +264,79 @@ export default function HomePage() {
       toast.error("Não foi possível salvar no servidor. A preferência ficou apenas neste dispositivo.");
     }
     setNetworkAceito(false);
+    setMenuNetwork(false);
     window.dispatchEvent(new Event("network-status-changed"));
   };
 
+  const go = (page: string) => setActivePage(page);
+
   return (
-    <div className="space-y-8">
-      {/* Hero Carousel */}
+    <div className="space-y-10 pb-8">
       <SlideCarousel
         pagina="home"
-        fallbackSlides={[{
-          titulo: "Impulsione seu Transporte Executivo",
-          subtitulo: "Gerencie sua frota, motoristas e corridas com tecnologia de ponta.",
-          imagem_url: luxuryCar,
-        }]}
+        fallbackSlides={[
+          {
+            titulo: "Impulsione seu Transporte Executivo",
+            subtitulo: "Gerencie sua frota, motoristas e corridas com tecnologia de ponta.",
+            imagem_url: luxuryCar,
+          },
+        ]}
       />
 
-      {/* Primeiros Passos */}
+      {/* Intro estilo landing, alinhada ao layout do sistema */}
+      <div className="rounded-2xl border border-border/80 bg-gradient-to-b from-card to-card/40 px-6 py-8 shadow-sm sm:px-10">
+        <div className="mx-auto max-w-3xl text-center">
+          <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-border bg-muted/50 px-3 py-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            <HomeIcon className="h-3.5 w-3.5 text-primary" aria-hidden />
+            Início
+          </div>
+          <h1 className="text-balance text-2xl font-bold tracking-tight text-foreground sm:text-3xl">Central da sua operação</h1>
+          <p className="mt-3 text-pretty text-muted-foreground sm:text-lg">
+            Acesse abaixo todas as áreas do painel — mesma estrutura do menu lateral — com atalhos diretos para cada ferramenta.
+          </p>
+        </div>
+      </div>
+
       {primeirosPassosConcluidos === false && (
-        <div className="rounded-xl border-2 border-amber-500/50 bg-card p-6 space-y-4">
+        <div className="space-y-4 rounded-xl border-2 border-amber-500/50 bg-card p-6">
           <div className="flex items-center gap-3">
-            <div className="p-3 rounded-xl bg-amber-500/10">
+            <div className="rounded-xl bg-amber-500/10 p-3">
               <Settings className="h-6 w-6 text-amber-500" />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-foreground">Primeiros Passos</h3>
+              <h3 className="text-lg font-bold text-foreground">Primeiros passos</h3>
               <p className="text-sm text-muted-foreground">Complete as etapas abaixo para começar a usar a plataforma</p>
             </div>
           </div>
           <div className="space-y-3">
             <div
-              className="flex items-center gap-3 p-3 rounded-lg border border-amber-500/30 bg-amber-500/5 cursor-pointer hover:bg-amber-500/10 transition-colors"
+              className="flex cursor-pointer items-center gap-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 transition-colors hover:bg-amber-500/10"
               onClick={() => setActivePage("sistema/configuracoes")}
+              onKeyDown={(e) => e.key === "Enter" && setActivePage("sistema/configuracoes")}
+              role="button"
+              tabIndex={0}
             >
-              <div className="p-1.5 rounded-full border-2 border-amber-500">
+              <div className="rounded-full border-2 border-amber-500 p-1.5">
                 <CircleDot className="h-4 w-4 text-amber-500" />
               </div>
               <div className="flex-1">
-                <p className="text-sm font-semibold text-foreground">Preencha suas Configurações</p>
-                <p className="text-xs text-muted-foreground">Acesse Sistema → Configurações e preencha todos os campos obrigatórios (nome, empresa, CNPJ, telefone, e-mail, endereço, cidade e estado).</p>
+                <p className="text-sm font-semibold text-foreground">Preencha suas configurações</p>
+                <p className="text-xs text-muted-foreground">
+                  Acesse Sistema → Configurações e preencha todos os campos obrigatórios (nome, empresa, CNPJ, telefone, e-mail, endereço, cidade e estado).
+                </p>
               </div>
-              <Badge variant="outline" className="text-amber-500 border-amber-500/50">Pendente</Badge>
+              <Badge variant="outline" className="border-amber-500/50 text-amber-500">
+                Pendente
+              </Badge>
             </div>
           </div>
         </div>
       )}
 
-
       {networkAceito === null && !mostrarRegras && (
-        <div className="rounded-xl border-2 border-primary/50 bg-card p-6 space-y-4">
+        <div className="space-y-4 rounded-xl border-2 border-primary/50 bg-card p-6">
           <div className="flex items-center gap-3">
-            <div className="p-3 rounded-xl bg-primary/10">
+            <div className="rounded-xl bg-primary/10 p-3">
               <ShieldCheck className="h-6 w-6 text-primary" />
             </div>
             <div>
@@ -181,13 +344,12 @@ export default function HomePage() {
               <p className="text-sm text-muted-foreground">Programa de atendimento corporativo nacional</p>
             </div>
           </div>
-          <p className="text-sm text-muted-foreground leading-relaxed">
-            Deseja fazer parte do sistema de <strong className="text-foreground">Network Nacional</strong> da E-Transporte.pro?
-            Ao participar, você poderá receber solicitações de atendimento corporativo de empresas parceiras em sua região.
+          <p className="text-sm leading-relaxed text-muted-foreground">
+            Deseja fazer parte do sistema de <strong className="text-foreground">Network Nacional</strong> da E-Transporte.pro? Ao participar, você poderá receber solicitações de atendimento corporativo de empresas parceiras em sua região.
           </p>
           <div className="flex gap-3">
             <Button onClick={handleAceitarNetwork} className="bg-primary text-primary-foreground">
-              <CheckCircle2 className="h-4 w-4 mr-2" /> Sim, quero participar
+              <CheckCircle2 className="mr-2 h-4 w-4" /> Sim, quero participar
             </Button>
             <Button variant="outline" onClick={handleRecusarNetwork}>
               Não, obrigado
@@ -196,79 +358,78 @@ export default function HomePage() {
         </div>
       )}
 
-      {/* Regras e Termos obrigatórios */}
       {mostrarRegras && (
-        <div className="rounded-xl border-2 border-destructive/50 bg-card p-6 space-y-5">
+        <div className="space-y-5 rounded-xl border-2 border-destructive/50 bg-card p-6">
           <div className="flex items-center gap-3">
-            <div className="p-3 rounded-xl bg-destructive/10">
+            <div className="rounded-xl bg-destructive/10 p-3">
               <AlertTriangle className="h-6 w-6 text-destructive" />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-foreground">Termos Obrigatórios — Network Nacional</h3>
-              <Badge variant="destructive" className="mt-1">Leitura obrigatória</Badge>
+              <h3 className="text-lg font-bold text-foreground">Termos obrigatórios — Network Nacional</h3>
+              <Badge variant="destructive" className="mt-1">
+                Leitura obrigatória
+              </Badge>
             </div>
           </div>
 
-          <div className="space-y-4 text-sm text-muted-foreground leading-relaxed border border-border rounded-lg p-4 bg-muted/30 max-h-80 overflow-y-auto">
+          <div className="max-h-80 space-y-4 overflow-y-auto rounded-lg border border-border bg-muted/30 p-4 text-sm leading-relaxed text-muted-foreground">
             <div>
-              <h4 className="font-bold text-foreground mb-1">📌 1. Obrigatoriedade de Atendimento</h4>
+              <h4 className="mb-1 font-bold text-foreground">1. Obrigatoriedade de atendimento</h4>
               <p>
-                Todas as solicitações enviadas para você através do Network Nacional <strong className="text-foreground">deverão ser obrigatoriamente realizadas por você</strong>.
-                Caso não consiga realizar o atendimento pessoalmente, <strong className="text-foreground">deverá ser realizado por um parceiro seu</strong>, e você será o responsável integral por esse atendimento.
+                Todas as solicitações enviadas para você através do Network Nacional <strong className="text-foreground">deverão ser obrigatoriamente realizadas por você</strong>. Caso não consiga realizar o atendimento pessoalmente,{" "}
+                <strong className="text-foreground">deverá ser realizado por um parceiro seu</strong>, e você será o responsável integral por esse atendimento.
               </p>
             </div>
 
             <div>
-              <h4 className="font-bold text-foreground mb-1">⚠️ 2. Penalização por Descumprimento</h4>
+              <h4 className="mb-1 font-bold text-foreground">2. Penalização por descumprimento</h4>
               <p>
-                O não cumprimento de qualquer solicitação resultará em <strong className="text-destructive">perda imediata do acesso ao sistema</strong> e <strong className="text-destructive">quebra da relação com a E-Transporte.pro</strong>.
-                Não haverá tolerância para descumprimentos.
+                O não cumprimento de qualquer solicitação resultará em <strong className="text-destructive">perda imediata do acesso ao sistema</strong> e <strong className="text-destructive">quebra da relação com a E-Transporte.pro</strong>. Não haverá tolerância para descumprimentos.
               </p>
             </div>
 
             <div>
-              <h4 className="font-bold text-foreground mb-1">🎩 3. Atendimento Alto Padrão — INDISPENSÁVEL</h4>
+              <h4 className="mb-1 font-bold text-foreground">3. Atendimento alto padrão — indispensável</h4>
               <p>
-                O motorista que faz parte do Network Nacional <strong className="text-foreground">deve manter um atendimento de altíssimo padrão</strong> em todas as corridas.
-                Isso inclui: pontualidade, cordialidade, veículo limpo e em perfeitas condições, vestimenta adequada, discrição e profissionalismo absoluto.
+                O motorista que faz parte do Network Nacional <strong className="text-foreground">deve manter um atendimento de altíssimo padrão</strong> em todas as corridas: pontualidade, cordialidade, veículo limpo e em boas condições, vestimenta adequada, discrição e profissionalismo.
               </p>
             </div>
 
             <div>
-              <h4 className="font-bold text-destructive mb-1">🚫 4. PROIBIÇÃO TOTAL DE TROCA DE CONTATOS</h4>
-              <p className="text-foreground font-semibold">
-                É TOTALMENTE PROIBIDO que o motorista solicite, ofereça ou troque qualquer tipo de contato com o passageiro.
-              </p>
+              <h4 className="mb-1 font-bold text-destructive">4. Proibição total de troca de contatos</h4>
+              <p className="font-semibold text-foreground">É totalmente proibido solicitar, oferecer ou trocar qualquer contato com o passageiro (telefone, WhatsApp, e-mail, redes sociais ou outros).</p>
               <p>
-                Isso inclui: número de telefone, WhatsApp, e-mail, redes sociais ou qualquer outro meio de comunicação direta.
-                O descumprimento desta regra resultará em <strong className="text-destructive">desligamento imediato do sistema sem possibilidade de retorno</strong>.
+                O descumprimento resultará em <strong className="text-destructive">desligamento imediato do sistema sem possibilidade de retorno</strong>.
               </p>
             </div>
 
             <div>
-              <h4 className="font-bold text-foreground mb-1">🤝 5. Representação da Marca</h4>
+              <h4 className="mb-1 font-bold text-foreground">5. Representação da marca</h4>
               <p>
-                Ao aceitar este termo, você se torna um representante da E-Transporte.pro perante os clientes corporativos.
-                Qualquer conduta inadequada reflete diretamente na marca e será tratada com o máximo rigor.
+                Ao aceitar este termo, você representa a E-Transporte.pro perante clientes corporativos. Condutas inadequadas serão tratadas com rigor.
               </p>
             </div>
           </div>
 
           <div className="flex gap-3 pt-2">
             <Button onClick={handleConfirmarRegras} className="bg-primary text-primary-foreground">
-              <CheckCircle2 className="h-4 w-4 mr-2" /> Li e aceito todos os termos
+              <CheckCircle2 className="mr-2 h-4 w-4" /> Li e aceito todos os termos
             </Button>
-            <Button variant="outline" onClick={() => { setMostrarRegras(false); }}>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setMostrarRegras(false);
+              }}
+            >
               Voltar
             </Button>
           </div>
         </div>
       )}
 
-      {/* Status após aceite */}
       {networkAceito === true && (
-        <div className="rounded-xl border border-primary/30 bg-primary/5 p-4 flex items-center gap-3">
-          <CheckCircle2 className="h-5 w-5 text-primary" />
+        <div className="flex items-center gap-3 rounded-xl border border-primary/30 bg-primary/5 p-4">
+          <CheckCircle2 className="h-5 w-5 shrink-0 text-primary" />
           <div>
             <p className="text-sm font-semibold text-foreground">Você faz parte do Network Nacional E-Transporte.pro</p>
             <p className="text-xs text-muted-foreground">Seus termos foram aceitos. Mantenha o padrão de excelência.</p>
@@ -277,7 +438,7 @@ export default function HomePage() {
       )}
 
       {networkAceito === false && (
-        <div className="rounded-xl border border-border bg-muted/30 p-4 flex items-center justify-between">
+        <div className="flex items-center justify-between rounded-xl border border-border bg-muted/30 p-4">
           <div className="flex items-center gap-3">
             <Users className="h-5 w-5 text-muted-foreground" />
             <p className="text-sm text-muted-foreground">Você optou por não participar do Network Nacional.</p>
@@ -294,6 +455,7 @@ export default function HomePage() {
                 toast.error("Não foi possível atualizar no servidor.");
               }
               setNetworkAceito(null);
+              setMenuNetwork(false);
               window.dispatchEvent(new Event("network-status-changed"));
             }}
           >
@@ -302,31 +464,42 @@ export default function HomePage() {
         </div>
       )}
 
-      {/* Tools */}
-      <div className="text-center">
-        <h2 className="text-2xl font-bold text-foreground">Ferramentas Disponíveis</h2>
-        <p className="text-muted-foreground mt-1">Tudo o que você precisa para impulsionar seu transporte executivo em uma única plataforma.</p>
-      </div>
+      {/* Mapa completo de ferramentas — espelha o menu lateral */}
+      <div className="space-y-12">
+        <div className="border-b border-border pb-6 text-center">
+          <h2 className="text-2xl font-bold tracking-tight text-foreground">Todas as ferramentas</h2>
+          <p className="mt-2 max-w-2xl mx-auto text-muted-foreground">
+            Atalhos para cada item do painel. A mesma lista está organizada no menu à esquerda.
+          </p>
+        </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {tools.map((tool) => (
-          <div key={tool.title} className="rounded-xl border border-border bg-card p-5 flex items-start gap-4 hover:shadow-md transition-shadow">
-            <div className="p-3 rounded-xl bg-muted">
-              <tool.icon className="h-5 w-5 text-muted-foreground" />
+        {sections.map((major) => (
+          <section key={major.id} className="space-y-8" aria-labelledby={`section-${major.id}`}>
+            <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+              <h2 id={`section-${major.id}`} className="text-xl font-bold text-foreground">
+                {major.label}
+              </h2>
+              <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Acesso rápido</span>
             </div>
-            <div>
-              <h3 className="font-semibold text-foreground">{tool.title}</h3>
-              <p className="text-sm text-muted-foreground mt-1">{tool.desc}</p>
-            </div>
-          </div>
+
+            {major.subsections.map((sub) => (
+              <div key={`${major.id}-${sub.title}`} className="space-y-4">
+                <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">{sub.title}</h3>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                  {sub.items.map((tool) => (
+                    <ToolCard key={`${tool.page}-${tool.title}`} tool={tool} onOpen={go} />
+                  ))}
+                </div>
+              </div>
+            ))}
+          </section>
         ))}
       </div>
 
-      {/* Footer */}
-      <div className="text-center py-6 bg-card rounded-xl">
-        <p className="font-semibold text-foreground">🚗 E-Transporte.pro — Plataforma completa para Transporte Executivo</p>
-        <p className="text-sm text-muted-foreground mt-1">Gestão de frota, marketing digital, network e muito mais. Tudo integrado para o seu crescimento.</p>
-      </div>
+      <footer className="rounded-2xl border border-border bg-card px-6 py-8 text-center">
+        <p className="font-semibold text-foreground">E-Transporte.pro — plataforma completa para transporte executivo</p>
+        <p className="mt-2 text-sm text-muted-foreground">Gestão de frota, marketing digital, network e integrações. Tudo em um só lugar.</p>
+      </footer>
     </div>
   );
 }

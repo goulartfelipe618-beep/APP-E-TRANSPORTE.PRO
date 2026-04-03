@@ -235,6 +235,7 @@ export function AppSidebar() {
 
                   const page = (item as { page: string }).page;
                   const isNetworkItem = item.title === "Network";
+                  const isDisparador = item.title === "Disparador";
                   const dimFlat = showNetworkHighlight && !isNetworkItem;
                   return (
                     <SidebarMenuItem
@@ -243,21 +244,38 @@ export function AppSidebar() {
                         "relative",
                         dimFlat && "opacity-40 pointer-events-none",
                         isNetworkItem && showNetworkHighlight && "z-40 opacity-100 pointer-events-auto",
+                        isDisparador && collapsed && "pt-3",
                       )}
                     >
-                      <SidebarMenuButton
-                        onClick={() => setActivePage(page)}
-                        className={cn(
-                          "cursor-pointer",
-                          isActive(page) && "bg-muted text-primary font-medium",
-                          isNetworkItem &&
-                            showNetworkHighlight &&
-                            "bg-sidebar text-foreground ring-2 ring-primary shadow-md rounded-md",
+                      {isDisparador && collapsed && (
+                        <span
+                          className="absolute left-1/2 top-0 z-10 -translate-x-1/2 rounded bg-amber-500 px-1 py-0.5 text-[7px] font-bold uppercase leading-none tracking-wide text-white shadow-sm"
+                          aria-hidden
+                        >
+                          BETA
+                        </span>
+                      )}
+                      <div className={cn("flex w-full flex-col", isDisparador && !collapsed && "gap-0.5")}>
+                        {isDisparador && !collapsed && (
+                          <span className="px-2 text-[10px] font-bold uppercase tracking-widest text-amber-600 dark:text-amber-500">
+                            BETA
+                          </span>
                         )}
-                      >
-                        <item.icon className="h-4 w-4 mr-2" />
-                        {!collapsed && <span>{item.title}</span>}
-                      </SidebarMenuButton>
+                        <SidebarMenuButton
+                          onClick={() => setActivePage(page)}
+                          title={isDisparador ? "Disparador (BETA)" : undefined}
+                          className={cn(
+                            "cursor-pointer",
+                            isActive(page) && "bg-muted text-primary font-medium",
+                            isNetworkItem &&
+                              showNetworkHighlight &&
+                              "bg-sidebar text-foreground ring-2 ring-primary shadow-md rounded-md",
+                          )}
+                        >
+                          <item.icon className="h-4 w-4 mr-2" />
+                          {!collapsed && <span>{item.title}</span>}
+                        </SidebarMenuButton>
+                      </div>
                     </SidebarMenuItem>
                   );
                 })}
