@@ -462,8 +462,9 @@ export default function CommunityFeed() {
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="mx-auto w-full max-w-3xl space-y-6 xl:mx-0">
+      <div className="flex flex-col gap-6 xl:flex-row xl:items-start">
+        <div className="flex min-w-0 flex-1 justify-center xl:min-h-0">
+          <div className="mx-auto w-full max-w-3xl space-y-6">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <p className="font-semibold text-foreground">Nova publicação</p>
@@ -714,8 +715,9 @@ export default function CommunityFeed() {
             })}
           </div>
         </div>
+        </div>
 
-        <aside className="space-y-4">
+        <aside className="w-full shrink-0 space-y-4 xl:w-[min(100%,28rem)] xl:min-w-[24rem]">
           <Card>
             <CardHeader className="pb-2">
               <p className="font-semibold text-foreground flex items-center gap-2">
