@@ -30,8 +30,6 @@ interface QrDownloadSource {
   titulo: string;
 }
 
-type BackgroundChoice = "com" | "sem";
-
 function isValidHttpUrl(s: string): boolean {
   try {
     const u = new URL(s.trim());
@@ -44,13 +42,11 @@ function isValidHttpUrl(s: string): boolean {
 function QrExportOptionsFields(props: {
   sizeId: QrExportSizeId;
   onSizeId: (v: QrExportSizeId) => void;
-  background: BackgroundChoice;
-  onBackground: (v: BackgroundChoice) => void;
   scheme: QrColorScheme;
   onScheme: (v: QrColorScheme) => void;
   idsPrefix: string;
 }) {
-  const { sizeId, onSizeId, background, onBackground, scheme, onScheme, idsPrefix } = props;
+  const { sizeId, onSizeId, scheme, onScheme, idsPrefix } = props;
 
   return (
     <>
@@ -83,50 +79,26 @@ function QrExportOptionsFields(props: {
       </div>
 
       <div className="space-y-2">
-        <Label className="text-base">Fundo na imagem</Label>
+        <Label className="text-base">Estilo</Label>
         <RadioGroup
-          value={background}
-          onValueChange={(v) => onBackground(v as BackgroundChoice)}
+          value={scheme}
+          onValueChange={(v) => onScheme(v as QrColorScheme)}
           className="grid gap-2"
         >
           <div className="flex items-center space-x-2 rounded-lg border border-border px-3 py-2 has-[:checked]:border-primary/50 has-[:checked]:bg-primary/5">
-            <RadioGroupItem value="com" id={`${idsPrefix}-bg-on`} />
-            <Label htmlFor={`${idsPrefix}-bg-on`} className="cursor-pointer font-normal flex-1">
-              Com fundo
+            <RadioGroupItem value="light" id={`${idsPrefix}-sc-l`} />
+            <Label htmlFor={`${idsPrefix}-sc-l`} className="cursor-pointer font-normal flex-1">
+              QR Code preto com fundo branco
             </Label>
           </div>
           <div className="flex items-center space-x-2 rounded-lg border border-border px-3 py-2 has-[:checked]:border-primary/50 has-[:checked]:bg-primary/5">
-            <RadioGroupItem value="sem" id={`${idsPrefix}-bg-off`} />
-            <Label htmlFor={`${idsPrefix}-bg-off`} className="cursor-pointer font-normal flex-1">
-              Sem fundo (transparente)
+            <RadioGroupItem value="dark" id={`${idsPrefix}-sc-d`} />
+            <Label htmlFor={`${idsPrefix}-sc-d`} className="cursor-pointer font-normal flex-1">
+              QR Code branco com fundo preto
             </Label>
           </div>
         </RadioGroup>
       </div>
-
-      {background === "com" && (
-        <div className="space-y-2">
-          <Label className="text-base">Estilo com fundo</Label>
-          <RadioGroup
-            value={scheme}
-            onValueChange={(v) => onScheme(v as QrColorScheme)}
-            className="grid gap-2"
-          >
-            <div className="flex items-center space-x-2 rounded-lg border border-border px-3 py-2 has-[:checked]:border-primary/50 has-[:checked]:bg-primary/5">
-              <RadioGroupItem value="light" id={`${idsPrefix}-sc-l`} />
-              <Label htmlFor={`${idsPrefix}-sc-l`} className="cursor-pointer font-normal flex-1">
-                QR Code preto com fundo branco
-              </Label>
-            </div>
-            <div className="flex items-center space-x-2 rounded-lg border border-border px-3 py-2 has-[:checked]:border-primary/50 has-[:checked]:bg-primary/5">
-              <RadioGroupItem value="dark" id={`${idsPrefix}-sc-d`} />
-              <Label htmlFor={`${idsPrefix}-sc-d`} className="cursor-pointer font-normal flex-1">
-                QR Code branco com fundo preto
-              </Label>
-            </div>
-          </RadioGroup>
-        </div>
-      )}
     </>
   );
 }
@@ -140,13 +112,11 @@ export default function MarketingQRCodePage() {
   const [saving, setSaving] = useState(false);
 
   const [createSizeId, setCreateSizeId] = useState<QrExportSizeId>("medio");
-  const [createBackground, setCreateBackground] = useState<BackgroundChoice>("com");
   const [createScheme, setCreateScheme] = useState<QrColorScheme>("light");
 
   const [downloadOpen, setDownloadOpen] = useState(false);
   const [downloadTarget, setDownloadTarget] = useState<QrDownloadSource | null>(null);
   const [dlSizeId, setDlSizeId] = useState<QrExportSizeId>("medio");
-  const [dlBackground, setDlBackground] = useState<BackgroundChoice>("com");
   const [dlScheme, setDlScheme] = useState<QrColorScheme>("light");
   const [downloading, setDownloading] = useState(false);
 
@@ -186,20 +156,15 @@ export default function MarketingQRCodePage() {
     setTitulo("");
     setUrlDestino("");
     setCreateSizeId("medio");
-    setCreateBackground("com");
     setCreateScheme("light");
   };
 
   const generateSlug = () => Math.random().toString(36).substring(2, 10);
 
-  const buildExportOpts = (
-    sizeId: QrExportSizeId,
-    background: BackgroundChoice,
-    scheme: QrColorScheme,
-  ) => ({
+  const buildExportOpts = (sizeId: QrExportSizeId, scheme: QrColorScheme) => ({
     sizePx: QR_EXPORT_SIZES[sizeId],
-    scheme: background === "sem" ? ("light" as QrColorScheme) : scheme,
-    solidBackground: background === "com",
+    scheme,
+    solidBackground: true,
   });
 
   const handleCreateAndDownload = async () => {
@@ -239,7 +204,7 @@ export default function MarketingQRCodePage() {
     }
 
     try {
-      await downloadQrCodePng(url, buildExportOpts(createSizeId, createBackground, createScheme), tituloFinal);
+      await downloadQrCodePng(url, buildExportOpts(createSizeId, createScheme), tituloFinal);
       toast.success("QR Code salvo e download iniciado.");
       setCreateOpen(false);
       resetCreateForm();
@@ -256,7 +221,6 @@ export default function MarketingQRCodePage() {
   const openDownloadDialog = (source: QrDownloadSource) => {
     setDownloadTarget(source);
     setDlSizeId("medio");
-    setDlBackground("com");
     setDlScheme("light");
     setDownloadOpen(true);
   };
@@ -267,7 +231,7 @@ export default function MarketingQRCodePage() {
     try {
       await downloadQrCodePng(
         downloadTarget.url_destino,
-        buildExportOpts(dlSizeId, dlBackground, dlScheme),
+        buildExportOpts(dlSizeId, dlScheme),
         downloadTarget.titulo,
       );
       toast.success("Download iniciado.");
@@ -329,8 +293,6 @@ export default function MarketingQRCodePage() {
                 idsPrefix="create"
                 sizeId={createSizeId}
                 onSizeId={setCreateSizeId}
-                background={createBackground}
-                onBackground={setCreateBackground}
                 scheme={createScheme}
                 onScheme={setCreateScheme}
               />
@@ -362,8 +324,6 @@ export default function MarketingQRCodePage() {
                 idsPrefix="dl"
                 sizeId={dlSizeId}
                 onSizeId={setDlSizeId}
-                background={dlBackground}
-                onBackground={setDlBackground}
                 scheme={dlScheme}
                 onScheme={setDlScheme}
               />
