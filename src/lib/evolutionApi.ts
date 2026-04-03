@@ -175,6 +175,35 @@ async function fetchPhoneFromInstancesList(
 }
 
 /** Tenta criar instância e retorna QR em base64 */
+/**
+ * Cria/recupera instância na Evolution do administrador e retorna o QR (Edge Function).
+ * Usa credenciais em `comunicador_evolution_credenciais` — não exige VITE_* no front do motorista.
+ */
+export async function fetchEvolutionMotoristaQrFromServer(): Promise<{
+  base64: string | null;
+  instanceName?: string;
+  detail?: string;
+}> {
+  const { data, error } = await supabase.functions.invoke<{
+    base64?: string;
+    instanceName?: string;
+    error?: string;
+    detail?: string;
+    code?: string;
+  }>("evolution-motorista-qr", { body: {} });
+
+  if (error) {
+    return { base64: null, detail: error.message };
+  }
+  if (data && typeof data === "object" && "error" in data && data.error) {
+    return { base64: null, detail: (data.detail as string) || String(data.error) };
+  }
+  if (!data?.base64) {
+    return { base64: null, detail: "Resposta sem QR Code." };
+  }
+  return { base64: data.base64, instanceName: data.instanceName };
+}
+
 export async function fetchEvolutionQrCode(
   instanceName: string,
   creds?: EvolutionCreds | null,

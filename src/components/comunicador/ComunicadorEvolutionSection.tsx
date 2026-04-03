@@ -24,6 +24,8 @@ type Props = {
   evolutionCreds?: EvolutionCreds | null;
   /** Comunicador oficial: sem QR — só status após conexão automática */
   hideQr?: boolean;
+  /** Quando true, não exige VITE_EVOLUTION_* (QR gerado no servidor com credenciais do admin). */
+  hideViteHint?: boolean;
 };
 
 export function ComunicadorEvolutionSection({
@@ -39,9 +41,10 @@ export function ComunicadorEvolutionSection({
   showRemover,
   evolutionCreds,
   hideQr,
+  hideViteHint,
 }: Props) {
   const img = qrSrc(row?.qr_code_base64 ?? null);
-  const envOk = evolutionEnvConfigured(evolutionCreds ?? undefined);
+  const envOk = hideViteHint || evolutionEnvConfigured(evolutionCreds ?? undefined);
 
   return (
     <Card>
@@ -70,7 +73,7 @@ export function ComunicadorEvolutionSection({
         </Button>
       </CardHeader>
       <CardContent className="space-y-4">
-        {!readOnly && !hideQr && !envOk && (
+        {!readOnly && !hideQr && !hideViteHint && !envOk && (
           <Alert>
             <Smartphone className="h-4 w-4" />
             <AlertTitle>Evolution API não configurada no front-end</AlertTitle>

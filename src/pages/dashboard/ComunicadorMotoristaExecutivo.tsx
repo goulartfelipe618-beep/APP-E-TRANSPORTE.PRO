@@ -8,7 +8,7 @@ import {
   useComunicadoresEvolution,
   instanceNameForUser,
 } from "@/hooks/useComunicadoresEvolution";
-import { fetchEvolutionQrCode, evolutionEnvConfigured, formatPhoneBrDisplay } from "@/lib/evolutionApi";
+import { fetchEvolutionMotoristaQrFromServer, formatPhoneBrDisplay } from "@/lib/evolutionApi";
 
 export default function ComunicadorMotoristaExecutivoPage() {
   const { sistema, own, loading, reload } = useComunicadoresEvolution();
@@ -54,16 +54,8 @@ export default function ComunicadorMotoristaExecutivoPage() {
       }
 
       if (!row?.id) return;
-      const inst = row.instance_name?.trim() || instanceNameForUser(user.id);
 
-      if (!evolutionEnvConfigured(null)) {
-        toast.message("Configure VITE_EVOLUTION_API_URL e VITE_EVOLUTION_API_KEY para gerar o QR nesta tela.", {
-          description: `Instância: ${inst}`,
-        });
-        return;
-      }
-
-      const { base64, detail } = await fetchEvolutionQrCode(inst);
+      const { base64, detail } = await fetchEvolutionMotoristaQrFromServer();
       if (!base64) {
         toast.error("Não foi possível obter o QR Code.", { description: detail });
         return;
@@ -105,8 +97,8 @@ export default function ComunicadorMotoristaExecutivoPage() {
           <h1 className="text-2xl font-bold text-foreground">Comunicador</h1>
           <p className="text-muted-foreground">
             A <strong className="text-foreground">linha oficial</strong> da plataforma aparece abaixo para referência. Você
-            pode conectar <strong className="text-foreground">apenas um</strong> WhatsApp próprio (integração via n8n /
-            Evolution). Em <strong className="text-foreground">Comunicar</strong>, você escolhe se fala pelo oficial ou
+            pode conectar <strong className="text-foreground">apenas um</strong> WhatsApp próprio (instância na Evolution da
+            plataforma). Em <strong className="text-foreground">Comunicar</strong>, você escolhe se fala pelo oficial ou
             pelo seu número.
           </p>
         </div>
@@ -146,9 +138,9 @@ export default function ComunicadorMotoristaExecutivoPage() {
       />
 
       {own ? (
-        <ComunicadorEvolutionSection
-          title="Meu comunicador"
-          description="Seu único WhatsApp próprio nesta conta. Em Comunicar, use esta opção para falar pelo seu número."
+      <ComunicadorEvolutionSection
+        title="Meu comunicador"
+        description="Seu único WhatsApp próprio nesta conta. A instância é criada automaticamente no servidor Evolution da plataforma; escaneie o QR para conectar. Em Comunicar, use esta opção para falar pelo seu número."
           row={own}
           readOnly={false}
           loading={loading}
@@ -158,6 +150,7 @@ export default function ComunicadorMotoristaExecutivoPage() {
           onRemover={handleRemoverProprio}
           showRemover
           evolutionCreds={null}
+          hideViteHint
         />
       ) : (
         <div className="rounded-xl border border-border bg-card p-6">

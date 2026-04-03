@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { Tables } from "@/integrations/supabase/types";
 import { AlertTriangle, Loader2, Pencil, Save, X } from "lucide-react";
+import { sanitizeApiKey } from "@/lib/evolutionApi";
 
 const ROW_ID = "00000000-0000-0000-0000-000000000001";
 
@@ -64,6 +65,12 @@ function emptyDraft(): Record<UrlKey, string> {
 export default function ComunicadorAdminMasterPage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<"missing_table" | "other" | null>(null);
+  const [evoLoading, setEvoLoading] = useState(true);
+  const [evoSaving, setEvoSaving] = useState(false);
+  const [comunicadorSistemaId, setComunicadorSistemaId] = useState<string | null>(null);
+  const [evoUrl, setEvoUrl] = useState("");
+  const [evoKey, setEvoKey] = useState("");
+  const [evoCredsExist, setEvoCredsExist] = useState(false);
   const [savingKey, setSavingKey] = useState<UrlKey | null>(null);
   const [server, setServer] = useState<Record<UrlKey, string>>(emptyDraft);
   const [draft, setDraft] = useState<Record<UrlKey, string>>(emptyDraft);
@@ -108,6 +115,90 @@ export default function ComunicadorAdminMasterPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  const loadEvolutionCreds = useCallback(async () => {
+    setEvoLoading(true);
+    const { data: sys } = await supabase
+      .from("comunicadores_evolution")
+      .select("id")
+      .eq("escopo", "sistema")
+      .maybeSingle();
+    if (!sys?.id) {
+      setComunicadorSistemaId(null);
+      setEvoCredsExist(false);
+      setEvoLoading(false);
+      return;
+    }
+    setComunicadorSistemaId(sys.id);
+    const { data: cr } = await supabase
+      .from("comunicador_evolution_credenciais")
+      .select("api_url, api_key")
+      .eq("comunicador_id", sys.id)
+      .maybeSingle();
+    setEvoUrl((cr?.api_url as string)?.trim() || "");
+    setEvoKey("");
+    setEvoCredsExist(Boolean((cr?.api_key as string)?.trim()));
+    setEvoLoading(false);
+  }, []);
+
+  useEffect(() => {
+    void loadEvolutionCreds();
+  }, [loadEvolutionCreds]);
+
+  const saveEvolutionCreds = async () => {
+    if (!comunicadorSistemaId) {
+      toast.error("Comunicador oficial não encontrado.");
+      return;
+    }
+    const url = evoUrl.trim();
+    if (!url || !url.startsWith("https://")) {
+      toast.error("Informe a URL HTTPS da Evolution API (ex.: https://evo.seudominio.com).");
+      return;
+    }
+    const keyTrim = evoKey.trim();
+    if (!evoCredsExist && !keyTrim) {
+      toast.error("Informe a API Key da Evolution (Authentication API Key).");
+      return;
+    }
+
+    setEvoSaving(true);
+    try {
+      const { data: existing } = await supabase
+        .from("comunicador_evolution_credenciais")
+        .select("id")
+        .eq("comunicador_id", comunicadorSistemaId)
+        .maybeSingle();
+
+      if (existing?.id) {
+        const patch: Record<string, string> = {
+          api_url: url,
+          updated_at: new Date().toISOString(),
+        };
+        if (keyTrim) patch.api_key = sanitizeApiKey(keyTrim);
+        const { error } = await supabase
+          .from("comunicador_evolution_credenciais")
+          .update(patch)
+          .eq("comunicador_id", comunicadorSistemaId);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("comunicador_evolution_credenciais").insert({
+          comunicador_id: comunicadorSistemaId,
+          api_url: url,
+          api_key: sanitizeApiKey(keyTrim),
+        });
+        if (error) throw error;
+      }
+      toast.success("Credenciais da Evolution salvas. Os motoristas poderão gerar QR no comunicador próprio.");
+      setEvoCredsExist(true);
+      setEvoKey("");
+      await loadEvolutionCreds();
+    } catch (e) {
+      console.error(e);
+      toast.error(e instanceof Error ? e.message : "Erro ao salvar credenciais.");
+    } finally {
+      setEvoSaving(false);
+    }
+  };
 
   const isLocked = (k: UrlKey) => Boolean(server[k]?.trim()) && !editing[k];
 
@@ -154,6 +245,58 @@ export default function ComunicadorAdminMasterPage() {
           fica destacado e bloqueado até você clicar em Editar.
         </p>
       </div>
+
+      <Card className="border-primary/30 bg-primary/5">
+        <CardHeader>
+          <CardTitle className="text-lg">Evolution API (WhatsApp)</CardTitle>
+          <CardDescription>
+            URL e chave do <strong className="text-foreground">mesmo servidor Evolution</strong> que você usa no painel. Com
+            isso, ao motorista clicar em &quot;Gerar QR Code&quot; no comunicador próprio, o sistema cria a instância nesse
+            servidor e exibe o QR — sem precisar de variáveis no front do motorista.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {evoLoading ? (
+            <p className="text-sm text-muted-foreground flex items-center gap-2">
+              <Loader2 className="h-4 w-4 animate-spin" /> Carregando credenciais…
+            </p>
+          ) : (
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="evo-url">URL da Evolution API</Label>
+                <Input
+                  id="evo-url"
+                  type="url"
+                  autoComplete="off"
+                  placeholder="https://seu-servidor-evolution.com"
+                  value={evoUrl}
+                  onChange={(e) => setEvoUrl(e.target.value)}
+                  className="font-mono text-sm"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="evo-key">API Key (Authentication)</Label>
+                <Input
+                  id="evo-key"
+                  type="password"
+                  autoComplete="new-password"
+                  placeholder={evoCredsExist ? "Deixe em branco para manter a chave atual" : "Cole a API Key"}
+                  value={evoKey}
+                  onChange={(e) => setEvoKey(e.target.value)}
+                  className="font-mono text-sm"
+                />
+                {evoCredsExist ? (
+                  <p className="text-xs text-muted-foreground">Chave já cadastrada. Preencha só se quiser substituir.</p>
+                ) : null}
+              </div>
+              <Button type="button" onClick={() => void saveEvolutionCreds()} disabled={evoSaving}>
+                {evoSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                Salvar credenciais Evolution
+              </Button>
+            </>
+          )}
+        </CardContent>
+      </Card>
 
       {loadError === "missing_table" && (
         <Alert variant="destructive">
