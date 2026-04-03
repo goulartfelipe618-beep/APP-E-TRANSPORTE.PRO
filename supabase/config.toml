@@ -18,6 +18,12 @@ verify_jwt = false
 [functions.evolution-motorista-qr]
 verify_jwt = false
 
+[functions.evolution-motorista-sync]
+verify_jwt = false
+
+[functions.evolution-motorista-delete]
+verify_jwt = false
+
 # Proxy para webhook n8n (evita CORS do navegador → n8n).
 [functions.n8n-comunicar-proxy]
 verify_jwt = false

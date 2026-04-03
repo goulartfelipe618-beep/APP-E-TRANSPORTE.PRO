@@ -204,6 +204,68 @@ export async function fetchEvolutionMotoristaQrFromServer(): Promise<{
   return { base64: data.base64, instanceName: data.instanceName };
 }
 
+/** Sincroniza número, foto e nome do perfil a partir da Evolution (Edge Function). */
+export async function fetchEvolutionMotoristaSyncFromServer(): Promise<{
+  phone: string | null;
+  profilePicUrl: string | null;
+  profileName: string | null;
+  state: string | null;
+  connected: boolean;
+  detail?: string;
+}> {
+  const { data, error } = await supabase.functions.invoke<{
+    phone?: string | null;
+    profilePicUrl?: string | null;
+    profileName?: string | null;
+    state?: string | null;
+    connected?: boolean;
+    error?: string;
+  }>("evolution-motorista-sync", { body: {} });
+
+  if (error) {
+    return { phone: null, profilePicUrl: null, profileName: null, state: null, connected: false, detail: error.message };
+  }
+  if (data && typeof data === "object" && "error" in data && data.error) {
+    return {
+      phone: null,
+      profilePicUrl: null,
+      profileName: null,
+      state: null,
+      connected: false,
+      detail: String(data.error),
+    };
+  }
+  if (!data) {
+    return { phone: null, profilePicUrl: null, profileName: null, state: null, connected: false, detail: "Resposta vazia" };
+  }
+  return {
+    phone: data.phone ?? null,
+    profilePicUrl: data.profilePicUrl ?? null,
+    profileName: data.profileName ?? null,
+    state: data.state ?? null,
+    connected: Boolean(data.connected),
+  };
+}
+
+/** Remove a instância na Evolution do motorista (Edge Function). */
+export async function fetchEvolutionMotoristaDeleteFromServer(): Promise<{ ok: boolean; detail?: string }> {
+  const { data, error } = await supabase.functions.invoke<{ ok?: boolean; error?: string; detail?: string }>(
+    "evolution-motorista-delete",
+    { body: {} },
+  );
+
+  if (error) {
+    return { ok: false, detail: error.message };
+  }
+  if (data && typeof data === "object" && "error" in data && data.error) {
+    return { ok: false, detail: (data as { detail?: string }).detail || String((data as { error: string }).error) };
+  }
+  if (data && typeof data === "object" && (data as { ok?: boolean }).ok) {
+    return { ok: true };
+  }
+  return { ok: false, detail: "Resposta inesperada" };
+}
+
 export async function fetchEvolutionQrCode(
   instanceName: string,
   creds?: EvolutionCreds | null,

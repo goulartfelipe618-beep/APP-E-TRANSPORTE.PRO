@@ -274,6 +274,7 @@ export type Database = {
           connection_status: string
           created_at: string
           escopo: string
+          foto_perfil_url: string | null
           id: string
           instance_name: string | null
           nome_dispositivo: string | null
@@ -287,6 +288,7 @@ export type Database = {
           connection_status?: string
           created_at?: string
           escopo: string
+          foto_perfil_url?: string | null
           id?: string
           instance_name?: string | null
           nome_dispositivo?: string | null
@@ -300,6 +302,7 @@ export type Database = {
           connection_status?: string
           created_at?: string
           escopo?: string
+          foto_perfil_url?: string | null
           id?: string
           instance_name?: string | null
           nome_dispositivo?: string | null
