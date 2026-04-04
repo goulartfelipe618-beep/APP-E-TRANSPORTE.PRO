@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Card, CardContent } from "@/components/ui/card";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Download, Copy, ExternalLink } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -14,7 +14,9 @@ import {
   type QrColorScheme,
   type QrExportSizeId,
   downloadQrCodePng,
+  getQrPreviewFgBg,
 } from "@/lib/qrCodeDownload";
+import { cn } from "@/lib/utils";
 
 interface QRCode {
   id: string;
@@ -44,61 +46,71 @@ function QrExportOptionsFields(props: {
   onSizeId: (v: QrExportSizeId) => void;
   scheme: QrColorScheme;
   onScheme: (v: QrColorScheme) => void;
+  previewUrl: string;
   idsPrefix: string;
 }) {
-  const { sizeId, onSizeId, scheme, onScheme, idsPrefix } = props;
+  const { sizeId, onSizeId, scheme, onScheme, previewUrl, idsPrefix } = props;
+  const previewColors = getQrPreviewFgBg(scheme, true);
+  const previewSize = Math.min(200, QR_EXPORT_SIZES[sizeId] > 400 ? 200 : 160);
 
   return (
     <>
-      <div className="space-y-2">
-        <Label className="text-base">Tamanho do QR Code</Label>
-        <RadioGroup
-          value={sizeId}
-          onValueChange={(v) => onSizeId(v as QrExportSizeId)}
-          className="grid gap-2"
-        >
-          <div className="flex items-center space-x-2 rounded-lg border border-border px-3 py-2 has-[:checked]:border-primary/50 has-[:checked]:bg-primary/5">
-            <RadioGroupItem value="pequeno" id={`${idsPrefix}-sz-p`} />
-            <Label htmlFor={`${idsPrefix}-sz-p`} className="cursor-pointer font-normal flex-1">
-              Pequeno — <span className="font-mono text-xs">512 × 512</span> px
-            </Label>
-          </div>
-          <div className="flex items-center space-x-2 rounded-lg border border-border px-3 py-2 has-[:checked]:border-primary/50 has-[:checked]:bg-primary/5">
-            <RadioGroupItem value="medio" id={`${idsPrefix}-sz-m`} />
-            <Label htmlFor={`${idsPrefix}-sz-m`} className="cursor-pointer font-normal flex-1">
-              Médio — <span className="font-mono text-xs">1024 × 1024</span> px
-            </Label>
-          </div>
-          <div className="flex items-center space-x-2 rounded-lg border border-border px-3 py-2 has-[:checked]:border-primary/50 has-[:checked]:bg-primary/5">
-            <RadioGroupItem value="grande" id={`${idsPrefix}-sz-g`} />
-            <Label htmlFor={`${idsPrefix}-sz-g`} className="cursor-pointer font-normal flex-1">
-              Grande — <span className="font-mono text-xs">2048 × 2048</span> px
-            </Label>
-          </div>
-        </RadioGroup>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="space-y-2">
+          <Label htmlFor={`${idsPrefix}-size`} className="text-base">
+            Tamanho do QR Code (PNG)
+          </Label>
+          <Select value={sizeId} onValueChange={(v) => onSizeId(v as QrExportSizeId)}>
+            <SelectTrigger id={`${idsPrefix}-size`} className="w-full">
+              <SelectValue placeholder="Tamanho" />
+            </SelectTrigger>
+            <SelectContent className="z-[300]">
+              <SelectItem value="pequeno">Pequeno — 512 × 512 px</SelectItem>
+              <SelectItem value="medio">Médio — 1024 × 1024 px</SelectItem>
+              <SelectItem value="grande">Grande — 2048 × 2048 px</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor={`${idsPrefix}-style`} className="text-base">
+            Estilo
+          </Label>
+          <Select value={scheme} onValueChange={(v) => onScheme(v as QrColorScheme)}>
+            <SelectTrigger id={`${idsPrefix}-style`} className="w-full">
+              <SelectValue placeholder="Estilo" />
+            </SelectTrigger>
+            <SelectContent className="z-[300]">
+              <SelectItem value="light">QR preto com fundo branco</SelectItem>
+              <SelectItem value="dark">QR branco com fundo preto</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
-      <div className="space-y-2">
-        <Label className="text-base">Estilo</Label>
-        <RadioGroup
-          value={scheme}
-          onValueChange={(v) => onScheme(v as QrColorScheme)}
-          className="grid gap-2"
-        >
-          <div className="flex items-center space-x-2 rounded-lg border border-border px-3 py-2 has-[:checked]:border-primary/50 has-[:checked]:bg-primary/5">
-            <RadioGroupItem value="light" id={`${idsPrefix}-sc-l`} />
-            <Label htmlFor={`${idsPrefix}-sc-l`} className="cursor-pointer font-normal flex-1">
-              QR Code preto com fundo branco
-            </Label>
+      {previewUrl.trim() && isValidHttpUrl(previewUrl) && (
+        <div className="space-y-2">
+          <Label className="text-sm text-muted-foreground">Pré-visualização (tamanho e estilo do download)</Label>
+          <div
+            className={cn(
+              "flex justify-center rounded-lg border border-border p-4",
+              scheme === "dark" ? "bg-black" : "bg-white",
+            )}
+          >
+            <QRCodeCanvas
+              value={previewUrl.trim()}
+              size={previewSize}
+              level="H"
+              includeMargin
+              fgColor={previewColors.fg}
+              bgColor={previewColors.bg}
+            />
           </div>
-          <div className="flex items-center space-x-2 rounded-lg border border-border px-3 py-2 has-[:checked]:border-primary/50 has-[:checked]:bg-primary/5">
-            <RadioGroupItem value="dark" id={`${idsPrefix}-sc-d`} />
-            <Label htmlFor={`${idsPrefix}-sc-d`} className="cursor-pointer font-normal flex-1">
-              QR Code branco com fundo preto
-            </Label>
-          </div>
-        </RadioGroup>
-      </div>
+          <p className="text-xs text-muted-foreground text-center">
+            Exportação em PNG: {QR_EXPORT_SIZES[sizeId]} × {QR_EXPORT_SIZES[sizeId]} px —{" "}
+            {scheme === "light" ? "preto no branco" : "branco no preto"}.
+          </p>
+        </div>
+      )}
     </>
   );
 }
@@ -295,6 +307,7 @@ export default function MarketingQRCodePage() {
                 onSizeId={setCreateSizeId}
                 scheme={createScheme}
                 onScheme={setCreateScheme}
+                previewUrl={urlDestino}
               />
 
               <p className="text-xs text-muted-foreground">
@@ -326,6 +339,7 @@ export default function MarketingQRCodePage() {
                 onSizeId={setDlSizeId}
                 scheme={dlScheme}
                 onScheme={setDlScheme}
+                previewUrl={downloadTarget.url_destino}
               />
               <div className="flex gap-2 pt-2">
                 <Button variant="outline" className="flex-1" onClick={() => setDownloadOpen(false)}>

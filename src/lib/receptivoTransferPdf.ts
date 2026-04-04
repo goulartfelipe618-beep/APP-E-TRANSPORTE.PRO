@@ -323,12 +323,9 @@ function drawTripFooter(
 ): number {
   if (f.numeroReserva == null) return y;
   doc.setTextColor(35, 35, 35);
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(8);
-  doc.text("Detalhes da viagem", xLeft, y);
-  let cy = y + 4.2;
   doc.setFont("helvetica", "normal");
   doc.setFontSize(7);
+  let cy = y;
   const reservaTxt = `Reserva nº ${f.numeroReserva}  |  Tipo: ${f.tipoLabel || "—"}`;
   wrapLines(doc, reservaTxt, maxW, 7).forEach((line) => {
     doc.text(line, xLeft, cy);
@@ -358,31 +355,19 @@ function drawTripFooter(
   return cy + 1;
 }
 
-/** Rodapé de viagem centralizado (Modelos 1 e 2). `bracedTitle`: título como `{ Detalhes da viagem }` (ref. Modelo 2). */
+/** Rodapé de viagem centralizado (modelos de receptivo): só os dados da reserva e trajeto, sem título. */
 function drawTripFooterCentered(
   doc: jsPDF,
   centerX: number,
   y: number,
   maxW: number,
   f: ReceptivoFooterPayload,
-  opts?: { bracedTitle?: boolean },
 ): number {
   if (f.numeroReserva == null) return y;
   doc.setTextColor(35, 35, 35);
-  let cy: number;
-  if (opts?.bracedTitle) {
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(7);
-    doc.text("{ Detalhes da viagem }", centerX, y, { align: "center" });
-    cy = y + 4.2;
-  } else {
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(8);
-    doc.text("Detalhes da viagem", centerX, y, { align: "center" });
-    cy = y + 4.2;
-  }
   doc.setFont("helvetica", "normal");
   doc.setFontSize(7);
+  let cy = y;
   const reservaTxt = `Reserva nº ${f.numeroReserva}  |  Tipo: ${f.tipoLabel || "—"}`;
   wrapLines(doc, reservaTxt, maxW, 7).forEach((line) => {
     doc.text(line, centerX, cy, { align: "center" });
@@ -684,7 +669,7 @@ export async function generateReceptivoTransferPdf(
         if (yFt + footerH > bottomSafe) {
           yFt = Math.max(yLineMm + 4, bottomSafe - footerH - 2);
         }
-        drawTripFooterCentered(doc, W / 2, yFt, contentW * 0.85, footer, { bracedTitle: true });
+        drawTripFooterCentered(doc, W / 2, yFt, contentW * 0.85, footer);
       }
     } else {
       const contentTop = M_OUT + M_IN + 8;
@@ -726,7 +711,7 @@ export async function generateReceptivoTransferPdf(
         if (yFt + footerH > bottomSafe) {
           yFt = Math.max(yLineMm + 4, bottomSafe - footerH - 2);
         }
-        drawTripFooterCentered(doc, W / 2, yFt, contentW * 0.85, footer, { bracedTitle: true });
+        drawTripFooterCentered(doc, W / 2, yFt, contentW * 0.85, footer);
       }
     } else {
       const contentTop = M_OUT + M_IN + 32;
@@ -760,7 +745,7 @@ export async function generateReceptivoTransferPdf(
       drawTraçoCentralComTicks(doc, W, y, innerW);
       y += 1.4 + 10;
       if (hasTrip) {
-        drawTripFooterCentered(doc, W / 2, y, contentW * 0.9, footer, { bracedTitle: true });
+        drawTripFooterCentered(doc, W / 2, y, contentW * 0.9, footer);
       }
       await drawLogoCenteredAtY(doc, logoDataUrl, nomeProjeto, W / 2, contentW, yLogoTop, H, {
         wMm: logoW,
@@ -787,7 +772,7 @@ export async function generateReceptivoTransferPdf(
         if (yFt + footerH > bottomSafe) {
           yFt = Math.max(yLineMm + 4, bottomSafe - footerH - 2);
         }
-        drawTripFooterCentered(doc, W / 2, yFt, contentW * 0.85, footer, { bracedTitle: true });
+        drawTripFooterCentered(doc, W / 2, yFt, contentW * 0.85, footer);
       }
     } else {
       const contentTop = M_OUT + M_IN + 32;
@@ -812,7 +797,7 @@ export async function generateReceptivoTransferPdf(
         if (yFooterTop + footerH > bottomSafe) {
           yFooterTop = Math.max(minY, bottomSafe - footerH - 2);
         }
-        drawTripFooterCentered(doc, W / 2, yFooterTop, contentW * 0.9, footer, { bracedTitle: true });
+        drawTripFooterCentered(doc, W / 2, yFooterTop, contentW * 0.9, footer);
       }
     }
   } else if (m === 4) {
@@ -835,7 +820,7 @@ export async function generateReceptivoTransferPdf(
         if (yFt + footerH > bottomSafe) {
           yFt = Math.max(yLineMm + 4, bottomSafe - footerH - 2);
         }
-        drawTripFooterCentered(doc, W / 2, yFt, contentW * 0.85, footer, { bracedTitle: true });
+        drawTripFooterCentered(doc, W / 2, yFt, contentW * 0.85, footer);
       }
     } else {
       const contentTop = M_OUT + M_IN + 16;
@@ -879,7 +864,7 @@ export async function generateReceptivoTransferPdf(
         if (yFooterTop + footerH > bottomSafe) {
           yFooterTop = Math.max(minY, bottomSafe - footerH - 2);
         }
-        drawTripFooterCentered(doc, W / 2, yFooterTop, contentW * 0.9, footer, { bracedTitle: true });
+        drawTripFooterCentered(doc, W / 2, yFooterTop, contentW * 0.9, footer);
       }
     }
   }

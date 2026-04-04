@@ -3,6 +3,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { RefreshCw, Plus, Search, Trash2, Pencil, StickyNote } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -24,6 +33,7 @@ export default function AnotacoesPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [titulo, setTitulo] = useState("");
   const [conteudo, setConteudo] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<Anotacao | null>(null);
 
   const fetchAnotacoes = async () => {
     const { data, error } = await supabase
@@ -71,9 +81,16 @@ export default function AnotacoesPage() {
     setDialogOpen(true);
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDeleteConfirm = async () => {
+    if (!deleteTarget) return;
+    const id = deleteTarget.id;
+    setDeleteTarget(null);
     const { error } = await supabase.from("anotacoes" as any).delete().eq("id", id);
-    if (error) toast.error("Erro ao excluir"); else { toast.success("Excluída"); fetchAnotacoes(); }
+    if (error) toast.error("Erro ao excluir");
+    else {
+      toast.success("Anotação excluída");
+      fetchAnotacoes();
+    }
   };
 
   const filtered = anotacoes.filter(a =>
@@ -127,7 +144,7 @@ export default function AnotacoesPage() {
                   <Button variant="outline" size="sm" onClick={() => handleEdit(a)}>
                     <Pencil className="h-3.5 w-3.5 mr-1" /> Editar
                   </Button>
-                  <Button variant="outline" size="sm" className="text-destructive hover:text-destructive" onClick={() => handleDelete(a.id)}>
+                  <Button variant="outline" size="sm" className="text-destructive hover:text-destructive" onClick={() => setDeleteTarget(a)}>
                     <Trash2 className="h-3.5 w-3.5 mr-1" /> Excluir
                   </Button>
                 </div>
@@ -136,6 +153,32 @@ export default function AnotacoesPage() {
           ))}
         </div>
       )}
+
+      <AlertDialog open={deleteTarget !== null} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir anotação?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação não pode ser desfeita. Tem certeza de que deseja excluir
+              {deleteTarget ? (
+                <>
+                  {" "}
+                  <span className="font-medium text-foreground">&quot;{deleteTarget.titulo}&quot;</span>
+                </>
+              ) : (
+                " esta anotação"
+              )}
+              ?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <Button variant="destructive" onClick={() => void handleDeleteConfirm()}>
+              Excluir
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-lg">

@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useLayoutEffect } from "react";
+import { syncPanelThemeForCurrentUser } from "@/lib/panelTheme";
 import { useSlowScrollContainer } from "@/hooks/useSlowScrollContainer";
 import PageLoader, { FROTA_SLIDE_LOADER_PAGES } from "@/components/PageLoader";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
@@ -93,6 +94,10 @@ function DashboardContent() {
   const mainRef = useRef<HTMLElement>(null);
   useSlowScrollContainer(mainRef, activePage === "website");
   const [showOverlay, setShowOverlay] = useState(readNetworkSpotlightActive);
+
+  useLayoutEffect(() => {
+    syncPanelThemeForCurrentUser("frota");
+  }, []);
 
   useEffect(() => {
     let cancelled = false;

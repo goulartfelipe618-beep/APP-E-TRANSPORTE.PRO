@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Heart, MessageCircle, Pencil, Trash2, RefreshCw, ImagePlus, Video, Tags, MoreHorizontal } from "lucide-react";
+import { Heart, MessageCircle, Pencil, Trash2, RefreshCw, ImagePlus, Video, Tags, MoreHorizontal, MoreVertical } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import {
   AlertDialog,
@@ -65,6 +65,8 @@ type CommunityComment = {
   user_id: string;
   content: string;
   created_at: string;
+  updated_at?: string;
+  is_edited?: boolean;
 };
 
 type CommunityCategory = {
@@ -115,6 +117,9 @@ export default function CommunityFeed() {
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
   const [editingCategoryName, setEditingCategoryName] = useState("");
   const [pendingDeletePost, setPendingDeletePost] = useState<CommunityPost | null>(null);
+  const [pendingDeleteComment, setPendingDeleteComment] = useState<CommunityComment | null>(null);
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
+  const [editingCommentText, setEditingCommentText] = useState("");
 
   const getImageDimensions = (file: File) =>
     new Promise<{ width: number; height: number }>((resolve, reject) => {
@@ -146,8 +151,9 @@ export default function CommunityFeed() {
     setNewPostFiles(validFiles);
   };
 
-  const fetchAll = useCallback(async () => {
-    setLoading(true);
+  const fetchAll = useCallback(async (opts?: { silent?: boolean }) => {
+    const silent = opts?.silent === true;
+    if (!silent) setLoading(true);
     const { data: userData } = await supabase.auth.getUser();
     const userId = userData.user?.id ?? null;
     setCurrentUserId(userId);
@@ -176,7 +182,7 @@ export default function CommunityFeed() {
 
     if (postsRes.error || mediaRes.error || mentionsRes.error || likesRes.error || commentsRes.error || profilesRes.error || categoriesRes.error) {
       toast.error("Erro ao carregar Comunidade");
-      setLoading(false);
+      if (!silent) setLoading(false);
       return;
     }
 
@@ -204,22 +210,22 @@ export default function CommunityFeed() {
       };
     }
     setProfiles(nextProfiles);
-    setLoading(false);
+    if (!silent) setLoading(false);
   }, [config.logo_url, config.nome_completo, config.nome_projeto]);
 
   useEffect(() => {
-    void fetchAll();
+    void fetchAll({ silent: false });
   }, [fetchAll]);
 
   useEffect(() => {
     const channel = supabase
       .channel("community-feed-realtime")
-      .on("postgres_changes", { event: "*", schema: "public", table: "community_posts" }, () => void fetchAll())
-      .on("postgres_changes", { event: "*", schema: "public", table: "community_post_media" }, () => void fetchAll())
-      .on("postgres_changes", { event: "*", schema: "public", table: "community_post_mentions" }, () => void fetchAll())
-      .on("postgres_changes", { event: "*", schema: "public", table: "community_post_likes" }, () => void fetchAll())
-      .on("postgres_changes", { event: "*", schema: "public", table: "community_post_comments" }, () => void fetchAll())
-      .on("postgres_changes", { event: "*", schema: "public", table: "community_categories" }, () => void fetchAll())
+      .on("postgres_changes", { event: "*", schema: "public", table: "community_posts" }, () => void fetchAll({ silent: true }))
+      .on("postgres_changes", { event: "*", schema: "public", table: "community_post_media" }, () => void fetchAll({ silent: true }))
+      .on("postgres_changes", { event: "*", schema: "public", table: "community_post_mentions" }, () => void fetchAll({ silent: true }))
+      .on("postgres_changes", { event: "*", schema: "public", table: "community_post_likes" }, () => void fetchAll({ silent: true }))
+      .on("postgres_changes", { event: "*", schema: "public", table: "community_post_comments" }, () => void fetchAll({ silent: true }))
+      .on("postgres_changes", { event: "*", schema: "public", table: "community_categories" }, () => void fetchAll({ silent: true }))
       .subscribe();
 
     return () => {
@@ -258,7 +264,7 @@ export default function CommunityFeed() {
     }
     setNewCategoryName("");
     toast.success("Categoria criada");
-    void fetchAll();
+    void fetchAll({ silent: true });
   };
 
   const handleSaveCategoryEdit = async () => {
@@ -275,7 +281,7 @@ export default function CommunityFeed() {
     setEditingCategoryId(null);
     setEditingCategoryName("");
     toast.success("Categoria atualizada");
-    void fetchAll();
+    void fetchAll({ silent: true });
   };
 
   const handleDeleteCategory = async (categoryId: string) => {
@@ -287,7 +293,7 @@ export default function CommunityFeed() {
     if (activeCategoryId === categoryId) setActiveCategoryId("all");
     if (newPostCategoryId === categoryId) setNewPostCategoryId("");
     toast.success("Categoria excluída");
-    void fetchAll();
+    void fetchAll({ silent: true });
   };
 
   const handleCreatePost = async () => {
@@ -361,7 +367,7 @@ export default function CommunityFeed() {
       setSelectedMentions([]);
       setNewPostCategoryId(categories[0]?.id || "");
       toast.success("Publicação criada");
-      void fetchAll();
+      void fetchAll({ silent: true });
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "desconhecido";
       toast.error(`Erro ao publicar: ${message}`);
@@ -387,7 +393,7 @@ export default function CommunityFeed() {
     toast.success("Publicação atualizada");
     setEditingPostId(null);
     setEditingContent("");
-    void fetchAll();
+    void fetchAll({ silent: true });
   };
 
   const handleDeletePost = async (post: CommunityPost) => {
@@ -397,7 +403,7 @@ export default function CommunityFeed() {
       return;
     }
     toast.success("Publicação removida");
-    void fetchAll();
+    void fetchAll({ silent: true });
   };
 
   const confirmDeletePost = async () => {
@@ -420,7 +426,7 @@ export default function CommunityFeed() {
       const { error } = await supabase.from("community_post_likes").insert({ post_id: postId, user_id: currentUserId });
       if (error) toast.error("Erro ao curtir publicação");
     }
-    void fetchAll();
+    void fetchAll({ silent: true });
   };
 
   const handleAddComment = async (postId: string) => {
@@ -438,7 +444,7 @@ export default function CommunityFeed() {
       return;
     }
     setCommentDrafts((prev) => ({ ...prev, [postId]: "" }));
-    void fetchAll();
+    void fetchAll({ silent: true });
   };
 
   const handleDeleteComment = async (comment: CommunityComment) => {
@@ -447,7 +453,38 @@ export default function CommunityFeed() {
       toast.error("Erro ao excluir comentário");
       return;
     }
-    void fetchAll();
+    toast.success("Comentário removido");
+    void fetchAll({ silent: true });
+  };
+
+  const confirmDeleteComment = async () => {
+    if (!pendingDeleteComment) return;
+    await handleDeleteComment(pendingDeleteComment);
+    setPendingDeleteComment(null);
+  };
+
+  const handleSaveCommentEdit = async (comment: CommunityComment) => {
+    const content = editingCommentText.trim();
+    if (!content) {
+      toast.error("O comentário não pode ficar vazio");
+      return;
+    }
+    const { error } = await supabase
+      .from("community_post_comments")
+      .update({
+        content,
+        updated_at: new Date().toISOString(),
+        is_edited: true,
+      })
+      .eq("id", comment.id);
+    if (error) {
+      toast.error("Erro ao salvar comentário");
+      return;
+    }
+    toast.success("Comentário atualizado");
+    setEditingCommentId(null);
+    setEditingCommentText("");
+    void fetchAll({ silent: true });
   };
 
   if (loading) {
@@ -473,7 +510,7 @@ export default function CommunityFeed() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <p className="font-semibold text-foreground">Nova publicação</p>
-              <Button variant="outline" size="icon" onClick={() => void fetchAll()} title="Atualizar feed">
+              <Button variant="outline" size="icon" onClick={() => void fetchAll({ silent: true })} title="Atualizar feed">
                 <RefreshCw className="h-4 w-4" />
               </Button>
             </CardHeader>
@@ -672,33 +709,85 @@ export default function CommunityFeed() {
                       {postComments.map((comment) => {
                         const commentAuthor = profiles[comment.user_id];
                         const commentAuthorName = displayName(commentAuthor);
-                        const canDeleteComment = !!currentUserId && (comment.user_id === currentUserId || isAdminMaster);
+                        const canManageComment =
+                          !!currentUserId && (comment.user_id === currentUserId || isAdminMaster);
                         return (
                           <div key={comment.id} className="rounded-md border border-border bg-muted/20 p-2">
-                            <div className="mb-1 flex items-center justify-between gap-2">
-                              <div className="flex items-center gap-2">
-                                <Avatar className="h-7 w-7">
+                            <div className="mb-1 flex items-start justify-between gap-2">
+                              <div className="flex min-w-0 flex-1 items-center gap-2">
+                                <Avatar className="h-7 w-7 shrink-0">
                                   <AvatarImage src={commentAuthor?.logo_url || undefined} alt={commentAuthorName} />
                                   <AvatarFallback className="text-[10px]">{initialsFromName(commentAuthorName)}</AvatarFallback>
                                 </Avatar>
-                                <p className="text-xs font-medium text-foreground">{commentAuthorName}</p>
+                                <div className="min-w-0">
+                                  <p className="text-xs font-medium text-foreground">{commentAuthorName}</p>
+                                  <p className="text-[11px] text-muted-foreground">
+                                    {new Date(comment.created_at).toLocaleString("pt-BR")}
+                                    {comment.is_edited ? " · editado" : ""}
+                                  </p>
+                                </div>
                               </div>
-                              <div className="flex items-center gap-2">
-                                <p className="text-[11px] text-muted-foreground">
-                                  {new Date(comment.created_at).toLocaleString("pt-BR")}
-                                </p>
-                                {canDeleteComment && (
-                                  <button
-                                    type="button"
-                                    className="text-destructive text-xs hover:underline"
-                                    onClick={() => void handleDeleteComment(comment)}
-                                  >
-                                    excluir
-                                  </button>
-                                )}
-                              </div>
+                              {canManageComment && (
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-7 w-7 shrink-0"
+                                      aria-label="Opções do comentário"
+                                    >
+                                      <MoreVertical className="h-4 w-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    <DropdownMenuItem
+                                      onClick={() => {
+                                        setEditingCommentId(comment.id);
+                                        setEditingCommentText(comment.content);
+                                      }}
+                                    >
+                                      <Pencil className="mr-2 h-4 w-4" />
+                                      Editar
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                      className="text-destructive focus:text-destructive"
+                                      onClick={() => setPendingDeleteComment(comment)}
+                                    >
+                                      <Trash2 className="mr-2 h-4 w-4" />
+                                      Excluir
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              )}
                             </div>
-                            <p className="whitespace-pre-wrap text-xs text-foreground">{comment.content}</p>
+                            {editingCommentId === comment.id ? (
+                              <div className="space-y-2 pt-1">
+                                <Textarea
+                                  value={editingCommentText}
+                                  onChange={(e) => setEditingCommentText(e.target.value)}
+                                  rows={3}
+                                  className="text-xs"
+                                />
+                                <div className="flex gap-2">
+                                  <Button size="sm" onClick={() => void handleSaveCommentEdit(comment)}>
+                                    Salvar
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => {
+                                      setEditingCommentId(null);
+                                      setEditingCommentText("");
+                                    }}
+                                  >
+                                    Cancelar
+                                  </Button>
+                                </div>
+                              </div>
+                            ) : (
+                              <p className="whitespace-pre-wrap text-xs text-foreground">{comment.content}</p>
+                            )}
                           </div>
                         );
                       })}
@@ -827,6 +916,26 @@ export default function CommunityFeed() {
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={() => void confirmDeletePost()}
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!pendingDeleteComment} onOpenChange={(open) => !open && setPendingDeleteComment(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir comentário?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza de que deseja remover este comentário? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => void confirmDeleteComment()}
             >
               Excluir
             </AlertDialogAction>

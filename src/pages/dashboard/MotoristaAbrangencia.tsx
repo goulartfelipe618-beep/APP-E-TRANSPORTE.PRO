@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import "leaflet/dist/leaflet.css";
 import { nominatimGeocode, nominatimDelayMs } from "@/lib/nominatimGeocode";
-import { findCoords, sleep } from "@/lib/abrangenciaMapHelpers";
+import { findCoords, primeiroSegmentoEndereco, sleep } from "@/lib/abrangenciaMapHelpers";
 import { Tables } from "@/integrations/supabase/types";
 import { toast } from "sonner";
 
@@ -61,17 +61,22 @@ type ReservaPendente = {
 };
 
 function getPrimeiroEmbarqueTransfer(r: Tables<"reservas_transfer">): string | null {
+  let raw: string | null = null;
   if (r.tipo_viagem === "por_hora") {
-    const p = r.por_hora_endereco_inicio?.trim();
-    if (p) return p;
+    raw = r.por_hora_endereco_inicio?.trim() || null;
+  } else {
+    raw = r.ida_embarque?.trim() || null;
   }
-  const ida = r.ida_embarque?.trim();
-  if (ida) return ida;
-  return null;
+  if (!raw) return null;
+  const seg = primeiroSegmentoEndereco(raw);
+  return seg || null;
 }
 
 function getPrimeiroEmbarqueGrupo(r: Tables<"reservas_grupos">): string | null {
-  return r.embarque?.trim() || null;
+  const raw = r.embarque?.trim();
+  if (!raw) return null;
+  const seg = primeiroSegmentoEndereco(raw);
+  return seg || null;
 }
 
 function isReservaConcluida(status: string | null | undefined): boolean {
@@ -83,18 +88,18 @@ function isReservaConcluida(status: string | null | undefined): boolean {
 
 function labelTransfer(r: Tables<"reservas_transfer">): string {
   if (r.tipo_viagem === "por_hora") {
-    const a = r.por_hora_endereco_inicio || "—";
-    const b = r.por_hora_ponto_encerramento || "—";
+    const a = primeiroSegmentoEndereco(r.por_hora_endereco_inicio) || "—";
+    const b = (r.por_hora_ponto_encerramento || "").trim() || "—";
     return `${a} → ${b}`;
   }
-  const a = r.ida_embarque || "—";
-  const b = r.ida_desembarque || "—";
+  const a = primeiroSegmentoEndereco(r.ida_embarque) || "—";
+  const b = (r.ida_desembarque || "").trim() || "—";
   return `${a} → ${b}`;
 }
 
 function labelGrupo(r: Tables<"reservas_grupos">): string {
-  const a = r.embarque || "—";
-  const b = r.destino || "—";
+  const a = primeiroSegmentoEndereco(r.embarque) || "—";
+  const b = (r.destino || "").trim() || "—";
   return `${a} → ${b}`;
 }
 
@@ -103,7 +108,41 @@ function cidadeFromEmbarque(embarque: string): string {
   return first && first.length > 0 ? first : "Sem localização";
 }
 
-/** RPC security definer contorna RLS que só permitia SELECT ao operador (user_id). */
+/** Reserva atribuída ao motorista OU criada por ele sem outro motorista definido. */
+function transferVisivelMotoristaExecutivo(r: Tables<"reservas_transfer">, userId: string): boolean {
+  const mid = (r.motorista_id ?? "").trim();
+  if (mid === userId) return true;
+  if (r.user_id === userId && mid === "") return true;
+  return false;
+}
+
+function grupoVisivelMotoristaExecutivo(r: Tables<"reservas_grupos">, userId: string): boolean {
+  if (r.motorista_id != null && r.motorista_id === userId) return true;
+  if (r.user_id === userId && r.motorista_id == null) return true;
+  return false;
+}
+
+/** Fallback quando a RPC ainda não foi aplicada ou retorna vazio. */
+async function loadReservasViaFallback(userId: string): Promise<{
+  transfers: Tables<"reservas_transfer">[];
+  grupos: Tables<"reservas_grupos">[];
+}> {
+  const [tRes, gRes] = await Promise.all([
+    supabase.from("reservas_transfer").select("*").or(`motorista_id.eq.${userId},user_id.eq.${userId}`),
+    supabase.from("reservas_grupos").select("*").or(`motorista_id.eq.${userId},user_id.eq.${userId}`),
+  ]);
+  if (tRes.error) throw tRes.error;
+  if (gRes.error) throw gRes.error;
+  const transfers = ((tRes.data || []) as Tables<"reservas_transfer">[]).filter((r) =>
+    transferVisivelMotoristaExecutivo(r, userId),
+  );
+  const grupos = ((gRes.data || []) as Tables<"reservas_grupos">[]).filter((r) =>
+    grupoVisivelMotoristaExecutivo(r, userId),
+  );
+  return { transfers, grupos };
+}
+
+/** RPC security definer + regras operador/motorista (ver migration). */
 async function loadReservasAtribuidas(userId: string): Promise<{
   transfers: Tables<"reservas_transfer">[];
   grupos: Tables<"reservas_grupos">[];
@@ -111,22 +150,13 @@ async function loadReservasAtribuidas(userId: string): Promise<{
   const { data: rpcData, error: rpcErr } = await supabase.rpc("get_motorista_abrangencia_reservas");
   if (!rpcErr && rpcData != null && typeof rpcData === "object") {
     const raw = rpcData as { transfer?: unknown; grupos?: unknown };
-    return {
-      transfers: Array.isArray(raw.transfer) ? (raw.transfer as Tables<"reservas_transfer">[]) : [],
-      grupos: Array.isArray(raw.grupos) ? (raw.grupos as Tables<"reservas_grupos">[]) : [],
-    };
+    const transfers = Array.isArray(raw.transfer) ? (raw.transfer as Tables<"reservas_transfer">[]) : [];
+    const grupos = Array.isArray(raw.grupos) ? (raw.grupos as Tables<"reservas_grupos">[]) : [];
+    if (transfers.length + grupos.length > 0) {
+      return { transfers, grupos };
+    }
   }
-
-  const [tRes, gRes] = await Promise.all([
-    supabase.from("reservas_transfer").select("*").eq("motorista_id", userId),
-    supabase.from("reservas_grupos").select("*").eq("motorista_id", userId),
-  ]);
-  if (tRes.error) throw tRes.error;
-  if (gRes.error) throw gRes.error;
-  return {
-    transfers: (tRes.data || []) as Tables<"reservas_transfer">[],
-    grupos: (gRes.data || []) as Tables<"reservas_grupos">[],
-  };
+  return loadReservasViaFallback(userId);
 }
 
 export default function MotoristaAbrangencia() {
@@ -339,8 +369,9 @@ export default function MotoristaAbrangencia() {
           </h1>
           <p className="text-muted-foreground mt-1">
             Mapa com as viagens nas quais você possui <strong className="font-medium text-foreground">reserva registrada</strong>.
-            Cada reserva gera <strong className="font-medium text-foreground">um único PIN</strong>, usando o local de embarque da{" "}
-            <strong className="font-medium text-foreground">primeira partida</strong> (Transfer: ida ou início “por hora”; Grupos: embarque).
+            Cada reserva gera <strong className="font-medium text-foreground">um único PIN</strong>, usando apenas o{" "}
+            <strong className="font-medium text-foreground">primeiro endereço de embarque</strong> (se houver vários pontos no mesmo
+            campo, só o primeiro conta; Transfer: ida ou início “por hora”; Grupos: embarque).
             Reservas concluídas continuam no mapa com pin de <strong className="font-medium text-foreground">atendimento realizado</strong>.
             Coordenadas: lista interna de cidades quando possível; senão busca automática (OpenStreetMap).
           </p>
@@ -354,9 +385,9 @@ export default function MotoristaAbrangencia() {
         <Alert>
           <AlertTitle>Nenhuma reserva vinculada à sua conta</AlertTitle>
           <AlertDescription>
-            O mapa só lista viagens em que o campo <strong className="text-foreground">motorista</strong> da reserva (Transfer
-            ou Grupo) aponta para o seu usuário. Peça ao operador para atribuir você na reserva — ou aplique as migrations no
-            Supabase se o mapa não carregar dados.
+            O mapa lista viagens em que você é o <strong className="text-foreground">motorista atribuído</strong> ou em que você
+            criou a reserva e ainda não há outro motorista definido. Se nada aparecer, confira os endereços de embarque e as
+            migrations no Supabase (RPC <span className="font-mono text-xs">get_motorista_abrangencia_reservas</span>).
           </AlertDescription>
         </Alert>
       ) : null}

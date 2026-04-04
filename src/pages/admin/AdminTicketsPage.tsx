@@ -6,8 +6,17 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
-import { Ticket, AlertCircle, Clock, CheckCircle, MessageSquare } from "lucide-react";
+import { Ticket, AlertCircle, Clock, CheckCircle, MessageSquare, Trash2 } from "lucide-react";
 
 interface TicketRow {
   id: string;
@@ -44,6 +53,8 @@ export default function AdminTicketsPage() {
   const [resposta, setResposta] = useState("");
   const [novoStatus, setNovoStatus] = useState("");
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [filtroStatus, setFiltroStatus] = useState("todos");
 
   const fetchTickets = async () => {
@@ -102,6 +113,22 @@ export default function AdminTicketsPage() {
       fetchTickets();
     }
     setSaving(false);
+  };
+
+  const handleDeleteTicket = async () => {
+    if (!selected) return;
+    setDeleting(true);
+    const { error } = await supabase.from("tickets" as any).delete().eq("id", selected.id);
+    setDeleting(false);
+    if (error) {
+      console.error(error);
+      toast.error(error.message || "Erro ao excluir ticket. Verifique permissões no banco.");
+      return;
+    }
+    toast.success("Ticket excluído. Ele não aparecerá mais para você nem para o motorista.");
+    setDeleteDialogOpen(false);
+    setSelected(null);
+    void fetchTickets();
   };
 
   const filtered = filtroStatus === "todos" ? tickets : tickets.filter(t => t.status === filtroStatus);
@@ -223,14 +250,49 @@ export default function AdminTicketsPage() {
                   <p className="text-sm font-medium text-foreground mb-1">Resposta</p>
                   <Textarea value={resposta} onChange={e => setResposta(e.target.value)} rows={4} placeholder="Escreva uma resposta para o motorista..." />
                 </div>
-                <Button onClick={handleSave} disabled={saving} className="w-full">
-                  {saving ? "Salvando..." : "Salvar Alterações"}
-                </Button>
+                <div className="flex flex-col gap-2">
+                  <Button onClick={handleSave} disabled={saving || deleting} className="w-full">
+                    {saving ? "Salvando..." : "Salvar Alterações"}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    className="w-full"
+                    disabled={saving || deleting}
+                    onClick={() => setDeleteDialogOpen(true)}
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Excluir ticket
+                  </Button>
+                </div>
               </div>
             </>
           )}
         </SheetContent>
       </Sheet>
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir este ticket?</AlertDialogTitle>
+            <AlertDialogDescription>
+              O chamado será removido de forma permanente. Ele deixará de aparecer aqui e no painel do motorista que o
+              criou. Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={deleting}
+              onClick={() => void handleDeleteTicket()}
+            >
+              {deleting ? "Excluindo…" : "Excluir definitivamente"}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

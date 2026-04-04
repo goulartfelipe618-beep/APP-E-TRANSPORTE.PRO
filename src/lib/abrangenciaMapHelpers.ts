@@ -1,3 +1,18 @@
+/**
+ * Primeiro ponto de embarque quando há vários endereços no mesmo campo (quebras de linha, `;` ou `|`).
+ * Usado no mapa de Abrangência: um PIN por reserva, só no primeiro embarque.
+ */
+export function primeiroSegmentoEndereco(raw: string | null | undefined): string {
+  if (raw == null) return "";
+  const t = raw.trim();
+  if (!t) return "";
+  const firstLine = t.split(/\r?\n/).map((s) => s.trim()).filter(Boolean)[0] ?? t;
+  const semi = firstLine.split(";").map((s) => s.trim()).filter(Boolean);
+  const afterSemi = semi.length > 1 ? semi[0]! : firstLine;
+  const pipe = afterSemi.split(/\s*\|\s*/).map((s) => s.trim()).filter(Boolean);
+  return pipe.length > 1 ? pipe[0]! : afterSemi;
+}
+
 /** Coordenadas aproximadas do centro urbano; chaves em minúsculas (com acento) — compartilhado entre Admin Abrangência e Motorista Abrangência. */
 
 const rawCityCoords: Record<string, [number, number]> = {

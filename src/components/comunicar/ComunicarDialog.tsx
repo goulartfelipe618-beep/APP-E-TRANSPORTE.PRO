@@ -15,6 +15,10 @@ import {
   jsonSafeRecord,
   type WebhookComunicacaoTipo,
 } from "@/lib/n8nComunicarWebhook";
+import {
+  dadosRegistroComunicarParaWebhook,
+  formatComunicarValorCampo,
+} from "@/lib/comunicarFieldFormat";
 
 interface ComunicarDialogProps {
   open: boolean;
@@ -136,7 +140,11 @@ export default function ComunicarDialog({
     () =>
       Object.entries(dados)
         .filter(([key, value]) => !ignoredKeys.includes(key) && value != null && value !== "")
-        .map(([key, value]) => ({ key, label: labelMap[key] || key, value: String(value) })),
+        .map(([key, value]) => ({
+          key,
+          label: labelMap[key] || key,
+          value: formatComunicarValorCampo(key, value),
+        })),
     [dados],
   );
 
@@ -175,7 +183,9 @@ export default function ComunicarDialog({
           momento: new Date().toISOString(),
           titulo_modal: titulo,
           telefone_cliente: telefone?.replace(/\D/g, "") || null,
-          dados_registro: jsonSafeRecord(dadosRef.current as Record<string, unknown>),
+          dados_registro: dadosRegistroComunicarParaWebhook(
+            jsonSafeRecord(dadosRef.current as Record<string, unknown>) as Record<string, unknown>,
+          ),
           variaveis_disponiveis: Object.entries(dadosRef.current)
             .filter(([k, v]) => !ignoredKeys.includes(k) && v != null && v !== "")
             .map(([k]) => k),
@@ -320,7 +330,9 @@ export default function ComunicarDialog({
           titulo_modal: titulo,
           telefone_cliente: phone || null,
           telefone_cliente_disponivel: Boolean(phone),
-          dados_registro: jsonSafeRecord(dadosRef.current as Record<string, unknown>),
+          dados_registro: dadosRegistroComunicarParaWebhook(
+            jsonSafeRecord(dadosRef.current as Record<string, unknown>) as Record<string, unknown>,
+          ),
           variaveis_chaves_incluidas: [...selectedVars],
           mensagem_completa: message,
           mensagem_partes: {

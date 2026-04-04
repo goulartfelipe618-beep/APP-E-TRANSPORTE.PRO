@@ -1,7 +1,7 @@
 import {
   LayoutDashboard, Home, Activity, MapPin, Car,
   Phone, CheckCircle, Users, Settings, StickyNote,
-  Bell, Moon, LogOut, Globe, ClipboardList,
+  Bell, Moon, Sun, LogOut, Globe, ClipboardList,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/collapsible";
 import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { usePanelTheme } from "@/hooks/usePanelTheme";
 import { useConfiguracoes } from "@/contexts/ConfiguracoesContext";
 import { useActivePage } from "@/contexts/ActivePageContext";
 
@@ -67,6 +68,7 @@ export function TaxiSidebar() {
   const navigate = useNavigate();
   const { config } = useConfiguracoes();
   const { activePage, setActivePage } = useActivePage();
+  const { darkMode, toggle: toggleTheme } = usePanelTheme("taxi");
 
   const isActive = (page: string) => activePage === page;
   const isGroupActive = (children: { page: string }[]) =>
@@ -170,9 +172,9 @@ export function TaxiSidebar() {
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>
-            <SidebarMenuButton className="w-full">
-              <Moon className="h-4 w-4 mr-2" />
-              {!collapsed && <span>Modo Escuro</span>}
+            <SidebarMenuButton className="w-full" onClick={() => void toggleTheme()}>
+              {darkMode ? <Sun className="h-4 w-4 mr-2" /> : <Moon className="h-4 w-4 mr-2" />}
+              {!collapsed && <span>{darkMode ? "Modo Claro" : "Modo Escuro"}</span>}
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>

@@ -9,6 +9,9 @@ import { toast } from "sonner";
 import type { Tables } from "@/integrations/supabase/types";
 import { AlertTriangle, Loader2, Pencil, Save, X } from "lucide-react";
 import { sanitizeApiKey } from "@/lib/evolutionApi";
+import { cn } from "@/lib/utils";
+
+const EVO_KEY_MASK = "••••••••••••••••••••";
 
 const ROW_ID = "00000000-0000-0000-0000-000000000001";
 
@@ -71,6 +74,8 @@ export default function ComunicadorAdminMasterPage() {
   const [evoUrl, setEvoUrl] = useState("");
   const [evoKey, setEvoKey] = useState("");
   const [evoCredsExist, setEvoCredsExist] = useState(false);
+  /** Só `false` quando há credencial salva e o admin clicou em Editar. */
+  const [evoEditing, setEvoEditing] = useState(true);
   const [savingKey, setSavingKey] = useState<UrlKey | null>(null);
   const [server, setServer] = useState<Record<UrlKey, string>>(emptyDraft);
   const [draft, setDraft] = useState<Record<UrlKey, string>>(emptyDraft);
@@ -135,9 +140,12 @@ export default function ComunicadorAdminMasterPage() {
       .select("api_url, api_key")
       .eq("comunicador_id", sys.id)
       .maybeSingle();
-    setEvoUrl((cr?.api_url as string)?.trim() || "");
+    const url = (cr?.api_url as string)?.trim() || "";
+    const hasKey = Boolean((cr?.api_key as string)?.trim());
+    setEvoUrl(url);
     setEvoKey("");
-    setEvoCredsExist(Boolean((cr?.api_key as string)?.trim()));
+    setEvoCredsExist(hasKey);
+    setEvoEditing(!(hasKey && url));
     setEvoLoading(false);
   }, []);
 
@@ -191,6 +199,7 @@ export default function ComunicadorAdminMasterPage() {
       toast.success("Credenciais da Evolution salvas. Os motoristas poderão gerar QR no comunicador próprio.");
       setEvoCredsExist(true);
       setEvoKey("");
+      setEvoEditing(false);
       await loadEvolutionCreds();
     } catch (e) {
       console.error(e);
@@ -198,6 +207,19 @@ export default function ComunicadorAdminMasterPage() {
     } finally {
       setEvoSaving(false);
     }
+  };
+
+  const evoLocked = Boolean(evoCredsExist && evoUrl.trim() && !evoEditing);
+
+  const startEvoEdit = () => {
+    setEvoEditing(true);
+    setEvoKey("");
+  };
+
+  const cancelEvoEdit = async () => {
+    setEvoKey("");
+    setEvoEditing(false);
+    await loadEvolutionCreds();
   };
 
   const isLocked = (k: UrlKey) => Boolean(server[k]?.trim()) && !editing[k];
@@ -262,37 +284,82 @@ export default function ComunicadorAdminMasterPage() {
             </p>
           ) : (
             <>
-              <div className="space-y-2">
-                <Label htmlFor="evo-url">URL da Evolution API</Label>
-                <Input
-                  id="evo-url"
-                  type="url"
-                  autoComplete="off"
-                  placeholder="https://seu-servidor-evolution.com"
-                  value={evoUrl}
-                  onChange={(e) => setEvoUrl(e.target.value)}
-                  className="font-mono text-sm"
-                />
+              <div className="relative rounded-lg border border-border/80 bg-muted/20">
+                {evoLocked && (
+                  <>
+                    <div
+                      className="pointer-events-auto absolute inset-0 z-[1] rounded-lg bg-background/75 dark:bg-black/50 backdrop-blur-[1px]"
+                      aria-hidden
+                    />
+                    <p className="absolute left-3 top-2 z-[2] text-xs font-medium text-muted-foreground">
+                      Configuração ativa — clique em Editar para alterar
+                    </p>
+                  </>
+                )}
+                <div
+                  className={cn(
+                    "space-y-4 p-4 pt-8",
+                    evoLocked && "pointer-events-none select-none opacity-70",
+                  )}
+                >
+                  <div className="space-y-2">
+                    <Label htmlFor="evo-url">URL da Evolution API</Label>
+                    <Input
+                      id="evo-url"
+                      type="url"
+                      autoComplete="off"
+                      placeholder="https://seu-servidor-evolution.com"
+                      value={evoUrl}
+                      onChange={(e) => setEvoUrl(e.target.value)}
+                      readOnly={evoLocked}
+                      className={cn("font-mono text-sm", evoLocked && "bg-muted/90")}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="evo-key">API Key (Authentication)</Label>
+                    <Input
+                      id="evo-key"
+                      type={evoLocked ? "text" : "password"}
+                      autoComplete="new-password"
+                      placeholder={
+                        evoEditing && evoCredsExist
+                          ? "Deixe em branco para manter a chave atual"
+                          : "Cole a API Key"
+                      }
+                      value={evoLocked && evoCredsExist ? EVO_KEY_MASK : evoKey}
+                      onChange={(e) => setEvoKey(e.target.value)}
+                      readOnly={evoLocked}
+                      className={cn("font-mono text-sm", evoLocked && "tracking-widest text-foreground")}
+                    />
+                    {evoEditing && evoCredsExist ? (
+                      <p className="text-xs text-muted-foreground">
+                        Chave já cadastrada. Informe uma nova API Key apenas se quiser substituir.
+                      </p>
+                    ) : null}
+                  </div>
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="evo-key">API Key (Authentication)</Label>
-                <Input
-                  id="evo-key"
-                  type="password"
-                  autoComplete="new-password"
-                  placeholder={evoCredsExist ? "Deixe em branco para manter a chave atual" : "Cole a API Key"}
-                  value={evoKey}
-                  onChange={(e) => setEvoKey(e.target.value)}
-                  className="font-mono text-sm"
-                />
-                {evoCredsExist ? (
-                  <p className="text-xs text-muted-foreground">Chave já cadastrada. Preencha só se quiser substituir.</p>
-                ) : null}
+              <div className="flex flex-wrap gap-2">
+                {evoLocked ? (
+                  <Button type="button" variant="outline" onClick={startEvoEdit}>
+                    <Pencil className="h-4 w-4 mr-2" />
+                    Editar
+                  </Button>
+                ) : (
+                  <>
+                    <Button type="button" onClick={() => void saveEvolutionCreds()} disabled={evoSaving}>
+                      {evoSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
+                      Salvar credenciais Evolution
+                    </Button>
+                    {evoCredsExist && evoUrl.trim() ? (
+                      <Button type="button" variant="ghost" onClick={() => void cancelEvoEdit()}>
+                        <X className="h-4 w-4 mr-2" />
+                        Cancelar
+                      </Button>
+                    ) : null}
+                  </>
+                )}
               </div>
-              <Button type="button" onClick={() => void saveEvolutionCreds()} disabled={evoSaving}>
-                {evoSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                Salvar credenciais Evolution
-              </Button>
             </>
           )}
         </CardContent>

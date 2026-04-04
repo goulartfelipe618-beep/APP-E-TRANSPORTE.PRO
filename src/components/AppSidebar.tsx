@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
+import { usePanelTheme } from "@/hooks/usePanelTheme";
 import {
   LayoutDashboard, Home, Activity, MapPin, ArrowLeftRight,
   FileText, BookOpen, Map, Users, UserCheck, Handshake,
   ClipboardList, CalendarDays, Car, Megaphone, BarChart3,
   Globe, Search, Mail, Monitor, Settings, StickyNote,
-  Bell, Moon, LogOut, GraduationCap, Plane,
+  Bell, Moon, Sun, LogOut, GraduationCap, Plane,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -122,6 +123,7 @@ export function AppSidebar() {
   const navigate = useNavigate();
   const { config } = useConfiguracoes();
   const { activePage, setActivePage } = useActivePage();
+  const { darkMode, toggle: toggleTheme } = usePanelTheme("frota");
   const [networkAceito, setNetworkAceito] = useState(() => localStorage.getItem("network_nacional_aceito") === "sim");
   const [showNetworkHighlight, setShowNetworkHighlight] = useState(readNetworkSpotlightHighlight);
 
@@ -326,9 +328,9 @@ export function AppSidebar() {
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>
-            <SidebarMenuButton className="w-full">
-              <Moon className="h-4 w-4 mr-2" />
-              {!collapsed && <span>Modo Escuro</span>}
+            <SidebarMenuButton className="w-full" onClick={() => void toggleTheme()}>
+              {darkMode ? <Sun className="h-4 w-4 mr-2" /> : <Moon className="h-4 w-4 mr-2" />}
+              {!collapsed && <span>{darkMode ? "Modo Claro" : "Modo Escuro"}</span>}
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>

@@ -1,4 +1,6 @@
+import { useLayoutEffect } from "react";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { syncPanelThemeForCurrentUser } from "@/lib/panelTheme";
 import PageLoader from "@/components/PageLoader";
 import { TaxiSidebar } from "@/components/TaxiSidebar";
 import { Car } from "lucide-react";
@@ -35,6 +37,10 @@ const PAGE_MAP: Record<string, React.ComponentType> = {
 function TaxiContent() {
   const { activePage } = useActivePage();
   const PageComponent = PAGE_MAP[activePage] || TaxiHome;
+
+  useLayoutEffect(() => {
+    syncPanelThemeForCurrentUser("taxi");
+  }, []);
 
   return (
     <div className="min-h-screen flex w-full">
