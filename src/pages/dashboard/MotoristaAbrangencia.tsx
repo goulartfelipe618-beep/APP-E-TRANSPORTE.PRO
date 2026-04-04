@@ -4,10 +4,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import L from "leaflet";
 import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import "leaflet/dist/leaflet.css";
 import { nominatimGeocode, nominatimDelayMs } from "@/lib/nominatimGeocode";
 import { findCoords, sleep } from "@/lib/abrangenciaMapHelpers";
 import { Tables } from "@/integrations/supabase/types";
+import { toast } from "sonner";
 
 delete (L.Icon.Default.prototype as any)._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -101,6 +103,32 @@ function cidadeFromEmbarque(embarque: string): string {
   return first && first.length > 0 ? first : "Sem localização";
 }
 
+/** RPC security definer contorna RLS que só permitia SELECT ao operador (user_id). */
+async function loadReservasAtribuidas(userId: string): Promise<{
+  transfers: Tables<"reservas_transfer">[];
+  grupos: Tables<"reservas_grupos">[];
+}> {
+  const { data: rpcData, error: rpcErr } = await supabase.rpc("get_motorista_abrangencia_reservas");
+  if (!rpcErr && rpcData != null && typeof rpcData === "object") {
+    const raw = rpcData as { transfer?: unknown; grupos?: unknown };
+    return {
+      transfers: Array.isArray(raw.transfer) ? (raw.transfer as Tables<"reservas_transfer">[]) : [],
+      grupos: Array.isArray(raw.grupos) ? (raw.grupos as Tables<"reservas_grupos">[]) : [],
+    };
+  }
+
+  const [tRes, gRes] = await Promise.all([
+    supabase.from("reservas_transfer").select("*").eq("motorista_id", userId),
+    supabase.from("reservas_grupos").select("*").eq("motorista_id", userId),
+  ]);
+  if (tRes.error) throw tRes.error;
+  if (gRes.error) throw gRes.error;
+  return {
+    transfers: (tRes.data || []) as Tables<"reservas_transfer">[],
+    grupos: (gRes.data || []) as Tables<"reservas_grupos">[],
+  };
+}
+
 export default function MotoristaAbrangencia() {
   const [pins, setPins] = useState<ReservaPin[]>([]);
   const [loading, setLoading] = useState(true);
@@ -108,6 +136,8 @@ export default function MotoristaAbrangencia() {
   const [totalReservas, setTotalReservas] = useState(0);
   const [pinsLista, setPinsLista] = useState(0);
   const [pinsOsm, setPinsOsm] = useState(0);
+  /** Total de reservas (transfer+grupo) com motorista_id = você, antes de filtrar embarque/geocódigo */
+  const [atribuidasNoBanco, setAtribuidasNoBanco] = useState<number | null>(null);
 
   const jitter = useMemo(() => () => (Math.random() - 0.5) * 0.02, []);
 
@@ -121,19 +151,24 @@ export default function MotoristaAbrangencia() {
         setTotalReservas(0);
         setPinsLista(0);
         setPinsOsm(0);
+        setAtribuidasNoBanco(null);
         return;
       }
 
-      const [tRes, gRes] = await Promise.all([
-        supabase.from("reservas_transfer").select("*").eq("motorista_id", user.id),
-        supabase.from("reservas_grupos").select("*").eq("motorista_id", user.id),
-      ]);
-
-      if (tRes.error) console.error(tRes.error);
-      if (gRes.error) console.error(gRes.error);
-
-      const transfers = (tRes.data || []) as Tables<"reservas_transfer">[];
-      const grupos = (gRes.data || []) as Tables<"reservas_grupos">[];
+      let transfers: Tables<"reservas_transfer">[] = [];
+      let grupos: Tables<"reservas_grupos">[] = [];
+      try {
+        const loaded = await loadReservasAtribuidas(user.id);
+        transfers = loaded.transfers;
+        grupos = loaded.grupos;
+        setAtribuidasNoBanco(transfers.length + grupos.length);
+      } catch (e) {
+        console.error(e);
+        setAtribuidasNoBanco(null);
+        toast.error("Não foi possível carregar suas reservas.", {
+          description: "Confirme se as migrations do Supabase foram aplicadas (RPC get_motorista_abrangencia_reservas).",
+        });
+      }
 
       const pendentes: ReservaPendente[] = [];
 
@@ -270,19 +305,8 @@ export default function MotoristaAbrangencia() {
 
   useEffect(() => {
     void fetchData();
-    const channel = supabase
-      .channel("motorista-abrangencia-reservas")
-      .on("postgres_changes", { event: "*", schema: "public", table: "reservas_transfer" }, () => {
-        void fetchData();
-      })
-      .on("postgres_changes", { event: "*", schema: "public", table: "reservas_grupos" }, () => {
-        void fetchData();
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    const id = window.setInterval(() => void fetchData(), 90_000);
+    return () => window.clearInterval(id);
   }, [fetchData]);
 
   if (loading) {
@@ -325,6 +349,17 @@ export default function MotoristaAbrangencia() {
           <RefreshCw className="h-4 w-4" />
         </Button>
       </div>
+
+      {atribuidasNoBanco === 0 ? (
+        <Alert>
+          <AlertTitle>Nenhuma reserva vinculada à sua conta</AlertTitle>
+          <AlertDescription>
+            O mapa só lista viagens em que o campo <strong className="text-foreground">motorista</strong> da reserva (Transfer
+            ou Grupo) aponta para o seu usuário. Peça ao operador para atribuir você na reserva — ou aplique as migrations no
+            Supabase se o mapa não carregar dados.
+          </AlertDescription>
+        </Alert>
+      ) : null}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 rounded-xl border border-border overflow-hidden" style={{ height: 500 }}>

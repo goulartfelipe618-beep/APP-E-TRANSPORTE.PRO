@@ -1664,6 +1664,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      get_motorista_abrangencia_reservas: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
     }
     Enums: {
       app_role: "admin_transfer" | "admin_taxi" | "admin_master"
