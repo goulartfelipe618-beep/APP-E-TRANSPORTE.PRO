@@ -34,12 +34,12 @@ const getMenuStructure = (showNetwork: boolean) => [
   {
     label: "Principal",
     items: [
-      { title: "Abrangência", page: "abrangencia", icon: MapPin },
       {
         title: "Painel",
         icon: LayoutDashboard,
         children: [
           { title: "Home", page: "home", icon: Home },
+          { title: "Abrangência", page: "abrangencia", icon: MapPin },
           { title: "Atualizações", page: "atualizacoes", icon: Bell },
           { title: "Métricas", page: "metricas", icon: Activity },
         ],
