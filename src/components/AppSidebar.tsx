@@ -167,7 +167,7 @@ export function AppSidebar() {
       <div
         className={cn(
           "p-4 flex items-center gap-3 border-b border-border",
-          showNetworkHighlight && "relative z-30 opacity-40 pointer-events-none",
+          showNetworkHighlight && "relative z-30 opacity-40",
         )}
       >
         {config.logo_url ? (
@@ -198,7 +198,7 @@ export function AppSidebar() {
                       <Collapsible
                         key={item.title}
                         defaultOpen={groupActive}
-                        className={cn(showNetworkHighlight && "opacity-40 pointer-events-none")}
+                        className={cn(showNetworkHighlight && "opacity-40")}
                       >
                         <SidebarMenuItem>
                           <CollapsibleTrigger asChild>
@@ -242,8 +242,8 @@ export function AppSidebar() {
                       key={item.title}
                       className={cn(
                         "relative",
-                        dimFlat && "opacity-40 pointer-events-none",
-                        isNetworkItem && showNetworkHighlight && "z-40 opacity-100 pointer-events-auto",
+                        dimFlat && "opacity-40",
+                        isNetworkItem && showNetworkHighlight && "z-40 opacity-100",
                         isDisparador && collapsed && "pt-3",
                       )}
                     >
@@ -315,7 +315,7 @@ export function AppSidebar() {
       <SidebarFooter
         className={cn(
           "border-t border-border",
-          showNetworkHighlight && "relative z-30 opacity-40 pointer-events-none",
+          showNetworkHighlight && "relative z-30 opacity-40",
         )}
       >
         <SidebarMenu>
