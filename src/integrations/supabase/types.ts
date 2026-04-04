@@ -14,6 +14,48 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_avisos_plataforma: {
+        Row: {
+          ativo: boolean
+          cor: string
+          created_at: string
+          escopo_global: boolean
+          id: string
+          incluir_motorista: boolean
+          incluir_taxi: boolean
+          paginas_motorista: string[] | null
+          paginas_taxi: string[] | null
+          texto: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          cor?: string
+          created_at?: string
+          escopo_global?: boolean
+          id?: string
+          incluir_motorista?: boolean
+          incluir_taxi?: boolean
+          paginas_motorista?: string[] | null
+          paginas_taxi?: string[] | null
+          texto: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          cor?: string
+          created_at?: string
+          escopo_global?: boolean
+          id?: string
+          incluir_motorista?: boolean
+          incluir_taxi?: boolean
+          paginas_motorista?: string[] | null
+          paginas_taxi?: string[] | null
+          texto?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       anotacoes: {
         Row: {
           conteudo: string | null

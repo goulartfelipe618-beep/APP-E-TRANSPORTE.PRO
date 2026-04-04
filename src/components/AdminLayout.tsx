@@ -23,6 +23,7 @@ import AdminTicketsPage from "@/pages/admin/AdminTicketsPage";
 import AdminMentoriaPage from "@/pages/admin/AdminMentoriaPage";
 import AdminEmptyLegsPage from "@/pages/admin/AdminEmptyLegsPage";
 import AdminCommunityPage from "@/pages/admin/AdminCommunityPage";
+import AdminAvisosPage from "@/pages/admin/AdminAvisosPage";
 
 const PAGE_MAP: Record<string, React.ComponentType> = {
   metricas: AdminMetricasPage,
@@ -39,6 +40,7 @@ const PAGE_MAP: Record<string, React.ComponentType> = {
   "sistema/configuracoes": SistemaConfiguracoesPage,
   "sistema/automacoes": AdminAutomacoesPage,
   "sistema/comunicador": ComunicadorAdminMasterPage,
+  "sistema/avisos": AdminAvisosPage,
   "sistema/anotacoes": AnotacoesPage,
   tickets: AdminTicketsPage,
   mentoria: AdminMentoriaPage,

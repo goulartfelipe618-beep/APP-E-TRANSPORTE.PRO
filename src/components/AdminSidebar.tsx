@@ -1,5 +1,5 @@
 import {
-  SlidersHorizontal, LogOut, Shield, BarChart3, MapPin, FileText, ChevronDown, Users, ClipboardList, Building2, LayoutTemplate, Bell, Moon, Sun, Settings, StickyNote, MessageSquare, Zap, GraduationCap, Plane,
+  SlidersHorizontal, LogOut, Shield, BarChart3, MapPin, FileText, ChevronDown, Users, ClipboardList, Building2, LayoutTemplate, Bell, Moon, Sun, Settings, StickyNote, MessageSquare, Zap, GraduationCap, Plane, Megaphone,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
@@ -40,6 +40,7 @@ const sistemaChildren = [
   { title: "Configurações", page: "sistema/configuracoes", icon: Settings },
   { title: "Automações", page: "sistema/automacoes", icon: Zap },
   { title: "Comunicador", page: "sistema/comunicador", icon: MessageSquare },
+  { title: "Avisos", page: "sistema/avisos", icon: Megaphone },
   { title: "Anotações", page: "sistema/anotacoes", icon: StickyNote },
 ];
 
