@@ -12,7 +12,7 @@ import { hydrateNetworkNacionalFromDb, persistNetworkHighlightDismissed } from "
 // Import all page components
 import HomePage from "@/pages/dashboard/Home";
 import MetricasPage from "@/pages/dashboard/Metricas";
-import PlaceholderPage from "@/pages/dashboard/Placeholder";
+import MotoristaAbrangenciaPage from "@/pages/dashboard/MotoristaAbrangencia";
 import TransferSolicitacoesPage from "@/pages/dashboard/TransferSolicitacoes";
 import TransferReservasPage from "@/pages/dashboard/TransferReservas";
 import TransferContratoPage from "@/pages/dashboard/TransferContrato";
@@ -48,7 +48,7 @@ const PAGE_MAP: Record<string, React.ComponentType> = {
   home: HomePage,
   atualizacoes: AtualizacoesPage,
   metricas: MetricasPage,
-  abrangencia: PlaceholderPage,
+  abrangencia: MotoristaAbrangenciaPage,
   "transfer/solicitacoes": TransferSolicitacoesPage,
   "transfer/reservas": TransferReservasPage,
   "transfer/contrato": TransferContratoPage,

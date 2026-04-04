@@ -56,7 +56,7 @@ function buildHomeSections(showNetwork: boolean): MajorSection[] {
       items: [
         { title: "Atualizações", page: "atualizacoes", desc: "Novidades da plataforma e avisos importantes.", icon: Bell },
         { title: "Métricas", page: "metricas", desc: "Indicadores e desempenho da operação.", icon: Activity },
-        { title: "Abrangência", page: "abrangencia", desc: "Área de atuação e presença no mapa.", icon: MapPin },
+        { title: "Abrangência", page: "abrangencia", desc: "Mapa das suas reservas (um PIN por viagem, embarque da primeira partida).", icon: MapPin },
       ],
     },
     {

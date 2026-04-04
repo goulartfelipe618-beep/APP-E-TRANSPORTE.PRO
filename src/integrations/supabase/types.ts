@@ -880,6 +880,7 @@ export type Database = {
           hora_retorno: string | null
           id: string
           metodo_pagamento: string | null
+          motorista_id: string | null
           nome_completo: string
           nome_motorista: string | null
           num_passageiros: number | null
@@ -909,6 +910,7 @@ export type Database = {
           hora_retorno?: string | null
           id?: string
           metodo_pagamento?: string | null
+          motorista_id?: string | null
           nome_completo: string
           nome_motorista?: string | null
           num_passageiros?: number | null
@@ -938,6 +940,7 @@ export type Database = {
           hora_retorno?: string | null
           id?: string
           metodo_pagamento?: string | null
+          motorista_id?: string | null
           nome_completo?: string
           nome_motorista?: string | null
           num_passageiros?: number | null
