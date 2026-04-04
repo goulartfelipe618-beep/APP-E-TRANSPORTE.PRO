@@ -12,7 +12,7 @@ as $$
       (
         select json_agg(row_to_json(r))
         from public.reservas_transfer r
-        where r.motorista_id = auth.uid()
+        where trim(r.motorista_id) = auth.uid()::text
       ),
       '[]'::json
     ),
