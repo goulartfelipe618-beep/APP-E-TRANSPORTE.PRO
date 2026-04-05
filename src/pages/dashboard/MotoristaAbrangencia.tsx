@@ -3,6 +3,7 @@ import { MapPin, RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import L from "leaflet";
+import { leafletDefaultMarkerIcon } from "@/lib/leafletDefaultIcon";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import "leaflet/dist/leaflet.css";
@@ -10,13 +11,6 @@ import { nominatimGeocode, nominatimDelayMs } from "@/lib/nominatimGeocode";
 import { findCoords, primeiroSegmentoEndereco, sleep } from "@/lib/abrangenciaMapHelpers";
 import { Tables } from "@/integrations/supabase/types";
 import { toast } from "sonner";
-
-delete (L.Icon.Default.prototype as any)._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png",
-  iconUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png",
-  shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png",
-});
 
 /** Ícone verde com ✓ — atendimento realizado (reserva concluída). */
 const iconConcluida = L.divIcon({
@@ -400,7 +394,7 @@ export default function MotoristaAbrangencia() {
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             />
             {pins.map((pin) => (
-              <Marker key={pin.reservaKey} position={pin.coords} icon={pin.concluida ? iconConcluida : undefined}>
+              <Marker key={pin.reservaKey} position={pin.coords} icon={pin.concluida ? iconConcluida : leafletDefaultMarkerIcon}>
                 <Popup>
                   <div className="text-sm max-w-[240px]">
                     <strong>

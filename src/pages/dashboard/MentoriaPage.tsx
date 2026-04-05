@@ -46,14 +46,24 @@ export default function MentoriaPage() {
       }
 
       if (user) {
-        const { data: prog } = await (supabase
-          .from("mentoria_progresso" as any)
-          .select("card_id, concluido")
-          .eq("user_id", user.id) as any);
-        if (prog) {
+        const { data: rpcRows, error: rpcErr } = await supabase.rpc("get_my_mentoria_progress");
+        const rows = !rpcErr && rpcRows ? rpcRows : null;
+        if (rows) {
           const map: Record<string, boolean> = {};
-          prog.forEach((p: any) => { if (p.concluido) map[p.card_id] = true; });
+          rows.forEach((p) => { if (p.concluido) map[p.card_id] = true; });
           setProgresso(map);
+        } else {
+          const { data: prog, error: progErr } = await (supabase
+            .from("mentoria_progresso" as any)
+            .select("card_id, concluido")
+            .eq("user_id", user.id) as any);
+          if (progErr) {
+            console.warn("[Mentoria] progresso:", rpcErr?.message ?? progErr.message);
+          } else if (prog) {
+            const map: Record<string, boolean> = {};
+            prog.forEach((p: any) => { if (p.concluido) map[p.card_id] = true; });
+            setProgresso(map);
+          }
         }
       }
     };

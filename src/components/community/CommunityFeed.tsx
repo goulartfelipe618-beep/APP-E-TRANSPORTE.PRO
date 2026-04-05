@@ -423,7 +423,11 @@ export default function CommunityFeed() {
         .eq("user_id", currentUserId);
       if (error) toast.error("Erro ao remover curtida");
     } else {
-      const { error } = await supabase.from("community_post_likes").insert({ post_id: postId, user_id: currentUserId });
+      // PK (post_id, user_id): insert duplicado retorna 409 — upsert com ignore evita corrida / duplo clique.
+      const { error } = await supabase.from("community_post_likes").upsert(
+        { post_id: postId, user_id: currentUserId },
+        { onConflict: "post_id,user_id", ignoreDuplicates: true },
+      );
       if (error) toast.error("Erro ao curtir publicação");
     }
     void fetchAll({ silent: true });

@@ -1710,6 +1710,13 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: Json
       }
+      get_my_mentoria_progress: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          card_id: string
+          concluido: boolean
+        }[]
+      }
     }
     Enums: {
       app_role: "admin_transfer" | "admin_taxi" | "admin_master"

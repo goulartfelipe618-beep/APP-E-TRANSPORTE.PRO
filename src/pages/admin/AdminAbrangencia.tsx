@@ -2,18 +2,11 @@ import { useState, useEffect, useCallback } from "react";
 import { MapPin, RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
-import L from "leaflet";
+import { leafletDefaultMarkerIcon } from "@/lib/leafletDefaultIcon";
 import { Button } from "@/components/ui/button";
 import "leaflet/dist/leaflet.css";
 import { nominatimGeocode, nominatimDelayMs } from "@/lib/nominatimGeocode";
 import { chunk, findCoords, sleep } from "@/lib/abrangenciaMapHelpers";
-
-delete (L.Icon.Default.prototype as any)._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png",
-  iconUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png",
-  shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png",
-});
 
 type LocSource = "mapbox" | "lista" | "osm";
 
@@ -239,7 +232,7 @@ export default function AdminAbrangencia() {
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             />
             {pins.map((pin) => (
-              <Marker key={pin.userId} position={pin.coords}>
+              <Marker key={pin.userId} position={pin.coords} icon={leafletDefaultMarkerIcon}>
                 <Popup>
                   <div className="text-sm max-w-[240px]">
                     <strong>{pin.nome}</strong>
