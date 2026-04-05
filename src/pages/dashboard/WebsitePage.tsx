@@ -7,7 +7,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  ArrowLeft, ArrowRight, Monitor, Eye, Check,
+  ArrowLeft, ArrowRight, Eye, Check,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -17,11 +17,12 @@ import { ExternalLink, CheckCircle2, Calendar, Info } from "lucide-react";
 import SlideCarousel from "@/components/SlideCarousel";
 import { useUserPlan } from "@/hooks/useUserPlan";
 import UpgradePlanDialog from "@/components/planos/UpgradePlanDialog";
+import { useActivePage } from "@/contexts/ActivePageContext";
+import { usePurchasedDomains } from "@/hooks/usePurchasedDomains";
 import {
-  DomainSelectionCard,
-  canAdvanceFromDomainSelection,
-  type DomainOption,
-} from "@/components/domain/DomainSelectionCard";
+  PurchasedDomainSelectStep,
+  REGISTER_NEW_DOMAIN_VALUE,
+} from "@/components/domain/PurchasedDomainSelectStep";
 
 interface TemplateDB {
   id: string;
@@ -76,7 +77,7 @@ const PRICE_OPTIONS = ["Econômico", "Intermediário", "Premium", "Luxo"];
 
 // ── Steps config ─────────────────────────────────────
 const STEPS = [
-  { n: 1, label: "Domínio" },
+  { n: 1, label: "Marca" },
   { n: 2, label: "Empresa" },
   { n: 3, label: "Serviços" },
   { n: 4, label: "Aeroportos" },
@@ -124,8 +125,9 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 // ══════════════════════════════════════════════════════
 export default function WebsitePage() {
+  const { setActivePage } = useActivePage();
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
-  const [step, setStep] = useState<"gallery" | "briefing" | "servico_ativo">("gallery");
+  const [step, setStep] = useState<"gallery" | "domain_pick" | "briefing" | "servico_ativo">("gallery");
   const [bs, setBs] = useState(1); // briefing step
   const [submitting, setSubmitting] = useState(false);
   const [servicoAtivo, setServicoAtivo] = useState<any>(null);
@@ -133,20 +135,15 @@ export default function WebsitePage() {
   const { plano, refetch: refetchPlano } = useUserPlan();
   const [upgradeOpen, setUpgradeOpen] = useState(false);
 
-  // Step 1 - Domínio (alinhado ao wizard E-mail Business)
+  /** Domínio escolhido na etapa dedicada (lista de comprados ou fluxo legado). */
   const [domain, setDomain] = useState("");
-  const [domainOption, setDomainOption] = useState<DomainOption>("new");
+  const [domainOption, setDomainOption] = useState<"new" | "existing">("existing");
+  const [purchasedDomainId, setPurchasedDomainId] = useState<string | null>(null);
   const [provider, setProvider] = useState("");
-  const [domainChecked, setDomainChecked] = useState(false);
-  const [domainAvailable, setDomainAvailable] = useState<boolean | null>(null);
-  const [domainMessage, setDomainMessage] = useState("");
-  const [checkingDomain, setCheckingDomain] = useState(false);
 
-  const resetDomainCheck = () => {
-    setDomainChecked(false);
-    setDomainAvailable(null);
-    setDomainMessage("");
-  };
+  const [domainPickSelect, setDomainPickSelect] = useState<string>("");
+  const domainPickEnabled = step === "domain_pick" && !!selectedTemplate;
+  const { domains: purchasedDomains, loading: domainPickLoading } = usePurchasedDomains(domainPickEnabled);
 
   // Step 2 - Empresa
   const [companyName, setCompanyName] = useState("");
@@ -235,38 +232,18 @@ export default function WebsitePage() {
     checkServico();
   }, []);
 
-  // ── Handlers ───────────────────────────────────────
-  const handleCheckDomain = async () => {
-    if (!domain.trim() || !domain.includes(".")) {
-      toast.error("Informe um domínio válido (ex: suaempresa.com.br)");
-      return;
-    }
-    setCheckingDomain(true);
-    setDomainChecked(false);
-    setDomainAvailable(null);
-    setDomainMessage("");
-    try {
-      const { data, error } = await supabase.functions.invoke("check-domain", {
-        body: { domain: domain.trim() },
-      });
-      if (error) throw error;
-      setDomainChecked(true);
-      setDomainAvailable(data.available === true);
-      setDomainMessage(data.message || "");
-      if (data.available) {
-        toast.success("Domínio disponível!");
-      } else {
-        toast.error(data.message || "Domínio indisponível");
-      }
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "";
-      toast.error("Erro ao verificar domínio: " + msg);
-    } finally {
-      setCheckingDomain(false);
-    }
-  };
-
   const selectedTemplateName = dbTemplates.find(t => t.id === selectedTemplate)?.nome || "";
+
+  /** Escolhe o modelo e avança automaticamente para a etapa de domínio (sem botão extra na galeria). */
+  const selectTemplateAndGoToDomain = (templateId: string) => {
+    setSelectedTemplate(templateId);
+    setDomainPickSelect("");
+    setPurchasedDomainId(null);
+    setDomain("");
+    setDomainOption("existing");
+    setProvider("");
+    setStep("domain_pick");
+  };
 
   const handleSubmitSolicitacao = async () => {
     setSubmitting(true);
@@ -275,9 +252,10 @@ export default function WebsitePage() {
     const { error } = await (supabase.from("solicitacoes_servicos" as any).insert({
       user_id: user.id,
       tipo_servico: "website",
-      dados_solicitacao: {
+        dados_solicitacao: {
         template: selectedTemplateName, template_id: selectedTemplate,
         dominio: domain,
+        dominio_usuario_id: purchasedDomainId,
         tipo_dominio: domainOption,
         provedor: provider,
         possui_dominio: domainOption === "existing",
@@ -354,6 +332,63 @@ export default function WebsitePage() {
     </div>
   ) : null;
 
+  const goToDomainMenu = () => setActivePage("dominios");
+
+  if (step === "domain_pick" && selectedTemplate) {
+    return (
+      <>
+        <UpgradePlanDialog
+          open={upgradeOpen}
+          onOpenChange={setUpgradeOpen}
+          requiredPlan="rise"
+          selfServiceUpgrade={plano === "free"}
+          onUpgradeSuccess={() => void refetchPlano()}
+        />
+        {pendingBanner}
+        <div className="space-y-8 max-w-lg">
+          <PurchasedDomainSelectStep
+            domains={purchasedDomains}
+            loading={domainPickLoading}
+            value={domainPickSelect}
+            onValueChange={(id, row) => {
+              setDomainPickSelect(id);
+              if (row) {
+                setDomain(row.fqdn);
+                setPurchasedDomainId(row.id);
+                setDomainOption("existing");
+                setProvider("");
+              }
+            }}
+            onRegisterNew={goToDomainMenu}
+          />
+
+          <div className="flex items-center justify-between pt-4">
+            <Button type="button" variant="outline" onClick={() => setStep("gallery")}>
+              <ArrowLeft className="h-4 w-4 mr-2" /> Voltar
+            </Button>
+            <Button
+              type="button"
+              onClick={() => {
+                if (!domainPickSelect || domainPickSelect === REGISTER_NEW_DOMAIN_VALUE) {
+                  toast.error("Selecione um domínio já cadastrado ou registre um novo no menu Domínios.");
+                  return;
+                }
+                if (plano === "free") {
+                  setUpgradeOpen(true);
+                  return;
+                }
+                setStep("briefing");
+                setBs(1);
+              }}
+            >
+              Continuar <ArrowRight className="h-4 w-4 ml-2" />
+            </Button>
+          </div>
+        </div>
+      </>
+    );
+  }
+
   // ── Briefing view ──────────────────────────────────
   if (step === "briefing") {
     return (
@@ -387,36 +422,17 @@ export default function WebsitePage() {
             ))}
           </div>
 
-          {/* ── STEP 1: Domínio (layout = E-mail Business) + Marca ── */}
+          {/* ── STEP 1: Marca (somente identidade visual; domínio foi na etapa anterior) ── */}
           {bs === 1 && (
             <div className="rounded-xl border border-border bg-card p-8 space-y-0">
-              <DomainSelectionCard
-                domainOption={domainOption}
-                onDomainOptionChange={setDomainOption}
-                domain={domain}
-                onDomainChange={setDomain}
-                domainChecked={domainChecked}
-                domainAvailable={domainAvailable}
-                domainMessage={domainMessage}
-                checkingDomain={checkingDomain}
-                onCheckDomain={handleCheckDomain}
-                onResetCheck={resetDomainCheck}
-                extraBelowDomain={
-                  domainOption === "existing" ? (
-                    <div>
-                      <label className="text-sm font-medium text-foreground">Provedor atual</label>
-                      <Input
-                        value={provider}
-                        onChange={(e) => setProvider(e.target.value)}
-                        placeholder="Hostinger, GoDaddy, Registro.br, etc."
-                        className="mt-1"
-                      />
-                    </div>
-                  ) : undefined
-                }
-              />
-              <div className="mt-10 pt-8 border-t border-border space-y-4">
+              <div className="space-y-4">
                 <h2 className="text-lg font-bold text-foreground">Marca</h2>
+                <p className="text-sm text-muted-foreground -mt-2">
+                  Domínio do site: <span className="font-medium text-foreground">{domain || "—"}</span>{" "}
+                  <button type="button" onClick={() => setStep("domain_pick")} className="text-primary hover:underline">
+                    Alterar domínio
+                  </button>
+                </p>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="text-sm font-medium text-foreground">Possui logotipo?</label>
@@ -657,21 +673,15 @@ export default function WebsitePage() {
           {/* Navigation */}
           <div className="flex items-center justify-between pt-4">
             <Button variant="outline" onClick={() => {
-              if (bs === 1) setStep("gallery"); else setBs(s => s - 1);
+              if (bs === 1) setStep("domain_pick"); else setBs(s => s - 1);
             }}>
               <ArrowLeft className="h-4 w-4 mr-2" /> Voltar
             </Button>
             <span className="text-xs text-muted-foreground">{bs} de {STEPS.length}</span>
             <Button onClick={() => {
               if (bs === 1) {
-                if (!canAdvanceFromDomainSelection(domain, domainOption, domainChecked, domainAvailable)) {
-                  if (domainOption === "new" && !domainChecked) {
-                    toast.error("Pesquise a disponibilidade do domínio antes de continuar.");
-                  } else if (domainOption === "new" && domainAvailable === false) {
-                    toast.error("Domínio indisponível. Escolha outro domínio.");
-                  } else {
-                    toast.error("Informe um domínio válido.");
-                  }
+                if (!domain.trim()) {
+                  toast.error("Volte à etapa anterior e selecione um domínio.");
                   return;
                 }
                 if (plano === "free") {
@@ -714,33 +724,41 @@ export default function WebsitePage() {
           const isSelected = selectedTemplate === t.id;
           return (
             <div key={t.id} className="flex flex-col">
-              <div className={cn("rounded-xl h-48 relative overflow-hidden border bg-muted group cursor-pointer", isSelected ? "ring-2 ring-primary" : "border-border")} onClick={() => setSelectedTemplate(t.id)}>
+              <button
+                type="button"
+                className={cn(
+                  "rounded-xl h-48 relative overflow-hidden border bg-muted group text-left w-full p-0",
+                  isSelected ? "ring-2 ring-primary" : "border-border",
+                )}
+                onClick={() => selectTemplateAndGoToDomain(t.id)}
+              >
                 {t.imagem_url ? (
                   <img src={t.imagem_url} alt={t.nome} className="w-full object-cover object-top transition-transform duration-[120s] ease-linear group-hover:translate-y-[calc(-100%+12rem)]" style={{ minHeight: "200%" }} />
                 ) : (
                   <div className="h-full flex items-center justify-center text-muted-foreground">Sem imagem</div>
                 )}
                 {isSelected && <div className="absolute top-3 right-3 w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center z-10"><Check className="h-3.5 w-3.5" /></div>}
-              </div>
+              </button>
               <p className="font-semibold text-foreground mt-3 text-sm">{t.nome}</p>
-              {t.link_modelo && <a href={t.link_modelo} target="_blank" rel="noopener noreferrer"><Button variant="outline" size="sm" className="mt-2 w-full gap-2"><Eye className="h-4 w-4" /> Ver Modelo</Button></a>}
-              {isSelected ? (
-                <Button size="sm" className="mt-2 w-full gap-2"><Check className="h-4 w-4" /> Selecionado</Button>
-              ) : (
-                <Button variant="outline" size="sm" className="mt-2 w-full" onClick={() => setSelectedTemplate(t.id)}>Selecionar</Button>
+              {t.link_modelo && (
+                <a href={t.link_modelo} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
+                  <Button variant="outline" size="sm" className="mt-2 w-full gap-2"><Eye className="h-4 w-4" /> Ver Modelo</Button>
+                </a>
               )}
+              <Button
+                type="button"
+                size="sm"
+                className="mt-2 w-full gap-2"
+                variant={isSelected ? "default" : "outline"}
+                onClick={() => selectTemplateAndGoToDomain(t.id)}
+              >
+                {isSelected ? <><Check className="h-4 w-4" /> Usar este modelo</> : "Selecionar modelo"}
+              </Button>
             </div>
           );
         })}
       </div>
       {dbTemplates.length === 0 && <div className="text-center py-12 text-muted-foreground">Nenhum template disponível no momento.</div>}
-      {selectedTemplate && (
-        <div className="fixed bottom-6 right-6 z-50">
-          <Button onClick={() => { setStep("briefing"); setBs(1); }} className="gap-2 shadow-lg px-6">
-            <Monitor className="h-4 w-4" /> Continuar com este modelo <ArrowRight className="h-4 w-4" />
-          </Button>
-        </div>
-      )}
       <UpgradePlanDialog
         open={upgradeOpen}
         onOpenChange={setUpgradeOpen}

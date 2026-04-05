@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Home, Activity, MapPin, ArrowLeftRight,
   FileText, BookOpen, Map, Users, UserCheck, Handshake,
   ClipboardList, CalendarDays, Car, Megaphone, BarChart3,
-  Globe, Search, Mail, Monitor, Settings, StickyNote,
+  Globe, Search, Mail, Monitor, Settings, StickyNote, Link2,
   Bell, Moon, Sun, LogOut, GraduationCap, Plane,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -96,6 +96,7 @@ const getMenuStructure = (showNetwork: boolean) => [
       { title: "Google", page: "google", icon: Search },
       { title: "E-mail Business", page: "email-business", icon: Mail },
       { title: "Website", page: "website", icon: Monitor },
+      { title: "Domínios", page: "dominios", icon: Link2 },
       { title: "Disparador", page: "disparador", icon: Megaphone },
     ],
   },

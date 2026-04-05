@@ -16,6 +16,12 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import FerramentasDevDialog from "@/components/automacoes/FerramentasDevDialog";
+import { ConfirmDeleteDialog } from "@/components/ConfirmDeleteDialog";
+
+type DeleteIntent =
+  | { kind: "automacao"; id: string }
+  | { kind: "teste"; id: string }
+  | { kind: "testes_all"; automacaoId: string };
 
 interface Automacao {
   id: string;
@@ -162,6 +168,8 @@ export default function SistemaAutomacoesPage() {
   // Track which containers are collapsed (saved)
   const [collapsedContainers, setCollapsedContainers] = useState<Record<string, boolean>>({});
   const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID || "seu-projeto";
+  const [deleteIntent, setDeleteIntent] = useState<DeleteIntent | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
 
   const fetchAutomacoes = useCallback(async () => {
     const { data, error } = await supabase
@@ -187,18 +195,33 @@ export default function SistemaAutomacoesPage() {
     if (!error) setTestes((data || []) as WebhookTeste[]);
   }, []);
 
-  const deleteTeste = async (id: string) => {
-    await supabase.from("webhook_testes").delete().eq("id", id);
-    setTestes((prev) => prev.filter((t) => t.id !== id));
-    if (selectedTeste?.id === id) setSelectedTeste(null);
-    toast.success("Teste removido");
-  };
-
-  const clearAllTestes = async (automacaoId: string) => {
-    await supabase.from("webhook_testes").delete().eq("automacao_id", automacaoId);
-    setTestes([]);
-    setSelectedTeste(null);
-    toast.success("Todos os testes removidos");
+  const executeDeleteIntent = async () => {
+    if (!deleteIntent) return;
+    setDeleteBusy(true);
+    try {
+      if (deleteIntent.kind === "automacao") {
+        const { error } = await supabase.from("automacoes").delete().eq("id", deleteIntent.id);
+        if (error) toast.error("Erro ao excluir");
+        else {
+          toast.success("Automação excluída");
+          if (selected?.id === deleteIntent.id) setSelected(null);
+          fetchAutomacoes();
+        }
+      } else if (deleteIntent.kind === "teste") {
+        await supabase.from("webhook_testes").delete().eq("id", deleteIntent.id);
+        setTestes((prev) => prev.filter((t) => t.id !== deleteIntent.id));
+        if (selectedTeste?.id === deleteIntent.id) setSelectedTeste(null);
+        toast.success("Teste removido");
+      } else {
+        await supabase.from("webhook_testes").delete().eq("automacao_id", deleteIntent.automacaoId);
+        setTestes([]);
+        setSelectedTeste(null);
+        toast.success("Todos os testes removidos");
+      }
+      setDeleteIntent(null);
+    } finally {
+      setDeleteBusy(false);
+    }
   };
 
   const handleCreate = async () => {
@@ -239,12 +262,6 @@ export default function SistemaAutomacoesPage() {
       setAutomacoes((prev) => prev.map((a) => a.id === automacao.id ? { ...a, ativo: newAtivo } : a));
       if (selected?.id === automacao.id) setSelected({ ...selected, ativo: newAtivo });
     }
-  };
-
-  const handleDelete = async (id: string) => {
-    const { error } = await supabase.from("automacoes").delete().eq("id", id);
-    if (error) toast.error("Erro ao excluir");
-    else { toast.success("Automação excluída"); fetchAutomacoes(); }
   };
 
   const getWebhookUrl = (id: string) =>
@@ -377,7 +394,7 @@ export default function SistemaAutomacoesPage() {
                     <RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Atualizar
                   </Button>
                   {testes.length > 0 && (
-                    <Button variant="outline" size="sm" onClick={() => clearAllTestes(selected.id)}>
+                    <Button variant="outline" size="sm" onClick={() => setDeleteIntent({ kind: "testes_all", automacaoId: selected.id })}>
                       <Trash2 className="h-3.5 w-3.5 mr-1.5" /> Limpar
                     </Button>
                   )}
@@ -418,7 +435,7 @@ export default function SistemaAutomacoesPage() {
                             }}>
                               <Copy className="h-3 w-3" />
                             </Button>
-                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => deleteTeste(selectedTeste.id)}>
+                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setDeleteIntent({ kind: "teste", id: selectedTeste.id })}>
                               <Trash2 className="h-3 w-3 text-destructive" />
                             </Button>
                             <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setSelectedTeste(null)}>
@@ -561,6 +578,27 @@ export default function SistemaAutomacoesPage() {
           tipo={selected.tipo}
           onSubmit={handleTestSubmit}
         />
+
+        <ConfirmDeleteDialog
+          open={deleteIntent !== null}
+          onOpenChange={(o) => !o && setDeleteIntent(null)}
+          title={
+            deleteIntent?.kind === "automacao"
+              ? "Excluir automação?"
+              : deleteIntent?.kind === "teste"
+                ? "Excluir teste de webhook?"
+                : "Remover todos os testes?"
+          }
+          description={
+            deleteIntent?.kind === "automacao"
+              ? "A automação e o webhook associado serão removidos. Esta ação não pode ser desfeita."
+              : deleteIntent?.kind === "teste"
+                ? "O registro deste teste será excluído permanentemente."
+                : "Todos os payloads de teste desta automação serão apagados. Deseja continuar?"
+          }
+          onConfirm={executeDeleteIntent}
+          loading={deleteBusy}
+        />
       </div>
     );
   }
@@ -647,7 +685,7 @@ export default function SistemaAutomacoesPage() {
                       }}>
                         Configurar
                       </Button>
-                      <Button variant="ghost" size="icon" onClick={() => handleDelete(a.id)}>
+                      <Button variant="ghost" size="icon" onClick={() => setDeleteIntent({ kind: "automacao", id: a.id })}>
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>
                     </div>
@@ -695,6 +733,27 @@ export default function SistemaAutomacoesPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDeleteDialog
+        open={deleteIntent !== null}
+        onOpenChange={(o) => !o && setDeleteIntent(null)}
+        title={
+          deleteIntent?.kind === "automacao"
+            ? "Excluir automação?"
+            : deleteIntent?.kind === "teste"
+              ? "Excluir teste de webhook?"
+              : "Remover todos os testes?"
+        }
+        description={
+          deleteIntent?.kind === "automacao"
+            ? "A automação e o webhook associado serão removidos. Esta ação não pode ser desfeita."
+            : deleteIntent?.kind === "teste"
+              ? "O registro deste teste será excluído permanentemente."
+              : "Todos os payloads de teste desta automação serão apagados. Deseja continuar?"
+        }
+        onConfirm={executeDeleteIntent}
+        loading={deleteBusy}
+      />
     </div>
   );
 }

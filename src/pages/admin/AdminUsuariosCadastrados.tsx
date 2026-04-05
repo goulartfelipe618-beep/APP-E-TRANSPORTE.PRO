@@ -10,6 +10,7 @@ import { Plus, Trash2, Users, Search, RefreshCw, Crown } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { PLAN_LABELS, PLAN_COLORS, PlanType, PLANS_PAID_ORDER } from "@/hooks/useUserPlan";
+import { ConfirmDeleteDialog } from "@/components/ConfirmDeleteDialog";
 
 interface UserItem {
   id: string;
@@ -48,6 +49,8 @@ export default function AdminUsuariosCadastrados() {
   const [formPlano, setFormPlano] = useState<PlanType>("seed");
   const [creating, setCreating] = useState(false);
   const [updatingPlan, setUpdatingPlan] = useState(false);
+  const [deleteUserId, setDeleteUserId] = useState<string | null>(null);
+  const [deleteUserLoading, setDeleteUserLoading] = useState(false);
 
   const fetchUsers = useCallback(async () => {
     setLoading(true);
@@ -129,31 +132,37 @@ export default function AdminUsuariosCadastrados() {
     setCreating(false);
   };
 
-  const handleDelete = async (userId: string) => {
-    if (!confirm("Tem certeza que deseja excluir este usuário? Todos os dados do painel dele serão apagados permanentemente.")) return;
-    
-    setUsers((prev) => prev.filter((u) => u.id !== userId));
-    
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) return;
-
-    const res = await fetch(
-      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-users?action=delete`,
-      {
-        method: "POST",
-        headers: {
-          ...edgeFunctionHeaders(session.access_token),
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ user_id: userId }),
+  const confirmDeleteUser = async () => {
+    if (!deleteUserId) return;
+    setDeleteUserLoading(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast.error("Sessão não encontrada.");
+        return;
       }
-    );
-    const data = await res.json();
-    if (data.error) {
-      toast.error(data.error);
-      fetchUsers();
-    } else {
-      toast.success("Usuário e todos os dados excluídos com sucesso!");
+
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-users?action=delete`,
+        {
+          method: "POST",
+          headers: {
+            ...edgeFunctionHeaders(session.access_token),
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ user_id: deleteUserId }),
+        }
+      );
+      const data = await res.json();
+      if (data.error) {
+        toast.error(data.error);
+      } else {
+        toast.success("Usuário e todos os dados excluídos com sucesso!");
+        setUsers((prev) => prev.filter((u) => u.id !== deleteUserId));
+        setDeleteUserId(null);
+      }
+    } finally {
+      setDeleteUserLoading(false);
     }
   };
 
@@ -282,7 +291,7 @@ export default function AdminUsuariosCadastrados() {
                       <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={() => handleOpenPlanDialog(u)} title="Alterar plano">
                         <Crown className="h-4 w-4" />
                       </Button>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDelete(u.id)}>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => setDeleteUserId(u.id)}>
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </>
@@ -380,6 +389,15 @@ export default function AdminUsuariosCadastrados() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDeleteDialog
+        open={deleteUserId !== null}
+        onOpenChange={(o) => !o && setDeleteUserId(null)}
+        title="Excluir usuário?"
+        description="Todos os dados do painel deste usuário serão apagados permanentemente. Esta ação não pode ser desfeita."
+        onConfirm={confirmDeleteUser}
+        loading={deleteUserLoading}
+      />
     </div>
   );
 }

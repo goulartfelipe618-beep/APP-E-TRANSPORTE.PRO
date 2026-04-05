@@ -12,6 +12,7 @@ import {
   downloadReceptivoPdf,
   buildFooterPayloadFromReceptivoRow,
 } from "@/lib/receptivoTransferPdf";
+import { ConfirmDeleteDialog } from "@/components/ConfirmDeleteDialog";
 
 type Receptivo = Tables<"receptivos">;
 
@@ -21,6 +22,8 @@ export default function MarketingReceptivosPage() {
   const [rows, setRows] = useState<Receptivo[]>([]);
   const [loading, setLoading] = useState(true);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   const fetchRows = useCallback(async () => {
     setLoading(true);
@@ -63,14 +66,21 @@ export default function MarketingReceptivosPage() {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    const { error } = await supabase.from("receptivos").delete().eq("id", id);
-    if (error) {
-      toast.error("Erro ao excluir");
-      return;
+  const confirmDelete = async () => {
+    if (!deleteId) return;
+    setDeleteLoading(true);
+    try {
+      const { error } = await supabase.from("receptivos").delete().eq("id", deleteId);
+      if (error) {
+        toast.error("Erro ao excluir");
+        return;
+      }
+      toast.success("Registro removido");
+      setDeleteId(null);
+      void fetchRows();
+    } finally {
+      setDeleteLoading(false);
     }
-    toast.success("Registro removido");
-    void fetchRows();
   };
 
   return (
@@ -148,7 +158,7 @@ export default function MarketingReceptivosPage() {
                         variant="ghost"
                         size="icon"
                         title="Excluir registro"
-                        onClick={() => void handleDelete(r.id)}
+                        onClick={() => setDeleteId(r.id)}
                       >
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>
@@ -165,6 +175,15 @@ export default function MarketingReceptivosPage() {
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         onSaved={() => void fetchRows()}
+      />
+
+      <ConfirmDeleteDialog
+        open={deleteId !== null}
+        onOpenChange={(o) => !o && setDeleteId(null)}
+        title="Excluir registro de receptivo?"
+        description="O histórico deste PDF gerado será removido permanentemente. Deseja continuar?"
+        onConfirm={confirmDelete}
+        loading={deleteLoading}
       />
     </div>
   );

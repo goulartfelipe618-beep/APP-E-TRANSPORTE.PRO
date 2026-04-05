@@ -27,6 +27,7 @@ import {
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { PLAN_LABELS, PLANS_PAID_ORDER, PlanType } from "@/hooks/useUserPlan";
+import { ConfirmDeleteDialog } from "@/components/ConfirmDeleteDialog";
 
 /** Dispara atualização da lista em Usuários > Cadastrados sem F5 */
 const ADMIN_CADASTRADOS_REFRESH = "admin-master-cadastrados-refresh";
@@ -122,6 +123,8 @@ export default function AdminUsuariosSolicitacoes() {
   const [deleteTarget, setDeleteTarget] = useState<SolicitacaoComPlano | null>(null);
   const [finalizeTarget, setFinalizeTarget] = useState<SolicitacaoComPlano | null>(null);
   const [finalizePlano, setFinalizePlano] = useState<PlanType>("seed");
+  const [acessoDeleteId, setAcessoDeleteId] = useState<string | null>(null);
+  const [acessoDeleteLoading, setAcessoDeleteLoading] = useState(false);
 
   const fetchSolicitacoesAcesso = async () => {
     const { data, error } = await supabase
@@ -190,15 +193,22 @@ export default function AdminUsuariosSolicitacoes() {
     if (selected?.id === id) setSelected((prev) => (prev ? { ...prev, status: newStatus } : null));
   };
 
-  const deleteSolicitacao = async (id: string) => {
-    const { error } = await supabase.from("solicitacoes_acesso").delete().eq("id", id);
-    if (error) {
-      toast.error("Erro ao excluir");
-      return;
+  const confirmDeleteSolicitacaoAcesso = async () => {
+    if (!acessoDeleteId) return;
+    setAcessoDeleteLoading(true);
+    try {
+      const { error } = await supabase.from("solicitacoes_acesso").delete().eq("id", acessoDeleteId);
+      if (error) {
+        toast.error("Erro ao excluir");
+        return;
+      }
+      toast.success("Solicitação excluída!");
+      setAcessoDeleteId(null);
+      void fetchSolicitacoesAcesso();
+      if (selected?.id === acessoDeleteId) setSelected(null);
+    } finally {
+      setAcessoDeleteLoading(false);
     }
-    toast.success("Solicitação excluída!");
-    void fetchSolicitacoesAcesso();
-    if (selected?.id === id) setSelected(null);
   };
 
   const filtered = filtroStatus === "todos" ? solicitacoes : solicitacoes.filter((s) => s.status === filtroStatus);
@@ -507,7 +517,7 @@ export default function AdminUsuariosSolicitacoes() {
                     <Button size="icon" variant="ghost" onClick={() => setSelected(s)}>
                       <Eye className="h-4 w-4" />
                     </Button>
-                    <Button size="icon" variant="ghost" className="text-destructive" onClick={() => void deleteSolicitacao(s.id)}>
+                    <Button size="icon" variant="ghost" className="text-destructive" onClick={() => setAcessoDeleteId(s.id)}>
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
@@ -574,6 +584,15 @@ export default function AdminUsuariosSolicitacoes() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDeleteDialog
+        open={acessoDeleteId !== null}
+        onOpenChange={(o) => !o && setAcessoDeleteId(null)}
+        title="Excluir solicitação?"
+        description="O registro desta solicitação (cadastro pelo site) será removido permanentemente. Deseja continuar?"
+        onConfirm={confirmDeleteSolicitacaoAcesso}
+        loading={acessoDeleteLoading}
+      />
 
       <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
         <AlertDialogContent>

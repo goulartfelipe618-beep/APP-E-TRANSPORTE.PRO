@@ -10,6 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { generateTransferPDF, getTransferReservaPdfBase64 } from "@/lib/pdfGenerator";
 import ComunicarDialog from "@/components/comunicar/ComunicarDialog";
 import { Tables } from "@/integrations/supabase/types";
+import { ConfirmDeleteDialog } from "@/components/ConfirmDeleteDialog";
 
 type Reserva = Tables<"reservas_transfer">;
 
@@ -27,6 +28,8 @@ export default function TransferReservasPage() {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [comunicarOpen, setComunicarOpen] = useState(false);
   const [comunicarDados, setComunicarDados] = useState<Reserva | null>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   const fetchReservas = useCallback(async () => {
     const { data, error } = await supabase
@@ -39,9 +42,20 @@ export default function TransferReservasPage() {
   }, []);
   useEffect(() => { fetchReservas(); }, [fetchReservas]);
 
-  const handleDelete = async (id: string) => {
-    const { error } = await supabase.from("reservas_transfer").delete().eq("id", id);
-    if (error) toast.error("Erro ao excluir"); else { toast.success("Reserva excluída"); fetchReservas(); }
+  const confirmDelete = async () => {
+    if (!deleteId) return;
+    setDeleteLoading(true);
+    try {
+      const { error } = await supabase.from("reservas_transfer").delete().eq("id", deleteId);
+      if (error) toast.error("Erro ao excluir");
+      else {
+        toast.success("Reserva excluída");
+        setDeleteId(null);
+        fetchReservas();
+      }
+    } finally {
+      setDeleteLoading(false);
+    }
   };
 
   const handleComunicar = (r: Reserva) => {
@@ -116,7 +130,7 @@ export default function TransferReservasPage() {
                       <Button variant="ghost" size="icon" onClick={() => handleDownload(r)} title="Download">
                         <Download className="h-4 w-4" />
                       </Button>
-                      <Button variant="ghost" size="icon" onClick={() => handleDelete(r.id)} title="Excluir">
+                      <Button variant="ghost" size="icon" onClick={() => setDeleteId(r.id)} title="Excluir">
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>
                     </div>
@@ -136,6 +150,15 @@ export default function TransferReservasPage() {
         onOpenChange={setSheetOpen}
         onComunicar={handleComunicar}
         onDownload={handleDownload}
+      />
+
+      <ConfirmDeleteDialog
+        open={deleteId !== null}
+        onOpenChange={(o) => !o && setDeleteId(null)}
+        title="Excluir reserva de transfer?"
+        description="Esta ação remove permanentemente a reserva do sistema. Deseja continuar?"
+        onConfirm={confirmDelete}
+        loading={deleteLoading}
       />
 
       {comunicarDados && (

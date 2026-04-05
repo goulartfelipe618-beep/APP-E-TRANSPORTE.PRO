@@ -8,6 +8,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import CriarNetworkDialog from "@/components/network/CriarNetworkDialog";
+import { ConfirmDeleteDialog } from "@/components/ConfirmDeleteDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { Database } from "@/integrations/supabase/types";
@@ -30,6 +31,8 @@ export default function NetworkCollaborationFeed({ allowModeratorDelete, title, 
   const [filtroTipo, setFiltroTipo] = useState("all");
   const [filtroEstado, setFiltroEstado] = useState("all");
   const [filtroCidade, setFiltroCidade] = useState("");
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   const canDelete = (row: NetworkRow) => {
     if (!currentUserId) return false;
@@ -89,14 +92,21 @@ export default function NetworkCollaborationFeed({ allowModeratorDelete, title, 
     };
   }, [fetchData]);
 
-  const handleDelete = async (id: string) => {
-    const { error } = await supabase.from("network").delete().eq("id", id);
-    if (error) {
-      toast.error("Erro ao remover: " + error.message);
-      return;
+  const confirmDelete = async () => {
+    if (!deleteId) return;
+    setDeleteLoading(true);
+    try {
+      const { error } = await supabase.from("network").delete().eq("id", deleteId);
+      if (error) {
+        toast.error("Erro ao remover: " + error.message);
+        return;
+      }
+      toast.success("Publicação removida");
+      setDeleteId(null);
+      void fetchData();
+    } finally {
+      setDeleteLoading(false);
     }
-    toast.success("Publicação removida");
-    void fetchData();
   };
 
   const filtered = data.filter((item) => {
@@ -228,7 +238,7 @@ export default function NetworkCollaborationFeed({ allowModeratorDelete, title, 
                         size="icon"
                         className="text-destructive hover:text-destructive"
                         title="Remover publicação"
-                        onClick={() => void handleDelete(item.id)}
+                        onClick={() => setDeleteId(item.id)}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -260,6 +270,15 @@ export default function NetworkCollaborationFeed({ allowModeratorDelete, title, 
           ))}
         </div>
       )}
+
+      <ConfirmDeleteDialog
+        open={deleteId !== null}
+        onOpenChange={(o) => !o && setDeleteId(null)}
+        title="Excluir publicação do Network?"
+        description="Esta oportunidade será removida permanentemente. Deseja continuar?"
+        onConfirm={confirmDelete}
+        loading={deleteLoading}
+      />
 
       <CriarNetworkDialog open={dialogOpen} onOpenChange={setDialogOpen} onSaved={() => void fetchData()} />
     </div>

@@ -10,6 +10,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import { Plus, Pencil, Trash2, Eye, ImageIcon, Upload, X } from "lucide-react";
+import { ConfirmDeleteDialog } from "@/components/ConfirmDeleteDialog";
 
 interface Template {
   id: string;
@@ -28,6 +29,8 @@ export default function AdminTemplatesPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [deleteTemplateId, setDeleteTemplateId] = useState<string | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   // Form
   const [nome, setNome] = useState("");
@@ -149,12 +152,21 @@ export default function AdminTemplatesPage() {
     fetchTemplates();
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Excluir este template?")) return;
-    const { error } = await (supabase.from("templates_website" as any).delete().eq("id", id) as any);
-    if (error) { toast.error("Erro: " + error.message); return; }
-    toast.success("Template excluído!");
-    fetchTemplates();
+  const confirmDelete = async () => {
+    if (!deleteTemplateId) return;
+    setDeleteLoading(true);
+    try {
+      const { error } = await (supabase.from("templates_website" as any).delete().eq("id", deleteTemplateId) as any);
+      if (error) {
+        toast.error("Erro: " + error.message);
+        return;
+      }
+      toast.success("Template excluído!");
+      setDeleteTemplateId(null);
+      fetchTemplates();
+    } finally {
+      setDeleteLoading(false);
+    }
   };
 
   const toggleAtivo = async (t: Template) => {
@@ -223,7 +235,7 @@ export default function AdminTemplatesPage() {
                 <Button variant="outline" size="sm" className="gap-1 text-xs" onClick={() => openEdit(t)}>
                   <Pencil className="h-3 w-3" /> Editar
                 </Button>
-                <Button variant="destructive" size="sm" className="gap-1 text-xs" onClick={() => handleDelete(t.id)}>
+                <Button variant="destructive" size="sm" className="gap-1 text-xs" onClick={() => setDeleteTemplateId(t.id)}>
                   <Trash2 className="h-3 w-3" />
                 </Button>
               </div>
@@ -309,6 +321,15 @@ export default function AdminTemplatesPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDeleteDialog
+        open={deleteTemplateId !== null}
+        onOpenChange={(o) => !o && setDeleteTemplateId(null)}
+        title="Excluir template?"
+        description="O modelo será removido permanentemente. Deseja continuar?"
+        onConfirm={confirmDelete}
+        loading={deleteLoading}
+      />
     </div>
   );
 }

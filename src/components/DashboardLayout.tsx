@@ -34,6 +34,7 @@ import NetworkPage from "@/pages/dashboard/NetworkPage";
 import GooglePage from "@/pages/dashboard/GooglePage";
 import EmailBusinessPage from "@/pages/dashboard/EmailBusinessPage";
 import WebsitePage from "@/pages/dashboard/WebsitePage";
+import DominiosPage from "@/pages/dashboard/DominiosPage";
 import AnotacoesPage from "@/pages/dashboard/AnotacoesPage";
 import SistemaConfiguracoesPage from "@/pages/dashboard/SistemaConfiguracoes";
 import SistemaAutomacoesPage from "@/pages/dashboard/SistemaAutomacoes";
@@ -72,6 +73,7 @@ const PAGE_MAP: Record<string, React.ComponentType> = {
   google: GooglePage,
   "email-business": EmailBusinessPage,
   website: WebsitePage,
+  dominios: DominiosPage,
   anotacoes: AnotacoesPage,
   "sistema/configuracoes": SistemaConfiguracoesPage,
   "sistema/automacoes": SistemaAutomacoesPage,

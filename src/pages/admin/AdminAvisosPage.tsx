@@ -19,6 +19,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { PAGINAS_MOTORISTA, PAGINAS_TAXI } from "@/lib/painelAvisosPages";
+import { ConfirmDeleteDialog } from "@/components/ConfirmDeleteDialog";
 
 type Aviso = Tables<"admin_avisos_plataforma">;
 
@@ -46,6 +47,8 @@ export default function AdminAvisosPage() {
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState<Aviso | null>(null);
   const [form, setForm] = useState(() => emptyForm());
+  const [deleteTarget, setDeleteTarget] = useState<Aviso | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   const fetchRows = useCallback(async () => {
     setLoading(true);
@@ -154,13 +157,19 @@ export default function AdminAvisosPage() {
     setSaving(false);
   };
 
-  const handleDelete = async (row: Aviso) => {
-    if (!confirm("Remover este aviso?")) return;
-    const { error } = await supabase.from("admin_avisos_plataforma").delete().eq("id", row.id);
-    if (error) toast.error("Erro ao remover");
-    else {
-      toast.success("Aviso removido");
-      void fetchRows();
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleteLoading(true);
+    try {
+      const { error } = await supabase.from("admin_avisos_plataforma").delete().eq("id", deleteTarget.id);
+      if (error) toast.error("Erro ao remover");
+      else {
+        toast.success("Aviso removido");
+        setDeleteTarget(null);
+        void fetchRows();
+      }
+    } finally {
+      setDeleteLoading(false);
     }
   };
 
@@ -224,7 +233,7 @@ export default function AdminAvisosPage() {
                 <Button variant="outline" size="icon" onClick={() => openEdit(r)} title="Editar">
                   <Pencil className="h-4 w-4" />
                 </Button>
-                <Button variant="outline" size="icon" onClick={() => handleDelete(r)} title="Excluir">
+                <Button variant="outline" size="icon" onClick={() => setDeleteTarget(r)} title="Excluir">
                   <Trash2 className="h-4 w-4 text-destructive" />
                 </Button>
               </div>
@@ -369,6 +378,15 @@ export default function AdminAvisosPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDeleteDialog
+        open={deleteTarget !== null}
+        onOpenChange={(o) => !o && setDeleteTarget(null)}
+        title="Remover aviso?"
+        description="O aviso deixará de ser exibido nos painéis. Esta ação não pode ser desfeita."
+        onConfirm={confirmDelete}
+        loading={deleteLoading}
+      />
     </div>
   );
 }

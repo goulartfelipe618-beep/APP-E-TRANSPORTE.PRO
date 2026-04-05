@@ -1,5 +1,5 @@
 import {
-  SlidersHorizontal, LogOut, Shield, BarChart3, MapPin, FileText, ChevronDown, Users, ClipboardList, Building2, LayoutTemplate, Bell, Moon, Sun, Settings, StickyNote, MessageSquare, Zap, GraduationCap, Plane, Megaphone,
+  SlidersHorizontal, LogOut, Shield, BarChart3, MapPin, FileText, ChevronDown, Users, ClipboardList, Building2, LayoutTemplate, Bell, Moon, Sun, Settings, StickyNote, MessageSquare, Zap, GraduationCap, Plane, Megaphone, Link2,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -24,6 +24,7 @@ const simpleItems = [
   { title: "Slides", page: "slides", icon: SlidersHorizontal },
   { title: "Mentoria", page: "mentoria", icon: GraduationCap },
   { title: "Empty Legs", page: "empty-legs", icon: Plane },
+  { title: "Domínios", page: "dominios", icon: Link2 },
 ];
 
 const contratoChildren = [

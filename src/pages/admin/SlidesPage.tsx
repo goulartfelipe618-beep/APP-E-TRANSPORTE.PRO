@@ -9,6 +9,7 @@ import { Plus, Pencil, Trash2, ArrowUp, ArrowDown, Image as ImageIcon } from "lu
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
+import { ConfirmDeleteDialog } from "@/components/ConfirmDeleteDialog";
 
 interface Slide {
   id: string;
@@ -64,6 +65,8 @@ export default function SlidesPage() {
   const [form, setForm] = useState({ titulo: "", subtitulo: "", imagem_url: "", mostrar_texto: false, link_url: "" });
   const [uploading, setUploading] = useState(false);
   const [paginaSelecionada, setPaginaSelecionada] = useState("home");
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   const fetchSlides = async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -160,11 +163,21 @@ export default function SlidesPage() {
     fetchSlides();
   };
 
-  const handleDelete = async (id: string) => {
-    const { error } = await supabase.from("slides").delete().eq("id", id);
-    if (error) { toast.error("Erro ao excluir"); return; }
-    toast.success("Slide excluído!");
-    fetchSlides();
+  const confirmDelete = async () => {
+    if (!deleteId) return;
+    setDeleteLoading(true);
+    try {
+      const { error } = await supabase.from("slides").delete().eq("id", deleteId);
+      if (error) {
+        toast.error("Erro ao excluir");
+        return;
+      }
+      toast.success("Slide excluído!");
+      setDeleteId(null);
+      fetchSlides();
+    } finally {
+      setDeleteLoading(false);
+    }
   };
 
   const handleToggle = async (s: Slide) => {
@@ -250,7 +263,7 @@ export default function SlidesPage() {
                 <TableCell className="text-right">
                   <div className="flex justify-end gap-1">
                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(s)}><Pencil className="h-4 w-4" /></Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDelete(s.id)}><Trash2 className="h-4 w-4" /></Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => setDeleteId(s.id)}><Trash2 className="h-4 w-4" /></Button>
                   </div>
                 </TableCell>
               </TableRow>
@@ -319,6 +332,15 @@ export default function SlidesPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDeleteDialog
+        open={deleteId !== null}
+        onOpenChange={(o) => !o && setDeleteId(null)}
+        title="Excluir slide?"
+        description="O slide será removido permanentemente desta página. Deseja continuar?"
+        onConfirm={confirmDelete}
+        loading={deleteLoading}
+      />
     </div>
   );
 }

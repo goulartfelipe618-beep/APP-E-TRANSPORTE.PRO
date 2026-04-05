@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Plus, Trash2, GraduationCap, Pencil, Upload, Video, Image as ImageIcon, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { ConfirmDeleteDialog } from "@/components/ConfirmDeleteDialog";
 
 interface MentoriaCard {
   id: string;
@@ -35,6 +36,8 @@ export default function AdminMentoriaPage() {
   const [uploadingImage, setUploadingImage] = useState(false);
   const videoInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
+  const [deleteCardId, setDeleteCardId] = useState<string | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   const fetchCards = async () => {
     const { data } = await (supabase.from("mentoria_cards" as any).select("*").order("tipo").order("ordem", { ascending: true }) as any);
@@ -92,11 +95,21 @@ export default function AdminMentoriaPage() {
     fetchCards();
   };
 
-  const handleDelete = async (id: string) => {
-    const { error } = await (supabase.from("mentoria_cards" as any).delete().eq("id", id) as any);
-    if (error) { toast.error("Erro ao excluir"); return; }
-    toast.success("Card excluído!");
-    fetchCards();
+  const confirmDeleteCard = async () => {
+    if (!deleteCardId) return;
+    setDeleteLoading(true);
+    try {
+      const { error } = await (supabase.from("mentoria_cards" as any).delete().eq("id", deleteCardId) as any);
+      if (error) {
+        toast.error("Erro ao excluir");
+        return;
+      }
+      toast.success("Card excluído!");
+      setDeleteCardId(null);
+      fetchCards();
+    } finally {
+      setDeleteLoading(false);
+    }
   };
 
   const handleToggle = async (id: string, ativo: boolean) => {
@@ -230,7 +243,7 @@ export default function AdminMentoriaPage() {
                   <Switch checked={card.ativo} onCheckedChange={() => handleToggle(card.id, card.ativo)} />
                   <div className="flex gap-1">
                     <Button size="icon" variant="ghost" onClick={() => openEdit(card)}><Pencil className="h-4 w-4" /></Button>
-                    <Button size="icon" variant="ghost" className="text-destructive" onClick={() => handleDelete(card.id)}><Trash2 className="h-4 w-4" /></Button>
+                    <Button size="icon" variant="ghost" className="text-destructive" onClick={() => setDeleteCardId(card.id)}><Trash2 className="h-4 w-4" /></Button>
                   </div>
                 </div>
               </CardContent>
@@ -259,7 +272,7 @@ export default function AdminMentoriaPage() {
                   <Switch checked={card.ativo} onCheckedChange={() => handleToggle(card.id, card.ativo)} />
                   <div className="flex gap-1">
                     <Button size="icon" variant="ghost" onClick={() => openEdit(card)}><Pencil className="h-3 w-3" /></Button>
-                    <Button size="icon" variant="ghost" className="text-destructive" onClick={() => handleDelete(card.id)}><Trash2 className="h-3 w-3" /></Button>
+                    <Button size="icon" variant="ghost" className="text-destructive" onClick={() => setDeleteCardId(card.id)}><Trash2 className="h-3 w-3" /></Button>
                   </div>
                 </div>
               </CardContent>
@@ -267,6 +280,15 @@ export default function AdminMentoriaPage() {
           ))}
         </div>
       </section>
+
+      <ConfirmDeleteDialog
+        open={deleteCardId !== null}
+        onOpenChange={(o) => !o && setDeleteCardId(null)}
+        title="Excluir card de mentoria?"
+        description="O conteúdo será removido permanentemente. Deseja continuar?"
+        onConfirm={confirmDeleteCard}
+        loading={deleteLoading}
+      />
     </div>
   );
 }

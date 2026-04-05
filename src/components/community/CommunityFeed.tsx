@@ -23,6 +23,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useConfiguracoes } from "@/contexts/ConfiguracoesContext";
+import { ConfirmDeleteDialog } from "@/components/ConfirmDeleteDialog";
+import { cn } from "@/lib/utils";
 
 type CommunityProfile = {
   user_id: string;
@@ -88,7 +90,13 @@ function initialsFromName(name: string) {
   return `${parts[0][0] || ""}${parts[parts.length - 1][0] || ""}`.toUpperCase();
 }
 
-export default function CommunityFeed() {
+type CommunityFeedProps = {
+  /** `admin`: banner em largura total da área de conteúdo (painel Admin Master). */
+  panel?: "motorista" | "admin";
+};
+
+export default function CommunityFeed({ panel = "motorista" }: CommunityFeedProps) {
+  const isAdminPanel = panel === "admin";
   const { config } = useConfiguracoes();
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [isAdminMaster, setIsAdminMaster] = useState(false);
@@ -118,6 +126,8 @@ export default function CommunityFeed() {
   const [editingCategoryName, setEditingCategoryName] = useState("");
   const [pendingDeletePost, setPendingDeletePost] = useState<CommunityPost | null>(null);
   const [pendingDeleteComment, setPendingDeleteComment] = useState<CommunityComment | null>(null);
+  const [pendingDeleteCategoryId, setPendingDeleteCategoryId] = useState<string | null>(null);
+  const [categoryDeleteLoading, setCategoryDeleteLoading] = useState(false);
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
   const [editingCommentText, setEditingCommentText] = useState("");
 
@@ -294,6 +304,17 @@ export default function CommunityFeed() {
     if (newPostCategoryId === categoryId) setNewPostCategoryId("");
     toast.success("Categoria excluída");
     void fetchAll({ silent: true });
+  };
+
+  const confirmDeleteCategory = async () => {
+    if (!pendingDeleteCategoryId) return;
+    setCategoryDeleteLoading(true);
+    try {
+      await handleDeleteCategory(pendingDeleteCategoryId);
+    } finally {
+      setCategoryDeleteLoading(false);
+      setPendingDeleteCategoryId(null);
+    }
   };
 
   const handleCreatePost = async () => {
@@ -493,7 +514,7 @@ export default function CommunityFeed() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20">
+      <div className={cn("flex items-center justify-center py-20", isAdminPanel && "px-6")}>
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
       </div>
     );
@@ -504,11 +525,20 @@ export default function CommunityFeed() {
 
   return (
     <div className="space-y-6">
-      <div className="-mx-6 -mt-6">
-        <SlideCarousel pagina="comunidade" variant="banner" />
-      </div>
+      {isAdminPanel ? (
+        <SlideCarousel pagina="comunidade" variant="banner" fullBleed />
+      ) : (
+        <div className="-mx-6 -mt-6">
+          <SlideCarousel pagina="comunidade" variant="banner" />
+        </div>
+      )}
 
-      <div className="flex flex-col gap-6 xl:flex-row xl:items-start">
+      <div
+        className={cn(
+          "flex flex-col gap-6 xl:flex-row xl:items-start",
+          isAdminPanel && "px-6",
+        )}
+      >
         <div className="flex min-w-0 flex-1 justify-center xl:min-h-0">
           <div className="mx-auto w-full max-w-3xl space-y-6">
           <Card>
@@ -891,7 +921,7 @@ export default function CommunityFeed() {
                               variant="ghost"
                               size="icon"
                               className="text-destructive hover:text-destructive"
-                              onClick={() => void handleDeleteCategory(category.id)}
+                              onClick={() => setPendingDeleteCategoryId(category.id)}
                             >
                               <Trash2 className="h-3.5 w-3.5" />
                             </Button>
@@ -906,6 +936,15 @@ export default function CommunityFeed() {
           )}
         </aside>
       </div>
+
+      <ConfirmDeleteDialog
+        open={pendingDeleteCategoryId !== null}
+        onOpenChange={(o) => !o && setPendingDeleteCategoryId(null)}
+        title="Excluir categoria?"
+        description="Posts podem estar vinculados a esta categoria. A categoria será removida permanentemente. Deseja continuar?"
+        onConfirm={confirmDeleteCategory}
+        loading={categoryDeleteLoading}
+      />
 
       <AlertDialog open={!!pendingDeletePost} onOpenChange={(open) => !open && setPendingDeletePost(null)}>
         <AlertDialogContent>

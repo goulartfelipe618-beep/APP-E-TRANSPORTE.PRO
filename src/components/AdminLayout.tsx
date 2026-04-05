@@ -1,6 +1,7 @@
 import { useRef, useLayoutEffect } from "react";
 import { syncPanelThemeForCurrentUser } from "@/lib/panelTheme";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { cn } from "@/lib/utils";
 import { useSlowScrollContainer } from "@/hooks/useSlowScrollContainer";
 import { AdminSidebar } from "@/components/AdminSidebar";
 import { ActivePageProvider, useActivePage } from "@/contexts/ActivePageContext";
@@ -24,6 +25,7 @@ import AdminTicketsPage from "@/pages/admin/AdminTicketsPage";
 import AdminMentoriaPage from "@/pages/admin/AdminMentoriaPage";
 import AdminEmptyLegsPage from "@/pages/admin/AdminEmptyLegsPage";
 import AdminCommunityPage from "@/pages/admin/AdminCommunityPage";
+import DominiosPage from "@/pages/dashboard/DominiosPage";
 import AdminAvisosPage from "@/pages/admin/AdminAvisosPage";
 
 const PAGE_MAP: Record<string, React.ComponentType> = {
@@ -46,6 +48,7 @@ const PAGE_MAP: Record<string, React.ComponentType> = {
   tickets: AdminTicketsPage,
   mentoria: AdminMentoriaPage,
   "empty-legs": AdminEmptyLegsPage,
+  dominios: DominiosPage,
 };
 
 function AdminContent() {
@@ -67,7 +70,13 @@ function AdminContent() {
           <SidebarTrigger />
           <span className="ml-3 text-sm font-semibold text-foreground">{config.nome_projeto || "Painel Admin Master"}</span>
         </header>
-        <main ref={mainRef} className="flex-1 p-6 overflow-auto scroll-smooth">
+        <main
+          ref={mainRef}
+          className={cn(
+            "flex-1 min-h-0 overflow-auto scroll-smooth",
+            activePage === "comunidade" ? "px-0 pb-6 pt-0" : "p-6",
+          )}
+        >
           <PageComponent key={activePage} />
         </main>
       </div>

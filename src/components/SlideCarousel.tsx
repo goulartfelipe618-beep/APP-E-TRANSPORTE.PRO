@@ -25,6 +25,8 @@ interface SlideCarouselProps {
   variant?: "default" | "banner";
   /** Quando definido, não busca no Supabase (útil para testes). */
   slidesOverride?: SlideCarouselSlide[];
+  /** Largura total no painel: sem cantos arredondados nem borda/chroming nas laterais (Admin Master / layouts full-bleed). */
+  fullBleed?: boolean;
   className?: string;
 }
 
@@ -33,6 +35,7 @@ export default function SlideCarousel({
   fallbackSlides,
   variant = "default",
   slidesOverride,
+  fullBleed = false,
   className,
 }: SlideCarouselProps) {
   const [currentSlide, setCurrentSlide] = useState(0);
@@ -152,8 +155,17 @@ export default function SlideCarousel({
   return (
     <div
       className={cn(
-        "relative w-full overflow-hidden",
-        isBanner ? "aspect-[1922/330] rounded-none rounded-b-xl border-b border-border bg-muted/30" : "rounded-xl",
+        "relative w-full max-w-none overflow-hidden",
+        isBanner
+          ? cn(
+              "aspect-[1922/330]",
+              fullBleed
+                ? "rounded-none border-0 bg-muted/30 shadow-none"
+                : "rounded-none rounded-b-xl border-b border-border bg-muted/30",
+            )
+          : fullBleed
+            ? "rounded-none border-0 shadow-none"
+            : "rounded-xl",
         className,
       )}
     >

@@ -3,17 +3,16 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import {
-  Star, User, CheckCircle2, Mail, Minus, Plus,
+  User, CheckCircle2, Mail,
   ArrowLeft, ArrowRight, Sparkles, FileText,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { ExternalLink, Calendar, Info } from "lucide-react";
 import SlideCarousel from "@/components/SlideCarousel";
-import {
-  DomainSelectionCard,
-  canAdvanceFromDomainSelection,
-} from "@/components/domain/DomainSelectionCard";
+import { PurchasedDomainSelectStep } from "@/components/domain/PurchasedDomainSelectStep";
+import { usePurchasedDomains } from "@/hooks/usePurchasedDomains";
+import { useActivePage } from "@/contexts/ActivePageContext";
 import { useUserPlan } from "@/hooks/useUserPlan";
 import UpgradePlanDialog from "@/components/planos/UpgradePlanDialog";
 
@@ -25,19 +24,18 @@ const benefits = [
   "Integração com Google Business",
 ];
 
-const plans = [
-  { name: "Email Go 30 GB", storage: "30 GB por conta", unitPrice: 13.41, defaultAccounts: 2, recommended: false },
-  { name: "Email Go 50 GB", storage: "50 GB por conta", unitPrice: 17.91, defaultAccounts: 2, recommended: true },
-  { name: "Email Locaweb 15 GB", storage: "15 GB por conta", unitPrice: 6.21, defaultAccounts: 25, recommended: false },
-];
+const STEPS = ["Domínio", "E-mail", "Dados", "Confirmação"] as const;
 
-const STEPS = ["Domínio", "Plano", "Dados", "Confirmação"] as const;
-
-function fmt(v: number) {
-  return v.toFixed(2).replace(".", ",");
+/** Caracteres permitidos na parte local do e-mail (RFC simplificado). */
+function sanitizeEmailLocalPart(raw: string) {
+  return raw
+    .toLowerCase()
+    .replace(/\s+/g, "")
+    .replace(/[^a-z0-9._+-]/g, "");
 }
 
 export default function EmailBusinessPage() {
+  const { setActivePage } = useActivePage();
   const [submitting, setSubmitting] = useState(false);
   const [servicoAtivo, setServicoAtivo] = useState<any>(null);
   const { plano, refetch: refetchPlano } = useUserPlan();
@@ -47,61 +45,22 @@ export default function EmailBusinessPage() {
   const [wizardActive, setWizardActive] = useState(false);
   const [step, setStep] = useState(0);
 
-  // step 1 – domain
-  const [domainOption, setDomainOption] = useState<"new" | "existing">("new");
+  // step 0 – domínio (igual ao Website: lista de domínios comprados)
   const [domain, setDomain] = useState("");
-  const [domainChecked, setDomainChecked] = useState(false);
-  const [domainAvailable, setDomainAvailable] = useState<boolean | null>(null);
-  const [checkingDomain, setCheckingDomain] = useState(false);
-  const [domainMessage, setDomainMessage] = useState("");
+  const [purchasedDomainId, setPurchasedDomainId] = useState<string | null>(null);
+  const [domainPickSelect, setDomainPickSelect] = useState("");
+  const domainStepEnabled = wizardActive && step === 0;
+  const { domains: purchasedDomains, loading: domainPickLoading } = usePurchasedDomains(domainStepEnabled);
 
-  // step 2 – plan
-  const [selectedPlan, setSelectedPlan] = useState(1);
-  const [accounts, setAccounts] = useState(plans.map((p) => p.defaultAccounts));
+  // step 1 – nome antes do @ (domínio vem do passo 0)
+  const [emailPrefix, setEmailPrefix] = useState("");
 
-  // step 3 – data
+  // step 2 – dados pessoais / empresa
   const [nomeCompleto, setNomeCompleto] = useState("");
   const [nomeEmpresa, setNomeEmpresa] = useState("");
-  const [emailPrefix, setEmailPrefix] = useState("contato");
 
-  const plan = plans[selectedPlan];
-  const totalMensal = plan.unitPrice * accounts[selectedPlan];
-  const totalAnual = totalMensal * 12;
-  const emailPrincipal = `${emailPrefix}@${domain || "seudominio"}`;
-
-  const resetDomainCheck = () => {
-    setDomainChecked(false);
-    setDomainAvailable(null);
-    setDomainMessage("");
-  };
-
-  const handleCheckDomain = async () => {
-    if (!domain.trim() || !domain.includes(".")) {
-      toast.error("Informe um domínio válido (ex: suaempresa.com.br)");
-      return;
-    }
-    setCheckingDomain(true);
-    setDomainChecked(false);
-    setDomainAvailable(null);
-    try {
-      const { data, error } = await supabase.functions.invoke("check-domain", {
-        body: { domain: domain.trim() },
-      });
-      if (error) throw error;
-      setDomainChecked(true);
-      setDomainAvailable(data.available === true);
-      setDomainMessage(data.message || "");
-      if (data.available) {
-        toast.success("Domínio disponível!");
-      } else {
-        toast.error(data.message || "Domínio indisponível");
-      }
-    } catch (err: any) {
-      toast.error("Erro ao verificar domínio: " + (err.message || ""));
-    } finally {
-      setCheckingDomain(false);
-    }
-  };
+  const emailPrincipal =
+    emailPrefix.trim() && domain.trim() ? `${sanitizeEmailLocalPart(emailPrefix.trim())}@${domain.trim()}` : "";
 
   useEffect(() => {
     const checkServico = async () => {
@@ -124,11 +83,9 @@ export default function EmailBusinessPage() {
       tipo_servico: "email",
       dados_solicitacao: {
         dominio: domain,
-        tipo_dominio: domainOption,
-        plano: plan.name,
-        contas: accounts[selectedPlan],
-        valor_mensal: totalMensal,
-        valor_anual: totalAnual,
+        dominio_usuario_id: purchasedDomainId,
+        tipo_dominio: "existing",
+        email_prefix: sanitizeEmailLocalPart(emailPrefix.trim()),
         email_principal: emailPrincipal,
         nome_completo: nomeCompleto,
         nome_empresa: nomeEmpresa,
@@ -235,13 +192,26 @@ export default function EmailBusinessPage() {
         </div>
 
         <div className="text-center">
-          <Button size="lg" onClick={() => setWizardActive(true)}>
+          <Button
+            size="lg"
+            onClick={() => {
+              setDomainPickSelect("");
+              setPurchasedDomainId(null);
+              setDomain("");
+              setEmailPrefix("");
+              setNomeCompleto("");
+              setNomeEmpresa("");
+              setWizardActive(true);
+            }}
+          >
             Contratar E-mail Business <ArrowRight className="h-4 w-4 ml-2" />
           </Button>
         </div>
       </div>
     );
   }
+
+  const goToDomainMenu = () => setActivePage("dominios");
 
   /* ── Wizard ── */
   return (
@@ -271,85 +241,89 @@ export default function EmailBusinessPage() {
         ))}
       </div>
 
-      {/* Step content */}
-      <div className="rounded-xl border border-border bg-card p-8">
-        {/* STEP 1 – Domínio */}
-        {step === 0 && (
-          <DomainSelectionCard
-            domainOption={domainOption}
-            onDomainOptionChange={setDomainOption}
-            domain={domain}
-            onDomainChange={setDomain}
-            domainChecked={domainChecked}
-            domainAvailable={domainAvailable}
-            domainMessage={domainMessage}
-            checkingDomain={checkingDomain}
-            onCheckDomain={handleCheckDomain}
-            onResetCheck={resetDomainCheck}
+      {step === 0 ? (
+        <div className="space-y-8 max-w-lg">
+          <PurchasedDomainSelectStep
+            domains={purchasedDomains}
+            loading={domainPickLoading}
+            value={domainPickSelect}
+            onValueChange={(id, row) => {
+              setDomainPickSelect(id);
+              if (row) {
+                setDomain(row.fqdn);
+                setPurchasedDomainId(row.id);
+              }
+            }}
+            onRegisterNew={goToDomainMenu}
           />
-        )}
-
-        {/* STEP 2 – Plano */}
+          <div className="flex justify-between pt-4">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setWizardActive(false);
+                setStep(0);
+              }}
+            >
+              <ArrowLeft className="h-4 w-4 mr-2" /> Voltar
+            </Button>
+            <Button
+              onClick={() => {
+                if (!domainPickSelect || !domain.trim()) {
+                  toast.error("Selecione um domínio já cadastrado ou registre um novo no menu Domínios.");
+                  return;
+                }
+                if (plano === "free") {
+                  setUpgradeOpen(true);
+                  return;
+                }
+                setStep(1);
+              }}
+            >
+              Próximo <ArrowRight className="h-4 w-4 ml-2" />
+            </Button>
+          </div>
+        </div>
+      ) : (
+      <div className="rounded-xl border border-border bg-card p-8">
+        {/* STEP 2 – Nome do e-mail (domínio fixo do passo anterior) */}
         {step === 1 && (
-          <div className="space-y-6">
+          <div className="space-y-6 max-w-xl">
             <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
-              <Star className="h-5 w-5" /> Confirme seu plano
+              <Mail className="h-5 w-5" /> Seu e-mail principal
             </h2>
 
-            <div className="space-y-4">
-              {plans.map((p, idx) => (
-                <div
-                  key={p.name}
-                  onClick={() => setSelectedPlan(idx)}
-                  className={`rounded-xl border p-5 cursor-pointer transition-all ${
-                    selectedPlan === idx
-                      ? "border-primary ring-2 ring-primary/20"
-                      : "border-border hover:border-muted-foreground/30"
-                  }`}
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-3">
-                      {idx === 2 ? (
-                        <User className="h-5 w-5 text-muted-foreground" />
-                      ) : idx === 1 ? (
-                        <Star className="h-5 w-5 text-primary" />
-                      ) : (
-                        <Mail className="h-5 w-5 text-muted-foreground" />
-                      )}
-                      <div>
-                        <p className="font-semibold text-foreground">{p.name}</p>
-                        <p className="text-sm text-muted-foreground">{p.storage}</p>
-                      </div>
-                    </div>
-                    {p.recommended && (
-                      <Badge className="bg-primary text-primary-foreground">Recomendado</Badge>
-                    )}
-                  </div>
+            <div className="rounded-lg border border-border bg-muted/40 px-4 py-3">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Domínio (fixo)</p>
+              <p className="font-mono text-sm font-semibold text-foreground break-all mt-1">{domain || "—"}</p>
+            </div>
 
-                  <div className="flex items-center justify-between mt-4">
-                    <div className="flex items-center gap-2">
-                      <Mail className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-sm text-muted-foreground">Contas:</span>
-                      <div className="flex items-center border border-border rounded-lg ml-2">
-                        <Button
-                          variant="ghost" size="icon" className="h-8 w-8"
-                          onClick={(e) => { e.stopPropagation(); setAccounts(prev => { const n = [...prev]; n[idx] = Math.max(1, n[idx] - 1); return n; }); }}
-                        ><Minus className="h-3 w-3" /></Button>
-                        <span className="w-8 text-center text-sm font-medium text-foreground">{accounts[idx]}</span>
-                        <Button
-                          variant="ghost" size="icon" className="h-8 w-8"
-                          onClick={(e) => { e.stopPropagation(); setAccounts(prev => { const n = [...prev]; n[idx] = n[idx] + 1; return n; }); }}
-                        ><Plus className="h-3 w-3" /></Button>
-                      </div>
-                    </div>
-                  </div>
+            <div>
+              <label htmlFor="email-prefix-local" className="text-sm font-medium text-foreground block mb-2">
+                Nome do e-mail desejado
+              </label>
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-2 rounded-lg border border-border bg-background px-3 py-2">
+                <Input
+                  id="email-prefix-local"
+                  className="border-0 shadow-none focus-visible:ring-0 max-w-[220px] px-0 h-9"
+                  placeholder="contato"
+                  value={emailPrefix}
+                  onChange={(e) => setEmailPrefix(sanitizeEmailLocalPart(e.target.value))}
+                  autoComplete="off"
+                  spellCheck={false}
+                />
+                <span className="text-sm text-muted-foreground select-none shrink-0">@{domain || ""}</span>
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">Apenas o trecho antes do @ pode ser editado. O domínio não pode ser alterado nesta etapa.</p>
+            </div>
 
-                  <div className="flex items-center justify-between mt-3">
-                    <span className="text-sm text-muted-foreground">{accounts[idx]}x R$ {fmt(p.unitPrice)}</span>
-                    <span className="font-bold text-foreground">R$ {fmt(p.unitPrice * accounts[idx])}/mês</span>
-                  </div>
-                </div>
-              ))}
+            <div className="space-y-3 rounded-lg border border-border/80 bg-muted/20 p-4 text-sm text-muted-foreground leading-relaxed">
+              <p>
+                Você deseja ter mais de 1 e-mail business? Você terá a oportunidade de comprar novas caixas de e-mail assim
+                que registrar o seu e-mail principal.
+              </p>
+              <p>
+                Após o registro deste e-mail, não haverá possibilidade de reverter ou editar o nome do registro de e-mail.
+              </p>
             </div>
           </div>
         )}
@@ -361,7 +335,7 @@ export default function EmailBusinessPage() {
               <User className="h-5 w-5" /> Seus dados
             </h2>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="text-sm font-medium text-foreground block mb-1">Nome completo</label>
                 <Input placeholder="Felipe da Silva" value={nomeCompleto} onChange={(e) => setNomeCompleto(e.target.value)} />
@@ -372,22 +346,9 @@ export default function EmailBusinessPage() {
               </div>
             </div>
 
-            <div>
-              <label className="text-sm font-medium text-foreground block mb-1">Nome do e-mail principal</label>
-              <div className="flex items-center gap-2">
-                <Input
-                  className="max-w-[200px]"
-                  value={emailPrefix}
-                  onChange={(e) => setEmailPrefix(e.target.value)}
-                />
-                <span className="text-sm text-muted-foreground">@{domain || "seudominio"}</span>
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">Sugestões: contato, reservas, financeiro</p>
-            </div>
-
             <div className="rounded-xl border border-primary/20 bg-primary/5 p-5 text-center">
-              <p className="text-sm text-muted-foreground">E-mail principal:</p>
-              <p className="text-lg font-bold text-foreground mt-1">{emailPrincipal}</p>
+              <p className="text-sm text-muted-foreground">E-mail principal</p>
+              <p className="text-lg font-bold text-foreground mt-1 break-all">{emailPrincipal || "—"}</p>
             </div>
           </div>
         )}
@@ -400,33 +361,21 @@ export default function EmailBusinessPage() {
             </h2>
 
             <div className="divide-y divide-border">
-              <div className="flex justify-between py-3">
-                <span className="text-sm text-muted-foreground">Domínio</span>
-                <span className="text-sm font-medium text-foreground">{domain || "—"}</span>
+              <div className="flex justify-between gap-4 py-3">
+                <span className="text-sm text-muted-foreground shrink-0">Domínio</span>
+                <span className="text-sm font-medium text-foreground text-right break-all">{domain || "—"}</span>
               </div>
-              <div className="flex justify-between py-3">
-                <span className="text-sm text-muted-foreground">Plano</span>
-                <span className="text-sm font-medium text-foreground">{plan.name}</span>
+              <div className="flex justify-between gap-4 py-3">
+                <span className="text-sm text-muted-foreground shrink-0">E-mail principal</span>
+                <span className="text-sm font-medium text-foreground text-right break-all">{emailPrincipal}</span>
               </div>
-              <div className="flex justify-between py-3">
-                <span className="text-sm text-muted-foreground">Contas de e-mail</span>
-                <span className="text-sm font-medium text-foreground">{accounts[selectedPlan]} contas</span>
+              <div className="flex justify-between gap-4 py-3">
+                <span className="text-sm text-muted-foreground shrink-0">Empresa</span>
+                <span className="text-sm font-medium text-foreground text-right">{nomeEmpresa || "—"}</span>
               </div>
-              <div className="flex justify-between py-3">
-                <span className="text-sm text-muted-foreground">Valor mensal</span>
-                <span className="text-sm font-medium text-foreground">R$ {fmt(totalMensal)}/mês</span>
-              </div>
-              <div className="flex justify-between py-3">
-                <span className="text-sm text-muted-foreground">Valor anual</span>
-                <span className="text-sm font-bold text-primary">R$ {fmt(totalAnual)}/ano</span>
-              </div>
-              <div className="flex justify-between py-3">
-                <span className="text-sm text-muted-foreground">E-mail principal</span>
-                <span className="text-sm font-medium text-foreground">{emailPrincipal}</span>
-              </div>
-              <div className="flex justify-between py-3">
-                <span className="text-sm text-muted-foreground">Responsável</span>
-                <span className="text-sm font-medium text-foreground">{nomeCompleto || "—"}</span>
+              <div className="flex justify-between gap-4 py-3">
+                <span className="text-sm text-muted-foreground shrink-0">Responsável</span>
+                <span className="text-sm font-medium text-foreground text-right">{nomeCompleto || "—"}</span>
               </div>
             </div>
 
@@ -448,7 +397,7 @@ export default function EmailBusinessPage() {
           <Button
             variant="outline"
             onClick={() => {
-              if (step === 0) setWizardActive(false);
+              if (step === 1) setStep(0);
               else setStep((s) => s - 1);
             }}
           >
@@ -457,34 +406,23 @@ export default function EmailBusinessPage() {
           {step < 3 ? (
             <Button
               onClick={() => {
-                if (step === 0) {
-                  if (!canAdvanceFromDomainSelection(domain, domainOption, domainChecked, domainAvailable)) {
-                    if (domainOption === "new" && !domainChecked) {
-                      toast.error("Pesquise a disponibilidade do domínio antes de continuar.");
-                    } else if (domainOption === "new" && domainAvailable === false) {
-                      toast.error("Domínio indisponível. Escolha outro domínio.");
-                    } else {
-                      toast.error("Informe um domínio válido.");
-                    }
+                if (step === 1) {
+                  const local = sanitizeEmailLocalPart(emailPrefix.trim());
+                  if (!local.length) {
+                    toast.error("Digite o nome do e-mail (parte antes do @).");
                     return;
                   }
-                  if (plano === "free") {
-                    setUpgradeOpen(true);
+                  if (local.startsWith(".") || local.endsWith(".") || local.includes("..")) {
+                    toast.error("Nome do e-mail inválido.");
                     return;
                   }
                 }
                 if (step === 2) {
                   if (!nomeCompleto.trim()) { toast.error("Preencha o nome completo."); return; }
                   if (!nomeEmpresa.trim()) { toast.error("Preencha o nome da empresa."); return; }
-                  if (!emailPrefix.trim()) { toast.error("Preencha o nome do e-mail principal."); return; }
                 }
                 setStep((s) => s + 1);
               }}
-              variant={
-                step === 0 && !canAdvanceFromDomainSelection(domain, domainOption, domainChecked, domainAvailable)
-                  ? "outline"
-                  : "default"
-              }
             >
               Próximo <ArrowRight className="h-4 w-4 ml-2" />
             </Button>
@@ -501,6 +439,7 @@ export default function EmailBusinessPage() {
           )}
         </div>
       </div>
+      )}
     </div>
   );
 }
