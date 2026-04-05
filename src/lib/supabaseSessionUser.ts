@@ -9,9 +9,11 @@ export function getPersistedSupabaseUserId(): string | null {
       if (!raw) continue;
       const parsed = JSON.parse(raw) as {
         user?: { id?: string };
+        session?: { user?: { id?: string } };
         currentSession?: { user?: { id?: string } };
       };
-      const id = parsed.user?.id ?? parsed.currentSession?.user?.id;
+      const id =
+        parsed.user?.id ?? parsed.session?.user?.id ?? parsed.currentSession?.user?.id;
       if (id && typeof id === "string") return id;
     }
   } catch {

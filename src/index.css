@@ -6,8 +6,59 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Modo claro = :root sem classe .dark no <html>. Modo escuro = <html class="dark">. */
+
 @layer base {
   :root {
+    --background: 0 0% 100%;
+    --foreground: 220 15% 12%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 220 15% 12%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 15% 12%;
+
+    --primary: 35 90% 48%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 220 14% 96%;
+    --secondary-foreground: 220 15% 18%;
+
+    --muted: 220 14% 96%;
+    --muted-foreground: 220 10% 40%;
+
+    --accent: 220 14% 94%;
+    --accent-foreground: 220 15% 18%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 35 90% 48%;
+
+    --radius: 0.75rem;
+
+    --sidebar-background: 220 14% 98%;
+    --sidebar-foreground: 220 15% 18%;
+    --sidebar-primary: 35 90% 48%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 220 14% 94%;
+    --sidebar-accent-foreground: 220 15% 18%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 35 90% 48%;
+
+    --login-bg: 220 18% 96%;
+    --login-card: 0 0% 100%;
+    --login-input: 220 14% 97%;
+    --login-input-border: 220 13% 88%;
+    --login-btn: 35 90% 48%;
+    --login-btn-foreground: 0 0% 100%;
+    --captcha-bg: 220 14% 94%;
+  }
+
+  .dark {
     --background: 220 15% 10%;
     --foreground: 0 0% 90%;
 
@@ -35,8 +86,6 @@
     --border: 220 10% 22%;
     --input: 220 10% 18%;
     --ring: 35 80% 55%;
-
-    --radius: 0.75rem;
 
     --sidebar-background: 220 15% 10%;
     --sidebar-foreground: 0 0% 90%;

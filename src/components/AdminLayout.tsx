@@ -1,4 +1,5 @@
-import { useRef } from "react";
+import { useRef, useLayoutEffect } from "react";
+import { syncPanelThemeForCurrentUser } from "@/lib/panelTheme";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { useSlowScrollContainer } from "@/hooks/useSlowScrollContainer";
 import { AdminSidebar } from "@/components/AdminSidebar";
@@ -53,6 +54,10 @@ function AdminContent() {
   const mainRef = useRef<HTMLElement>(null);
   useSlowScrollContainer(mainRef, activePage === "templates");
   const PageComponent = PAGE_MAP[activePage] || AdminAbrangenciaPage;
+
+  useLayoutEffect(() => {
+    syncPanelThemeForCurrentUser("admin");
+  }, []);
 
   return (
     <div className="min-h-screen flex w-full bg-background">

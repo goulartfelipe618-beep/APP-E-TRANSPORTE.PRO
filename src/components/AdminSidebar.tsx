@@ -1,7 +1,6 @@
 import {
   SlidersHorizontal, LogOut, Shield, BarChart3, MapPin, FileText, ChevronDown, Users, ClipboardList, Building2, LayoutTemplate, Bell, Moon, Sun, Settings, StickyNote, MessageSquare, Zap, GraduationCap, Plane, Megaphone,
 } from "lucide-react";
-import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -16,6 +15,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useActivePage } from "@/contexts/ActivePageContext";
 import { useConfiguracoes } from "@/contexts/ConfiguracoesContext";
+import { usePanelTheme } from "@/hooks/usePanelTheme";
 
 const simpleItems = [
   { title: "Abrangência", page: "abrangencia", icon: MapPin },
@@ -50,16 +50,7 @@ export function AdminSidebar() {
   const navigate = useNavigate();
   const { activePage, setActivePage } = useActivePage();
   const { config } = useConfiguracoes();
-
-  const [darkMode, setDarkMode] = useState(() => document.documentElement.classList.contains("dark"));
-
-  useEffect(() => {
-    if (darkMode) {
-      document.documentElement.classList.add("dark");
-    } else {
-      document.documentElement.classList.remove("dark");
-    }
-  }, [darkMode]);
+  const { darkMode, toggle: toggleTheme } = usePanelTheme("admin");
 
   const isActive = (page: string) => activePage === page;
   const contratoActive = contratoChildren.some((c) => isActive(c.page));
@@ -202,7 +193,7 @@ export function AdminSidebar() {
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>
-            <SidebarMenuButton className="w-full" onClick={() => setDarkMode(!darkMode)}>
+            <SidebarMenuButton className="w-full" onClick={() => void toggleTheme()}>
               {darkMode ? <Sun className="h-4 w-4 mr-2" /> : <Moon className="h-4 w-4 mr-2" />}
               {!collapsed && <span>{darkMode ? "Modo Claro" : "Modo Escuro"}</span>}
             </SidebarMenuButton>

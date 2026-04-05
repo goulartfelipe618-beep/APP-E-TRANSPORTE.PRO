@@ -1,7 +1,7 @@
 import { getPersistedSupabaseUserId } from "@/lib/supabaseSessionUser";
 
 /** Painéis com preferência de tema isolada (não partilham a mesma chave). */
-export type PanelThemeKind = "frota" | "taxi";
+export type PanelThemeKind = "frota" | "taxi" | "admin";
 
 function storageKey(panel: PanelThemeKind): string {
   return `etp_theme_${panel}_v1`;

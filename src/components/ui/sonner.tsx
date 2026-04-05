@@ -1,10 +1,30 @@
-import { useTheme } from "next-themes";
+import { useSyncExternalStore } from "react";
 import { Toaster as Sonner, toast } from "sonner";
 
 type ToasterProps = React.ComponentProps<typeof Sonner>;
 
+function subscribeToHtmlDark(callback: () => void) {
+  const el = document.documentElement;
+  const obs = new MutationObserver(() => callback());
+  obs.observe(el, { attributes: true, attributeFilter: ["class"] });
+  return () => obs.disconnect();
+}
+
+function getHtmlIsDarkSnapshot() {
+  return document.documentElement.classList.contains("dark");
+}
+
+function getServerSnapshot() {
+  return false;
+}
+
+function useHtmlDarkTheme(): "light" | "dark" {
+  const dark = useSyncExternalStore(subscribeToHtmlDark, getHtmlIsDarkSnapshot, getServerSnapshot);
+  return dark ? "dark" : "light";
+}
+
 const Toaster = ({ ...props }: ToasterProps) => {
-  const { theme = "system" } = useTheme();
+  const theme = useHtmlDarkTheme();
 
   return (
     <Sonner
