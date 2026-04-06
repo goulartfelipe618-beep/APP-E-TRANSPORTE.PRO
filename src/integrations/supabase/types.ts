@@ -317,7 +317,9 @@ export type Database = {
           fqdn: string
           id: string
           observacoes: string | null
+          plataforma_registro: string | null
           status: string
+          tipo_origem: string | null
           updated_at: string
           user_id: string
         }
@@ -326,7 +328,9 @@ export type Database = {
           fqdn: string
           id?: string
           observacoes?: string | null
+          plataforma_registro?: string | null
           status?: string
+          tipo_origem?: string | null
           updated_at?: string
           user_id: string
         }
@@ -335,7 +339,9 @@ export type Database = {
           fqdn?: string
           id?: string
           observacoes?: string | null
+          plataforma_registro?: string | null
           status?: string
+          tipo_origem?: string | null
           updated_at?: string
           user_id?: string
         }
