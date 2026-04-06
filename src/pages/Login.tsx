@@ -92,14 +92,14 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen w-full bg-background lg:flex lg:items-stretch">
-      <aside className="hidden lg:block lg:w-1/2 bg-black">
+    <div className="h-screen w-full overflow-hidden bg-background lg:flex lg:items-stretch">
+      <aside className="hidden h-screen lg:block lg:w-1/2 bg-black">
         <img src={loginConfig.imagem_lateral_url} alt="" className="h-full w-full object-contain object-center" />
       </aside>
 
-      <section className="w-full lg:w-1/2 bg-white min-h-screen">
-        <div className="mx-auto flex min-h-screen w-full max-w-xl flex-col px-6 py-6 sm:px-8">
-          <div className="mb-8 flex items-center justify-end gap-3">
+      <section className="h-screen w-full overflow-hidden bg-white lg:w-1/2">
+        <div className="mx-auto flex h-full w-full max-w-xl flex-col px-4 py-3 sm:px-6">
+          <div className="mb-3 flex items-center justify-end gap-2">
             <Button type="button" variant="outline" size="sm" className="gap-2" onClick={() => window.open("mailto:suporte@e-transporte.pro", "_blank")}>
               <HelpCircle className="h-4 w-4" />
               {loginConfig.texto_botao_ajuda}
@@ -116,24 +116,24 @@ const Login = () => {
             </select>
           </div>
 
-          <div className="my-auto space-y-6">
+          <div className="flex min-h-0 flex-1 flex-col justify-center gap-3">
             <LoginAvisosBanner />
 
-            <header className="space-y-2">
+            <header className="space-y-1">
               <p className="text-xs font-semibold tracking-wide text-primary">E-TRANSPORTE.PRO</p>
-              <h1 className="text-3xl font-bold text-foreground">{loginConfig.painel_titulo}</h1>
-              <p className="text-sm text-muted-foreground">{loginConfig.painel_subtitulo}</p>
+              <h1 className="text-2xl font-bold leading-tight text-foreground">{loginConfig.painel_titulo}</h1>
+              <p className="text-xs text-muted-foreground">{loginConfig.painel_subtitulo}</p>
             </header>
 
             <Card className="border-border shadow-sm">
-              <CardHeader className="pb-3">
+              <CardHeader className="px-4 pb-2 pt-4">
                 <CardTitle className="text-xl">{loginConfig.form_titulo}</CardTitle>
-                <p className="text-sm text-muted-foreground">{loginConfig.form_legenda}</p>
+                <p className="text-xs text-muted-foreground">{loginConfig.form_legenda}</p>
               </CardHeader>
-              <CardContent>
-                <form onSubmit={handleLogin} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="login-user">Usuario</Label>
+              <CardContent className="px-4 pb-4 pt-0">
+                <form onSubmit={handleLogin} className="space-y-3">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="login-user" className="text-xs">Usuario</Label>
                     <div className="flex items-center gap-2 rounded-md border border-input bg-background px-3">
                       <Mail className="h-4 w-4 text-muted-foreground" />
                       <Input
@@ -148,8 +148,8 @@ const Login = () => {
                     </div>
                   </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="login-pass">Senha</Label>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="login-pass" className="text-xs">Senha</Label>
                     <div className="flex items-center gap-2 rounded-md border border-input bg-background px-3">
                       <Lock className="h-4 w-4 text-muted-foreground" />
                       <Input
@@ -164,11 +164,11 @@ const Login = () => {
                     </div>
                   </div>
 
-                  <div className="space-y-2">
-                    <Label>Codigo de seguranca</Label>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Codigo de seguranca</Label>
                     <div className="flex items-center gap-2">
                       <Key className="h-4 w-4 text-muted-foreground" />
-                      <div className="rounded-md border bg-muted px-4 py-2 font-mono tracking-widest line-through decoration-muted-foreground/40">
+                      <div className="rounded-md border bg-muted px-4 py-1.5 text-sm font-mono tracking-widest line-through decoration-muted-foreground/40">
                         {captcha}
                       </div>
                       <button
@@ -193,7 +193,7 @@ const Login = () => {
                     </div>
                   </div>
 
-                  <div className="text-right">
+                  <div className="text-right leading-none">
                     <a className="text-xs text-primary hover:underline" href="mailto:suporte@e-transporte.pro">
                       {loginConfig.texto_esqueci_senha}
                     </a>
@@ -209,10 +209,10 @@ const Login = () => {
               </CardContent>
             </Card>
 
-            <Alert className="bg-slate-50 border-slate-200">
+            <Alert className="bg-slate-50 border-slate-200 px-4 py-3">
               <AlertTitle className="text-sm">{loginConfig.seguranca_titulo}</AlertTitle>
               <AlertDescription>
-                <ul className="list-disc space-y-1 pl-5">
+                <ul className="list-disc space-y-0.5 pl-5 text-xs">
                   {loginConfig.seguranca_itens.map((item, idx) => (
                     <li key={idx}>{item}</li>
                   ))}
@@ -221,7 +221,7 @@ const Login = () => {
             </Alert>
           </div>
 
-          <footer className="mt-8 text-center text-xs text-muted-foreground">{loginConfig.rodape_texto}</footer>
+          <footer className="mt-3 text-center text-[11px] text-muted-foreground">{loginConfig.rodape_texto}</footer>
         </div>
       </section>
     </div>
