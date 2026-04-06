@@ -8,21 +8,15 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { mergeLoginPainelConfig, type LoginPainelConfig } from "@/lib/loginPainelConfig";
+import {
+  DEFAULT_LOGIN_PAINEL_CONFIG,
+  mergeLoginPainelConfig,
+  type LoginPainelConfig,
+} from "@/lib/loginPainelConfig";
 import LoginAvisosBanner from "@/components/LoginAvisosBanner";
 
+/** Persistência opcional; não ler na montagem — evita exibir URL antiga da imagem antes do fetch. */
 const LOGIN_CONFIG_CACHE_KEY = "etp_login_painel_config_v1";
-
-function readLoginConfigCache(): LoginPainelConfig | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = sessionStorage.getItem(LOGIN_CONFIG_CACHE_KEY);
-    if (!raw) return null;
-    return mergeLoginPainelConfig(JSON.parse(raw) as Partial<LoginPainelConfig>);
-  } catch {
-    return null;
-  }
-}
 
 function writeLoginConfigCache(config: LoginPainelConfig) {
   try {
@@ -50,8 +44,8 @@ const Login = () => {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [idioma, setIdioma] = useState("pt-BR");
-  const [loginConfig, setLoginConfig] = useState<LoginPainelConfig | null>(() => readLoginConfigCache());
-  const [configReady, setConfigReady] = useState(() => readLoginConfigCache() !== null);
+  const [loginConfig, setLoginConfig] = useState<LoginPainelConfig | null>(null);
+  const [lateralImageReady, setLateralImageReady] = useState(false);
 
   const refreshCaptcha = useCallback(() => {
     setCaptcha(generateCaptcha());
@@ -69,9 +63,40 @@ const Login = () => {
       setLoginConfig(merged);
       setIdioma(merged.idioma_padrao || "pt-BR");
       writeLoginConfigCache(merged);
-      setConfigReady(true);
     })();
   }, []);
+
+  useEffect(() => {
+    const url = loginConfig?.imagem_lateral_url;
+    if (!url) {
+      setLateralImageReady(false);
+      return;
+    }
+    setLateralImageReady(false);
+    let cancelled = false;
+    const img = new Image();
+    img.onload = () => {
+      void (async () => {
+        try {
+          if ("decode" in img && typeof img.decode === "function") {
+            await img.decode();
+          }
+        } catch {
+          /* decode opcional */
+        }
+        if (!cancelled) setLateralImageReady(true);
+      })();
+    };
+    img.onerror = () => {
+      if (!cancelled) setLateralImageReady(true);
+    };
+    img.src = url;
+    return () => {
+      cancelled = true;
+      img.onload = null;
+      img.onerror = null;
+    };
+  }, [loginConfig?.imagem_lateral_url]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -118,8 +143,9 @@ const Login = () => {
   return (
     <div className="fixed inset-0 z-0 flex h-[100dvh] w-full max-w-none flex-col overflow-hidden bg-white lg:flex-row lg:gap-0 lg:items-stretch">
       <aside className="hidden h-full min-h-0 shrink-0 overflow-hidden bg-white p-0 lg:block lg:w-1/2 lg:max-w-[50%]">
-        {configReady && loginConfig ? (
+        {loginConfig && lateralImageReady ? (
           <img
+            key={loginConfig.imagem_lateral_url}
             src={loginConfig.imagem_lateral_url}
             alt=""
             className="h-full w-full object-contain object-left"
@@ -243,7 +269,7 @@ const Login = () => {
               <AlertTitle className="text-sm">{loginConfig?.seguranca_titulo ?? "Checkup de segurança"}</AlertTitle>
               <AlertDescription>
                 <ul className="list-disc space-y-0.5 pl-5 text-xs">
-                  {(loginConfig?.seguranca_itens ?? []).map((item, idx) => (
+                  {(loginConfig?.seguranca_itens ?? DEFAULT_LOGIN_PAINEL_CONFIG.seguranca_itens).map((item, idx) => (
                     <li key={idx}>{item}</li>
                   ))}
                 </ul>
