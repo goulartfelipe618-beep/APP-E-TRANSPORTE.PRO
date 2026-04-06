@@ -29,6 +29,7 @@ import {
 import { isMissingFonteColumnError } from "@/lib/painelAvisoPersist";
 import { renderAvisoTextoComMarcacao } from "@/lib/painelAvisoTexto";
 import { ConfirmDeleteDialog } from "@/components/ConfirmDeleteDialog";
+import AdminFullscreenBannersSection from "@/pages/admin/AdminFullscreenBannersSection";
 import {
   Select,
   SelectContent,
@@ -246,6 +247,8 @@ export default function AdminAvisosPage() {
           Novo aviso
         </Button>
       </div>
+
+      <AdminFullscreenBannersSection />
 
       {loading ? (
         <div className="flex items-center gap-2 text-muted-foreground py-12">

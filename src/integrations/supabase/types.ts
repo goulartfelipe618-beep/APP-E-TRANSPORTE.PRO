@@ -59,6 +59,48 @@ export type Database = {
         }
         Relationships: []
       }
+      admin_fullscreen_banners: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          data_fim: string
+          data_inicio: string
+          id: string
+          imagem_url: string
+          incluir_motorista: boolean
+          incluir_taxi: boolean
+          paginas_motorista: string[] | null
+          paginas_taxi: string[] | null
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          data_fim: string
+          data_inicio: string
+          id?: string
+          imagem_url: string
+          incluir_motorista?: boolean
+          incluir_taxi?: boolean
+          paginas_motorista?: string[] | null
+          paginas_taxi?: string[] | null
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          data_fim?: string
+          data_inicio?: string
+          id?: string
+          imagem_url?: string
+          incluir_motorista?: boolean
+          incluir_taxi?: boolean
+          paginas_motorista?: string[] | null
+          paginas_taxi?: string[] | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       anotacoes: {
         Row: {
           conteudo: string | null
