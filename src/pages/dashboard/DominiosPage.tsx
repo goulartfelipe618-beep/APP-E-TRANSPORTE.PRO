@@ -603,9 +603,6 @@ export default function DominiosPage() {
           onEscapeKeyDown={(e) => {
             if (confirmLockRemaining > 0) e.preventDefault();
           }}
-          onPointerDownOutside={(e) => {
-            if (confirmLockRemaining > 0) e.preventDefault();
-          }}
         >
           <AlertDialogHeader>
             <AlertDialogTitle>Confirmar solicitação</AlertDialogTitle>
