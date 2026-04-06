@@ -20,6 +20,7 @@ import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp
 import MapboxAddressInput from "@/components/mapbox/MapboxAddressInput";
 import { isMapboxConfigured } from "@/lib/mapboxGeocode";
 import { persistNetworkRetornoSolicitado, persistNetworkSair } from "@/lib/networkNacionalPrefs";
+import LoginConfiguracoesSection from "@/pages/dashboard/LoginConfiguracoesSection";
 
 const FONT_OPTIONS = [
   { value: "montserrat", label: "Montserrat" },
@@ -678,6 +679,8 @@ export default function SistemaConfiguracoesPage() {
           <Save className="h-4 w-4 mr-2" /> Salvar
         </Button>
       </div>
+
+      <LoginConfiguracoesSection />
 
       {/* Informações Contratuais */}
       <div className="rounded-xl border border-border bg-card p-6 max-w-2xl">

@@ -1,9 +1,15 @@
 import { useState, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Mail, Lock, Key, RefreshCw, LogIn } from "lucide-react";
+import { HelpCircle, Key, Lock, LogIn, Mail, RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { getPostLoginPath } from "@/lib/sessionRole";
-import luxuryCar from "@/assets/luxury-car.jpg";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { mergeLoginPainelConfig, type LoginPainelConfig } from "@/lib/loginPainelConfig";
+import LoginAvisosBanner from "@/components/LoginAvisosBanner";
 
 function generateCaptcha(length = 6): string {
   const chars = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ23456789";
@@ -22,6 +28,8 @@ const Login = () => {
   const [captchaInput, setCaptchaInput] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [idioma, setIdioma] = useState("pt-BR");
+  const [loginConfig, setLoginConfig] = useState<LoginPainelConfig>(() => mergeLoginPainelConfig(null));
 
   const refreshCaptcha = useCallback(() => {
     setCaptcha(generateCaptcha());
@@ -31,6 +39,15 @@ const Login = () => {
   useEffect(() => {
     refreshCaptcha();
   }, [refreshCaptcha]);
+
+  useEffect(() => {
+    void (async () => {
+      const { data } = await supabase.from("login_painel_config").select("*").eq("id", 1).maybeSingle();
+      const merged = mergeLoginPainelConfig(data as Partial<LoginPainelConfig>);
+      setLoginConfig(merged);
+      setIdioma(merged.idioma_padrao || "pt-BR");
+    })();
+  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -75,109 +92,138 @@ const Login = () => {
   };
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center bg-[hsl(var(--login-bg))] p-4 overflow-hidden">
-      {/* Ambient background */}
-      <div className="pointer-events-none absolute inset-0">
-        <div className="absolute -top-1/3 -left-1/4 h-[700px] w-[700px] rounded-full bg-primary/20 blur-[120px]" />
-        <div className="absolute -bottom-1/4 -right-1/4 h-[600px] w-[600px] rounded-full bg-blue-600/15 blur-[100px]" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-[500px] w-[500px] rounded-full bg-amber-500/10 blur-[140px]" />
-        <div className="absolute inset-0" style={{ backgroundImage: 'radial-gradient(rgba(255,255,255,0.06) 1px, transparent 1px)', backgroundSize: '32px 32px' }} />
-      </div>
-      <div className="w-full max-w-md">
-        <div className="overflow-hidden rounded-2xl bg-[hsl(var(--login-card))] shadow-2xl">
-          {/* Car Image */}
-          <div className="overflow-hidden rounded-t-2xl">
-            <img
-              src={luxuryCar}
-              alt="Luxury car"
-              className="h-52 w-full object-cover"
-            />
+    <div className="min-h-screen w-full bg-background lg:flex">
+      <aside className="hidden lg:block lg:w-1/2 lg:h-screen">
+        <img src={loginConfig.imagem_lateral_url} alt="" className="h-full w-full object-cover" />
+      </aside>
+
+      <section className="w-full lg:w-1/2 bg-white min-h-screen">
+        <div className="mx-auto flex min-h-screen w-full max-w-xl flex-col px-6 py-6 sm:px-8">
+          <div className="mb-8 flex items-center justify-end gap-3">
+            <Button type="button" variant="outline" size="sm" className="gap-2" onClick={() => window.open("mailto:suporte@e-transporte.pro", "_blank")}>
+              <HelpCircle className="h-4 w-4" />
+              {loginConfig.texto_botao_ajuda}
+            </Button>
+            <select
+              value={idioma}
+              onChange={(e) => setIdioma(e.target.value)}
+              className="h-9 rounded-md border border-input bg-background px-2 text-sm"
+              aria-label="Idioma"
+            >
+              <option value="pt-BR">PT-BR</option>
+              <option value="en-US">EN</option>
+              <option value="es-ES">ES</option>
+            </select>
           </div>
 
-          {/* Form */}
-          <div className="px-8 pb-8 pt-6">
-            <h1 className="mb-6 text-center text-xl font-bold text-foreground">
-              Faça seu Login
-            </h1>
+          <div className="my-auto space-y-6">
+            <LoginAvisosBanner />
 
-            <form onSubmit={handleLogin} className="space-y-4">
-              {/* Email */}
-              <div className="flex items-center gap-3 rounded-lg border border-[hsl(var(--login-input-border))] bg-[hsl(var(--login-input))] px-4 py-3">
-                <Mail className="h-5 w-5 text-muted-foreground" />
-                <input
-                  type="email"
-                  placeholder="Email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  className="w-full bg-transparent text-foreground placeholder:text-muted-foreground focus:outline-none"
-                />
-              </div>
+            <header className="space-y-2">
+              <p className="text-xs font-semibold tracking-wide text-primary">E-TRANSPORTE.PRO</p>
+              <h1 className="text-3xl font-bold text-foreground">{loginConfig.painel_titulo}</h1>
+              <p className="text-sm text-muted-foreground">{loginConfig.painel_subtitulo}</p>
+            </header>
 
-              {/* Password */}
-              <div className="flex items-center gap-3 rounded-lg border border-[hsl(var(--login-input-border))] bg-[hsl(var(--login-input))] px-4 py-3">
-                <Lock className="h-5 w-5 text-muted-foreground" />
-                <input
-                  type="password"
-                  placeholder="Senha"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  className="w-full bg-transparent text-foreground placeholder:text-muted-foreground focus:outline-none"
-                />
-              </div>
+            <Card className="border-border shadow-sm">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-xl">{loginConfig.form_titulo}</CardTitle>
+                <p className="text-sm text-muted-foreground">{loginConfig.form_legenda}</p>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handleLogin} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="login-user">Usuario</Label>
+                    <div className="flex items-center gap-2 rounded-md border border-input bg-background px-3">
+                      <Mail className="h-4 w-4 text-muted-foreground" />
+                      <Input
+                        id="login-user"
+                        type="email"
+                        placeholder={loginConfig.placeholder_usuario}
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        required
+                        className="border-0 px-0 shadow-none focus-visible:ring-0"
+                      />
+                    </div>
+                  </div>
 
-              {/* Captcha Display */}
-              <div className="flex items-center gap-3">
-                <Key className="h-5 w-5 text-muted-foreground" />
-                <div className="rounded-lg bg-[hsl(var(--captcha-bg))] px-4 py-2 font-mono text-lg tracking-widest text-foreground line-through decoration-muted-foreground/40">
-                  {captcha}
-                </div>
-                <button
-                  type="button"
-                  onClick={refreshCaptcha}
-                  className="text-muted-foreground transition-colors hover:text-foreground"
-                >
-                  <RefreshCw className="h-5 w-5" />
-                </button>
-              </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="login-pass">Senha</Label>
+                    <div className="flex items-center gap-2 rounded-md border border-input bg-background px-3">
+                      <Lock className="h-4 w-4 text-muted-foreground" />
+                      <Input
+                        id="login-pass"
+                        type="password"
+                        placeholder={loginConfig.placeholder_senha}
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        required
+                        className="border-0 px-0 shadow-none focus-visible:ring-0"
+                      />
+                    </div>
+                  </div>
 
-              {/* Captcha Input */}
-              <div className="flex items-center gap-3 rounded-lg border border-[hsl(var(--login-input-border))] bg-[hsl(var(--login-input))] px-4 py-3">
-                <Key className="h-5 w-5 text-muted-foreground" />
-                <input
-                  type="text"
-                  placeholder="Digite o código acima"
-                  value={captchaInput}
-                  onChange={(e) => setCaptchaInput(e.target.value)}
-                  required
-                  className="w-full bg-transparent text-foreground placeholder:text-muted-foreground focus:outline-none"
-                />
-              </div>
+                  <div className="space-y-2">
+                    <Label>Codigo de seguranca</Label>
+                    <div className="flex items-center gap-2">
+                      <Key className="h-4 w-4 text-muted-foreground" />
+                      <div className="rounded-md border bg-muted px-4 py-2 font-mono tracking-widest line-through decoration-muted-foreground/40">
+                        {captcha}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={refreshCaptcha}
+                        className="inline-flex h-9 w-9 items-center justify-center rounded-md border hover:bg-muted"
+                        aria-label="Gerar novo captcha"
+                      >
+                        <RefreshCw className="h-4 w-4" />
+                      </button>
+                    </div>
+                    <div className="flex items-center gap-2 rounded-md border border-input bg-background px-3">
+                      <Key className="h-4 w-4 text-muted-foreground" />
+                      <Input
+                        type="text"
+                        placeholder={loginConfig.placeholder_captcha}
+                        value={captchaInput}
+                        onChange={(e) => setCaptchaInput(e.target.value)}
+                        required
+                        className="border-0 px-0 shadow-none focus-visible:ring-0"
+                      />
+                    </div>
+                  </div>
 
-              {/* Error */}
-              {error && (
-                <p className="text-sm text-destructive">{error}</p>
-              )}
+                  <div className="text-right">
+                    <a className="text-xs text-primary hover:underline" href="mailto:suporte@e-transporte.pro">
+                      {loginConfig.texto_esqueci_senha}
+                    </a>
+                  </div>
 
-              {/* Submit */}
-              <button
-                type="submit"
-                disabled={loading}
-                className="flex w-full items-center justify-center gap-2 rounded-lg bg-[hsl(var(--login-btn))] py-3 font-semibold text-[hsl(var(--login-btn-foreground))] transition-opacity hover:opacity-90 disabled:opacity-50"
-              >
-                <LogIn className="h-5 w-5" />
-                {loading ? "Entrando..." : "Iniciar Sessão"}
-              </button>
-            </form>
+                  {error ? <p className="text-sm text-destructive">{error}</p> : null}
+
+                  <Button type="submit" disabled={loading} className="w-full gap-2">
+                    <LogIn className="h-4 w-4" />
+                    {loading ? "Entrando..." : loginConfig.texto_botao_login}
+                  </Button>
+                </form>
+              </CardContent>
+            </Card>
+
+            <Alert className="bg-slate-50 border-slate-200">
+              <AlertTitle className="text-sm">{loginConfig.seguranca_titulo}</AlertTitle>
+              <AlertDescription>
+                <ul className="list-disc space-y-1 pl-5">
+                  {loginConfig.seguranca_itens.map((item, idx) => (
+                    <li key={idx}>{item}</li>
+                  ))}
+                </ul>
+              </AlertDescription>
+            </Alert>
           </div>
+
+          <footer className="mt-8 text-center text-xs text-muted-foreground">{loginConfig.rodape_texto}</footer>
         </div>
-
-        {/* Footer */}
-        <p className="mt-6 text-center text-sm text-muted-foreground">
-          © 2026 — Todos os direitos reservados.
-        </p>
-      </div>
+      </section>
     </div>
   );
 };

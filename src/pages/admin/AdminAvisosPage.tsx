@@ -53,6 +53,7 @@ const emptyForm = () => ({
   escopo_global: false,
   incluir_motorista: true,
   incluir_taxi: true,
+  incluir_login: false,
   paginas_motorista: [] as string[],
   paginas_taxi: [] as string[],
   ativo: true,
@@ -102,6 +103,7 @@ export default function AdminAvisosPage() {
       escopo_global: row.escopo_global,
       incluir_motorista: row.incluir_motorista,
       incluir_taxi: row.incluir_taxi,
+      incluir_login: row.incluir_login ?? false,
       paginas_motorista: [...(row.paginas_motorista || [])],
       paginas_taxi: [...(row.paginas_taxi || [])],
       ativo: row.ativo,
@@ -123,8 +125,8 @@ export default function AdminAvisosPage() {
 
   const validate = (): string | null => {
     if (!form.texto.trim()) return "Informe o texto do aviso.";
-    if (!form.incluir_motorista && !form.incluir_taxi) {
-      return "Marque pelo menos um público: Motorista executivo ou Taxista.";
+    if (!form.incluir_motorista && !form.incluir_taxi && !form.incluir_login) {
+      return "Marque pelo menos um público: Motorista executivo, Taxista ou Tela de login.";
     }
     if (!form.escopo_global) {
       if (form.incluir_motorista && form.paginas_motorista.length === 0) {
@@ -150,6 +152,7 @@ export default function AdminAvisosPage() {
       escopo_global: form.escopo_global,
       incluir_motorista: form.incluir_motorista,
       incluir_taxi: form.incluir_taxi,
+      incluir_login: form.incluir_login,
       paginas_motorista: form.escopo_global ? [] : form.paginas_motorista,
       paginas_taxi: form.escopo_global ? [] : form.paginas_taxi,
       ativo: form.ativo,
@@ -283,6 +286,7 @@ export default function AdminAvisosPage() {
                     <span className="text-xs rounded-md border border-border px-2 py-0.5">Motorista</span>
                   )}
                   {r.incluir_taxi && <span className="text-xs rounded-md border border-border px-2 py-0.5">Táxi</span>}
+                  {r.incluir_login && <span className="text-xs rounded-md border border-border px-2 py-0.5">Tela de login</span>}
                 </div>
                 <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                   {r.fonte && r.fonte !== "padrao" ? (
@@ -406,6 +410,16 @@ export default function AdminAvisosPage() {
                   />
                   <Label htmlFor="pub-t" className="font-normal cursor-pointer">
                     Taxista (Gestão de Táxi)
+                  </Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="pub-login"
+                    checked={form.incluir_login}
+                    onCheckedChange={(v) => setForm((f) => ({ ...f, incluir_login: v === true }))}
+                  />
+                  <Label htmlFor="pub-login" className="font-normal cursor-pointer">
+                    Tela de login
                   </Label>
                 </div>
               </div>

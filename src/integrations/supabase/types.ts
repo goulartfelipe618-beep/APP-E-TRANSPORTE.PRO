@@ -22,6 +22,7 @@ export type Database = {
           escopo_global: boolean
           fonte: string
           id: string
+          incluir_login: boolean
           incluir_motorista: boolean
           incluir_taxi: boolean
           paginas_motorista: string[] | null
@@ -36,6 +37,7 @@ export type Database = {
           escopo_global?: boolean
           fonte?: string
           id?: string
+          incluir_login?: boolean
           incluir_motorista?: boolean
           incluir_taxi?: boolean
           paginas_motorista?: string[] | null
@@ -50,6 +52,7 @@ export type Database = {
           escopo_global?: boolean
           fonte?: string
           id?: string
+          incluir_login?: boolean
           incluir_motorista?: boolean
           incluir_taxi?: boolean
           paginas_motorista?: string[] | null
@@ -101,7 +104,69 @@ export type Database = {
         }
         Relationships: []
       }
-      anotacoes: {
+      login_painel_config: {
+        Row: {
+          created_at: string
+          form_legenda: string
+          form_titulo: string
+          id: number
+          idioma_padrao: string
+          imagem_lateral_url: string | null
+          painel_subtitulo: string
+          painel_titulo: string
+          placeholder_captcha: string
+          placeholder_senha: string
+          placeholder_usuario: string
+          rodape_texto: string
+          seguranca_itens: string[]
+          seguranca_titulo: string
+          texto_botao_ajuda: string
+          texto_botao_login: string
+          texto_esqueci_senha: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          form_legenda?: string
+          form_titulo?: string
+          id?: number
+          idioma_padrao?: string
+          imagem_lateral_url?: string | null
+          painel_subtitulo?: string
+          painel_titulo?: string
+          placeholder_captcha?: string
+          placeholder_senha?: string
+          placeholder_usuario?: string
+          rodape_texto?: string
+          seguranca_itens?: string[]
+          seguranca_titulo?: string
+          texto_botao_ajuda?: string
+          texto_botao_login?: string
+          texto_esqueci_senha?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          form_legenda?: string
+          form_titulo?: string
+          id?: number
+          idioma_padrao?: string
+          imagem_lateral_url?: string | null
+          painel_subtitulo?: string
+          painel_titulo?: string
+          placeholder_captcha?: string
+          placeholder_senha?: string
+          placeholder_usuario?: string
+          rodape_texto?: string
+          seguranca_itens?: string[]
+          seguranca_titulo?: string
+          texto_botao_ajuda?: string
+          texto_botao_login?: string
+          texto_esqueci_senha?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }      anotacoes: {
         Row: {
           conteudo: string | null
           created_at: string
