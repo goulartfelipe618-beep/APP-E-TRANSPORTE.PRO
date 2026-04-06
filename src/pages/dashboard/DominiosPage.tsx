@@ -48,8 +48,15 @@ const STATUS_LABEL: Record<string, string> = {
   cancelado: "Cancelado",
 };
 
-const CUSTO_AVISO =
-  "A criação e adição de novos domínios possui um custo de R$ 60,00 e não garante automaticamente a criação de um novo site.";
+const CUSTO_AVISO = (
+  <>
+    • Você possui direito a 1 domínio gratuito que será utilizado para a criação do seu primeiro site.
+    <br />
+    • A criação e adição de novos domínios possui um custo de R$ 60,00 e não garante automaticamente a criação de um novo site.
+  </>
+);
+
+
 
 /** 12 opções; registro.br em primeiro lugar. */
 const PLATAFORMAS_REGISTRO = [
