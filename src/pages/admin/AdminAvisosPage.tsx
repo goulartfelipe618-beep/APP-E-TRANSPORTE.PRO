@@ -26,6 +26,7 @@ import {
   isAvisoFonte,
   type AvisoFonte,
 } from "@/lib/painelAvisoEstilo";
+import { isMissingFonteColumnError } from "@/lib/painelAvisoPersist";
 import { renderAvisoTextoComMarcacao } from "@/lib/painelAvisoTexto";
 import { ConfirmDeleteDialog } from "@/components/ConfirmDeleteDialog";
 import {
@@ -142,10 +143,9 @@ export default function AdminAvisosPage() {
       return;
     }
     setSaving(true);
-    const payload = {
+    const payloadBase = {
       texto: form.texto.trim(),
       cor: form.cor,
-      fonte: form.fonte,
       escopo_global: form.escopo_global,
       incluir_motorista: form.incluir_motorista,
       incluir_taxi: form.incluir_taxi,
@@ -154,27 +154,56 @@ export default function AdminAvisosPage() {
       ativo: form.ativo,
       updated_at: new Date().toISOString(),
     };
+    const payloadWithFonte = { ...payloadBase, fonte: form.fonte };
 
     const errMsg = (e: { message?: string; details?: string; hint?: string }) =>
       [e.message, e.details, e.hint].filter(Boolean).join(" — ") || "Erro desconhecido";
 
     if (editing) {
-      const { error } = await supabase.from("admin_avisos_plataforma").update(payload).eq("id", editing.id);
-      if (error) {
+      let { error } = await supabase.from("admin_avisos_plataforma").update(payloadWithFonte).eq("id", editing.id);
+      if (error && isMissingFonteColumnError(error)) {
+        ({ error } = await supabase.from("admin_avisos_plataforma").update(payloadBase).eq("id", editing.id));
+        if (!error) {
+          toast.success("Aviso atualizado");
+          toast.message(
+            "A coluna «fonte» ainda não existe no banco. A escolha de fonte não foi salva — execute a migração no Supabase ou rode o SQL da documentação.",
+            { duration: 8000 },
+          );
+        } else {
+          console.error(error);
+          toast.error(`Erro ao atualizar: ${errMsg(error)}`);
+        }
+      } else if (error) {
         console.error(error);
         toast.error(`Erro ao atualizar: ${errMsg(error)}`);
       } else {
         toast.success("Aviso atualizado");
+      }
+      if (!error) {
         setDialogOpen(false);
         void fetchRows();
       }
     } else {
-      const { error } = await supabase.from("admin_avisos_plataforma").insert(payload);
-      if (error) {
+      let { error } = await supabase.from("admin_avisos_plataforma").insert(payloadWithFonte);
+      if (error && isMissingFonteColumnError(error)) {
+        ({ error } = await supabase.from("admin_avisos_plataforma").insert(payloadBase));
+        if (!error) {
+          toast.success("Aviso criado");
+          toast.message(
+            "A coluna «fonte» ainda não existe no banco. A escolha de fonte não foi salva — execute a migração no Supabase ou rode o SQL da documentação.",
+            { duration: 8000 },
+          );
+        } else {
+          console.error(error);
+          toast.error(`Erro ao criar: ${errMsg(error)}`);
+        }
+      } else if (error) {
         console.error(error);
         toast.error(`Erro ao criar: ${errMsg(error)}`);
       } else {
         toast.success("Aviso criado");
+      }
+      if (!error) {
         setDialogOpen(false);
         void fetchRows();
       }

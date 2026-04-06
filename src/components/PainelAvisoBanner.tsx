@@ -76,9 +76,7 @@ export default function PainelAvisoBanner({ painel, activePage }: Props) {
     void (async () => {
       const { data, error } = await supabase
         .from("admin_avisos_plataforma")
-        .select(
-          "id, texto, cor, escopo_global, incluir_motorista, incluir_taxi, paginas_motorista, paginas_taxi, fonte",
-        )
+        .select("*")
         .eq("ativo", true)
         .order("created_at", { ascending: false });
 
