@@ -116,15 +116,19 @@ const Login = () => {
   };
 
   return (
-    <div className="h-screen w-full overflow-hidden bg-white lg:flex lg:items-stretch">
-      <aside className="hidden h-screen lg:block lg:w-1/2 bg-white">
+    <div className="fixed inset-0 z-0 flex h-[100dvh] w-full max-w-none flex-col overflow-hidden bg-white lg:flex-row lg:gap-0 lg:items-stretch">
+      <aside className="hidden h-full min-h-0 shrink-0 overflow-hidden bg-white p-0 lg:block lg:w-1/2 lg:max-w-[50%]">
         {configReady && loginConfig ? (
-          <img src={loginConfig.imagem_lateral_url} alt="" className="h-full w-full object-contain object-center" />
+          <img
+            src={loginConfig.imagem_lateral_url}
+            alt=""
+            className="h-full w-full object-contain object-left"
+          />
         ) : null}
       </aside>
 
-      <section className="h-screen w-full overflow-hidden bg-white lg:w-1/2">
-        <div className="mx-auto flex h-full w-full max-w-xl flex-col px-4 py-3 sm:px-6">
+      <section className="h-full min-h-0 w-full shrink-0 overflow-hidden bg-white lg:w-1/2 lg:max-w-[50%]">
+        <div className="flex h-full w-full max-w-xl flex-col px-4 py-3 sm:px-6 lg:pl-6 lg:pr-8">
           <div className="mb-3 flex items-center justify-end gap-2">
             <Button type="button" variant="outline" size="sm" className="gap-2" onClick={() => window.open("mailto:suporte@e-transporte.pro", "_blank")}>
               <HelpCircle className="h-4 w-4" />
