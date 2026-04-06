@@ -11,6 +11,27 @@ import { Label } from "@/components/ui/label";
 import { mergeLoginPainelConfig, type LoginPainelConfig } from "@/lib/loginPainelConfig";
 import LoginAvisosBanner from "@/components/LoginAvisosBanner";
 
+const LOGIN_CONFIG_CACHE_KEY = "etp_login_painel_config_v1";
+
+function readLoginConfigCache(): LoginPainelConfig | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = sessionStorage.getItem(LOGIN_CONFIG_CACHE_KEY);
+    if (!raw) return null;
+    return mergeLoginPainelConfig(JSON.parse(raw) as Partial<LoginPainelConfig>);
+  } catch {
+    return null;
+  }
+}
+
+function writeLoginConfigCache(config: LoginPainelConfig) {
+  try {
+    sessionStorage.setItem(LOGIN_CONFIG_CACHE_KEY, JSON.stringify(config));
+  } catch {
+    /* ignore */
+  }
+}
+
 function generateCaptcha(length = 6): string {
   const chars = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ23456789";
   let result = "";
@@ -29,7 +50,8 @@ const Login = () => {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [idioma, setIdioma] = useState("pt-BR");
-  const [loginConfig, setLoginConfig] = useState<LoginPainelConfig>(() => mergeLoginPainelConfig(null));
+  const [loginConfig, setLoginConfig] = useState<LoginPainelConfig | null>(() => readLoginConfigCache());
+  const [configReady, setConfigReady] = useState(() => readLoginConfigCache() !== null);
 
   const refreshCaptcha = useCallback(() => {
     setCaptcha(generateCaptcha());
@@ -46,6 +68,8 @@ const Login = () => {
       const merged = mergeLoginPainelConfig(data as Partial<LoginPainelConfig>);
       setLoginConfig(merged);
       setIdioma(merged.idioma_padrao || "pt-BR");
+      writeLoginConfigCache(merged);
+      setConfigReady(true);
     })();
   }, []);
 
@@ -93,8 +117,10 @@ const Login = () => {
 
   return (
     <div className="h-screen w-full overflow-hidden bg-white lg:flex lg:items-stretch">
-      <aside className="hidden h-screen lg:block lg:w-1/2">
-        <img src={loginConfig.imagem_lateral_url} alt="" className="h-full w-full object-cover object-center" />
+      <aside className="hidden h-screen lg:block lg:w-1/2 bg-white">
+        {configReady && loginConfig ? (
+          <img src={loginConfig.imagem_lateral_url} alt="" className="h-full w-full object-contain object-center" />
+        ) : null}
       </aside>
 
       <section className="h-screen w-full overflow-hidden bg-white lg:w-1/2">
@@ -102,7 +128,7 @@ const Login = () => {
           <div className="mb-3 flex items-center justify-end gap-2">
             <Button type="button" variant="outline" size="sm" className="gap-2" onClick={() => window.open("mailto:suporte@e-transporte.pro", "_blank")}>
               <HelpCircle className="h-4 w-4" />
-              {loginConfig.texto_botao_ajuda}
+              {loginConfig?.texto_botao_ajuda ?? "Ajuda"}
             </Button>
             <select
               value={idioma}
@@ -121,14 +147,14 @@ const Login = () => {
 
             <header className="space-y-1">
               <p className="text-xs font-semibold tracking-wide text-primary">E-TRANSPORTE.PRO</p>
-              <h1 className="text-2xl font-bold leading-tight text-foreground">{loginConfig.painel_titulo}</h1>
-              <p className="text-xs text-muted-foreground">{loginConfig.painel_subtitulo}</p>
+              <h1 className="text-2xl font-bold leading-tight text-foreground">{loginConfig?.painel_titulo ?? "Painel E-Transporte.pro"}</h1>
+              <p className="text-xs text-muted-foreground">{loginConfig?.painel_subtitulo ?? ""}</p>
             </header>
 
             <Card className="border-border shadow-sm">
               <CardHeader className="px-4 pb-2 pt-4">
-                <CardTitle className="text-xl">{loginConfig.form_titulo}</CardTitle>
-                <p className="text-xs text-muted-foreground">{loginConfig.form_legenda}</p>
+                <CardTitle className="text-xl">{loginConfig?.form_titulo ?? "Faça seu login"}</CardTitle>
+                <p className="text-xs text-muted-foreground">{loginConfig?.form_legenda ?? ""}</p>
               </CardHeader>
               <CardContent className="px-4 pb-4 pt-0">
                 <form onSubmit={handleLogin} className="space-y-3">
@@ -139,7 +165,7 @@ const Login = () => {
                       <Input
                         id="login-user"
                         type="email"
-                        placeholder={loginConfig.placeholder_usuario}
+                        placeholder={loginConfig?.placeholder_usuario ?? "Email ou usuário"}
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         required
@@ -155,7 +181,7 @@ const Login = () => {
                       <Input
                         id="login-pass"
                         type="password"
-                        placeholder={loginConfig.placeholder_senha}
+                        placeholder={loginConfig?.placeholder_senha ?? "Senha"}
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         required
@@ -184,7 +210,7 @@ const Login = () => {
                       <Key className="h-4 w-4 text-muted-foreground" />
                       <Input
                         type="text"
-                        placeholder={loginConfig.placeholder_captcha}
+                        placeholder={loginConfig?.placeholder_captcha ?? "Digite o código acima"}
                         value={captchaInput}
                         onChange={(e) => setCaptchaInput(e.target.value)}
                         required
@@ -195,7 +221,7 @@ const Login = () => {
 
                   <div className="text-right leading-none">
                     <a className="text-xs text-primary hover:underline" href="mailto:suporte@e-transporte.pro">
-                      {loginConfig.texto_esqueci_senha}
+                      {loginConfig?.texto_esqueci_senha ?? "Esqueci minha senha"}
                     </a>
                   </div>
 
@@ -203,17 +229,17 @@ const Login = () => {
 
                   <Button type="submit" disabled={loading} className="w-full gap-2">
                     <LogIn className="h-4 w-4" />
-                    {loading ? "Entrando..." : loginConfig.texto_botao_login}
+                    {loading ? "Entrando..." : loginConfig?.texto_botao_login ?? "Iniciar sessão"}
                   </Button>
                 </form>
               </CardContent>
             </Card>
 
             <Alert className="bg-slate-50 border-slate-200 px-4 py-3">
-              <AlertTitle className="text-sm">{loginConfig.seguranca_titulo}</AlertTitle>
+              <AlertTitle className="text-sm">{loginConfig?.seguranca_titulo ?? "Checkup de segurança"}</AlertTitle>
               <AlertDescription>
                 <ul className="list-disc space-y-0.5 pl-5 text-xs">
-                  {loginConfig.seguranca_itens.map((item, idx) => (
+                  {(loginConfig?.seguranca_itens ?? []).map((item, idx) => (
                     <li key={idx}>{item}</li>
                   ))}
                 </ul>
@@ -221,7 +247,7 @@ const Login = () => {
             </Alert>
           </div>
 
-          <footer className="mt-3 text-center text-[11px] text-muted-foreground">{loginConfig.rodape_texto}</footer>
+          <footer className="mt-3 text-center text-[11px] text-muted-foreground">{loginConfig?.rodape_texto ?? ""}</footer>
         </div>
       </section>
     </div>
