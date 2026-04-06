@@ -3,6 +3,7 @@ import { X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { storageKeyAvisoDismiss, type PainelTipo } from "@/lib/painelAvisosPages";
+import { avisoFonteClassName } from "@/lib/painelAvisoEstilo";
 import { Button } from "@/components/ui/button";
 
 type AvisoRow = {
@@ -14,6 +15,8 @@ type AvisoRow = {
   incluir_taxi: boolean;
   paginas_motorista: string[] | null;
   paginas_taxi: string[] | null;
+  texto_negrito: boolean;
+  fonte: string;
 };
 
 const COR_CLASS: Record<AvisoRow["cor"], string> = {
@@ -74,7 +77,7 @@ export default function PainelAvisoBanner({ painel, activePage }: Props) {
       const { data, error } = await supabase
         .from("admin_avisos_plataforma")
         .select(
-          "id, texto, cor, escopo_global, incluir_motorista, incluir_taxi, paginas_motorista, paginas_taxi",
+          "id, texto, cor, escopo_global, incluir_motorista, incluir_taxi, paginas_motorista, paginas_taxi, texto_negrito, fonte",
         )
         .eq("ativo", true)
         .order("created_at", { ascending: false });
@@ -84,12 +87,19 @@ export default function PainelAvisoBanner({ painel, activePage }: Props) {
         console.error(error);
         return;
       }
-      setAvisos((data || []) as AvisoRow[]);
+      const rows = (data || []) as AvisoRow[];
+      setAvisos(
+        rows.map((r) => ({
+          ...r,
+          texto_negrito: r.texto_negrito ?? false,
+          fonte: r.fonte ?? "padrao",
+        })),
+      );
     })();
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [activePage]);
 
   const visíveis = useMemo(() => {
     return avisos.filter((a) => {
@@ -120,7 +130,15 @@ export default function PainelAvisoBanner({ painel, activePage }: Props) {
             COR_CLASS[a.cor] ?? COR_CLASS.amarelo,
           )}
         >
-          <p className="min-w-0 flex-1 whitespace-pre-wrap leading-snug">{a.texto}</p>
+          <p
+            className={cn(
+              "min-w-0 flex-1 whitespace-pre-wrap leading-snug",
+              a.texto_negrito && "font-bold",
+              avisoFonteClassName(a.fonte),
+            )}
+          >
+            {a.texto}
+          </p>
           <Button
             type="button"
             variant="ghost"

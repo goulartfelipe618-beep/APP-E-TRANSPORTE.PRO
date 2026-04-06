@@ -19,7 +19,21 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { PAGINAS_MOTORISTA, PAGINAS_TAXI } from "@/lib/painelAvisosPages";
+import {
+  AVISO_FONTE_LABELS,
+  AVISO_FONTE_VALUES,
+  avisoFonteClassName,
+  isAvisoFonte,
+  type AvisoFonte,
+} from "@/lib/painelAvisoEstilo";
 import { ConfirmDeleteDialog } from "@/components/ConfirmDeleteDialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 type Aviso = Tables<"admin_avisos_plataforma">;
 
@@ -32,6 +46,8 @@ const CORES: { value: "verde" | "amarelo" | "vermelho"; label: string; sample: s
 const emptyForm = () => ({
   texto: "",
   cor: "amarelo" as const,
+  texto_negrito: false,
+  fonte: "padrao" as AvisoFonte,
   escopo_global: false,
   incluir_motorista: true,
   incluir_taxi: true,
@@ -80,6 +96,8 @@ export default function AdminAvisosPage() {
     setForm({
       texto: row.texto,
       cor: row.cor as "verde" | "amarelo" | "vermelho",
+      texto_negrito: row.texto_negrito ?? false,
+      fonte: isAvisoFonte(row.fonte ?? "") ? row.fonte : "padrao",
       escopo_global: row.escopo_global,
       incluir_motorista: row.incluir_motorista,
       incluir_taxi: row.incluir_taxi,
@@ -128,6 +146,8 @@ export default function AdminAvisosPage() {
     const payload = {
       texto: form.texto.trim(),
       cor: form.cor,
+      texto_negrito: form.texto_negrito,
+      fonte: form.fonte,
       escopo_global: form.escopo_global,
       incluir_motorista: form.incluir_motorista,
       incluir_taxi: form.incluir_taxi,
@@ -227,7 +247,25 @@ export default function AdminAvisosPage() {
                   )}
                   {r.incluir_taxi && <span className="text-xs rounded-md border border-border px-2 py-0.5">Táxi</span>}
                 </div>
-                <p className="text-sm text-foreground whitespace-pre-wrap">{r.texto}</p>
+                <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                  {r.texto_negrito ? (
+                    <span className="rounded border border-border px-1.5 py-0.5">Negrito</span>
+                  ) : null}
+                  {r.fonte && r.fonte !== "padrao" ? (
+                    <span className="rounded border border-border px-1.5 py-0.5">
+                      {AVISO_FONTE_LABELS[r.fonte as AvisoFonte] ?? r.fonte}
+                    </span>
+                  ) : null}
+                </div>
+                <p
+                  className={cn(
+                    "text-sm text-foreground whitespace-pre-wrap",
+                    r.texto_negrito && "font-bold",
+                    avisoFonteClassName(r.fonte ?? "padrao"),
+                  )}
+                >
+                  {r.texto}
+                </p>
               </div>
               <div className="flex gap-2 shrink-0">
                 <Button variant="outline" size="icon" onClick={() => openEdit(r)} title="Editar">
@@ -278,6 +316,37 @@ export default function AdminAvisosPage() {
                     </button>
                   ))}
                 </div>
+              </div>
+
+              <div className="flex items-center justify-between rounded-lg border border-border p-3">
+                <div>
+                  <p className="font-medium text-sm">Texto em negrito</p>
+                  <p className="text-xs text-muted-foreground">Aplica só a este aviso no painel.</p>
+                </div>
+                <Switch
+                  checked={form.texto_negrito}
+                  onCheckedChange={(v) => setForm((f) => ({ ...f, texto_negrito: v }))}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="aviso-fonte">Fonte do texto</Label>
+                <p className="text-xs text-muted-foreground">Somente para este aviso; não altera o restante do painel.</p>
+                <Select
+                  value={form.fonte}
+                  onValueChange={(v) => setForm((f) => ({ ...f, fonte: v as AvisoFonte }))}
+                >
+                  <SelectTrigger id="aviso-fonte" className="w-full">
+                    <SelectValue placeholder="Fonte" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {AVISO_FONTE_VALUES.map((key) => (
+                      <SelectItem key={key} value={key}>
+                        {AVISO_FONTE_LABELS[key]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="flex items-center justify-between rounded-lg border border-border p-3">
