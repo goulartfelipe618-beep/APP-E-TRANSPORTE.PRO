@@ -182,7 +182,7 @@ export default function FullscreenBannerOverlay({ painel, activePage }: Props) {
       aria-label="Banner promocional"
     >
       <div
-        className="relative w-[1220px] max-w-[min(1220px,calc(100vw-2rem))] h-[880px] max-h-[min(880px,calc(100vh-4rem))] shrink-0 overflow-hidden rounded-lg border border-white/10 shadow-2xl"
+        className="relative w-[560px] max-w-[min(560px,calc(100vw-2rem))] h-[400px] max-h-[min(400px,calc(100vh-4rem))] shrink-0 overflow-hidden rounded-lg border border-white/10 shadow-2xl"
       >
         <img
           src={current.imagem_url}

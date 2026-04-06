@@ -207,7 +207,7 @@ export default function AdminFullscreenBannersSection() {
             Banners em tela cheia
           </h2>
           <p className="text-muted-foreground mt-1 text-sm max-w-2xl">
-            Imagem fixa 1220×880 px (centralizada no ecrã). Defina páginas, público e período. Os utilizadores podem
+            Área de exibição ~560×400 px (centralizada; imagens maiores são reduzidas). Defina páginas, público e período. Os utilizadores podem
             fechar com animação; a partir da 3.ª exibição surge a opção «Não mostrar novamente».
           </p>
         </div>
@@ -268,7 +268,7 @@ export default function AdminFullscreenBannersSection() {
           <ScrollArea className="max-h-[calc(90vh-8rem)] px-6">
             <div className="space-y-4 pr-4 pb-4">
               <div className="space-y-2">
-                <Label>Imagem (obrigatório — recomendado 1220×880 px)</Label>
+                <Label>Imagem (obrigatório — recomendado ~560×400 px ou proporção semelhante)</Label>
                 <Input
                   type="file"
                   accept="image/*"
