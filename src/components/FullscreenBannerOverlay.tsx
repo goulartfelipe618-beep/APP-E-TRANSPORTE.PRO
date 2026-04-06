@@ -182,7 +182,7 @@ export default function FullscreenBannerOverlay({ painel, activePage }: Props) {
       aria-label="Banner promocional"
     >
       <div
-        className="relative w-[560px] max-w-[min(560px,calc(100vw-2rem))] h-[400px] max-h-[min(400px,calc(100vh-4rem))] shrink-0 overflow-hidden rounded-lg border border-white/10 shadow-2xl"
+        className="relative w-[560px] max-w-[min(560px,calc(100vw-2rem))] h-[400px] max-h-[min(400px,calc(100vh-4rem))] shrink-0 overflow-hidden rounded-none border border-white/10 shadow-2xl"
       >
         <img
           src={current.imagem_url}
@@ -191,7 +191,7 @@ export default function FullscreenBannerOverlay({ painel, activePage }: Props) {
         />
         <div className="absolute right-2 top-2 z-10 flex items-center gap-3">
           {showCheckbox ? (
-            <div className="flex items-center gap-2 rounded-md bg-black/50 px-2 py-1.5 backdrop-blur-sm">
+            <div className="flex items-center gap-2 rounded-none bg-black/50 px-2 py-1.5 backdrop-blur-sm">
               <Checkbox
                 id={checkboxId}
                 checked={neverAgain}
