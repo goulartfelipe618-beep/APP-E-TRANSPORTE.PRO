@@ -19,7 +19,6 @@ import SistemaAutomacoesPage from "@/pages/dashboard/SistemaAutomacoes";
 import TicketsPage from "@/pages/dashboard/TicketsPage";
 import TaxiCommunityPage from "@/pages/taxi/TaxiCommunityPage";
 import PainelAvisoBanner from "@/components/PainelAvisoBanner";
-import WelcomeBanner from "@/components/WelcomeBanner";
 import FullscreenBannerOverlay from "@/components/FullscreenBannerOverlay";
 
 const PAGE_MAP: Record<string, React.ComponentType> = {
@@ -55,7 +54,6 @@ function TaxiContent() {
             <span className="text-sm font-medium text-foreground">E-Transporte.pro — Gestão de Táxi</span>
           </div>
         </header>
-        <WelcomeBanner variant="taxi" />
         <PainelAvisoBanner painel="taxi" activePage={activePage} />
         <main className="flex-1 bg-background p-6 overflow-auto">
           <PageLoader pageKey={activePage} showLoaderOnPages={["home"]}>

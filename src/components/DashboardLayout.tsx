@@ -46,7 +46,6 @@ import EmptyLegsPage from "@/pages/dashboard/EmptyLegsPage";
 import AtualizacoesPage from "@/pages/dashboard/AtualizacoesPage";
 import CommunityPage from "@/pages/dashboard/CommunityPage";
 import PainelAvisoBanner from "@/components/PainelAvisoBanner";
-import WelcomeBanner from "@/components/WelcomeBanner";
 import FullscreenBannerOverlay from "@/components/FullscreenBannerOverlay";
 
 const PAGE_MAP: Record<string, React.ComponentType> = {
@@ -165,7 +164,6 @@ function DashboardContent() {
               <span className="text-sm font-medium text-foreground">E-Transporte.pro — Gestão de Frota</span>
             </div>
           </header>
-          <WelcomeBanner variant="motorista" />
           <PainelAvisoBanner painel="motorista" activePage={activePage} />
           <main
             ref={mainRef}

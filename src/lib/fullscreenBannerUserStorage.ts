@@ -1,5 +1,3 @@
-import { shouldShowNeverAgainCheckbox } from "@/lib/welcomeBannerStorage";
-
 const SESSION_KEY = "etp_fullscreen_dismissed_session";
 
 function userMapKey(userId: string): string {
@@ -39,8 +37,9 @@ export function getFullscreenBannerState(
   return m[bannerId] ?? { closeCount: 0, permanent: false };
 }
 
+/** Checkbox «Não mostrar novamente» a partir da 3.ª exibição (closeCount ≥ 2). */
 export function shouldShowFullscreenCheckbox(closeCount: number): boolean {
-  return shouldShowNeverAgainCheckbox(closeCount);
+  return closeCount >= 2;
 }
 
 export function getSessionDismissedBannerIds(): string[] {
