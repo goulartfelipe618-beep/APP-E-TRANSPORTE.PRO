@@ -153,6 +153,10 @@ export default function SistemaConfiguracoesPage() {
   const [fonteGlobal, setFonteGlobal] = useState("montserrat");
   const [logoUrl, setLogoUrl] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [logoEditing, setLogoEditing] = useState(false);
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [nomeProjetoEditing, setNomeProjetoEditing] = useState(false);
+  const [fonteEditing, setFonteEditing] = useState(false);
 
   // Informações Contratuais
   const [contratualEditing, setContratualEditing] = useState(true);
@@ -306,24 +310,32 @@ export default function SistemaConfiguracoesPage() {
 
   const handleSaveNomeProjeto = async () => {
     const ok = await upsertField({ nome_projeto: nomeProjeto });
-    if (ok) { toast.success("Nome do projeto salvo"); await refreshConfig(); }
+    if (ok) { toast.success("Nome do projeto salvo"); setNomeProjetoEditing(false); await refreshConfig(); }
   };
 
   const handleSaveFonte = async () => {
     const ok = await upsertField({ fonte_global: fonteGlobal });
-    if (ok) { toast.success("Fonte global salva"); await refreshConfig(); }
+    if (ok) { toast.success("Fonte global salva"); setFonteEditing(false); await refreshConfig(); }
   };
 
-  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleLogoFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    setLogoFile(file);
+  };
+
+  const handleSaveLogoUpload = async () => {
+    if (!logoFile) {
+      toast.error("Selecione uma imagem para salvar.");
+      return;
+    }
 
     setUploading(true);
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { toast.error("Não autenticado"); setUploading(false); return; }
 
-    const filePath = `${user.id}/logo-${Date.now()}.${file.name.split('.').pop()}`;
-    const { error: upErr } = await supabase.storage.from("logos").upload(filePath, file, { upsert: true });
+    const filePath = `${user.id}/logo-${Date.now()}.${logoFile.name.split('.').pop()}`;
+    const { error: upErr } = await supabase.storage.from("logos").upload(filePath, logoFile, { upsert: true });
     if (upErr) { toast.error("Erro no upload"); setUploading(false); return; }
 
     const { data: urlData } = supabase.storage.from("logos").getPublicUrl(filePath);
@@ -332,6 +344,8 @@ export default function SistemaConfiguracoesPage() {
     const ok = await upsertField({ logo_url: publicUrl });
     if (ok) {
       setLogoUrl(publicUrl);
+      setLogoFile(null);
+      setLogoEditing(false);
       toast.success("Logomarca atualizada");
       await refreshConfig();
     }
@@ -619,65 +633,105 @@ export default function SistemaConfiguracoesPage() {
 
       {/* Logomarca Global */}
       <div className="rounded-xl border border-border bg-card p-6 max-w-2xl">
-        <div className="flex items-center gap-2 mb-1">
-          <Car className="h-5 w-5 text-foreground" />
-          <h3 className="font-semibold text-foreground">Logomarca Global</h3>
+        <div className="flex items-center justify-between mb-1">
+          <div className="flex items-center gap-2">
+            <Car className="h-5 w-5 text-foreground" />
+            <h3 className="font-semibold text-foreground">Logomarca Global</h3>
+          </div>
+          {!logoEditing && (
+            <Button variant="outline" size="sm" onClick={() => setLogoEditing(true)}>
+              <Pencil className="h-4 w-4 mr-2" /> Editar
+            </Button>
+          )}
         </div>
         <p className="text-sm text-muted-foreground mb-4">Altera a logomarca em todo o sistema (painel, contratos, etc.)</p>
 
-        <div className="bg-muted/30 rounded-lg p-8 flex items-center justify-center mb-4">
+        <div className={`space-y-4 ${!logoEditing ? "opacity-70 pointer-events-none" : ""}`}>
+          <div className="bg-muted/30 rounded-lg p-8 flex items-center justify-center mb-4">
           {logoUrl ? (
             <img src={logoUrl} alt="Logo" className="h-16 max-w-[200px] object-contain" />
           ) : (
             <Car className="h-16 w-16 text-foreground" />
           )}
+          </div>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handleLogoFileSelect}
+            disabled={!logoEditing}
+          />
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" onClick={() => fileInputRef.current?.click()} disabled={uploading || !logoEditing}>
+              <Upload className="h-4 w-4 mr-2" /> {logoFile ? "Trocar imagem" : "Escolher imagem"}
+            </Button>
+            {logoFile ? <span className="text-xs text-muted-foreground self-center">{logoFile.name}</span> : null}
+          </div>
         </div>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*"
-          className="hidden"
-          onChange={handleLogoUpload}
-        />
-        <Button variant="outline" onClick={() => fileInputRef.current?.click()} disabled={uploading}>
-          <Upload className="h-4 w-4 mr-2" /> {uploading ? "Enviando..." : "Enviar Logomarca"}
-        </Button>
+        {logoEditing && (
+          <Button className="bg-primary text-primary-foreground mt-4" onClick={handleSaveLogoUpload} disabled={uploading}>
+            <Save className="h-4 w-4 mr-2" /> {uploading ? "Enviando..." : "Salvar Logomarca"}
+          </Button>
+        )}
       </div>
 
       {/* Nome do Projeto */}
       <div className="rounded-xl border border-border bg-card p-6 max-w-2xl">
-        <div className="flex items-center gap-2 mb-1">
-          <Type className="h-5 w-5 text-foreground" />
-          <h3 className="font-semibold text-foreground">Nome do Projeto</h3>
+        <div className="flex items-center justify-between mb-1">
+          <div className="flex items-center gap-2">
+            <Type className="h-5 w-5 text-foreground" />
+            <h3 className="font-semibold text-foreground">Nome do Projeto</h3>
+          </div>
+          {!nomeProjetoEditing && (
+            <Button variant="outline" size="sm" onClick={() => setNomeProjetoEditing(true)}>
+              <Pencil className="h-4 w-4 mr-2" /> Editar
+            </Button>
+          )}
         </div>
         <p className="text-sm text-muted-foreground mb-4">Altera o nome exibido em todo o sistema (painel, contratos, etc.)</p>
-        <Input value={nomeProjeto} onChange={e => setNomeProjeto(e.target.value)} className="mb-3" />
-        <Button className="bg-primary text-primary-foreground" onClick={handleSaveNomeProjeto}>
-          <Save className="h-4 w-4 mr-2" /> Salvar
-        </Button>
+        <div className={`${!nomeProjetoEditing ? "opacity-70 pointer-events-none" : ""}`}>
+          <Input value={nomeProjeto} onChange={e => setNomeProjeto(e.target.value)} className="mb-3" disabled={!nomeProjetoEditing} />
+        </div>
+        {nomeProjetoEditing && (
+          <Button className="bg-primary text-primary-foreground" onClick={handleSaveNomeProjeto}>
+            <Save className="h-4 w-4 mr-2" /> Salvar
+          </Button>
+        )}
       </div>
 
       {/* Fonte Global */}
       <div className="rounded-xl border border-border bg-card p-6 max-w-2xl">
-        <div className="flex items-center gap-2 mb-1">
-          <Type className="h-5 w-5 text-foreground" />
-          <h3 className="font-semibold text-foreground">Fonte Global</h3>
+        <div className="flex items-center justify-between mb-1">
+          <div className="flex items-center gap-2">
+            <Type className="h-5 w-5 text-foreground" />
+            <h3 className="font-semibold text-foreground">Fonte Global</h3>
+          </div>
+          {!fonteEditing && (
+            <Button variant="outline" size="sm" onClick={() => setFonteEditing(true)}>
+              <Pencil className="h-4 w-4 mr-2" /> Editar
+            </Button>
+          )}
         </div>
         <p className="text-sm text-muted-foreground mb-4">Altera a fonte de todo o sistema, inclusive contratos</p>
-        <Select value={fonteGlobal} onValueChange={setFonteGlobal}>
-          <SelectTrigger><SelectValue /></SelectTrigger>
-          <SelectContent>
-            {FONT_OPTIONS.map(f => (
-              <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <p className="text-sm text-muted-foreground mt-2" style={{ fontFamily: FONT_OPTIONS.find(f => f.value === fonteGlobal)?.label }}>
-          Exemplo de texto com a fonte <strong>{FONT_OPTIONS.find(f => f.value === fonteGlobal)?.label}</strong>
-        </p>
-        <Button className="bg-primary text-primary-foreground mt-3" onClick={handleSaveFonte}>
-          <Save className="h-4 w-4 mr-2" /> Salvar
-        </Button>
+        <div className={`space-y-2 ${!fonteEditing ? "opacity-70 pointer-events-none" : ""}`}>
+          <Select value={fonteGlobal} onValueChange={setFonteGlobal} disabled={!fonteEditing}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {FONT_OPTIONS.map(f => (
+                <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-sm text-muted-foreground mt-2" style={{ fontFamily: FONT_OPTIONS.find(f => f.value === fonteGlobal)?.label }}>
+            Exemplo de texto com a fonte <strong>{FONT_OPTIONS.find(f => f.value === fonteGlobal)?.label}</strong>
+          </p>
+        </div>
+        {fonteEditing && (
+          <Button className="bg-primary text-primary-foreground mt-3" onClick={handleSaveFonte}>
+            <Save className="h-4 w-4 mr-2" /> Salvar
+          </Button>
+        )}
       </div>
 
       <LoginConfiguracoesSection />

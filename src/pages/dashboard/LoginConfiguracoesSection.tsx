@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Loader2, Save, Upload } from "lucide-react";
+import { Loader2, Pencil, Save, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,7 @@ export default function LoginConfiguracoesSection() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [editing, setEditing] = useState(false);
   const imageRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -79,16 +80,24 @@ export default function LoginConfiguracoesSection() {
       toast.error(`Erro ao salvar configuracoes da tela de login: ${error.message}`);
       return;
     }
+    setEditing(false);
     toast.success("Configuracoes de login salvas com sucesso.");
   };
 
   return (
     <Card className="p-6 max-w-3xl">
-      <div className="mb-4">
-        <h3 className="text-lg font-semibold text-foreground">Configuracoes de login</h3>
-        <p className="text-sm text-muted-foreground">
-          Ajuste imagem lateral, titulos, legendas, placeholders e itens exibidos na tela de login.
-        </p>
+      <div className="mb-4 flex items-start justify-between gap-4">
+        <div>
+          <h3 className="text-lg font-semibold text-foreground">Configuracoes de login</h3>
+          <p className="text-sm text-muted-foreground">
+            Ajuste imagem lateral, titulos, legendas, placeholders e itens exibidos na tela de login.
+          </p>
+        </div>
+        {!editing && (
+          <Button type="button" variant="outline" size="sm" onClick={() => setEditing(true)}>
+            <Pencil className="h-4 w-4 mr-2" /> Editar
+          </Button>
+        )}
       </div>
 
       {loading ? (
@@ -96,14 +105,14 @@ export default function LoginConfiguracoesSection() {
           <Loader2 className="h-4 w-4 animate-spin" /> Carregando...
         </div>
       ) : (
-        <div className="space-y-4">
+        <div className={`space-y-4 ${!editing ? "opacity-70 pointer-events-none" : ""}`}>
           <div className="space-y-2">
             <Label>Imagem lateral (coluna esquerda)</Label>
             <div className="overflow-hidden border bg-muted">
               <img src={form.imagem_lateral_url} alt="" className="h-40 w-full object-cover" />
             </div>
             <input ref={imageRef} type="file" accept="image/*" className="hidden" onChange={handleUploadImage} />
-            <Button type="button" variant="outline" onClick={() => imageRef.current?.click()} disabled={uploading}>
+            <Button type="button" variant="outline" onClick={() => imageRef.current?.click()} disabled={uploading || !editing}>
               <Upload className="h-4 w-4 mr-2" />
               {uploading ? "Enviando..." : "Enviar imagem"}
             </Button>
@@ -116,6 +125,7 @@ export default function LoginConfiguracoesSection() {
                 id="login-painel-titulo"
                 value={form.painel_titulo}
                 onChange={(e) => setForm((f) => ({ ...f, painel_titulo: e.target.value }))}
+                disabled={!editing}
               />
             </div>
             <div className="space-y-2">
@@ -124,6 +134,7 @@ export default function LoginConfiguracoesSection() {
                 id="login-painel-subtitulo"
                 value={form.painel_subtitulo}
                 onChange={(e) => setForm((f) => ({ ...f, painel_subtitulo: e.target.value }))}
+                disabled={!editing}
               />
             </div>
           </div>
@@ -135,6 +146,7 @@ export default function LoginConfiguracoesSection() {
                 id="login-form-titulo"
                 value={form.form_titulo}
                 onChange={(e) => setForm((f) => ({ ...f, form_titulo: e.target.value }))}
+                disabled={!editing}
               />
             </div>
             <div className="space-y-2">
@@ -143,6 +155,7 @@ export default function LoginConfiguracoesSection() {
                 id="login-form-legenda"
                 value={form.form_legenda}
                 onChange={(e) => setForm((f) => ({ ...f, form_legenda: e.target.value }))}
+                disabled={!editing}
               />
             </div>
           </div>
@@ -154,6 +167,7 @@ export default function LoginConfiguracoesSection() {
                 id="login-ph-user"
                 value={form.placeholder_usuario}
                 onChange={(e) => setForm((f) => ({ ...f, placeholder_usuario: e.target.value }))}
+                disabled={!editing}
               />
             </div>
             <div className="space-y-2">
@@ -162,6 +176,7 @@ export default function LoginConfiguracoesSection() {
                 id="login-ph-pass"
                 value={form.placeholder_senha}
                 onChange={(e) => setForm((f) => ({ ...f, placeholder_senha: e.target.value }))}
+                disabled={!editing}
               />
             </div>
           </div>
@@ -173,6 +188,7 @@ export default function LoginConfiguracoesSection() {
                 id="login-ph-captcha"
                 value={form.placeholder_captcha}
                 onChange={(e) => setForm((f) => ({ ...f, placeholder_captcha: e.target.value }))}
+                disabled={!editing}
               />
             </div>
             <div className="space-y-2">
@@ -181,6 +197,7 @@ export default function LoginConfiguracoesSection() {
                 id="login-login-btn"
                 value={form.texto_botao_login}
                 onChange={(e) => setForm((f) => ({ ...f, texto_botao_login: e.target.value }))}
+                disabled={!editing}
               />
             </div>
           </div>
@@ -192,6 +209,7 @@ export default function LoginConfiguracoesSection() {
                 id="login-help-btn"
                 value={form.texto_botao_ajuda}
                 onChange={(e) => setForm((f) => ({ ...f, texto_botao_ajuda: e.target.value }))}
+                disabled={!editing}
               />
             </div>
             <div className="space-y-2">
@@ -200,6 +218,7 @@ export default function LoginConfiguracoesSection() {
                 id="login-forgot"
                 value={form.texto_esqueci_senha}
                 onChange={(e) => setForm((f) => ({ ...f, texto_esqueci_senha: e.target.value }))}
+                disabled={!editing}
               />
             </div>
           </div>
@@ -210,6 +229,7 @@ export default function LoginConfiguracoesSection() {
               id="login-sec-title"
               value={form.seguranca_titulo}
               onChange={(e) => setForm((f) => ({ ...f, seguranca_titulo: e.target.value }))}
+              disabled={!editing}
             />
           </div>
 
@@ -228,6 +248,7 @@ export default function LoginConfiguracoesSection() {
                     .filter((v) => v.length > 0),
                 }))
               }
+              disabled={!editing}
             />
           </div>
 
@@ -238,6 +259,7 @@ export default function LoginConfiguracoesSection() {
                 id="login-footer"
                 value={form.rodape_texto}
                 onChange={(e) => setForm((f) => ({ ...f, rodape_texto: e.target.value }))}
+                disabled={!editing}
               />
             </div>
             <div className="space-y-2">
@@ -247,6 +269,7 @@ export default function LoginConfiguracoesSection() {
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                 value={form.idioma_padrao}
                 onChange={(e) => setForm((f) => ({ ...f, idioma_padrao: e.target.value }))}
+                disabled={!editing}
               >
                 {LANGUAGE_OPTIONS.map((opt) => (
                   <option key={opt.value} value={opt.value}>
@@ -257,10 +280,12 @@ export default function LoginConfiguracoesSection() {
             </div>
           </div>
 
-          <Button type="button" onClick={() => void handleSave()} disabled={saving || uploading}>
-            <Save className="h-4 w-4 mr-2" />
-            {saving ? "Salvando..." : "Salvar configuracoes de login"}
-          </Button>
+          {editing && (
+            <Button type="button" onClick={() => void handleSave()} disabled={saving || uploading}>
+              <Save className="h-4 w-4 mr-2" />
+              {saving ? "Salvando..." : "Salvar configuracoes de login"}
+            </Button>
+          )}
         </div>
       )}
     </Card>
