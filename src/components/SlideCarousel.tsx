@@ -25,8 +25,13 @@ interface SlideCarouselProps {
   variant?: "default" | "banner";
   /** Quando definido, não busca no Supabase (útil para testes). */
   slidesOverride?: SlideCarouselSlide[];
-  /** Largura total no painel: sem cantos arredondados nem borda/chroming nas laterais (Admin Master / layouts full-bleed). */
+  /** Sem cantos arredondados nem sombra no bloco do carrossel (padrão: true no painel). */
   fullBleed?: boolean;
+  /**
+   * Compensa o `p-6` do `<main>` do painel para o slide ir da borda esquerda da área de conteúdo até a direita.
+   * Desative no Admin Master (ex.: Comunidade com `main` em `px-0`).
+   */
+  breakoutHorizontal?: boolean;
   className?: string;
 }
 
@@ -35,7 +40,8 @@ export default function SlideCarousel({
   fallbackSlides,
   variant = "default",
   slidesOverride,
-  fullBleed = false,
+  fullBleed = true,
+  breakoutHorizontal = true,
   className,
 }: SlideCarouselProps) {
   const [currentSlide, setCurrentSlide] = useState(0);
@@ -155,6 +161,7 @@ export default function SlideCarousel({
   return (
     <div
       className={cn(
+        breakoutHorizontal && "-mx-6",
         "relative w-full max-w-none overflow-hidden",
         isBanner
           ? cn(
