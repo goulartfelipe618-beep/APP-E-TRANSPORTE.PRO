@@ -27,7 +27,6 @@ export type Database = {
           paginas_motorista: string[] | null
           paginas_taxi: string[] | null
           texto: string
-          texto_negrito: boolean
           updated_at: string
         }
         Insert: {
@@ -42,7 +41,6 @@ export type Database = {
           paginas_motorista?: string[] | null
           paginas_taxi?: string[] | null
           texto: string
-          texto_negrito?: boolean
           updated_at?: string
         }
         Update: {
@@ -57,7 +55,6 @@ export type Database = {
           paginas_motorista?: string[] | null
           paginas_taxi?: string[] | null
           texto?: string
-          texto_negrito?: boolean
           updated_at?: string
         }
         Relationships: []

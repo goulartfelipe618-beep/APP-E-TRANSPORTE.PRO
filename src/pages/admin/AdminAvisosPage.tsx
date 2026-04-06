@@ -26,6 +26,7 @@ import {
   isAvisoFonte,
   type AvisoFonte,
 } from "@/lib/painelAvisoEstilo";
+import { renderAvisoTextoComMarcacao } from "@/lib/painelAvisoTexto";
 import { ConfirmDeleteDialog } from "@/components/ConfirmDeleteDialog";
 import {
   Select,
@@ -46,7 +47,6 @@ const CORES: { value: "verde" | "amarelo" | "vermelho"; label: string; sample: s
 const emptyForm = () => ({
   texto: "",
   cor: "amarelo" as const,
-  texto_negrito: false,
   fonte: "padrao" as AvisoFonte,
   escopo_global: false,
   incluir_motorista: true,
@@ -96,7 +96,6 @@ export default function AdminAvisosPage() {
     setForm({
       texto: row.texto,
       cor: row.cor as "verde" | "amarelo" | "vermelho",
-      texto_negrito: row.texto_negrito ?? false,
       fonte: isAvisoFonte(row.fonte ?? "") ? row.fonte : "padrao",
       escopo_global: row.escopo_global,
       incluir_motorista: row.incluir_motorista,
@@ -146,7 +145,6 @@ export default function AdminAvisosPage() {
     const payload = {
       texto: form.texto.trim(),
       cor: form.cor,
-      texto_negrito: form.texto_negrito,
       fonte: form.fonte,
       escopo_global: form.escopo_global,
       incluir_motorista: form.incluir_motorista,
@@ -157,18 +155,25 @@ export default function AdminAvisosPage() {
       updated_at: new Date().toISOString(),
     };
 
+    const errMsg = (e: { message?: string; details?: string; hint?: string }) =>
+      [e.message, e.details, e.hint].filter(Boolean).join(" — ") || "Erro desconhecido";
+
     if (editing) {
       const { error } = await supabase.from("admin_avisos_plataforma").update(payload).eq("id", editing.id);
-      if (error) toast.error("Erro ao atualizar");
-      else {
+      if (error) {
+        console.error(error);
+        toast.error(`Erro ao atualizar: ${errMsg(error)}`);
+      } else {
         toast.success("Aviso atualizado");
         setDialogOpen(false);
         void fetchRows();
       }
     } else {
       const { error } = await supabase.from("admin_avisos_plataforma").insert(payload);
-      if (error) toast.error("Erro ao criar");
-      else {
+      if (error) {
+        console.error(error);
+        toast.error(`Erro ao criar: ${errMsg(error)}`);
+      } else {
         toast.success("Aviso criado");
         setDialogOpen(false);
         void fetchRows();
@@ -248,9 +253,6 @@ export default function AdminAvisosPage() {
                   {r.incluir_taxi && <span className="text-xs rounded-md border border-border px-2 py-0.5">Táxi</span>}
                 </div>
                 <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                  {r.texto_negrito ? (
-                    <span className="rounded border border-border px-1.5 py-0.5">Negrito</span>
-                  ) : null}
                   {r.fonte && r.fonte !== "padrao" ? (
                     <span className="rounded border border-border px-1.5 py-0.5">
                       {AVISO_FONTE_LABELS[r.fonte as AvisoFonte] ?? r.fonte}
@@ -260,11 +262,10 @@ export default function AdminAvisosPage() {
                 <p
                   className={cn(
                     "text-sm text-foreground whitespace-pre-wrap",
-                    r.texto_negrito && "font-bold",
                     avisoFonteClassName(r.fonte ?? "padrao"),
                   )}
                 >
-                  {r.texto}
+                  {renderAvisoTextoComMarcacao(r.texto)}
                 </p>
               </div>
               <div className="flex gap-2 shrink-0">
@@ -289,12 +290,16 @@ export default function AdminAvisosPage() {
             <div className="space-y-4 pr-4 pb-4">
               <div className="space-y-2">
                 <Label htmlFor="aviso-texto">Texto do aviso</Label>
+                <p className="text-xs text-muted-foreground">
+                  Para destacar em negrito só parte do texto, use <span className="font-mono text-foreground">**assim**</span>{" "}
+                  (dois asteriscos antes e depois da expressão).
+                </p>
                 <Textarea
                   id="aviso-texto"
                   value={form.texto}
                   onChange={(e) => setForm((f) => ({ ...f, texto: e.target.value }))}
                   rows={4}
-                  placeholder="Mensagem exibida no topo do conteúdo do painel."
+                  placeholder="Ex.: Manutenção programada **hoje às 22h**. Demais horários normais."
                 />
               </div>
 
@@ -316,17 +321,6 @@ export default function AdminAvisosPage() {
                     </button>
                   ))}
                 </div>
-              </div>
-
-              <div className="flex items-center justify-between rounded-lg border border-border p-3">
-                <div>
-                  <p className="font-medium text-sm">Texto em negrito</p>
-                  <p className="text-xs text-muted-foreground">Aplica só a este aviso no painel.</p>
-                </div>
-                <Switch
-                  checked={form.texto_negrito}
-                  onCheckedChange={(v) => setForm((f) => ({ ...f, texto_negrito: v }))}
-                />
               </div>
 
               <div className="space-y-2">
