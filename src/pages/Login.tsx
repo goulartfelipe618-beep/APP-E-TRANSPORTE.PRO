@@ -92,9 +92,9 @@ const Login = () => {
   };
 
   return (
-    <div className="h-screen w-full overflow-hidden bg-background lg:flex lg:items-stretch">
-      <aside className="hidden h-screen lg:block lg:w-1/2 bg-black">
-        <img src={loginConfig.imagem_lateral_url} alt="" className="h-full w-full object-contain object-center" />
+    <div className="h-screen w-full overflow-hidden bg-white lg:flex lg:items-stretch">
+      <aside className="hidden h-screen lg:block lg:w-1/2">
+        <img src={loginConfig.imagem_lateral_url} alt="" className="h-full w-full object-cover object-center" />
       </aside>
 
       <section className="h-screen w-full overflow-hidden bg-white lg:w-1/2">
