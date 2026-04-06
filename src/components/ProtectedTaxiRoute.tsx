@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { getPostLoginPath } from "@/lib/sessionRole";
+import { clearAuthStartedAt, isAuthExpired, readAuthStartedAt, setAuthStartedAt } from "@/lib/authExpiry";
 
 export default function ProtectedTaxiRoute({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
@@ -12,6 +13,21 @@ export default function ProtectedTaxiRoute({ children }: { children: React.React
     const checkAccess = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
+        setAuthorized(false);
+        setNeedsMfa(false);
+        setLoading(false);
+        return;
+      }
+
+      const startedAt = readAuthStartedAt();
+      if (!startedAt) setAuthStartedAt(Date.now());
+      if (startedAt && isAuthExpired(startedAt)) {
+        clearAuthStartedAt();
+        try {
+          await supabase.auth.signOut();
+        } catch {
+          // ignore
+        }
         setAuthorized(false);
         setNeedsMfa(false);
         setLoading(false);

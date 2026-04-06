@@ -1852,6 +1852,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      service_delete_user_owned_data: {
+        Args: { p_user_id: string }
+        Returns: undefined
+      }
       get_motorista_abrangencia_reservas: {
         Args: Record<PropertyKey, never>
         Returns: Json

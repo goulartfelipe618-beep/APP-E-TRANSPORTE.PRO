@@ -316,28 +316,14 @@ Deno.serve(async (req) => {
         return new Response(JSON.stringify({ error: "Não é possível excluir um admin master" }), { status: 403, headers: corsHeaders });
       }
 
-      const tablesToClean = [
-        "anotacoes", "automacoes", "cabecalho_contratual", "chamadas_taxi",
-        "configuracoes", "contratos", "network", "reservas_grupos",
-        "reservas_transfer", "solicitacoes_grupos",
-        "solicitacoes_servicos", "solicitacoes_transfer", "webhook_testes", "user_plans",
-      ];
+      // Uma única transação no Postgres (RPC security definer + service_role); depois remoção em Auth.
+      const { error: rpcErr } = await supabaseAdmin.rpc("service_delete_user_owned_data", {
+        p_user_id: user_id,
+      });
 
-      await Promise.all(
-        tablesToClean.map((table) =>
-          supabaseAdmin.from(table).delete().eq("user_id", user_id)
-        )
-      );
-
-      // solicitacoes_motoristas may reference either:
-      // - user_id: automation owner (original app behavior)
-      // - lead_user_id: the created login for the landing lead
-      await Promise.all([
-        supabaseAdmin.from("solicitacoes_motoristas").delete().eq("user_id", user_id),
-        supabaseAdmin.from("solicitacoes_motoristas").delete().eq("lead_user_id", user_id),
-      ]);
-
-      await supabaseAdmin.from("user_roles").delete().eq("user_id", user_id);
+      if (rpcErr) {
+        return new Response(JSON.stringify({ error: rpcErr.message }), { status: 400, headers: corsHeaders });
+      }
 
       const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(user_id);
 

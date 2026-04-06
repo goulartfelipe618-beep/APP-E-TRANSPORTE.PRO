@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { PLAN_LABELS, PLAN_COLORS, PlanType, PLANS_PAID_ORDER } from "@/hooks/useUserPlan";
 import { ConfirmDeleteDialog } from "@/components/ConfirmDeleteDialog";
+import { purgeStoredStateForUserId } from "@/lib/hardDelete";
 
 interface UserItem {
   id: string;
@@ -157,6 +158,7 @@ export default function AdminUsuariosCadastrados() {
       if (data.error) {
         toast.error(data.error);
       } else {
+        purgeStoredStateForUserId(deleteUserId);
         toast.success("Usuário e todos os dados excluídos com sucesso!");
         setUsers((prev) => prev.filter((u) => u.id !== deleteUserId));
         setDeleteUserId(null);

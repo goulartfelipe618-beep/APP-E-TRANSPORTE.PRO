@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useLayoutEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { HelpCircle, Key, Lock, LogIn, Mail, RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -14,6 +14,8 @@ import {
   type LoginPainelConfig,
 } from "@/lib/loginPainelConfig";
 import LoginAvisosBanner from "@/components/LoginAvisosBanner";
+import { applyDocumentClassDark } from "@/lib/panelTheme";
+import { clearAuthStartedAt, isAuthExpired, readAuthStartedAt, setAuthStartedAt } from "@/lib/authExpiry";
 
 /** Persistência opcional; não ler na montagem — evita exibir URL antiga da imagem antes do fetch. */
 const LOGIN_CONFIG_CACHE_KEY = "etp_login_painel_config_v1";
@@ -37,6 +39,7 @@ function generateCaptcha(length = 6): string {
 
 const Login = () => {
   const navigate = useNavigate();
+  const [gateReady, setGateReady] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [captcha, setCaptcha] = useState("");
@@ -46,6 +49,38 @@ const Login = () => {
   const [idioma, setIdioma] = useState("pt-BR");
   const [loginConfig, setLoginConfig] = useState<LoginPainelConfig | null>(null);
   const [lateralImageReady, setLateralImageReady] = useState(false);
+
+  useLayoutEffect(() => {
+    // Regra adicional: login SEMPRE em tema claro.
+    applyDocumentClassDark(false);
+  }, []);
+
+  useEffect(() => {
+    // Se a sessão ainda estiver válida (dentro de 24h), não deve ser possível voltar ao /login.
+    void (async () => {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const session = sessionData.session;
+
+      if (session) {
+        const startedAt = readAuthStartedAt();
+        if (!startedAt) setAuthStartedAt(Date.now());
+
+        const started = startedAt ?? Date.now();
+        if (startedAt && isAuthExpired(startedAt)) {
+          clearAuthStartedAt();
+          await supabase.auth.signOut();
+          setGateReady(true);
+          return;
+        }
+
+        const path = await getPostLoginPath(session.user.id);
+        navigate(path, { replace: true });
+        return;
+      }
+
+      setGateReady(true);
+    })();
+  }, [navigate]);
 
   const refreshCaptcha = useCallback(() => {
     setCaptcha(generateCaptcha());
@@ -129,7 +164,7 @@ const Login = () => {
 
       if (!assuranceErr && assuranceData?.nextLevel === "aal2" && assuranceData?.currentLevel !== "aal2") {
         setLoading(false);
-        navigate("/mfa");
+        navigate("/mfa", { replace: true });
         return;
       }
     } catch {
@@ -137,8 +172,17 @@ const Login = () => {
     }
 
     const path = await getPostLoginPath(data.user.id);
-    navigate(path);
+    setAuthStartedAt(Date.now());
+    navigate(path, { replace: true });
   };
+
+  if (!gateReady) {
+    return (
+      <div className="fixed inset-0 z-0 flex h-[100dvh] w-full max-w-none items-center justify-center bg-white">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-0 flex h-[100dvh] w-full max-w-none flex-col overflow-hidden bg-white lg:flex-row lg:gap-0 lg:items-stretch">

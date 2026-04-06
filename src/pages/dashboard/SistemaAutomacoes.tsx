@@ -204,6 +204,8 @@ export default function SistemaAutomacoesPage() {
         if (error) toast.error("Erro ao excluir");
         else {
           toast.success("Automação excluída");
+          setTestes([]);
+          setSelectedTeste(null);
           if (selected?.id === deleteIntent.id) setSelected(null);
           fetchAutomacoes();
         }

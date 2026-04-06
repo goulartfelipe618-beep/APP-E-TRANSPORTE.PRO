@@ -13,6 +13,7 @@ import ProtectedTaxiRoute from "./components/ProtectedTaxiRoute";
 import ProtectedAdminRoute from "./components/ProtectedAdminRoute";
 import { ConfiguracoesProvider } from "./contexts/ConfiguracoesContext";
 import MfaChallengePage from "./pages/MfaChallenge";
+import AuthExpiryGuard from "./components/AuthExpiryGuard";
 
 const queryClient = new QueryClient();
 
@@ -23,6 +24,7 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
+        <AuthExpiryGuard />
         <Routes>
           <Route path="/" element={<Navigate to="/login" replace />} />
           <Route path="/login" element={<Login />} />

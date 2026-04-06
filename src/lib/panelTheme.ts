@@ -46,3 +46,19 @@ export function applyPanelThemeFromStorage(panel: PanelThemeKind, userId: string
 export function syncPanelThemeForCurrentUser(panel: PanelThemeKind) {
   applyPanelThemeFromStorage(panel, getPersistedSupabaseUserId());
 }
+
+/** Remove preferências de tema guardadas para este utilizador (ex.: após exclusão da conta). */
+export function clearPanelThemePrefsForUser(userId: string) {
+  if (typeof window === "undefined" || !userId) return;
+  const panels: PanelThemeKind[] = ["frota", "taxi", "admin"];
+  for (const panel of panels) {
+    try {
+      const raw = localStorage.getItem(storageKey(panel));
+      if (!raw) continue;
+      const p = JSON.parse(raw) as { userId?: string };
+      if (p.userId === userId) localStorage.removeItem(storageKey(panel));
+    } catch {
+      /* ignore */
+    }
+  }
+}

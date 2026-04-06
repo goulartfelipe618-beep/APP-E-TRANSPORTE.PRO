@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { clearAuthStartedAt, isAuthExpired, readAuthStartedAt, setAuthStartedAt } from "@/lib/authExpiry";
 
 export default function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
@@ -19,6 +20,21 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
         if (!mounted) return;
 
         if (!session) {
+          setAuthenticated(false);
+          setNeedsMfa(false);
+          setLoading(false);
+          return;
+        }
+
+        const startedAt = readAuthStartedAt();
+        if (!startedAt) setAuthStartedAt(Date.now());
+        if (startedAt && isAuthExpired(startedAt)) {
+          clearAuthStartedAt();
+          try {
+            await supabase.auth.signOut();
+          } catch {
+            // ignore
+          }
           setAuthenticated(false);
           setNeedsMfa(false);
           setLoading(false);
