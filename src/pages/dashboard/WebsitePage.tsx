@@ -724,13 +724,11 @@ export default function WebsitePage() {
           const isSelected = selectedTemplate === t.id;
           return (
             <div key={t.id} className="flex flex-col">
-              <button
-                type="button"
+              <div
                 className={cn(
                   "rounded-xl h-48 relative overflow-hidden border bg-muted group text-left w-full p-0",
                   isSelected ? "ring-2 ring-primary" : "border-border",
                 )}
-                onClick={() => selectTemplateAndGoToDomain(t.id)}
               >
                 {t.imagem_url ? (
                   <img src={t.imagem_url} alt={t.nome} className="w-full object-cover object-top transition-transform duration-[120s] ease-linear group-hover:translate-y-[calc(-100%+12rem)]" style={{ minHeight: "200%" }} />
@@ -738,7 +736,7 @@ export default function WebsitePage() {
                   <div className="h-full flex items-center justify-center text-muted-foreground">Sem imagem</div>
                 )}
                 {isSelected && <div className="absolute top-3 right-3 w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center z-10"><Check className="h-3.5 w-3.5" /></div>}
-              </button>
+              </div>
               <p className="font-semibold text-foreground mt-3 text-sm">{t.nome}</p>
               {t.link_modelo && (
                 <a href={t.link_modelo} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
@@ -752,7 +750,7 @@ export default function WebsitePage() {
                 variant={isSelected ? "default" : "outline"}
                 onClick={() => selectTemplateAndGoToDomain(t.id)}
               >
-                {isSelected ? <><Check className="h-4 w-4" /> Usar este modelo</> : "Selecionar modelo"}
+                {isSelected ? <><Check className="h-4 w-4" /> Usar este modelo</> : "Usar este modelo"}
               </Button>
             </div>
           );
