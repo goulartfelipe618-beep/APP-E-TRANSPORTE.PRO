@@ -147,10 +147,11 @@ Deno.serve(async (req) => {
   try {
     const url = new URL(req.url);
     const automacaoId = url.searchParams.get("automacao_id");
+    const campanhaSlug = url.searchParams.get("campanha");
 
-    if (!automacaoId) {
+    if (!automacaoId && !campanhaSlug) {
       return new Response(
-        JSON.stringify({ error: "automacao_id is required" }),
+        JSON.stringify({ error: "automacao_id or campanha is required" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -159,11 +160,36 @@ Deno.serve(async (req) => {
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
-    const { data: automacao, error: autoError } = await supabase
-      .from("automacoes")
-      .select("*")
-      .eq("id", automacaoId)
-      .single();
+    let automacao: any = null;
+    let autoError: any = null;
+
+    if (automacaoId) {
+      const autoRes = await supabase
+        .from("automacoes")
+        .select("*")
+        .eq("id", automacaoId)
+        .single();
+      automacao = autoRes.data;
+      autoError = autoRes.error;
+    } else if (campanhaSlug) {
+      const { data: campanha } = await supabase
+        .from("campanhas")
+        .select("id")
+        .eq("slug", campanhaSlug)
+        .limit(1)
+        .maybeSingle();
+      if (campanha?.id) {
+        const autoRes = await supabase
+          .from("automacoes")
+          .select("*")
+          .eq("campanha_id", campanha.id)
+          .eq("tipo", "campanha")
+          .limit(1)
+          .maybeSingle();
+        automacao = autoRes.data;
+        autoError = autoRes.error;
+      }
+    }
 
     if (autoError || !automacao) {
       return new Response(
@@ -179,7 +205,7 @@ Deno.serve(async (req) => {
       const { error: testError } = await supabase
         .from("webhook_testes")
         .insert({
-          automacao_id: automacaoId,
+          automacao_id: automacao.id,
           user_id: automacao.user_id,
           payload: body,
         });
@@ -495,6 +521,52 @@ Deno.serve(async (req) => {
       };
 
       const { error } = await supabase.from("solicitacoes_motoristas").insert(record);
+      insertError = error;
+    } else if (tipo === "campanha") {
+      if (!automacao.campanha_id) {
+        return new Response(
+          JSON.stringify({ error: "Automação de campanha inválida (campanha ausente)." }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const { data: campanha, error: campanhaErr } = await supabase
+        .from("campanhas")
+        .select("id, status, data_inicio, data_fim")
+        .eq("id", automacao.campanha_id)
+        .maybeSingle();
+
+      if (campanhaErr || !campanha) {
+        return new Response(
+          JSON.stringify({ error: "Campanha não encontrada para este webhook." }),
+          { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const nowIso = new Date().toISOString().slice(0, 10);
+      if (campanha.status !== "ativa" || nowIso < campanha.data_inicio || nowIso > campanha.data_fim) {
+        await supabase.from("campanhas").update({ status: "encerrada" }).eq("id", campanha.id);
+        await supabase.from("automacoes").delete().eq("id", automacao.id);
+        return new Response(
+          JSON.stringify({ error: "Campanha encerrada. Webhook removido automaticamente." }),
+          { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const map = (savedMappings?.default || {}) as Record<string, string>;
+      const mappedFields: Record<string, any> = {};
+      for (const [placeholder, incomingPath] of Object.entries(map)) {
+        if (!incomingPath) continue;
+        mappedFields[placeholder] = resolveValue(body, incomingPath);
+      }
+
+      const { error } = await supabase.from("campanha_leads").insert({
+        user_id: userId,
+        campanha_id: campanha.id,
+        automacao_id: automacao.id,
+        payload: body,
+        campos: mappedFields,
+      });
       insertError = error;
     } else {
       return new Response(

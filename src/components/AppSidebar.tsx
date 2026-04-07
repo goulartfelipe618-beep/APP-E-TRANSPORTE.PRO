@@ -119,7 +119,7 @@ const getMenuStructure = (showNetwork: boolean) => [
 ];
 
 export function AppSidebar() {
-  const { state } = useSidebar();
+  const { state, isMobile, setOpenMobile } = useSidebar();
   const collapsed = state === "collapsed";
   const navigate = useNavigate();
   const { config } = useConfiguracoes();
@@ -156,6 +156,12 @@ export function AppSidebar() {
   const isActive = (page: string) => activePage === page;
   const isGroupActive = (children: { page: string }[]) =>
     children.some((c) => activePage === c.page);
+  const handleNavigate = (page: string) => {
+    setActivePage(page);
+    if (isMobile) {
+      setOpenMobile(false);
+    }
+  };
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -218,7 +224,7 @@ export function AppSidebar() {
                               {item.children.map((child) => (
                                 <SidebarMenuSubItem key={child.page}>
                                   <SidebarMenuSubButton
-                                    onClick={() => setActivePage(child.page)}
+                                    onClick={() => handleNavigate(child.page)}
                                     className={cn(
                                       "text-sm cursor-pointer w-full",
                                       isActive(child.page) && "text-primary font-medium"
@@ -265,7 +271,7 @@ export function AppSidebar() {
                           </span>
                         )}
                         <SidebarMenuButton
-                          onClick={() => setActivePage(page)}
+                          onClick={() => handleNavigate(page)}
                           title={isDisparador ? "Disparador (BETA)" : undefined}
                           className={cn(
                             "cursor-pointer",

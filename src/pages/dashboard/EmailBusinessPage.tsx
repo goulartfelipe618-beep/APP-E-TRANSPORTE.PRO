@@ -75,6 +75,13 @@ export default function EmailBusinessPage() {
   }, []);
 
   const handleSubmitEmail = async () => {
+    if (plano === "free") {
+      setUpgradeOpen(true);
+      toast.message("Plano necessário", {
+        description: "Para enviar a solicitação de E-mail Business, confirme um plano pago no painel.",
+      });
+      return;
+    }
     setSubmitting(true);
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { toast.error("Não autenticado"); setSubmitting(false); return; }
@@ -157,6 +164,7 @@ export default function EmailBusinessPage() {
         {/* Carousel */}
         <SlideCarousel
           pagina="email_business"
+          breakoutTop={!pendingBanner}
           fallbackSlides={[
             { titulo: "Seu E-mail Profissional", subtitulo: "Tenha um endereço como contato@suaempresa.com.br e transmita autoridade e credibilidade para hotéis e clientes executivos." },
             { titulo: "Destaque-se da Concorrência", subtitulo: "Um e-mail profissional mostra que você leva seu negócio a sério. Impressione clientes corporativos e feche mais contratos." },
@@ -252,6 +260,7 @@ export default function EmailBusinessPage() {
               if (row) {
                 setDomain(row.fqdn);
                 setPurchasedDomainId(row.id);
+                setStep(1);
               }
             }}
             onRegisterNew={goToDomainMenu}
@@ -272,10 +281,6 @@ export default function EmailBusinessPage() {
                   toast.error("Selecione um domínio já cadastrado ou registre um novo no menu Domínios.");
                   return;
                 }
-                if (plano === "free") {
-                  setUpgradeOpen(true);
-                  return;
-                }
                 setStep(1);
               }}
             >
@@ -289,22 +294,22 @@ export default function EmailBusinessPage() {
         {step === 1 && (
           <div className="space-y-6 max-w-xl">
             <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
-              <Mail className="h-5 w-5" /> Seu e-mail principal
+              <Mail className="h-5 w-5" /> Digite o e-mail desejado
             </h2>
 
             <div className="rounded-lg border border-border bg-muted/40 px-4 py-3">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Domínio (fixo)</p>
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Domínio</p>
               <p className="font-mono text-sm font-semibold text-foreground break-all mt-1">{domain || "—"}</p>
             </div>
 
             <div>
               <label htmlFor="email-prefix-local" className="text-sm font-medium text-foreground block mb-2">
-                Nome do e-mail desejado
+                Endereço completo
               </label>
               <div className="flex flex-wrap items-center gap-x-2 gap-y-2 rounded-lg border border-border bg-background px-3 py-2">
                 <Input
                   id="email-prefix-local"
-                  className="border-0 shadow-none focus-visible:ring-0 max-w-[220px] px-0 h-9"
+                  className="min-w-0 flex-1 border-0 bg-transparent shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 px-0 h-9 sm:max-w-none max-w-[200px]"
                   placeholder="contato"
                   value={emailPrefix}
                   onChange={(e) => setEmailPrefix(sanitizeEmailLocalPart(e.target.value))}
@@ -313,16 +318,8 @@ export default function EmailBusinessPage() {
                 />
                 <span className="text-sm text-muted-foreground select-none shrink-0">@{domain || ""}</span>
               </div>
-              <p className="text-xs text-muted-foreground mt-2">Apenas o trecho antes do @ pode ser editado. O domínio não pode ser alterado nesta etapa.</p>
-            </div>
-
-            <div className="space-y-3 rounded-lg border border-border/80 bg-muted/20 p-4 text-sm text-muted-foreground leading-relaxed">
-              <p>
-                Você deseja ter mais de 1 e-mail business? Você terá a oportunidade de comprar novas caixas de e-mail assim
-                que registrar o seu e-mail principal.
-              </p>
-              <p>
-                Após o registro deste e-mail, não haverá possibilidade de reverter ou editar o nome do registro de e-mail.
+              <p className="text-xs text-muted-foreground mt-2">
+                Informe apenas a parte antes do @. O domínio vem da etapa anterior.
               </p>
             </div>
           </div>

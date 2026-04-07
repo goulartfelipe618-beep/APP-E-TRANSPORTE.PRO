@@ -234,8 +234,8 @@ const Login = () => {
                 <form onSubmit={handleLogin} className="space-y-3">
                   <div className="space-y-1.5">
                     <Label htmlFor="login-user" className="text-xs">Usuario</Label>
-                    <div className="flex items-center gap-2 rounded-md border border-input bg-background px-3">
-                      <Mail className="h-4 w-4 text-muted-foreground" />
+                    <div className="flex min-h-10 items-center gap-2 rounded-md border border-input bg-background px-3 shadow-sm has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring has-[:focus-visible]:ring-offset-0">
+                      <Mail className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
                       <Input
                         id="login-user"
                         type="email"
@@ -243,15 +243,15 @@ const Login = () => {
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         required
-                        className="border-0 px-0 shadow-none focus-visible:ring-0"
+                        className="min-w-0 flex-1 border-0 bg-transparent px-0 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
                       />
                     </div>
                   </div>
 
                   <div className="space-y-1.5">
                     <Label htmlFor="login-pass" className="text-xs">Senha</Label>
-                    <div className="flex items-center gap-2 rounded-md border border-input bg-background px-3">
-                      <Lock className="h-4 w-4 text-muted-foreground" />
+                    <div className="flex min-h-10 items-center gap-2 rounded-md border border-input bg-background px-3 shadow-sm has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring has-[:focus-visible]:ring-offset-0">
+                      <Lock className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
                       <Input
                         id="login-pass"
                         type="password"
@@ -259,7 +259,7 @@ const Login = () => {
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         required
-                        className="border-0 px-0 shadow-none focus-visible:ring-0"
+                        className="min-w-0 flex-1 border-0 bg-transparent px-0 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
                       />
                     </div>
                   </div>
@@ -280,15 +280,15 @@ const Login = () => {
                         <RefreshCw className="h-4 w-4" />
                       </button>
                     </div>
-                    <div className="flex items-center gap-2 rounded-md border border-input bg-background px-3">
-                      <Key className="h-4 w-4 text-muted-foreground" />
+                    <div className="flex min-h-10 items-center gap-2 rounded-md border border-input bg-background px-3 shadow-sm has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring has-[:focus-visible]:ring-offset-0">
+                      <Key className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
                       <Input
                         type="text"
                         placeholder={loginConfig?.placeholder_captcha ?? "Digite o código acima"}
                         value={captchaInput}
                         onChange={(e) => setCaptchaInput(e.target.value)}
                         required
-                        className="border-0 px-0 shadow-none focus-visible:ring-0"
+                        className="min-w-0 flex-1 border-0 bg-transparent px-0 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
                       />
                     </div>
                   </div>

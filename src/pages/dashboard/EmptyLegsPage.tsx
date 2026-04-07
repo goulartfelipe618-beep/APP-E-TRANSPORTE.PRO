@@ -61,7 +61,7 @@ export default function EmptyLegsPage() {
         </p>
       </div>
 
-      <SlideCarousel pagina="empty_legs" />
+      <SlideCarousel pagina="empty_legs" breakoutTop={false} />
 
       {loading ? (
         <p className="text-muted-foreground text-center py-8">Carregando...</p>

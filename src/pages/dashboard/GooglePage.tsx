@@ -975,6 +975,7 @@ export default function GooglePage() {
 
         <SlideCarousel
           pagina="google"
+          breakoutTop={false}
           fallbackSlides={[
             { titulo: "Coloque Sua Empresa no Google", subtitulo: "Crie seu perfil no Google Business Profile e apareça nas buscas quando clientes procurarem por transporte executivo na sua região." },
             { titulo: "Perfil Verificado no Google", subtitulo: "Motoristas com perfil verificado passam mais confiança. Hotéis e empresas encontram você diretamente no Google Maps." },

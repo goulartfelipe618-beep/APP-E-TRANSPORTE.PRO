@@ -28,10 +28,15 @@ interface SlideCarouselProps {
   /** Sem cantos arredondados nem sombra no bloco do carrossel (padrão: true no painel). */
   fullBleed?: boolean;
   /**
-   * Compensa o `p-6` do `<main>` do painel para o slide ir da borda esquerda da área de conteúdo até a direita.
+   * Compensa o `px-6` do `<main>` para o slide encostar nas laterais da área de conteúdo.
    * Desative no Admin Master (ex.: Comunidade com `main` em `px-0`).
    */
   breakoutHorizontal?: boolean;
+  /**
+   * Compensa o `pt-6` do `<main>` quando o carrossel é o primeiro bloco da página.
+   * Use `false` se houver título/banner acima do carrossel (evita sobreposição).
+   */
+  breakoutTop?: boolean;
   className?: string;
 }
 
@@ -42,6 +47,7 @@ export default function SlideCarousel({
   slidesOverride,
   fullBleed = true,
   breakoutHorizontal = true,
+  breakoutTop = true,
   className,
 }: SlideCarouselProps) {
   const [currentSlide, setCurrentSlide] = useState(0);
@@ -126,21 +132,27 @@ export default function SlideCarousel({
         alt={slide.titulo || "Slide"}
         className={
           isBanner
-            ? "h-full w-full object-cover object-center"
-            : "h-auto w-full max-w-full block"
+            ? "h-full w-full min-h-0 object-cover object-center"
+            : "block h-auto w-full max-w-none object-contain align-top"
         }
       />
     ) : (
       <div
         className={cn(
           "bg-gradient-to-r from-primary/80 to-primary",
+          fullBleed && "rounded-none",
           isBanner ? "h-full min-h-[8rem] w-full" : "h-72 w-full",
         )}
       />
     );
 
     const inner = linkUrl && isActive ? (
-      <a href={linkUrl} target="_blank" rel="noopener noreferrer" className={cn("block", isBanner && "h-full w-full")}>
+      <a
+        href={linkUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={cn("block w-full", isBanner && "h-full w-full")}
+      >
         {imageEl}
       </a>
     ) : (
@@ -162,7 +174,8 @@ export default function SlideCarousel({
     <div
       className={cn(
         breakoutHorizontal && "-mx-6",
-        "relative w-full max-w-none overflow-hidden",
+        breakoutHorizontal && breakoutTop && "-mt-6",
+        "relative w-full max-w-none min-w-0 overflow-hidden p-0",
         isBanner
           ? cn(
               "aspect-[1922/330]",
@@ -176,13 +189,18 @@ export default function SlideCarousel({
         className,
       )}
     >
-      <div className={cn("relative", isBanner ? "absolute inset-0 h-full w-full" : "")}>
+      <div className={cn("relative w-full", isBanner ? "absolute inset-0 h-full w-full min-h-0" : "")}>
         {!isBanner && (
           <>
             {displaySlides[0]?.imagem_url ? (
-              <img src={displaySlides[0].imagem_url} alt="" className="block h-auto w-full invisible" />
+              <img
+                src={displaySlides[0].imagem_url}
+                alt=""
+                className="pointer-events-none block h-auto w-full max-w-none object-contain invisible select-none"
+                aria-hidden
+              />
             ) : (
-              <div className="invisible h-72" />
+              <div className="invisible h-72 w-full" />
             )}
           </>
         )}

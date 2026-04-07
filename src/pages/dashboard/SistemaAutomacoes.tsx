@@ -30,6 +30,8 @@ interface Automacao {
   tipo: string;
   ativo: boolean;
   mappings: Record<string, Record<string, string>>;
+  campanha_id?: string | null;
+  is_campaign_webhook?: boolean;
   created_at: string;
 }
 
@@ -44,6 +46,7 @@ const tipoLabels: Record<string, string> = {
   transfer: "Transfer Executivo",
   motorista: "Solicitação Motorista",
   grupo: "Solicitação de Grupo",
+  campanha: "Campanha",
 };
 
 // Fallback fields (used if DB config not loaded yet)
@@ -170,6 +173,10 @@ export default function SistemaAutomacoesPage() {
   const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID || "seu-projeto";
   const [deleteIntent, setDeleteIntent] = useState<DeleteIntent | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
+  const [campaignFields, setCampaignFields] = useState<string[]>([]);
+  const [newCampaignField, setNewCampaignField] = useState("");
+  const [campaignFieldLocked, setCampaignFieldLocked] = useState(false);
+  const [campaignMeta, setCampaignMeta] = useState<any>(null);
 
   const fetchAutomacoes = useCallback(async () => {
     const { data, error } = await supabase
@@ -185,6 +192,14 @@ export default function SistemaAutomacoesPage() {
   }, []);
 
   useEffect(() => { fetchAutomacoes(); }, [fetchAutomacoes]);
+
+  const slugify = (value: string) =>
+    value
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "");
 
   const fetchTestes = useCallback(async (automacaoId: string) => {
     const { data, error } = await supabase
@@ -266,11 +281,16 @@ export default function SistemaAutomacoesPage() {
     }
   };
 
-  const getWebhookUrl = (id: string) =>
-    `https://${projectId}.supabase.co/functions/v1/webhook-solicitacao?automacao_id=${id}`;
+  const getWebhookUrl = (automacao: Automacao) => {
+    if (automacao.tipo === "campanha") {
+      const campaignSlug = slugify(automacao.nome) || "campanha";
+      return `https://${projectId}.supabase.co/functions/v1/webhook-solicitacao?campanha=${encodeURIComponent(campaignSlug)}&automacao_id=${automacao.id}`;
+    }
+    return `https://${projectId}.supabase.co/functions/v1/webhook-solicitacao?automacao_id=${automacao.id}`;
+  };
 
-  const copyUrl = (id: string) => {
-    navigator.clipboard.writeText(getWebhookUrl(id));
+  const copyUrl = (automacao: Automacao) => {
+    navigator.clipboard.writeText(getWebhookUrl(automacao));
     toast.success("URL copiada!");
   };
 
@@ -304,15 +324,51 @@ export default function SistemaAutomacoesPage() {
     toast.success("Teste enviado! Verifique as Solicitações correspondentes.");
   };
 
+  const addCampaignField = () => {
+    const field = newCampaignField.trim();
+    if (!field) return;
+    if (campaignFields.includes(field)) {
+      toast.error("Esse placeholder já existe.");
+      return;
+    }
+    setCampaignFields((prev) => [...prev, field]);
+    setNewCampaignField("");
+    setCampaignFieldLocked(false);
+  };
+
+  const saveCampaignMappings = async () => {
+    if (!selected) return;
+    const requiredMap = mappings.default || {};
+    const payloadFields = campaignFields.reduce((acc, field) => {
+      acc[field] = requiredMap[field] || "";
+      return acc;
+    }, {} as Record<string, string>);
+    const nextMappings = { ...mappings, default: payloadFields };
+    const { error } = await supabase
+      .from("automacoes")
+      .update({ mappings: nextMappings as any, updated_at: new Date().toISOString() })
+      .eq("id", selected.id);
+    if (error) {
+      toast.error("Erro ao salvar");
+      return;
+    }
+    setMappings(nextMappings);
+    setAutomacoes((prev) => prev.map((a) => a.id === selected.id ? { ...a, mappings: nextMappings } : a));
+    setSelected({ ...selected, mappings: nextMappings });
+    toast.success("Mapeamento salvo com sucesso!");
+    setCampaignFieldLocked(true);
+  };
+
   // Detail view
   if (selected) {
     const isTransfer = selected.tipo === "transfer";
-    const webhookUrl = getWebhookUrl(selected.id);
+    const webhookUrl = getWebhookUrl(selected);
+    const isCampaign = selected.tipo === "campanha";
 
     return (
       <div className="space-y-6">
         <button
-          onClick={() => { setSelected(null); setMappings({}); setTestes([]); setSelectedTeste(null); setContainerTestes({}); setCollapsedContainers({}); }}
+          onClick={() => { setSelected(null); setMappings({}); setTestes([]); setSelectedTeste(null); setContainerTestes({}); setCollapsedContainers({}); setCampaignFields([]); setNewCampaignField(""); setCampaignFieldLocked(false); setCampaignMeta(null); }}
           className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
         >
           <ArrowLeft className="h-4 w-4" />
@@ -324,10 +380,17 @@ export default function SistemaAutomacoesPage() {
             <h1 className="text-2xl font-bold text-foreground uppercase">{tipoLabels[selected.tipo] || selected.tipo}</h1>
             <p className="text-muted-foreground">Configure o webhook e mapeamento de campos.</p>
           </div>
-          <Button variant="outline" onClick={() => setDevToolsOpen(true)}>
-            <Code2 className="h-4 w-4 mr-2" /> Ferramentas do Desenvolvedor
-          </Button>
+          {!isCampaign && (
+            <Button variant="outline" onClick={() => setDevToolsOpen(true)}>
+              <Code2 className="h-4 w-4 mr-2" /> Ferramentas do Desenvolvedor
+            </Button>
+          )}
         </div>
+        {isCampaign && campaignMeta && (
+          <div className="rounded-lg border border-border bg-muted/30 p-4 text-sm">
+            <p><strong>Período da campanha:</strong> {new Date(`${campaignMeta.data_inicio}T00:00:00`).toLocaleDateString("pt-BR")} - {new Date(`${campaignMeta.data_fim}T00:00:00`).toLocaleDateString("pt-BR")}</p>
+          </div>
+        )}
 
         {/* Webhook URL card */}
         <div className="rounded-xl border border-border bg-card p-6 space-y-4">
@@ -339,7 +402,7 @@ export default function SistemaAutomacoesPage() {
               <p className="text-sm font-medium text-foreground">URL do Webhook:</p>
               <p className="text-xs text-muted-foreground break-all mt-1 font-mono">{webhookUrl}</p>
             </div>
-            <Button variant="outline" size="sm" onClick={() => copyUrl(selected.id)} className="shrink-0">
+            <Button variant="outline" size="sm" onClick={() => copyUrl(selected)} className="shrink-0">
               <Copy className="h-3.5 w-3.5 mr-1.5" /> Copiar
             </Button>
           </div>
@@ -355,7 +418,9 @@ export default function SistemaAutomacoesPage() {
                 </p>
                 <p className="text-xs text-muted-foreground">
                   {selected.ativo
-                    ? `Dados recebidos serão encaminhados automaticamente para o menu Solicitações de ${tipoLabels[selected.tipo] || selected.tipo}. Testes NÃO serão armazenados.`
+                    ? (isCampaign
+                      ? "Dados recebidos serão encaminhados automaticamente para o submenu LEADS. Testes NÃO serão armazenados."
+                      : `Dados recebidos serão encaminhados automaticamente para o menu Solicitações de ${tipoLabels[selected.tipo] || selected.tipo}. Testes NÃO serão armazenados.`)
                     : "Envie um POST para a URL acima para receber testes. Configure o mapeamento antes de ativar."}
                 </p>
               </div>
@@ -373,7 +438,9 @@ export default function SistemaAutomacoesPage() {
             <Sparkles className="h-8 w-8 text-green-500 mx-auto" />
             <h3 className="font-semibold text-foreground">Webhook em Produção</h3>
             <p className="text-sm text-muted-foreground">
-              Todos os dados recebidos via webhook estão sendo encaminhados automaticamente para o menu <strong>Solicitações → {tipoLabels[selected.tipo]}</strong>.
+              {isCampaign
+                ? <>Todos os dados recebidos via webhook estão sendo encaminhados automaticamente para o submenu <strong>LEADS</strong>.</>
+                : <>Todos os dados recebidos via webhook estão sendo encaminhados automaticamente para o menu <strong>Solicitações → {tipoLabels[selected.tipo]}</strong>.</>}
             </p>
             <p className="text-xs text-muted-foreground">
               Para receber testes novamente, desative o webhook acima.
@@ -469,6 +536,8 @@ export default function SistemaAutomacoesPage() {
               <div className="flex items-center justify-between mb-4">
               {isTransfer ? (
                 <h3 className="font-semibold text-foreground">Mapeamento de Campos</h3>
+              ) : isCampaign ? (
+                <h3 className="font-semibold text-foreground">Placeholders da Campanha</h3>
               ) : (
                 <>
                   <h3 className="font-semibold text-foreground">Mapeamento de Campos</h3>
@@ -547,6 +616,43 @@ export default function SistemaAutomacoesPage() {
                     );
                   })}
                 </div>
+              ) : isCampaign ? (
+                <div className="space-y-4">
+                  <div className="flex items-end gap-2">
+                    <div className="flex-1">
+                      <Label>Novo placeholder</Label>
+                      <Input
+                        placeholder="Ex: nome_cliente, telefone, utm_source"
+                        value={newCampaignField}
+                        onChange={(e) => setNewCampaignField(e.target.value)}
+                        disabled={campaignFieldLocked}
+                      />
+                    </div>
+                    {!campaignFieldLocked && (
+                      <Button variant="outline" onClick={addCampaignField}>Criar Campo</Button>
+                    )}
+                    {campaignFieldLocked ? (
+                      <Button variant="outline" onClick={() => setCampaignFieldLocked(false)}>
+                        <Pencil className="h-3.5 w-3.5 mr-1.5" /> Editar
+                      </Button>
+                    ) : (
+                      <Button onClick={saveCampaignMappings}>
+                        <Save className="h-3.5 w-3.5 mr-1.5" /> Salvar
+                      </Button>
+                    )}
+                  </div>
+                  {campaignFields.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">Nenhum placeholder criado. Crie campos manualmente para mapear variáveis capturadas nos testes.</p>
+                  ) : (
+                    <FieldMappingList
+                      fields={campaignFields}
+                      mappings={mappings["default"] || {}}
+                      onUpdate={(f, v) => updateMapping("default", f, v)}
+                      availableVars={selectedTeste ? extractPayloadKeys(selectedTeste.payload) : []}
+                      testPayload={selectedTeste?.payload || null}
+                    />
+                  )}
+                </div>
               ) : selected.tipo === "grupo" ? (
                 !collapsedContainers["default"] ? (
                   <FieldMappingList fields={getFields("grupo", "default")} mappings={mappings["default"] || {}} onUpdate={(f, v) => updateMapping("default", f, v)} availableVars={selectedTeste ? extractPayloadKeys(selectedTeste.payload) : []} testPayload={selectedTeste?.payload || null} />
@@ -574,12 +680,14 @@ export default function SistemaAutomacoesPage() {
           )}
         </div>
 
-        <FerramentasDevDialog
-          open={devToolsOpen}
-          onOpenChange={setDevToolsOpen}
-          tipo={selected.tipo}
-          onSubmit={handleTestSubmit}
-        />
+        {!isCampaign && (
+          <FerramentasDevDialog
+            open={devToolsOpen}
+            onOpenChange={setDevToolsOpen}
+            tipo={selected.tipo}
+            onSubmit={handleTestSubmit}
+          />
+        )}
 
         <ConfirmDeleteDialog
           open={deleteIntent !== null}
@@ -643,8 +751,8 @@ export default function SistemaAutomacoesPage() {
                   <TableCell><Badge variant="secondary">{tipoLabels[a.tipo] || a.tipo}</Badge></TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2 max-w-[280px]">
-                      <span className="text-xs font-mono text-muted-foreground truncate">{getWebhookUrl(a.id)}</span>
-                      <Button variant="ghost" size="icon" className="shrink-0 h-7 w-7" onClick={() => copyUrl(a.id)} title="Copiar URL">
+                      <span className="text-xs font-mono text-muted-foreground truncate">{getWebhookUrl(a)}</span>
+                      <Button variant="ghost" size="icon" className="shrink-0 h-7 w-7" onClick={() => copyUrl(a)} title="Copiar URL">
                         <Copy className="h-3 w-3" />
                       </Button>
                     </div>
@@ -674,6 +782,27 @@ export default function SistemaAutomacoesPage() {
                         setSelected(a);
                         setMappings(m);
                         fetchTestes(a.id);
+                        if (a.tipo === "campanha") {
+                          const placeholders = Object.keys(m.default || {});
+                          setCampaignFields(placeholders);
+                          setCampaignFieldLocked(placeholders.length > 0);
+                          setNewCampaignField("");
+                          if (a.campanha_id) {
+                            supabase
+                              .from("campanhas" as any)
+                              .select("data_inicio, data_fim")
+                              .eq("id", a.campanha_id)
+                              .maybeSingle()
+                              .then(({ data }) => setCampaignMeta(data || null));
+                          } else {
+                            setCampaignMeta(null);
+                          }
+                        } else {
+                          setCampaignMeta(null);
+                          setCampaignFields([]);
+                          setCampaignFieldLocked(false);
+                          setNewCampaignField("");
+                        }
                         // Sempre abrir com mapeamento recolhido; o motorista expande com "Editar"
                         if (a.tipo === "transfer") {
                           setCollapsedContainers({
@@ -681,6 +810,8 @@ export default function SistemaAutomacoesPage() {
                             ida_volta: true,
                             por_hora: true,
                           });
+                        } else if (a.tipo === "campanha") {
+                          setCollapsedContainers({ default: false });
                         } else {
                           setCollapsedContainers({ default: true });
                         }

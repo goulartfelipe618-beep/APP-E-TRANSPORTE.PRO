@@ -234,9 +234,17 @@ export default function WebsitePage() {
 
   const selectedTemplateName = dbTemplates.find(t => t.id === selectedTemplate)?.nome || "";
 
-  /** Escolhe o modelo e avança automaticamente para a etapa de domínio (sem botão extra na galeria). */
-  const selectTemplateAndGoToDomain = (templateId: string) => {
+  /** Apenas marca o template na galeria; o utilizador confirma com "Continuar com modelo escolhido". */
+  const selectTemplateOnly = (templateId: string) => {
     setSelectedTemplate(templateId);
+  };
+
+  /** Após seleção visual na galeria, avança para a etapa de domínio. */
+  const continueWithSelectedTemplate = () => {
+    if (!selectedTemplate) {
+      toast.error("Selecione um modelo primeiro.");
+      return;
+    }
     setDomainPickSelect("");
     setPurchasedDomainId(null);
     setDomain("");
@@ -277,7 +285,9 @@ export default function WebsitePage() {
     setSubmitting(false);
     if (error) { toast.error("Erro ao enviar: " + error.message); return; }
     toast.success("Briefing enviado com sucesso! O administrador irá processar seu pedido.");
-    setBs(1); setStep("gallery");
+    setBs(1);
+    setSelectedTemplate(null);
+    setStep("gallery");
   };
 
   // ── Active service view ────────────────────────────
@@ -711,7 +721,7 @@ export default function WebsitePage() {
   return (
     <div className="space-y-6">
       {pendingBanner}
-      <SlideCarousel pagina="website" fallbackSlides={[
+      <SlideCarousel pagina="website" breakoutTop={!pendingBanner} fallbackSlides={[
         { titulo: "Crie Seu Site Profissional", subtitulo: "Design premium e responsivo para transporte executivo." },
         { titulo: "Templates Exclusivos", subtitulo: "Modelos desenvolvidos para o segmento de transporte." },
       ]} />
@@ -747,15 +757,33 @@ export default function WebsitePage() {
                 type="button"
                 size="sm"
                 className="mt-2 w-full gap-2"
-                variant={isSelected ? "default" : "outline"}
-                onClick={() => selectTemplateAndGoToDomain(t.id)}
+                variant={isSelected ? "secondary" : "outline"}
+                disabled={isSelected}
+                onClick={() => selectTemplateOnly(t.id)}
               >
-                {isSelected ? <><Check className="h-4 w-4" /> Usar este modelo</> : "Usar este modelo"}
+                {isSelected ? (
+                  <><Check className="h-4 w-4" /> Modelo selecionado</>
+                ) : (
+                  "Usar este modelo"
+                )}
               </Button>
             </div>
           );
         })}
       </div>
+
+      {selectedTemplate && dbTemplates.length > 0 && (
+        <div className="sticky bottom-0 z-10 flex flex-col items-center gap-2 border-t border-border bg-background/95 py-4 backdrop-blur supports-[backdrop-filter]:bg-background/80 -mx-4 px-4 sm:-mx-6 sm:px-6">
+          <p className="text-center text-sm text-muted-foreground">
+            Modelo: <span className="font-medium text-foreground">{selectedTemplateName}</span>
+          </p>
+          <Button type="button" size="lg" className="w-full max-w-md gap-2" onClick={continueWithSelectedTemplate}>
+            Continuar com modelo escolhido
+            <ArrowRight className="h-4 w-4" />
+          </Button>
+        </div>
+      )}
+
       {dbTemplates.length === 0 && <div className="text-center py-12 text-muted-foreground">Nenhum template disponível no momento.</div>}
       <UpgradePlanDialog
         open={upgradeOpen}

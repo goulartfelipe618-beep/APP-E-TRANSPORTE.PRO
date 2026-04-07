@@ -10,6 +10,7 @@ import { User, FileText, CreditCard, Car, ArrowLeft, ArrowRight, Upload } from "
 import { toast } from "sonner";
 import type { MotoristaInitialData } from "@/lib/motoristaFromSolicitacao";
 import { parseDadosWebhook, pickStr } from "@/lib/motoristaFromSolicitacao";
+import { supabase } from "@/integrations/supabase/client";
 
 const UFS = ["AC","AL","AP","AM","BA","CE","DF","ES","GO","MA","MT","MS","MG","PA","PB","PR","PE","PI","RJ","RN","RS","RO","RR","SC","SP","SE","TO"] as const;
 
@@ -105,6 +106,7 @@ export default function CadastrarMotoristaDialog({ open, onOpenChange, onCreated
   const [chassi, setChassi] = useState("");
   const [statusVeiculo, setStatusVeiculo] = useState("ativo");
   const [obsVeiculo, setObsVeiculo] = useState("");
+  const [saving, setSaving] = useState(false);
 
   const resetEmpty = useCallback(() => {
     setNome("");
@@ -249,7 +251,7 @@ export default function CadastrarMotoristaDialog({ open, onOpenChange, onCreated
     setTabIndex((t) => Math.min(t + 1, TABS.length - 1));
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const err = validateAll();
     if (err) {
       toast.error(err);
@@ -259,8 +261,83 @@ export default function CadastrarMotoristaDialog({ open, onOpenChange, onCreated
       else setTabIndex(3);
       return;
     }
-    // Persistência em motoristas/veículos: ainda não implementada no backend deste fluxo
-    toast.success("Validação OK. Cadastro completo será persistido quando a API de motoristas estiver ligada.");
+    setSaving(true);
+    const payloadWebhook = {
+      rg,
+      data_nascimento: dataNascimento || null,
+      endereco: enderecoCompleto || null,
+      cep: cep || null,
+      categoria_cnh: categoriaCnh || null,
+      validade_cnh: validadeCnh || null,
+      possui_veiculo: possuiVeiculo,
+      marca_veiculo: marca || null,
+      modelo_veiculo: modelo || null,
+      ano_veiculo: ano || null,
+      cor_veiculo: cor || null,
+      placa_veiculo: placa || null,
+      combustivel_veiculo: combustivel || null,
+      renavam_veiculo: renavam || null,
+      chassi_veiculo: chassi || null,
+      status_veiculo: statusVeiculo || null,
+      observacoes_veiculo: obsVeiculo || null,
+      tipo_pagamento: tipoPagamento || null,
+      pix_chave: pixChave || null,
+      observacoes_internas: observacoesInternas || null,
+    };
+
+    if (initialData?.solicitacao_id) {
+      const { error } = await supabase
+        .from("solicitacoes_motoristas")
+        .update({
+          nome: nome.trim(),
+          cpf: cpf || null,
+          cnh: cnh || null,
+          telefone: telefone || null,
+          email: emailField || null,
+          cidade: cidade || null,
+          estado: estadoUf || null,
+          mensagem_observacoes: observacoesInternas || null,
+          dados_webhook: payloadWebhook as any,
+          status: "cadastrado",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", initialData.solicitacao_id);
+      if (error) {
+        toast.error(`Erro ao salvar cadastro: ${error.message}`);
+        setSaving(false);
+        return;
+      }
+    } else {
+      const { data: authData } = await supabase.auth.getUser();
+      const user = authData.user;
+      if (!user) {
+        toast.error("Sessão inválida. Faça login novamente.");
+        setSaving(false);
+        return;
+      }
+      const { error } = await supabase.from("solicitacoes_motoristas").insert({
+        user_id: user.id,
+        nome: nome.trim(),
+        cpf: cpf || null,
+        cnh: cnh || null,
+        telefone: telefone || null,
+        email: emailField || null,
+        cidade: cidade || null,
+        estado: estadoUf || null,
+        mensagem: observacoesInternas || null,
+        mensagem_observacoes: observacoesInternas || null,
+        dados_webhook: payloadWebhook as any,
+        status: "cadastrado",
+      } as any);
+      if (error) {
+        toast.error(`Erro ao salvar cadastro: ${error.message}`);
+        setSaving(false);
+        return;
+      }
+    }
+
+    toast.success("Motorista salvo e disponível na lista imediatamente.");
+    setSaving(false);
     onOpenChange(false);
     onCreated?.();
   };
@@ -565,8 +642,8 @@ export default function CadastrarMotoristaDialog({ open, onOpenChange, onCreated
             <div />
           )}
           {isLast ? (
-            <Button type="button" onClick={handleSave}>
-              Salvar motorista
+            <Button type="button" onClick={handleSave} disabled={saving}>
+              {saving ? "Salvando..." : "Salvar motorista"}
             </Button>
           ) : (
             <Button type="button" onClick={goNext}>
