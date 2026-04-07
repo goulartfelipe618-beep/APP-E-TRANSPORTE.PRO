@@ -97,6 +97,41 @@ function sanitizeComBrLabel(raw: string) {
 
 type DomainCheckCertainty = "registry_br" | "registry_other" | "dns_hint" | "unknown";
 
+/**
+ * Domínios .br: só confiamos em RDAP Registro.br (`certainty === "registry_br"`).
+ * Se a Edge Function no Supabase estiver antiga, ainda vem "aparenta" / DNS — o cliente corrige o texto e não marca como disponível.
+ */
+function normalizeDomainCheckResult(
+  fqdn: string,
+  r: { available: boolean | null; message: string; certainty: DomainCheckCertainty },
+): { available: boolean | null; message: string; certainty: DomainCheckCertainty } {
+  const isBr = fqdn.toLowerCase().trim().endsWith(".br");
+  if (!isBr) return r;
+
+  const legacyAparenta = /aparenta/i.test(r.message);
+  const notOfficial = r.certainty !== "registry_br";
+
+  if (r.available === true && notOfficial) {
+    return {
+      available: null,
+      certainty: "unknown",
+      message:
+        "Sem confirmação pelo RDAP oficial do Registro.br. O projeto no Supabase provavelmente ainda usa uma versão antiga da função check-domain (que respondia só por DNS e dizia “aparenta”). Faça o deploy do código atual: na pasta do projeto rode `supabase functions deploy check-domain`. Depois disso, “disponível” só aparece quando o Registro.br (RDAP) confirmar que o nome não consta registrado.",
+    };
+  }
+
+  if (legacyAparenta && notOfficial) {
+    return {
+      available: null,
+      certainty: "unknown",
+      message:
+        "Mensagem antiga da consulta (não é confirmação oficial). Atualize a Edge Function check-domain no Supabase com a versão do repositório e teste de novo, ou verifique o nome em registro.br.",
+    };
+  }
+
+  return r;
+}
+
 async function checkDomainAvailability(fqdn: string): Promise<{
   available: boolean | null;
   message: string;
@@ -140,11 +175,11 @@ async function checkDomainAvailability(fqdn: string): Promise<{
               : "";
           if (msg) {
             const a = body.available;
-            return {
+            return normalizeDomainCheckResult(fqdn, {
               available: a === true ? true : a === false ? false : null,
               message: msg,
               certainty: parseCertainty((body as { certainty?: unknown }).certainty),
-            };
+            });
           }
         } catch {
           /* corpo não é JSON */
@@ -171,13 +206,17 @@ async function checkDomainAvailability(fqdn: string): Promise<{
     }
     const message = typeof data?.message === "string" ? data.message : "";
     const certainty = parseCertainty((data as { certainty?: unknown } | null)?.certainty);
-    if (data?.available === true) return { available: true, message, certainty };
-    if (data?.available === false) return { available: false, message, certainty };
-    return {
+    if (data?.available === true) {
+      return normalizeDomainCheckResult(fqdn, { available: true, message, certainty });
+    }
+    if (data?.available === false) {
+      return normalizeDomainCheckResult(fqdn, { available: false, message, certainty });
+    }
+    return normalizeDomainCheckResult(fqdn, {
       available: null,
       message: message || "Não foi possível confirmar a disponibilidade.",
       certainty,
-    };
+    });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Falha na verificação.";
     return { available: null, message: msg, certainty: "unknown" };
