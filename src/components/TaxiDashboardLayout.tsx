@@ -55,7 +55,7 @@ function TaxiContent() {
           </div>
         </header>
         <PainelAvisoBanner painel="taxi" activePage={activePage} />
-        <main className="flex-1 bg-background p-6 overflow-auto">
+        <main className="flex-1 bg-background overflow-auto [--main-pad-x:1.5rem] [--main-pad-y:1.5rem] px-[var(--main-pad-x)] py-[var(--main-pad-y)]">
           <PageLoader pageKey={activePage} showLoaderOnPages={["home"]}>
             <PageComponent key={activePage} />
           </PageLoader>

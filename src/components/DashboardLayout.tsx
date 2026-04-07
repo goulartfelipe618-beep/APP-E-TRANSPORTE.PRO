@@ -167,7 +167,7 @@ function DashboardContent() {
           <PainelAvisoBanner painel="motorista" activePage={activePage} />
           <main
             ref={mainRef}
-            className="relative z-0 flex-1 bg-background p-6 overflow-auto scroll-smooth"
+            className="relative z-0 flex-1 bg-background overflow-auto scroll-smooth [--main-pad-x:1.5rem] [--main-pad-y:1.5rem] px-[var(--main-pad-x)] py-[var(--main-pad-y)]"
           >
             <PageLoader pageKey={activePage} showLoaderOnPages={FROTA_SLIDE_LOADER_PAGES}>
               <PageComponent key={activePage} />

@@ -1,5 +1,6 @@
 import { useState, useEffect, ReactNode } from "react";
 import { Loader2 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 /** Painel Motorista (frota): menus com `SlideCarousel` — únicos que devem exibir o overlay de carregamento. */
 export const FROTA_SLIDE_LOADER_PAGES = [
@@ -41,9 +42,9 @@ export default function PageLoader({ children, pageKey, showLoaderOnPages }: Pag
   }, [pageKey, shouldShowLoader]);
 
   return (
-    <div className="relative min-h-[60vh]">
+    <div className="relative min-h-[60vh] w-full min-w-0">
       {/* Children always mounted (hidden while loading) so data fetches in parallel */}
-      <div className={loading ? "invisible absolute inset-0" : ""}>
+      <div className={cn(loading ? "invisible absolute inset-0" : "", "w-full min-w-0")}>
         {children}
       </div>
       {loading && (

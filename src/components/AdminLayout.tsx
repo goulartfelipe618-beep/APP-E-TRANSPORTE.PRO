@@ -74,7 +74,9 @@ function AdminContent() {
           ref={mainRef}
           className={cn(
             "flex-1 min-h-0 overflow-auto scroll-smooth",
-            activePage === "comunidade" ? "px-0 pb-6 pt-0" : "p-6",
+            activePage === "comunidade"
+              ? "[--main-pad-x:0px] [--main-pad-y:0px] px-0 pb-6 pt-0"
+              : "[--main-pad-x:1.5rem] [--main-pad-y:1.5rem] px-[var(--main-pad-x)] py-[var(--main-pad-y)]",
           )}
         >
           <PageComponent key={activePage} />

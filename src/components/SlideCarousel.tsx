@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, type CSSProperties } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
@@ -28,12 +28,12 @@ interface SlideCarouselProps {
   /** Sem cantos arredondados nem sombra no bloco do carrossel (padrão: true no painel). */
   fullBleed?: boolean;
   /**
-   * Compensa o `p-6` do `<main>` (1,5rem cada lado) para o slide encostar nas laterais.
+   * Compensa o padding do `<main>` (`--main-pad-x` / `--main-pad-y`, padrão 1,5rem) para o slide encostar nas bordas.
    * Desative no Admin Master (ex.: Comunidade com `main` em `px-0`).
    */
   breakoutHorizontal?: boolean;
   /**
-   * Compensa o `pt-6` do `<main>` quando o carrossel é o primeiro bloco da página.
+   * Compensa o padding superior do `<main>` quando o carrossel é o primeiro bloco da página.
    * Use `false` se houver título/banner acima do carrossel (evita sobreposição).
    */
   breakoutTop?: boolean;
@@ -114,6 +114,22 @@ export default function SlideCarousel({
 
   if (loading || displaySlides.length === 0) return null;
 
+  /** Encosta nas bordas internas do `<main>` usando `--main-pad-x` / `--main-pad-y` definidos no layout. */
+  const bleedStyle: CSSProperties | undefined =
+    breakoutHorizontal || breakoutTop
+      ? {
+          ...(breakoutHorizontal && {
+            marginLeft: "calc(-1 * var(--main-pad-x, 1.5rem))",
+            marginRight: "calc(-1 * var(--main-pad-x, 1.5rem))",
+            width: "calc(100% + 2 * var(--main-pad-x, 1.5rem))",
+            maxWidth: "none",
+          }),
+          ...(breakoutTop && {
+            marginTop: "calc(-1 * var(--main-pad-y, 1.5rem))",
+          }),
+        }
+      : undefined;
+
   const currentSlideData = displaySlides[currentSlide];
   const showText =
     variant !== "banner" &&
@@ -168,11 +184,9 @@ export default function SlideCarousel({
 
   return (
     <div
+      style={bleedStyle}
       className={cn(
-        /* Largura total da coluna: 100% + padding lateral do main (2×1,5rem). */
-        breakoutHorizontal && "-mx-6 w-[calc(100%+3rem)] max-w-none",
-        breakoutHorizontal && breakoutTop && "-mt-6",
-        "relative min-w-0 shrink-0 overflow-hidden p-0",
+        "relative box-border min-w-0 shrink-0 overflow-hidden p-0",
         isBanner
           ? cn(
               "aspect-[1922/330] min-h-[120px]",
