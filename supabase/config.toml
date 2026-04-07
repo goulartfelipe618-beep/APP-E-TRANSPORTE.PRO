@@ -10,9 +10,9 @@ verify_jwt = false
 [functions.self-upgrade-plan]
 verify_jwt = true
 
-# Consulta RDAP/DNS para disponibilidade de domínio (painel Domínios).
+# Consulta RDAP público (ex.: rdap.registro.br) — não exige sessão; o gateway ainda exige apikey (anon).
 [functions.check-domain]
-verify_jwt = true
+verify_jwt = false
 
 # Proxy para Evolution API (evita 403 do navegador → servidor Evolution).
 [functions.evolution-proxy]

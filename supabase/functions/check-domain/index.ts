@@ -11,17 +11,25 @@ const fetchHeaders: Record<string, string> = {
   "User-Agent": "E-TransportePro-CheckDomain/1.0 (Supabase Edge)",
 };
 
-// RDAP servers by TLD
+/**
+ * RDAP por TLD. Para .br o serviço oficial do NIC.br é:
+ * GET https://rdap.registro.br/domain/{fqdn} (sem /v1 — /v1/domain responde 501).
+ * @see https://github.com/registrobr/rdap
+ */
 const rdapServers: Record<string, string> = {
   com: "https://rdap.verisign.com/com/v1",
   net: "https://rdap.verisign.com/net/v1",
   org: "https://rdap.org/org/v1",
-  "com.br": "https://rdap.registro.br/v1",
-  br: "https://rdap.registro.br/v1",
+  "com.br": "https://rdap.registro.br",
+  br: "https://rdap.registro.br",
   io: "https://rdap.nic.io/v1",
   dev: "https://rdap.nic.google/v1",
   app: "https://rdap.nic.google/v1",
 };
+
+function isNicBrRdap(base: string): boolean {
+  return base.includes("rdap.registro.br");
+}
 
 function getTLD(domain: string): string {
   const parts = domain.split(".");
@@ -143,11 +151,15 @@ serve(async (req) => {
     }
 
     if (rdapResp.status === 404 || rdapResp.status === 400) {
+      const via = isNicBrRdap(rdapBase)
+        ? " (RDAP oficial Registro.br / NIC.br)"
+        : "";
       return ok({
         domain: cleanDomain,
         available: true,
         method: "rdap",
-        message: "Domínio disponível para registro!",
+        source: isNicBrRdap(rdapBase) ? "rdap.registro.br" : "rdap",
+        message: `Domínio disponível para registro${via}.`,
       });
     }
 
@@ -158,11 +170,16 @@ serve(async (req) => {
         const registration = events.find((e: { eventAction?: string }) => e.eventAction === "registration");
         const expiration = events.find((e: { eventAction?: string }) => e.eventAction === "expiration");
 
+        const via = isNicBrRdap(rdapBase)
+          ? " (dados públicos RDAP do Registro.br)"
+          : "";
+
         return ok({
           domain: cleanDomain,
           available: false,
           method: "rdap",
-          message: "Este domínio já está registrado.",
+          source: isNicBrRdap(rdapBase) ? "rdap.registro.br" : "rdap",
+          message: `Este domínio já está registrado${via}.`,
           registrationDate: registration?.eventDate ?? null,
           expirationDate: expiration?.eventDate ?? null,
         });
