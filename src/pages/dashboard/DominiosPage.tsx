@@ -95,7 +95,13 @@ function sanitizeComBrLabel(raw: string) {
     .replace(/^-+|-+$/g, "");
 }
 
-async function checkDomainAvailability(fqdn: string): Promise<{ available: boolean | null; message: string }> {
+type DomainCheckCertainty = "registry_br" | "registry_other" | "dns_hint" | "unknown";
+
+async function checkDomainAvailability(fqdn: string): Promise<{
+  available: boolean | null;
+  message: string;
+  certainty: DomainCheckCertainty;
+}> {
   try {
     /**
      * O gateway do Supabase valida o JWT em Authorization. Com sessão expirada/corrompida,
@@ -111,6 +117,14 @@ async function checkDomainAvailability(fqdn: string): Promise<{ available: boole
       body: { domain: fqdn.trim() },
       ...(anonKey ? { headers: { Authorization: `Bearer ${anonKey}` } } : {}),
     });
+
+    const parseCertainty = (raw: unknown): DomainCheckCertainty => {
+      if (raw === "registry_br" || raw === "registry_other" || raw === "dns_hint" || raw === "unknown") {
+        return raw;
+      }
+      return "unknown";
+    };
+
     if (error) {
       if (error instanceof FunctionsHttpError && error.context instanceof Response) {
         try {
@@ -129,6 +143,7 @@ async function checkDomainAvailability(fqdn: string): Promise<{ available: boole
             return {
               available: a === true ? true : a === false ? false : null,
               message: msg,
+              certainty: parseCertainty((body as { certainty?: unknown }).certainty),
             };
           }
         } catch {
@@ -139,6 +154,7 @@ async function checkDomainAvailability(fqdn: string): Promise<{ available: boole
       if (/invalid jwt|401/i.test(generic)) {
         return {
           available: null,
+          certainty: "unknown",
           message:
             "Sessão inválida para o gateway do Supabase. Atualize a página ou saia e entre de novo. Se o erro continuar, confira o deploy da função check-domain (JWT verification).",
         };
@@ -146,19 +162,25 @@ async function checkDomainAvailability(fqdn: string): Promise<{ available: boole
       if (generic.includes("non-2xx")) {
         return {
           available: null,
+          certainty: "unknown",
           message:
             "Não foi possível contatar o serviço de verificação. Confirme se a função check-domain está publicada no Supabase ou se a sessão está válida.",
         };
       }
-      return { available: null, message: generic };
+      return { available: null, certainty: "unknown", message: generic };
     }
     const message = typeof data?.message === "string" ? data.message : "";
-    if (data?.available === true) return { available: true, message };
-    if (data?.available === false) return { available: false, message };
-    return { available: null, message: message || "Não foi possível confirmar a disponibilidade." };
+    const certainty = parseCertainty((data as { certainty?: unknown } | null)?.certainty);
+    if (data?.available === true) return { available: true, message, certainty };
+    if (data?.available === false) return { available: false, message, certainty };
+    return {
+      available: null,
+      message: message || "Não foi possível confirmar a disponibilidade.",
+      certainty,
+    };
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Falha na verificação.";
-    return { available: null, message: msg };
+    return { available: null, message: msg, certainty: "unknown" };
   }
 }
 
@@ -174,6 +196,7 @@ export default function DominiosPage() {
   const [comBrLabelDraft, setComBrLabelDraft] = useState("");
   const [domainAvailable, setDomainAvailable] = useState<boolean | null>(null);
   const [domainCheckMessage, setDomainCheckMessage] = useState("");
+  const [domainCertainty, setDomainCertainty] = useState<DomainCheckCertainty>("unknown");
   const [checkingDomain, setCheckingDomain] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -216,6 +239,7 @@ export default function DominiosPage() {
       }
       setDomainAvailable(null);
       setDomainCheckMessage("");
+      setDomainCertainty("unknown");
       setCheckingDomain(false);
       return;
     }
@@ -224,6 +248,7 @@ export default function DominiosPage() {
     if (!label.length) {
       setDomainAvailable(null);
       setDomainCheckMessage("");
+      setDomainCertainty("unknown");
       setCheckingDomain(false);
       return;
     }
@@ -233,13 +258,15 @@ export default function DominiosPage() {
     setCheckingDomain(true);
     setDomainAvailable(null);
     setDomainCheckMessage("");
+    setDomainCertainty("unknown");
 
     debounceRef.current = setTimeout(() => {
       void (async () => {
-        const { available, message } = await checkDomainAvailability(fqdn);
+        const { available, message, certainty } = await checkDomainAvailability(fqdn);
         setCheckingDomain(false);
         setDomainAvailable(available);
         setDomainCheckMessage(message || "");
+        setDomainCertainty(certainty);
       })();
     }, 600);
 
@@ -266,6 +293,7 @@ export default function DominiosPage() {
     setComBrLabelDraft("");
     setDomainAvailable(null);
     setDomainCheckMessage("");
+    setDomainCertainty("unknown");
     setCheckingDomain(false);
   };
 
@@ -361,16 +389,19 @@ export default function DominiosPage() {
     }
     const fqdn = `${label}.com.br`;
     setCheckingDomain(true);
-    const { available, message } = await checkDomainAvailability(fqdn);
+    const { available, message, certainty } = await checkDomainAvailability(fqdn);
     setCheckingDomain(false);
     setDomainAvailable(available);
     setDomainCheckMessage(message || "");
+    setDomainCertainty(certainty);
 
-    if (available !== true) {
+    if (available !== true || certainty !== "registry_br") {
       toast.error(
         available === false
           ? "Este domínio já está em uso ou não está disponível para registro."
-          : message || "Não foi possível confirmar a disponibilidade. Tente novamente.",
+          : certainty !== "registry_br" && available === true
+            ? "A consulta ao Registro.br não foi conclusiva. Só é possível seguir com resposta oficial do RDAP."
+            : message || "Não foi possível confirmar a disponibilidade. Tente novamente.",
       );
       return;
     }
@@ -409,6 +440,7 @@ export default function DominiosPage() {
   const podeSalvarNovo =
     sanitizeComBrLabel(comBrLabelDraft).length > 0 &&
     domainAvailable === true &&
+    domainCertainty === "registry_br" &&
     !checkingDomain;
 
   return (
@@ -583,7 +615,9 @@ export default function DominiosPage() {
                   <Label htmlFor="dom-novo-label">Nome do domínio</Label>
                   <p className="text-xs text-muted-foreground mt-1 mb-2">
                     Edite apenas o nome antes de <span className="font-mono text-foreground">.com.br</span> (sufixo
-                    fixo). A disponibilidade é verificada automaticamente.
+                    fixo). A consulta usa o{" "}
+                    <span className="text-foreground font-medium">RDAP oficial do Registro.br</span> — a mesma base
+                    pública do NIC.br. O registro só fica garantido ao concluir a compra no site do Registro.br.
                   </p>
                   <div className="flex flex-wrap items-stretch gap-0 rounded-md border border-input bg-background shadow-sm overflow-hidden">
                     <Input
@@ -607,9 +641,19 @@ export default function DominiosPage() {
                           <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
                           Verificando disponibilidade…
                         </p>
-                      ) : domainAvailable === true ? (
-                        <p className="text-sm font-medium text-green-600 dark:text-green-500">
-                          {domainCheckMessage || "Domínio disponível para registro."}
+                      ) : domainAvailable === true && domainCertainty === "registry_br" ? (
+                        <div className="space-y-1.5">
+                          <p className="text-sm font-medium text-green-600 dark:text-green-500">
+                            {domainCheckMessage || "Nome não consta como registrado no Registro.br (RDAP)."}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            Fonte: RDAP público registro.br. Nenhum sistema pode garantir o registro antes do checkout
+                            no Registro.br; aqui repetimos o que o órgão publica sobre existência do nome.
+                          </p>
+                        </div>
+                      ) : domainAvailable === false && domainCertainty === "registry_br" ? (
+                        <p className="text-sm font-medium text-destructive">
+                          {domainCheckMessage || "Este domínio consta como registrado no Registro.br."}
                         </p>
                       ) : domainAvailable === false ? (
                         <p className="text-sm font-medium text-destructive">
@@ -617,7 +661,7 @@ export default function DominiosPage() {
                         </p>
                       ) : (
                         <p className="text-sm text-muted-foreground">
-                          {domainCheckMessage || "Não foi possível confirmar a disponibilidade."}
+                          {domainCheckMessage || "Não foi possível obter resposta oficial do Registro.br."}
                         </p>
                       )}
                     </div>

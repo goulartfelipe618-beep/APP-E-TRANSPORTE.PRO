@@ -12,8 +12,8 @@ const fetchHeaders: Record<string, string> = {
 };
 
 /**
- * RDAP por TLD. Para .br o serviço oficial do NIC.br é:
- * GET https://rdap.registro.br/domain/{fqdn} (sem /v1 — /v1/domain responde 501).
+ * RDAP por TLD. Para .br o serviço oficial do NIC.br:
+ * GET https://rdap.registro.br/domain/{fqdn}
  * @see https://github.com/registrobr/rdap
  */
 const rdapServers: Record<string, string> = {
@@ -27,8 +27,19 @@ const rdapServers: Record<string, string> = {
   app: "https://rdap.nic.google/v1",
 };
 
+/** Nível de confiança da resposta (para o painel decidir se libera “Salvar”). */
+type Certainty =
+  | "registry_br" // RDAP registro.br respondeu de forma interpretável
+  | "registry_other" // outro RDAP (ex.: .com Verisign)
+  | "dns_hint" // só DNS — não é prova de registro
+  | "unknown"; // não dá para afirmar
+
 function isNicBrRdap(base: string): boolean {
   return base.includes("rdap.registro.br");
+}
+
+function isBrFqdn(domain: string): boolean {
+  return domain.toLowerCase().endsWith(".br");
 }
 
 function getTLD(domain: string): string {
@@ -40,7 +51,6 @@ function getTLD(domain: string): string {
   return parts[parts.length - 1];
 }
 
-/** Sempre HTTP 200: o cliente Supabase trata 4xx/5xx como erro genérico ("non-2xx"). */
 function ok(body: Record<string, unknown>) {
   return new Response(JSON.stringify(body), {
     status: 200,
@@ -48,7 +58,7 @@ function ok(body: Record<string, unknown>) {
   });
 }
 
-/** Google DNS JSON: Status 3 = NXDOMAIN (sem registro DNS para o nome). */
+/** Google DNS JSON: Status 3 = NXDOMAIN. Indício fraco para domínios .br (não substitui RDAP). */
 async function dnsLooksUnregistered(domain: string): Promise<boolean | null> {
   try {
     const url = `https://dns.google/resolve?name=${encodeURIComponent(domain)}&type=A`;
@@ -74,6 +84,7 @@ serve(async (req) => {
     } catch {
       return ok({
         available: null,
+        certainty: "unknown" satisfies Certainty,
         message: "Requisição inválida. Tente novamente.",
       });
     }
@@ -85,6 +96,7 @@ serve(async (req) => {
     if (!domain || typeof domain !== "string") {
       return ok({
         available: null,
+        certainty: "unknown" satisfies Certainty,
         message: "Domínio não informado.",
       });
     }
@@ -98,6 +110,7 @@ serve(async (req) => {
     if (!cleanDomain.includes(".")) {
       return ok({
         available: null,
+        certainty: "unknown" satisfies Certainty,
         message: "Domínio inválido. Informe o nome completo (ex.: empresa.com.br).",
       });
     }
@@ -111,55 +124,80 @@ serve(async (req) => {
         return ok({
           domain: cleanDomain,
           available: null,
+          certainty: "unknown" satisfies Certainty,
           method: "dns",
-          message: "Não foi possível verificar este TLD automaticamente. Confira no registrador.",
+          message: "Não foi possível verificar este TLD automaticamente. Pesquise no registrador responsável.",
         });
       }
       return ok({
         domain: cleanDomain,
         available: dns,
+        certainty: "dns_hint" satisfies Certainty,
         method: "dns",
         message: dns
-          ? "Domínio aparenta estar disponível (consulta DNS)."
-          : "Domínio já possui registros DNS — provavelmente está registrado.",
+          ? "Indício por DNS apenas: não há resposta A para este nome. Isso não prova que o domínio possa ser registrado — confirme no registrador."
+          : "Indício por DNS: há registro para este nome. Provavelmente já está em uso.",
       });
     }
 
     const rdapUrl = `${rdapBase}/domain/${encodeURIComponent(cleanDomain)}`;
+    const nicBr = isNicBrRdap(rdapBase);
+
     let rdapResp: Response;
     try {
       rdapResp = await fetch(rdapUrl, { headers: fetchHeaders });
     } catch (e) {
       console.error("RDAP fetch failed:", e);
+      if (nicBr && isBrFqdn(cleanDomain)) {
+        return ok({
+          domain: cleanDomain,
+          available: null,
+          certainty: "unknown" satisfies Certainty,
+          method: "rdap_error",
+          source: "rdap.registro.br",
+          message:
+            "Não foi possível contatar o RDAP do Registro.br. Sem essa consulta oficial, o painel não indica se o .br está livre. Tente de novo em instantes ou pesquise em registro.br.",
+        });
+      }
       const dns = await dnsLooksUnregistered(cleanDomain);
       if (dns === null) {
         return ok({
           domain: cleanDomain,
           available: null,
+          certainty: "unknown" satisfies Certainty,
           method: "dns_fallback",
-          message: "Serviço RDAP indisponível. Tente de novo em instantes ou confira no registro.br.",
+          message: "Serviço RDAP indisponível. Tente de novo em instantes ou confira no registrador.",
         });
       }
       return ok({
         domain: cleanDomain,
         available: dns,
+        certainty: "dns_hint" satisfies Certainty,
         method: "dns_fallback",
         message: dns
-          ? "Não foi possível consultar o RDAP; pelo DNS o nome parece livre (confirme no registrador)."
-          : "Não foi possível consultar o RDAP; o domínio responde em DNS — provavelmente já está registrado.",
+          ? "RDAP indisponível; só há indício por DNS (não é confirmação definitiva). Verifique no registrador."
+          : "RDAP indisponível; há resposta em DNS — o nome provavelmente já está em uso.",
       });
     }
 
     if (rdapResp.status === 404 || rdapResp.status === 400) {
-      const via = isNicBrRdap(rdapBase)
-        ? " (RDAP oficial Registro.br / NIC.br)"
-        : "";
+      if (nicBr) {
+        return ok({
+          domain: cleanDomain,
+          available: true,
+          certainty: "registry_br" satisfies Certainty,
+          method: "rdap",
+          source: "rdap.registro.br",
+          message:
+            "No RDAP oficial do Registro.br (NIC.br), este nome não consta como domínio registrado. É a mesma base pública que o órgão disponibiliza. O registro só fica definitivo quando você concluir a contratação no site do Registro.br (regras e políticas deles valem).",
+        });
+      }
       return ok({
         domain: cleanDomain,
         available: true,
+        certainty: "registry_other" satisfies Certainty,
         method: "rdap",
-        source: isNicBrRdap(rdapBase) ? "rdap.registro.br" : "rdap",
-        message: `Domínio disponível para registro${via}.`,
+        message: "No RDAP deste TLD, o nome não foi encontrado — em geral indica que pode ser registrado. Confirme no registrador.",
       });
     }
 
@@ -170,39 +208,73 @@ serve(async (req) => {
         const registration = events.find((e: { eventAction?: string }) => e.eventAction === "registration");
         const expiration = events.find((e: { eventAction?: string }) => e.eventAction === "expiration");
 
-        const via = isNicBrRdap(rdapBase)
-          ? " (dados públicos RDAP do Registro.br)"
-          : "";
+        if (nicBr) {
+          return ok({
+            domain: cleanDomain,
+            available: false,
+            certainty: "registry_br" satisfies Certainty,
+            method: "rdap",
+            source: "rdap.registro.br",
+            message:
+              "Este nome consta como domínio registrado no RDAP oficial do Registro.br (NIC.br). Não é possível registrá-lo de novo enquanto estiver ativo para o mesmo titular/registro.",
+            registrationDate: registration?.eventDate ?? null,
+            expirationDate: expiration?.eventDate ?? null,
+          });
+        }
 
         return ok({
           domain: cleanDomain,
           available: false,
+          certainty: "registry_other" satisfies Certainty,
           method: "rdap",
-          source: isNicBrRdap(rdapBase) ? "rdap.registro.br" : "rdap",
-          message: `Este domínio já está registrado${via}.`,
+          message: "Este domínio consta como registrado no RDAP deste TLD.",
           registrationDate: registration?.eventDate ?? null,
           expirationDate: expiration?.eventDate ?? null,
         });
       } catch (e) {
         console.error("RDAP JSON parse failed:", e);
+        if (nicBr && isBrFqdn(cleanDomain)) {
+          return ok({
+            domain: cleanDomain,
+            available: null,
+            certainty: "unknown" satisfies Certainty,
+            method: "rdap_parse_error",
+            source: "rdap.registro.br",
+            message:
+              "O Registro.br respondeu, mas a resposta não pôde ser interpretada. Tente de novo ou consulte diretamente em registro.br — sem RDAP válido não indicamos disponibilidade.",
+          });
+        }
         const dns = await dnsLooksUnregistered(cleanDomain);
         if (dns === null) {
           return ok({
             domain: cleanDomain,
             available: null,
+            certainty: "unknown" satisfies Certainty,
             method: "dns_fallback",
-            message: "Resposta do RDAP inválida. Tente novamente ou verifique no registro.br.",
+            message: "Resposta RDAP inválida. Tente novamente ou verifique no registrador.",
           });
         }
         return ok({
           domain: cleanDomain,
           available: dns,
+          certainty: "dns_hint" satisfies Certainty,
           method: "dns_fallback",
           message: dns
-            ? "Consulta RDAP incompleta; pelo DNS o nome parece livre (confirme no registrador)."
-            : "Consulta RDAP incompleta; o domínio responde em DNS — provavelmente já está registrado.",
+            ? "RDAP com resposta inválida; há só indício por DNS — confirme no registrador."
+            : "RDAP com resposta inválida; há DNS ativo — provavelmente já registrado.",
         });
       }
+    }
+
+    if (nicBr && isBrFqdn(cleanDomain)) {
+      return ok({
+        domain: cleanDomain,
+        available: null,
+        certainty: "unknown" satisfies Certainty,
+        method: "rdap_unexpected",
+        source: "rdap.registro.br",
+        message: `O RDAP do Registro.br retornou status ${rdapResp.status}. Não usamos DNS como substituto para .br. Tente de novo ou pesquise em registro.br.`,
+      });
     }
 
     const dns = await dnsLooksUnregistered(cleanDomain);
@@ -210,22 +282,25 @@ serve(async (req) => {
       return ok({
         domain: cleanDomain,
         available: null,
+        certainty: "unknown" satisfies Certainty,
         method: "dns_fallback",
-        message: `Consulta RDAP retornou status ${rdapResp.status}. Tente de novo ou verifique manualmente no registrador.`,
+        message: `Consulta RDAP retornou status ${rdapResp.status}. Verifique manualmente no registrador.`,
       });
     }
     return ok({
       domain: cleanDomain,
       available: dns,
+      certainty: "dns_hint" satisfies Certainty,
       method: "dns_fallback",
       message: dns
-        ? "RDAP não respondeu como esperado; pelo DNS o nome parece livre (confirme no registrador)."
-        : "RDAP não respondeu como esperado; o domínio responde em DNS — provavelmente já está registrado.",
+        ? "RDAP não respondeu como esperado; indício por DNS apenas — confirme no registrador."
+        : "RDAP não respondeu como esperado; há DNS — provavelmente já registrado.",
     });
   } catch (error) {
     console.error("Error checking domain:", error);
     return ok({
       available: null,
+      certainty: "unknown" satisfies Certainty,
       message: "Erro ao verificar o domínio. Tente novamente em alguns instantes.",
     });
   }
