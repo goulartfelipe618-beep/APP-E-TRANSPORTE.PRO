@@ -526,7 +526,12 @@ export default function CommunityFeed({ panel = "motorista" }: CommunityFeedProp
   return (
     <div className="space-y-6">
       {isAdminPanel ? (
-        <SlideCarousel pagina="comunidade" variant="banner" breakoutHorizontal={false} />
+        <SlideCarousel
+          pagina="comunidade"
+          variant="banner"
+          breakoutHorizontal={false}
+          breakoutTop={false}
+        />
       ) : (
         <SlideCarousel pagina="comunidade" variant="banner" />
       )}

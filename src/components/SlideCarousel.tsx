@@ -28,7 +28,7 @@ interface SlideCarouselProps {
   /** Sem cantos arredondados nem sombra no bloco do carrossel (padrão: true no painel). */
   fullBleed?: boolean;
   /**
-   * Compensa o `px-6` do `<main>` para o slide encostar nas laterais da área de conteúdo.
+   * Compensa o `p-6` do `<main>` (1,5rem cada lado) para o slide encostar nas laterais.
    * Desative no Admin Master (ex.: Comunidade com `main` em `px-0`).
    */
   breakoutHorizontal?: boolean;
@@ -130,18 +130,14 @@ export default function SlideCarousel({
       <img
         src={slide.imagem_url}
         alt={slide.titulo || "Slide"}
-        className={
-          isBanner
-            ? "h-full w-full min-h-0 object-cover object-center"
-            : "block h-auto w-full max-w-none object-contain align-top"
-        }
+        className="h-full w-full min-h-0 object-cover object-center"
       />
     ) : (
       <div
         className={cn(
-          "bg-gradient-to-r from-primary/80 to-primary",
+          "h-full w-full min-h-0 bg-gradient-to-r from-primary/80 to-primary",
           fullBleed && "rounded-none",
-          isBanner ? "h-full min-h-[8rem] w-full" : "h-72 w-full",
+          !isBanner && "min-h-[8rem]",
         )}
       />
     );
@@ -151,7 +147,7 @@ export default function SlideCarousel({
         href={linkUrl}
         target="_blank"
         rel="noopener noreferrer"
-        className={cn("block w-full", isBanner && "h-full w-full")}
+        className="block h-full w-full min-h-0"
       >
         {imageEl}
       </a>
@@ -173,37 +169,25 @@ export default function SlideCarousel({
   return (
     <div
       className={cn(
-        breakoutHorizontal && "-mx-6",
+        /* Largura total da coluna: 100% + padding lateral do main (2×1,5rem). */
+        breakoutHorizontal && "-mx-6 w-[calc(100%+3rem)] max-w-none",
         breakoutHorizontal && breakoutTop && "-mt-6",
-        "relative w-full max-w-none min-w-0 overflow-hidden p-0",
+        "relative min-w-0 shrink-0 overflow-hidden p-0",
         isBanner
           ? cn(
-              "aspect-[1922/330]",
+              "aspect-[1922/330] min-h-[120px]",
               fullBleed
                 ? "rounded-none border-0 bg-muted/30 shadow-none"
                 : "rounded-none rounded-b-xl border-b border-border bg-muted/30",
             )
-          : fullBleed
-            ? "rounded-none border-0 shadow-none"
-            : "rounded-xl",
+          : cn(
+              "aspect-[16/5] min-h-[140px] sm:min-h-[180px]",
+              fullBleed ? "rounded-none border-0 shadow-none" : "rounded-xl",
+            ),
         className,
       )}
     >
-      <div className={cn("relative w-full", isBanner ? "absolute inset-0 h-full w-full min-h-0" : "")}>
-        {!isBanner && (
-          <>
-            {displaySlides[0]?.imagem_url ? (
-              <img
-                src={displaySlides[0].imagem_url}
-                alt=""
-                className="pointer-events-none block h-auto w-full max-w-none object-contain invisible select-none"
-                aria-hidden
-              />
-            ) : (
-              <div className="invisible h-72 w-full" />
-            )}
-          </>
-        )}
+      <div className="absolute inset-0 min-h-0">
         {displaySlides.map((s, i) => renderSlide(s, i))}
       </div>
 
