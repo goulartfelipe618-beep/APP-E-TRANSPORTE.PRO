@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Globe, Info, Loader2, Plus } from "lucide-react";
+import { FunctionsHttpError } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -100,7 +101,38 @@ async function checkDomainAvailability(fqdn: string): Promise<{ available: boole
       body: { domain: fqdn.trim() },
     });
     if (error) {
-      return { available: null, message: error.message || "Erro ao verificar domínio." };
+      if (error instanceof FunctionsHttpError && error.context instanceof Response) {
+        try {
+          const body = await error.context.clone().json() as {
+            message?: string;
+            error?: string;
+            available?: boolean | null;
+          };
+          const msg = typeof body.message === "string"
+            ? body.message
+            : typeof body.error === "string"
+              ? body.error
+              : "";
+          if (msg) {
+            const a = body.available;
+            return {
+              available: a === true ? true : a === false ? false : null,
+              message: msg,
+            };
+          }
+        } catch {
+          /* corpo não é JSON */
+        }
+      }
+      const generic = error.message || "Erro ao verificar domínio.";
+      if (generic.includes("non-2xx")) {
+        return {
+          available: null,
+          message:
+            "Não foi possível contatar o serviço de verificação. Confirme se a função check-domain está publicada no Supabase ou se a sessão está válida.",
+        };
+      }
+      return { available: null, message: generic };
     }
     const message = typeof data?.message === "string" ? data.message : "";
     if (data?.available === true) return { available: true, message };

@@ -6,20 +6,24 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+const fetchHeaders: Record<string, string> = {
+  Accept: "application/rdap+json, application/json",
+  "User-Agent": "E-TransportePro-CheckDomain/1.0 (Supabase Edge)",
+};
+
 // RDAP servers by TLD
 const rdapServers: Record<string, string> = {
-  "com": "https://rdap.verisign.com/com/v1",
-  "net": "https://rdap.verisign.com/net/v1",
-  "org": "https://rdap.org/org/v1",
+  com: "https://rdap.verisign.com/com/v1",
+  net: "https://rdap.verisign.com/net/v1",
+  org: "https://rdap.org/org/v1",
   "com.br": "https://rdap.registro.br/v1",
-  "br": "https://rdap.registro.br/v1",
-  "io": "https://rdap.nic.io/v1",
-  "dev": "https://rdap.nic.google/v1",
-  "app": "https://rdap.nic.google/v1",
+  br: "https://rdap.registro.br/v1",
+  io: "https://rdap.nic.io/v1",
+  dev: "https://rdap.nic.google/v1",
+  app: "https://rdap.nic.google/v1",
 };
 
 function getTLD(domain: string): string {
-  // Check compound TLDs first
   const parts = domain.split(".");
   if (parts.length >= 3) {
     const compound = parts.slice(-2).join(".");
@@ -28,27 +32,65 @@ function getTLD(domain: string): string {
   return parts[parts.length - 1];
 }
 
+/** Sempre HTTP 200: o cliente Supabase trata 4xx/5xx como erro genérico ("non-2xx"). */
+function ok(body: Record<string, unknown>) {
+  return new Response(JSON.stringify(body), {
+    status: 200,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
+/** Google DNS JSON: Status 3 = NXDOMAIN (sem registro DNS para o nome). */
+async function dnsLooksUnregistered(domain: string): Promise<boolean | null> {
+  try {
+    const url = `https://dns.google/resolve?name=${encodeURIComponent(domain)}&type=A`;
+    const dnsResp = await fetch(url, { headers: { Accept: "application/dns-json" } });
+    if (!dnsResp.ok) return null;
+    const dnsData = await dnsResp.json();
+    if (typeof dnsData.Status !== "number") return null;
+    return dnsData.Status === 3;
+  } catch {
+    return null;
+  }
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { domain } = await req.json();
-    if (!domain || typeof domain !== "string") {
-      return new Response(JSON.stringify({ error: "Domínio não informado" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+    let raw: unknown;
+    try {
+      raw = await req.json();
+    } catch {
+      return ok({
+        available: null,
+        message: "Requisição inválida. Tente novamente.",
       });
     }
 
-    // Clean domain
-    const cleanDomain = domain.toLowerCase().replace(/^(https?:\/\/)?(www\.)?/, "").replace(/\/.*$/, "").trim();
-    
+    const domain = typeof raw === "object" && raw !== null && "domain" in raw
+      ? (raw as { domain?: unknown }).domain
+      : undefined;
+
+    if (!domain || typeof domain !== "string") {
+      return ok({
+        available: null,
+        message: "Domínio não informado.",
+      });
+    }
+
+    const cleanDomain = domain
+      .toLowerCase()
+      .replace(/^(https?:\/\/)?(www\.)?/, "")
+      .replace(/\/.*$/, "")
+      .trim();
+
     if (!cleanDomain.includes(".")) {
-      return new Response(JSON.stringify({ error: "Domínio inválido" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      return ok({
+        available: null,
+        message: "Domínio inválido. Informe o nome completo (ex.: empresa.com.br).",
       });
     }
 
@@ -56,88 +98,118 @@ serve(async (req) => {
     const rdapBase = rdapServers[tld];
 
     if (!rdapBase) {
-      // Fallback: try DNS lookup approach
-      try {
-        const dnsResp = await fetch(`https://dns.google/resolve?name=${cleanDomain}&type=A`);
-        const dnsData = await dnsResp.json();
-        // Status 3 = NXDOMAIN (domain doesn't exist in DNS)
-        const available = dnsData.Status === 3;
-        return new Response(JSON.stringify({
-          domain: cleanDomain,
-          available,
-          method: "dns",
-          message: available ? "Domínio aparenta estar disponível" : "Domínio já está registrado",
-        }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      } catch {
-        return new Response(JSON.stringify({
+      const dns = await dnsLooksUnregistered(cleanDomain);
+      if (dns === null) {
+        return ok({
           domain: cleanDomain,
           available: null,
-          method: "unknown",
-          message: "Não foi possível verificar este TLD. Verifique manualmente.",
-        }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          method: "dns",
+          message: "Não foi possível verificar este TLD automaticamente. Confira no registrador.",
         });
       }
+      return ok({
+        domain: cleanDomain,
+        available: dns,
+        method: "dns",
+        message: dns
+          ? "Domínio aparenta estar disponível (consulta DNS)."
+          : "Domínio já possui registros DNS — provavelmente está registrado.",
+      });
     }
 
-    // Query RDAP
-    const rdapUrl = `${rdapBase}/domain/${cleanDomain}`;
-    const rdapResp = await fetch(rdapUrl, {
-      headers: { "Accept": "application/rdap+json" },
-    });
+    const rdapUrl = `${rdapBase}/domain/${encodeURIComponent(cleanDomain)}`;
+    let rdapResp: Response;
+    try {
+      rdapResp = await fetch(rdapUrl, { headers: fetchHeaders });
+    } catch (e) {
+      console.error("RDAP fetch failed:", e);
+      const dns = await dnsLooksUnregistered(cleanDomain);
+      if (dns === null) {
+        return ok({
+          domain: cleanDomain,
+          available: null,
+          method: "dns_fallback",
+          message: "Serviço RDAP indisponível. Tente de novo em instantes ou confira no registro.br.",
+        });
+      }
+      return ok({
+        domain: cleanDomain,
+        available: dns,
+        method: "dns_fallback",
+        message: dns
+          ? "Não foi possível consultar o RDAP; pelo DNS o nome parece livre (confirme no registrador)."
+          : "Não foi possível consultar o RDAP; o domínio responde em DNS — provavelmente já está registrado.",
+      });
+    }
 
     if (rdapResp.status === 404 || rdapResp.status === 400) {
-      // Domain not found = available
-      return new Response(JSON.stringify({
+      return ok({
         domain: cleanDomain,
         available: true,
         method: "rdap",
         message: "Domínio disponível para registro!",
-      }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     if (rdapResp.ok) {
-      // Domain exists = taken
-      const rdapData = await rdapResp.json();
-      const events = rdapData.events || [];
-      const registration = events.find((e: any) => e.eventAction === "registration");
-      const expiration = events.find((e: any) => e.eventAction === "expiration");
-      
-      return new Response(JSON.stringify({
-        domain: cleanDomain,
-        available: false,
-        method: "rdap",
-        message: "Este domínio já está registrado.",
-        registrationDate: registration?.eventDate || null,
-        expirationDate: expiration?.eventDate || null,
-      }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      try {
+        const rdapData = await rdapResp.json();
+        const events = rdapData.events || [];
+        const registration = events.find((e: { eventAction?: string }) => e.eventAction === "registration");
+        const expiration = events.find((e: { eventAction?: string }) => e.eventAction === "expiration");
+
+        return ok({
+          domain: cleanDomain,
+          available: false,
+          method: "rdap",
+          message: "Este domínio já está registrado.",
+          registrationDate: registration?.eventDate ?? null,
+          expirationDate: expiration?.eventDate ?? null,
+        });
+      } catch (e) {
+        console.error("RDAP JSON parse failed:", e);
+        const dns = await dnsLooksUnregistered(cleanDomain);
+        if (dns === null) {
+          return ok({
+            domain: cleanDomain,
+            available: null,
+            method: "dns_fallback",
+            message: "Resposta do RDAP inválida. Tente novamente ou verifique no registro.br.",
+          });
+        }
+        return ok({
+          domain: cleanDomain,
+          available: dns,
+          method: "dns_fallback",
+          message: dns
+            ? "Consulta RDAP incompleta; pelo DNS o nome parece livre (confirme no registrador)."
+            : "Consulta RDAP incompleta; o domínio responde em DNS — provavelmente já está registrado.",
+        });
+      }
     }
 
-    // Fallback to DNS if RDAP fails
-    const dnsResp = await fetch(`https://dns.google/resolve?name=${cleanDomain}&type=A`);
-    const dnsData = await dnsResp.json();
-    const available = dnsData.Status === 3;
-    
-    return new Response(JSON.stringify({
+    const dns = await dnsLooksUnregistered(cleanDomain);
+    if (dns === null) {
+      return ok({
+        domain: cleanDomain,
+        available: null,
+        method: "dns_fallback",
+        message: `Consulta RDAP retornou status ${rdapResp.status}. Tente de novo ou verifique manualmente no registrador.`,
+      });
+    }
+    return ok({
       domain: cleanDomain,
-      available,
+      available: dns,
       method: "dns_fallback",
-      message: available ? "Domínio aparenta estar disponível" : "Domínio já está registrado",
-    }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      message: dns
+        ? "RDAP não respondeu como esperado; pelo DNS o nome parece livre (confirme no registrador)."
+        : "RDAP não respondeu como esperado; o domínio responde em DNS — provavelmente já está registrado.",
     });
-
   } catch (error) {
     console.error("Error checking domain:", error);
-    return new Response(JSON.stringify({ error: "Erro interno ao verificar domínio" }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    return ok({
+      available: null,
+      message: "Erro ao verificar o domínio. Tente novamente em alguns instantes.",
     });
   }
 });
