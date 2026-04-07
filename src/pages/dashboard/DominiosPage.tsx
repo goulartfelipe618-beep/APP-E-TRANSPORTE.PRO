@@ -97,8 +97,19 @@ function sanitizeComBrLabel(raw: string) {
 
 async function checkDomainAvailability(fqdn: string): Promise<{ available: boolean | null; message: string }> {
   try {
+    /**
+     * O gateway do Supabase valida o JWT em Authorization. Com sessão expirada/corrompida,
+     * o access_token do usuário gera 401 "Invalid JWT". Esta função só consulta RDAP público,
+     * então usamos o JWT da chave anon (sempre válido no projeto) em vez do token do usuário.
+     */
+    const anonKey =
+      typeof import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY === "string"
+        ? import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY.trim()
+        : "";
+
     const { data, error } = await supabase.functions.invoke("check-domain", {
       body: { domain: fqdn.trim() },
+      ...(anonKey ? { headers: { Authorization: `Bearer ${anonKey}` } } : {}),
     });
     if (error) {
       if (error instanceof FunctionsHttpError && error.context instanceof Response) {
@@ -125,6 +136,13 @@ async function checkDomainAvailability(fqdn: string): Promise<{ available: boole
         }
       }
       const generic = error.message || "Erro ao verificar domínio.";
+      if (/invalid jwt|401/i.test(generic)) {
+        return {
+          available: null,
+          message:
+            "Sessão inválida para o gateway do Supabase. Atualize a página ou saia e entre de novo. Se o erro continuar, confira o deploy da função check-domain (JWT verification).",
+        };
+      }
       if (generic.includes("non-2xx")) {
         return {
           available: null,
