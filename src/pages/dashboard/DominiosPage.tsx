@@ -101,6 +101,56 @@ type DomainCheckCertainty = "registry_br" | "registry_other" | "dns_hint" | "unk
  * Domínios .br: só confiamos em RDAP Registro.br (`certainty === "registry_br"`).
  * Se a Edge Function no Supabase estiver antiga, ainda vem "aparenta" / DNS — o cliente corrige o texto e não marca como disponível.
  */
+const MSG_RDAP_BR_LIVRE =
+  "No RDAP oficial do Registro.br (NIC.br), este nome não consta como domínio registrado. É a mesma base pública que o órgão disponibiliza. O registro só fica definitivo quando você concluir a contratação no site do Registro.br (regras e políticas deles valem).";
+
+const MSG_RDAP_BR_OCUPADO =
+  "Este nome consta como domínio registrado no RDAP oficial do Registro.br (NIC.br). Não é possível registrá-lo de novo enquanto estiver ativo para o mesmo titular/registro.";
+
+/**
+ * RDAP do Registro.br costuma liberar CORS (`Access-Control-Allow-Origin: *`).
+ * Consulta no navegador evita 403 que o NIC.br aplica a IPs de datacenter (ex.: Supabase Edge).
+ */
+async function queryNicBrRdapFromBrowser(fqdn: string): Promise<{
+  available: boolean | null;
+  message: string;
+  certainty: DomainCheckCertainty;
+} | null> {
+  const d = fqdn.toLowerCase().trim();
+  if (!d.endsWith(".br")) return null;
+
+  try {
+    const url = `https://rdap.registro.br/domain/${encodeURIComponent(d)}`;
+    const res = await fetch(url, {
+      method: "GET",
+      headers: {
+        Accept: "application/rdap+json, application/json",
+        "Accept-Language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7",
+      },
+    });
+
+    if (res.status === 404 || res.status === 400) {
+      return { available: true, certainty: "registry_br", message: MSG_RDAP_BR_LIVRE };
+    }
+
+    if (res.ok) {
+      const rdapData = (await res.json()) as {
+        objectClassName?: string;
+        ldhName?: string;
+        events?: { eventAction?: string; eventDate?: string }[];
+      };
+      if (rdapData?.objectClassName !== "domain" && typeof rdapData?.ldhName !== "string") {
+        return null;
+      }
+      return { available: false, certainty: "registry_br", message: MSG_RDAP_BR_OCUPADO };
+    }
+
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 function normalizeDomainCheckResult(
   fqdn: string,
   r: { available: boolean | null; message: string; certainty: DomainCheckCertainty },
@@ -138,6 +188,14 @@ async function checkDomainAvailability(fqdn: string): Promise<{
   certainty: DomainCheckCertainty;
 }> {
   try {
+    const trimmed = fqdn.trim();
+    if (trimmed.toLowerCase().endsWith(".br")) {
+      const fromBrowser = await queryNicBrRdapFromBrowser(trimmed);
+      if (fromBrowser) {
+        return normalizeDomainCheckResult(trimmed, fromBrowser);
+      }
+    }
+
     /**
      * O gateway do Supabase valida o JWT em Authorization. Com sessão expirada/corrompida,
      * o access_token do usuário gera 401 "Invalid JWT". Esta função só consulta RDAP público,
@@ -149,7 +207,7 @@ async function checkDomainAvailability(fqdn: string): Promise<{
         : "";
 
     const { data, error } = await supabase.functions.invoke("check-domain", {
-      body: { domain: fqdn.trim() },
+      body: { domain: trimmed },
       ...(anonKey ? { headers: { Authorization: `Bearer ${anonKey}` } } : {}),
     });
 

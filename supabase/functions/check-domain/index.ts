@@ -6,9 +6,12 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+/** User-Agent “de navegador”: alguns WAFs do NIC.br retornam 403 para bots / IPs de datacenter. */
 const fetchHeaders: Record<string, string> = {
   Accept: "application/rdap+json, application/json",
-  "User-Agent": "E-TransportePro-CheckDomain/1.0 (Supabase Edge)",
+  "Accept-Language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7",
+  "User-Agent":
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
 };
 
 /**
@@ -264,6 +267,18 @@ serve(async (req) => {
             : "RDAP com resposta inválida; há DNS ativo — provavelmente já registrado.",
         });
       }
+    }
+
+    if (nicBr && isBrFqdn(cleanDomain) && rdapResp.status === 403) {
+      return ok({
+        domain: cleanDomain,
+        available: null,
+        certainty: "unknown" satisfies Certainty,
+        method: "rdap_forbidden",
+        source: "rdap.registro.br",
+        message:
+          "O Registro.br devolveu 403 para a consulta feita a partir do servidor (bloqueio comum a IPs de datacenter). O painel tenta primeiro o RDAP direto no seu navegador — atualize a página com a versão mais recente do app. Se continuar, pesquise o nome em registro.br.",
+      });
     }
 
     if (nicBr && isBrFqdn(cleanDomain)) {
