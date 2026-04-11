@@ -41,6 +41,7 @@ import {
 import type { Tables } from "@/integrations/supabase/types";
 
 type DominioRow = Tables<"dominios_usuario">;
+type DominioRowView = DominioRow & { motorista_nome?: string };
 
 const STATUS_LABEL: Record<string, string> = {
   pendente: "Pendente",
@@ -282,8 +283,9 @@ async function checkDomainAvailability(fqdn: string): Promise<{
 }
 
 export default function DominiosPage() {
-  const [rows, setRows] = useState<DominioRow[]>([]);
+  const [rows, setRows] = useState<DominioRowView[]>([]);
   const [loading, setLoading] = useState(true);
+  const [adminMasterView, setAdminMasterView] = useState(false);
   const [dialogMode, setDialogMode] = useState<DialogMode>("closed");
   const [saving, setSaving] = useState(false);
 
@@ -307,19 +309,50 @@ export default function DominiosPage() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       setRows([]);
+      setAdminMasterView(false);
       setLoading(false);
       return;
     }
-    const { data, error } = await supabase
-      .from("dominios_usuario")
-      .select("*")
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false });
+
+    const { data: primary, error: roleErr } = await supabase.rpc("get_session_primary_role");
+    const isAdminMaster = !roleErr && primary === "admin_master";
+    setAdminMasterView(isAdminMaster);
+
+    let q = supabase.from("dominios_usuario").select("*").order("created_at", { ascending: false });
+    if (!isAdminMaster) {
+      q = q.eq("user_id", user.id);
+    }
+    const { data, error } = await q;
+
     if (error) {
       toast.error("Não foi possível carregar os domínios.", { description: error.message });
       setRows([]);
+      setLoading(false);
+      return;
+    }
+
+    const base = (data as DominioRow[]) || [];
+
+    if (isAdminMaster && base.length > 0) {
+      const userIds = [...new Set(base.map((r) => r.user_id))];
+      const { data: nomesData } = await supabase
+        .from("configuracoes")
+        .select("user_id, nome_completo")
+        .in("user_id", userIds);
+
+      const nomeByUserId = (nomesData || []).reduce<Record<string, string>>((acc, row: { user_id: string; nome_completo: string | null }) => {
+        acc[row.user_id] = (row.nome_completo && row.nome_completo.trim()) || "";
+        return acc;
+      }, {});
+
+      setRows(
+        base.map((r) => ({
+          ...r,
+          motorista_nome: nomeByUserId[r.user_id] || undefined,
+        })),
+      );
     } else {
-      setRows((data as DominioRow[]) || []);
+      setRows(base);
     }
     setLoading(false);
   }, []);
@@ -555,8 +588,18 @@ export default function DominiosPage() {
             Domínios
           </h1>
           <p className="text-muted-foreground text-sm mt-1">
-            Compre e gerencie seus domínios. Os domínios ativos aparecem na etapa &quot;Escolha seu domínio&quot; do fluxo
-            Website.
+            {adminMasterView ? (
+              <>
+                Visão do painel master: lista todos os domínios registrados na plataforma (inclui motoristas). Cada
+                usuário continua vendo apenas os próprios domínios no painel dele; os ativos entram na etapa
+                &quot;Escolha seu domínio&quot; do Website.
+              </>
+            ) : (
+              <>
+                Compre e gerencie seus domínios. Os domínios ativos aparecem na etapa &quot;Escolha seu domínio&quot; do
+                fluxo Website.
+              </>
+            )}
           </p>
         </div>
         <Button type="button" onClick={openDialog} className="shrink-0 gap-2">
@@ -573,12 +616,17 @@ export default function DominiosPage() {
           </div>
         ) : rows.length === 0 ? (
           <div className="p-10 text-center text-muted-foreground text-sm">
-            Nenhum domínio cadastrado. Use &quot;Registrar um novo domínio&quot; para adicionar ou solicitar registro.
+            {adminMasterView
+              ? "Nenhum domínio cadastrado na plataforma."
+              : 'Nenhum domínio cadastrado. Use "Registrar um novo domínio" para adicionar ou solicitar registro.'}
           </div>
         ) : (
           <Table>
             <TableHeader>
               <TableRow>
+                {adminMasterView && (
+                  <TableHead className="min-w-[140px] max-w-[220px]">Motorista</TableHead>
+                )}
                 <TableHead>Domínio</TableHead>
                 <TableHead className="hidden sm:table-cell w-44">Origem / plataforma</TableHead>
                 <TableHead className="w-36">Status</TableHead>
@@ -588,6 +636,13 @@ export default function DominiosPage() {
             <TableBody>
               {rows.map((r) => (
                 <TableRow key={r.id}>
+                  {adminMasterView && (
+                    <TableCell className="text-muted-foreground text-sm max-w-[220px] align-top">
+                      <span className="line-clamp-2" title={r.motorista_nome || "Motorista sem nome"}>
+                        {r.motorista_nome || "Motorista sem nome"}
+                      </span>
+                    </TableCell>
+                  )}
                   <TableCell className="font-medium text-foreground">{r.fqdn}</TableCell>
                   <TableCell className="hidden sm:table-cell text-muted-foreground text-sm">
                     {origemLabel(r)}
