@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Globe, Info, Loader2, Plus } from "lucide-react";
+import { Globe, Info, Loader2, Plus, Users } from "lucide-react";
 import { FunctionsHttpError } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -318,22 +318,20 @@ export default function DominiosPage() {
     const isAdminMaster = !roleErr && primary === "admin_master";
     setAdminMasterView(isAdminMaster);
 
-    let q = supabase.from("dominios_usuario").select("*").order("created_at", { ascending: false });
-    if (!isAdminMaster) {
-      q = q.eq("user_id", user.id);
-    }
-    const { data, error } = await q;
-
-    if (error) {
-      toast.error("Não foi possível carregar os domínios.", { description: error.message });
-      setRows([]);
-      setLoading(false);
-      return;
-    }
-
-    const base = (data as DominioRow[]) || [];
-
-    if (isAdminMaster && base.length > 0) {
+    if (isAdminMaster) {
+      const { data: rpcData, error: rpcErr } = await supabase.rpc("list_dominios_motoristas_for_admin");
+      if (rpcErr) {
+        toast.error("Não foi possível carregar os domínios dos motoristas.", { description: rpcErr.message });
+        setRows([]);
+        setLoading(false);
+        return;
+      }
+      const base = (rpcData as DominioRow[]) || [];
+      if (base.length === 0) {
+        setRows([]);
+        setLoading(false);
+        return;
+      }
       const userIds = [...new Set(base.map((r) => r.user_id))];
       const { data: nomesData } = await supabase
         .from("configuracoes")
@@ -351,8 +349,21 @@ export default function DominiosPage() {
           motorista_nome: nomeByUserId[r.user_id] || undefined,
         })),
       );
+      setLoading(false);
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("dominios_usuario")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      toast.error("Não foi possível carregar os domínios.", { description: error.message });
+      setRows([]);
     } else {
-      setRows(base);
+      setRows((data as DominioRow[]) || []);
     }
     setLoading(false);
   }, []);
@@ -575,24 +586,50 @@ export default function DominiosPage() {
 
   return (
     <div className="space-y-6">
-      <Alert className="border-amber-500/40 bg-amber-500/10 text-foreground">
-        <Info className="h-4 w-4 text-amber-700 dark:text-amber-400" />
-        <AlertTitle className="text-amber-900 dark:text-amber-100">Aviso</AlertTitle>
-        <AlertDescription className="text-amber-900/90 dark:text-amber-50/95">{CUSTO_AVISO}</AlertDescription>
-      </Alert>
+      {adminMasterView ? (
+        <Alert className="border-border bg-muted/40 text-foreground">
+          <Info className="h-4 w-4 text-muted-foreground" />
+          <AlertTitle className="text-foreground">Gestão operacional</AlertTitle>
+          <AlertDescription className="text-muted-foreground">
+            Esta tela lista apenas domínios cadastrados pelos motoristas no painel deles. Novos registros e solicitações
+            são feitos pelo próprio motorista em Ferramentas → Domínios; aqui você acompanha status e titular para
+            suporte e configuração.
+          </AlertDescription>
+        </Alert>
+      ) : (
+        <Alert className="border-amber-500/40 bg-amber-500/10 text-foreground">
+          <Info className="h-4 w-4 text-amber-700 dark:text-amber-400" />
+          <AlertTitle className="text-amber-900 dark:text-amber-100">Aviso</AlertTitle>
+          <AlertDescription className="text-amber-900/90 dark:text-amber-50/95">{CUSTO_AVISO}</AlertDescription>
+        </Alert>
+      )}
 
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div
+        className={
+          adminMasterView
+            ? "flex flex-col gap-2"
+            : "flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"
+        }
+      >
         <div>
           <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-            <Globe className="h-7 w-7 text-primary" />
-            Domínios
+            {adminMasterView ? (
+              <>
+                <Users className="h-7 w-7 text-primary" />
+                Domínios dos motoristas
+              </>
+            ) : (
+              <>
+                <Globe className="h-7 w-7 text-primary" />
+                Domínios
+              </>
+            )}
           </h1>
           <p className="text-muted-foreground text-sm mt-1">
             {adminMasterView ? (
               <>
-                Visão do painel master: lista todos os domínios registrados na plataforma (inclui motoristas). Cada
-                usuário continua vendo apenas os próprios domínios no painel dele; os ativos entram na etapa
-                &quot;Escolha seu domínio&quot; do Website.
+                Visão consolidada dos domínios vinculados a contas de motorista (contas administrativas da plataforma
+                não aparecem aqui). Domínios ativos seguem disponíveis no fluxo Website de cada motorista.
               </>
             ) : (
               <>
@@ -602,10 +639,12 @@ export default function DominiosPage() {
             )}
           </p>
         </div>
-        <Button type="button" onClick={openDialog} className="shrink-0 gap-2">
-          <Plus className="h-4 w-4" />
-          Registrar um novo domínio
-        </Button>
+        {!adminMasterView && (
+          <Button type="button" onClick={openDialog} className="shrink-0 gap-2">
+            <Plus className="h-4 w-4" />
+            Registrar um novo domínio
+          </Button>
+        )}
       </div>
 
       <div className="rounded-xl border border-border bg-card overflow-hidden">
@@ -617,7 +656,7 @@ export default function DominiosPage() {
         ) : rows.length === 0 ? (
           <div className="p-10 text-center text-muted-foreground text-sm">
             {adminMasterView
-              ? "Nenhum domínio cadastrado na plataforma."
+              ? "Nenhum domínio cadastrado por motoristas até o momento."
               : 'Nenhum domínio cadastrado. Use "Registrar um novo domínio" para adicionar ou solicitar registro.'}
           </div>
         ) : (
@@ -662,6 +701,8 @@ export default function DominiosPage() {
         )}
       </div>
 
+      {!adminMasterView && (
+      <>
       <Dialog
         open={dialogMode !== "closed"}
         onOpenChange={(o) => {
@@ -899,6 +940,8 @@ export default function DominiosPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      </>
+      )}
     </div>
   );
 }

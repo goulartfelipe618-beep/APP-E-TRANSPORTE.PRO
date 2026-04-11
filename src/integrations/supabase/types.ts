@@ -1826,6 +1826,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: Database["public"]["Enums"]["app_role"] | null
       }
+      list_dominios_motoristas_for_admin: {
+        Args: Record<PropertyKey, never>
+        Returns: Database["public"]["Tables"]["dominios_usuario"]["Row"][]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

@@ -24,7 +24,7 @@ const simpleItems = [
   { title: "Slides", page: "slides", icon: SlidersHorizontal },
   { title: "Mentoria", page: "mentoria", icon: GraduationCap },
   { title: "Empty Legs", page: "empty-legs", icon: Plane },
-  { title: "Domínios", page: "dominios", icon: Link2 },
+  { title: "Domínios (motoristas)", page: "dominios", icon: Link2 },
 ];
 
 const contratoChildren = [
