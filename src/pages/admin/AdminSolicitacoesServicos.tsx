@@ -48,6 +48,7 @@ const STATUS_COLORS: Record<string, string> = {
   pendente: "bg-yellow-500/10 text-yellow-700 border-yellow-500/30",
   em_andamento: "bg-blue-500/10 text-blue-700 border-blue-500/30",
   concluido: "bg-green-500/10 text-green-700 border-green-500/30",
+  publicado: "bg-emerald-500/10 text-emerald-800 border-emerald-500/30",
   recusado: "bg-red-500/10 text-red-700 border-red-500/30",
 };
 
@@ -153,6 +154,7 @@ export default function AdminSolicitacoesServicos() {
                 <SelectItem value="pendente">Pendente</SelectItem>
                 <SelectItem value="em_andamento">Em Andamento</SelectItem>
                 <SelectItem value="concluido">Concluído</SelectItem>
+                <SelectItem value="publicado">Website publicado</SelectItem>
                 <SelectItem value="recusado">Recusado</SelectItem>
               </SelectContent>
             </Select>
@@ -205,8 +207,9 @@ export default function AdminSolicitacoesServicos() {
                           {s.status === "pendente" && <Clock className="h-3 w-3 mr-1" />}
                           {s.status === "em_andamento" && <Loader2 className="h-3 w-3 mr-1" />}
                           {s.status === "concluido" && <CheckCircle2 className="h-3 w-3 mr-1" />}
+                          {s.status === "publicado" && <CheckCircle2 className="h-3 w-3 mr-1" />}
                           {s.status === "recusado" && <XCircle className="h-3 w-3 mr-1" />}
-                          {s.status}
+                          {s.status === "publicado" ? "Website publicado" : s.status}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">{resumo}</TableCell>
@@ -262,9 +265,15 @@ export default function AdminSolicitacoesServicos() {
                       <SelectItem value="pendente">Pendente</SelectItem>
                       <SelectItem value="em_andamento">Em Andamento</SelectItem>
                       <SelectItem value="concluido">Concluído</SelectItem>
+                      <SelectItem value="publicado">Website publicado</SelectItem>
                       <SelectItem value="recusado">Recusado</SelectItem>
                     </SelectContent>
                   </Select>
+                  {selected?.tipo_servico === "website" && editStatus === "publicado" && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Informe o <strong>Link de Acesso</strong> com a URL final do site; o motorista verá o botão &quot;Visualizar site publicado&quot;.
+                    </p>
+                  )}
                 </div>
                 <div>
                   <label className="text-sm font-medium text-foreground mb-1 block">Link de Acesso</label>

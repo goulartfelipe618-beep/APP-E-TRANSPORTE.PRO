@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -9,13 +9,13 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  ArrowLeft, ArrowRight, Eye, Check, Upload,
+  ArrowLeft, ArrowRight, Eye, Check, Upload, Monitor, LayoutTemplate, Clock,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
-import { ExternalLink, CheckCircle2, Calendar, Info } from "lucide-react";
+import { ExternalLink, CheckCircle2, Info } from "lucide-react";
 import SlideCarousel from "@/components/SlideCarousel";
 import { useUserPlan } from "@/hooks/useUserPlan";
 import UpgradePlanDialog from "@/components/planos/UpgradePlanDialog";
@@ -73,6 +73,56 @@ const INTEGRATION_OPTIONS = [
 
 const EMAIL_REGISTER_VALUE = "__email_business_cadastrar__";
 const EMAIL_LATER_VALUE = "__email_depois__";
+
+function resolveWebsiteTemplatePreviewUrl(dados: Record<string, unknown> | null | undefined, templates: TemplateDB[]): string | null {
+  const fromData = typeof dados?.template_imagem_url === "string" ? dados.template_imagem_url.trim() : "";
+  if (fromData) return fromData;
+  const tid = dados?.template_id;
+  if (typeof tid === "string") {
+    const t = templates.find((x) => x.id === tid);
+    if (t?.imagem_url) return t.imagem_url;
+  }
+  return null;
+}
+
+function websiteMotoristaStatusPresentation(status: string, linkAcesso: string | null | undefined): {
+  headline: string;
+  description: string;
+} {
+  if (status === "pendente") {
+    return {
+      headline: "Em análise",
+      description: "Recebemos seu briefing. Nossa equipe está analisando as informações antes de seguir com a produção.",
+    };
+  }
+  if (status === "em_andamento") {
+    return {
+      headline: "Em desenvolvimento",
+      description: "Seu site está sendo produzido com base no modelo e no conteúdo enviados.",
+    };
+  }
+  if (status === "publicado") {
+    return {
+      headline: "Website publicado",
+      description: "Seu site já está no ar. Use o botão abaixo para abrir a versão publicada.",
+    };
+  }
+  if (status === "concluido") {
+    return {
+      headline: linkAcesso ? "Website publicado" : "Concluído",
+      description: linkAcesso
+        ? "Seu projeto foi finalizado. Acesse o link abaixo quando desejar."
+        : "Seu pedido foi concluído. Em breve você receberá o link de acesso, se ainda não estiver disponível.",
+    };
+  }
+  if (status === "recusado") {
+    return {
+      headline: "Solicitação não aprovada",
+      description: "Entre em contato com o suporte para mais detalhes ou envie um novo pedido quando for possível.",
+    };
+  }
+  return { headline: status, description: "" };
+}
 
 function formatVehicleLineFromWebhook(dw: unknown): string | null {
   if (!dw || typeof dw !== "object") return null;
@@ -147,7 +197,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 export default function WebsitePage() {
   const { setActivePage } = useActivePage();
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
-  const [step, setStep] = useState<"gallery" | "domain_pick" | "briefing" | "servico_ativo">("gallery");
+  const [step, setStep] = useState<"gallery" | "domain_pick" | "briefing" | "acompanhamento">("gallery");
   const [bs, setBs] = useState(1); // briefing step
   const [submitting, setSubmitting] = useState(false);
   const [servicoAtivo, setServicoAtivo] = useState<any>(null);
@@ -287,19 +337,59 @@ export default function WebsitePage() {
     };
   }, [step]);
 
-  useEffect(() => {
-    const checkServico = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      const { data } = await (supabase.from("solicitacoes_servicos" as any).select("*").eq("user_id", user.id).eq("tipo_servico", "website").order("created_at", { ascending: false }).limit(1) as any);
-      if (data && data.length > 0) {
-        const s = data[0];
-        if (s.status === "concluido") { setServicoAtivo(s); setStep("servico_ativo"); }
-        else if (s.status === "pendente" || s.status === "em_andamento") { setServicoAtivo(s); }
-      }
-    };
-    checkServico();
+  const refreshWebsiteSolicitacao = useCallback(async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const { data } = await (supabase.from("solicitacoes_servicos" as any).select("*").eq("user_id", user.id).eq("tipo_servico", "website").order("created_at", { ascending: false }).limit(1) as any);
+    if (!data?.length) {
+      setServicoAtivo(null);
+      setStep("gallery");
+      return;
+    }
+    const s = data[0];
+    if (s.status === "recusado") {
+      setServicoAtivo(null);
+      setStep("gallery");
+      return;
+    }
+    setServicoAtivo(s);
+    if (["pendente", "em_andamento", "publicado", "concluido"].includes(s.status)) {
+      setStep("acompanhamento");
+    }
   }, []);
+
+  useEffect(() => {
+    void refreshWebsiteSolicitacao();
+  }, [refreshWebsiteSolicitacao]);
+
+  useEffect(() => {
+    if (step !== "acompanhamento" || !servicoAtivo?.id) return;
+    const ch = supabase
+      .channel(`website-solicitacao-${servicoAtivo.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "solicitacoes_servicos",
+          filter: `id=eq.${servicoAtivo.id}`,
+        },
+        () => {
+          void refreshWebsiteSolicitacao();
+        },
+      )
+      .subscribe();
+    return () => {
+      void supabase.removeChannel(ch);
+    };
+  }, [step, servicoAtivo?.id, refreshWebsiteSolicitacao]);
+
+  useEffect(() => {
+    if (step !== "acompanhamento") return;
+    const onFocus = () => void refreshWebsiteSolicitacao();
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [step, refreshWebsiteSolicitacao]);
 
   const selectedTemplateName = dbTemplates.find(t => t.id === selectedTemplate)?.nome || "";
 
@@ -374,11 +464,15 @@ export default function WebsitePage() {
       .filter((x): x is string => !!x);
     const veiculosTextoMerged = [...linhasCadastro, veiculos.trim()].filter(Boolean).join("\n");
 
-    const { error } = await (supabase.from("solicitacoes_servicos" as any).insert({
+    const tmpl = dbTemplates.find((t) => t.id === selectedTemplate);
+
+    const { data: inserted, error } = await (supabase.from("solicitacoes_servicos" as any).insert({
       user_id: user.id,
       tipo_servico: "website",
+      status: "pendente",
         dados_solicitacao: {
         template: selectedTemplateName, template_id: selectedTemplate,
+        template_imagem_url: tmpl?.imagem_url ?? null,
         dominio: domain,
         dominio_usuario_id: purchasedDomainId,
         tipo_dominio: domainOption,
@@ -405,66 +499,148 @@ export default function WebsitePage() {
         conteudo: { fotos_cidade: temFotosCidade, fotos_veiculos: temFotosVeiculos, fotos_motorista: temFotosMotorista, videos: temVideos },
         plataformas, horario_atendimento: horarioAtendimento, depoimentos,
       },
-    } as any) as any);
+    } as any).select().single() as any);
     setSubmitting(false);
     if (error) { toast.error("Erro ao enviar: " + error.message); return; }
-    toast.success("Briefing enviado com sucesso! O administrador irá processar seu pedido.");
+    toast.success("Briefing enviado! Acompanhe o status desta página.");
     setBs(1);
     setSelectedTemplate(null);
-    setStep("gallery");
+    if (inserted) {
+      setServicoAtivo(inserted);
+      setStep("acompanhamento");
+    } else {
+      void refreshWebsiteSolicitacao();
+    }
   };
 
-  // ── Active service view ────────────────────────────
-  if (step === "servico_ativo" && servicoAtivo) {
+  // ── Pós-briefing: resumo + mockup (galeria de modelos bloqueada) ──
+  if (step === "acompanhamento" && servicoAtivo) {
+    const dados = (servicoAtivo.dados_solicitacao || {}) as Record<string, unknown>;
+    const previewUrl = resolveWebsiteTemplatePreviewUrl(dados, dbTemplates);
+    const { headline, description } = websiteMotoristaStatusPresentation(servicoAtivo.status, servicoAtivo.link_acesso);
+    const emailProf =
+      dados.email_profissional_opcao === "cadastrar_depois"
+        ? "Vou cadastrar depois"
+        : (typeof dados.email === "string" && dados.email.trim() ? dados.email : "—");
+    const linkPublicado = typeof servicoAtivo.link_acesso === "string" ? servicoAtivo.link_acesso.trim() : "";
+    const exibirBotaoSitePublicado =
+      linkPublicado.length > 0 &&
+      (servicoAtivo.status === "publicado" || servicoAtivo.status === "concluido");
+
     return (
       <div className="space-y-6">
         <div>
           <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-            <CheckCircle2 className="h-6 w-6 text-primary" /> Website — Serviço Ativo
+            <Monitor className="h-7 w-7 text-primary" /> Website — Acompanhamento do projeto
           </h1>
-          <p className="text-muted-foreground">Seu website foi configurado e está pronto para uso.</p>
+          <p className="text-muted-foreground text-sm mt-1">
+            Seu briefing já foi enviado. A escolha de novos modelos na galeria fica bloqueada enquanto este projeto estiver em andamento.
+          </p>
         </div>
-        <div className="rounded-xl border border-primary/30 bg-card p-6 space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {servicoAtivo.link_acesso && (
-              <div className="space-y-1">
-                <p className="text-sm text-muted-foreground">Link de Acesso</p>
-                <a href={servicoAtivo.link_acesso} target="_blank" rel="noopener noreferrer" className="text-primary font-medium flex items-center gap-1 hover:underline">
-                  <ExternalLink className="h-4 w-4" /> {servicoAtivo.link_acesso}
-                </a>
-              </div>
-            )}
-            {servicoAtivo.data_expiracao && (
-              <div className="space-y-1">
-                <p className="text-sm text-muted-foreground">Válido até</p>
-                <p className="text-foreground font-medium flex items-center gap-1">
-                  <Calendar className="h-4 w-4" /> {new Date(servicoAtivo.data_expiracao).toLocaleDateString("pt-BR")}
-                </p>
-              </div>
-            )}
-          </div>
-          {servicoAtivo.instrucoes_acesso && <div className="space-y-1"><p className="text-sm text-muted-foreground">Instruções de Acesso</p><p className="text-foreground whitespace-pre-wrap">{servicoAtivo.instrucoes_acesso}</p></div>}
-          {servicoAtivo.como_usar && <div className="space-y-1"><p className="text-sm text-muted-foreground">Como Usar</p><p className="text-foreground whitespace-pre-wrap">{servicoAtivo.como_usar}</p></div>}
-          {servicoAtivo.observacoes_admin && (
-            <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-1">
-              <p className="text-sm font-medium text-foreground flex items-center gap-1"><Info className="h-4 w-4" /> Observações</p>
-              <p className="text-sm text-muted-foreground whitespace-pre-wrap">{servicoAtivo.observacoes_admin}</p>
+
+        <div className="grid grid-cols-1 gap-8 lg:grid-cols-2 lg:gap-10 items-start">
+          <div className="space-y-3">
+            <p className="text-sm font-medium text-foreground flex items-center gap-2">
+              <LayoutTemplate className="h-4 w-4 text-muted-foreground" /> Modelo escolhido
+            </p>
+            <div
+              className={cn(
+                "relative mx-auto w-full max-w-md overflow-hidden rounded-xl border border-border bg-muted shadow-sm",
+                "aspect-square",
+              )}
+            >
+              {previewUrl ? (
+                <div className="group relative h-full w-full cursor-ns-resize overflow-hidden">
+                  <img
+                    src={previewUrl}
+                    alt={typeof dados.template === "string" ? dados.template : "Prévia do modelo"}
+                    className="h-[200%] w-full object-cover object-top transition-transform duration-[50s] ease-linear group-hover:-translate-y-[min(45%,12rem)]"
+                  />
+                  <p className="pointer-events-none absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-background/90 px-3 py-1 text-[10px] text-muted-foreground shadow border border-border">
+                    Passe o mouse para simular rolagem
+                  </p>
+                </div>
+              ) : (
+                <div className="flex h-full min-h-[200px] items-center justify-center p-6 text-center text-sm text-muted-foreground">
+                  Prévia indisponível. O modelo registrado:{" "}
+                  <span className="font-medium text-foreground">{String(dados.template || "—")}</span>
+                </div>
+              )}
             </div>
-          )}
+          </div>
+
+          <div className="space-y-5 rounded-xl border border-border bg-card p-6">
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Status do projeto</p>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <Badge
+                  variant="outline"
+                  className={cn(
+                    "text-base px-3 py-1",
+                    servicoAtivo.status === "publicado" || (servicoAtivo.status === "concluido" && linkPublicado)
+                      ? "border-green-500/40 bg-green-500/10 text-green-900 dark:text-green-100"
+                      : servicoAtivo.status === "em_andamento"
+                        ? "border-blue-500/40 bg-blue-500/10 text-blue-900 dark:text-blue-100"
+                        : "border-amber-500/40 bg-amber-500/10 text-amber-950 dark:text-amber-100",
+                  )}
+                >
+                  {servicoAtivo.status === "publicado" || (servicoAtivo.status === "concluido" && linkPublicado) ? (
+                    <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
+                  ) : (
+                    <Clock className="h-3.5 w-3.5 mr-1.5" />
+                  )}
+                  {headline}
+                </Badge>
+              </div>
+              {description ? <p className="text-sm text-muted-foreground mt-3 leading-relaxed">{description}</p> : null}
+            </div>
+
+            <div className="border-t border-border pt-4">
+              <p className="text-sm font-semibold text-foreground mb-3">Resumo do briefing</p>
+              <dl className="grid gap-2 text-sm">
+                {[
+                  ["Modelo", String(dados.template || "—")],
+                  ["Domínio", String(dados.dominio || "—")],
+                  ["Empresa", String(dados.nome_empresa || "—")],
+                  ["WhatsApp", String(dados.whatsapp || "—")],
+                  ["E-mail profissional", emailProf],
+                  ["Cidade / região", [dados.cidade_sede, dados.regiao_atendida].filter(Boolean).join(" · ") || "—"],
+                  ["Estilo", String(dados.estilo || "—")],
+                ].map(([k, v]) => (
+                  <div key={k} className="flex justify-between gap-4 border-b border-border/60 pb-2 last:border-0">
+                    <dt className="text-muted-foreground shrink-0">{k}</dt>
+                    <dd className="text-foreground text-right font-medium break-words">{v || "—"}</dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
+
+            {exibirBotaoSitePublicado ? (
+              <Button type="button" size="lg" className="w-full gap-2" asChild>
+                <a href={linkPublicado} target="_blank" rel="noopener noreferrer">
+                  <ExternalLink className="h-4 w-4" /> Visualizar site publicado
+                </a>
+              </Button>
+            ) : null}
+
+            {servicoAtivo.observacoes_admin ? (
+              <div className="rounded-lg border border-border bg-muted/30 p-3 text-sm">
+                <p className="font-medium text-foreground flex items-center gap-1 mb-1"><Info className="h-4 w-4" /> Observações da equipe</p>
+                <p className="text-muted-foreground whitespace-pre-wrap">{servicoAtivo.observacoes_admin}</p>
+              </div>
+            ) : null}
+
+            {servicoAtivo.instrucoes_acesso ? (
+              <div className="text-sm text-muted-foreground whitespace-pre-wrap border-t border-border pt-4">
+                <span className="font-medium text-foreground">Instruções: </span>
+                {servicoAtivo.instrucoes_acesso}
+              </div>
+            ) : null}
+          </div>
         </div>
       </div>
     );
   }
-
-  const pendingBanner = servicoAtivo && (servicoAtivo.status === "pendente" || servicoAtivo.status === "em_andamento") ? (
-    <div className="rounded-xl border border-yellow-500/30 bg-yellow-500/10 p-4 flex items-center gap-3">
-      <Info className="h-5 w-5 text-yellow-600" />
-      <div>
-        <p className="text-sm font-semibold text-foreground">Solicitação em análise</p>
-        <p className="text-xs text-muted-foreground">Status: <Badge variant="outline">{servicoAtivo.status === "pendente" ? "Pendente" : "Em andamento"}</Badge></p>
-      </div>
-    </div>
-  ) : null;
 
   const goToDomainMenu = () => setActivePage("dominios");
 
@@ -478,7 +654,6 @@ export default function WebsitePage() {
           selfServiceUpgrade={plano === "free"}
           onUpgradeSuccess={() => void refetchPlano()}
         />
-        {pendingBanner}
         <div className="space-y-8 max-w-lg">
           <PurchasedDomainSelectStep
             domains={purchasedDomains}
@@ -534,13 +709,12 @@ export default function WebsitePage() {
           selfServiceUpgrade={plano === "free"}
           onUpgradeSuccess={() => void refetchPlano()}
         />
-        {pendingBanner}
         <div className="space-y-6">
           <div>
             <h1 className="text-2xl font-bold text-foreground">Website — Briefing Completo</h1>
             <p className="text-sm text-muted-foreground">
-              Modelo: <span className="font-semibold text-foreground">{selectedTemplateName}</span>{" "}
-              <button onClick={() => setStep("gallery")} className="text-primary hover:underline">(alterar)</button>
+              Modelo escolhido: <span className="font-semibold text-foreground">{selectedTemplateName}</span>
+              <span className="text-muted-foreground"> (definido antes do domínio; após enviar o briefing não será possível trocar o modelo pela galeria)</span>
             </p>
           </div>
 
@@ -964,8 +1138,7 @@ export default function WebsitePage() {
   // ── Gallery view ───────────────────────────────────
   return (
     <div className="space-y-6">
-      {pendingBanner}
-      <SlideCarousel pagina="website" breakoutTop={!pendingBanner} fallbackSlides={[
+      <SlideCarousel pagina="website" breakoutTop fallbackSlides={[
         { titulo: "Crie Seu Site Profissional", subtitulo: "Design premium e responsivo para transporte executivo." },
         { titulo: "Templates Exclusivos", subtitulo: "Modelos desenvolvidos para o segmento de transporte." },
       ]} />
