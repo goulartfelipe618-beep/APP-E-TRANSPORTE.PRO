@@ -285,9 +285,10 @@ async function checkDomainAvailability(fqdn: string): Promise<{
 export default function DominiosPage() {
   const [rows, setRows] = useState<DominioRowView[]>([]);
   const [loading, setLoading] = useState(true);
-  const [adminMasterView, setAdminMasterView] = useState(false);
+  const [adminMasterView, setAdminMasterView] = useState<boolean | null>(null);
   const [dialogMode, setDialogMode] = useState<DialogMode>("closed");
   const [saving, setSaving] = useState(false);
+  const [adminUpdatingDomainId, setAdminUpdatingDomainId] = useState<string | null>(null);
 
   const [plataformaDraft, setPlataformaDraft] = useState("");
   const [fqdnExistenteDraft, setFqdnExistenteDraft] = useState("");
@@ -304,6 +305,8 @@ export default function DominiosPage() {
 
   const fqdnNovoPreview =
     sanitizeComBrLabel(comBrLabelDraft).length > 0 ? `${sanitizeComBrLabel(comBrLabelDraft)}.com.br` : "";
+  const roleResolved = adminMasterView !== null;
+  const isAdminMaster = adminMasterView === true;
 
   const load = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -315,10 +318,10 @@ export default function DominiosPage() {
     }
 
     const { data: primary, error: roleErr } = await supabase.rpc("get_session_primary_role");
-    const isAdminMaster = !roleErr && primary === "admin_master";
-    setAdminMasterView(isAdminMaster);
+    const adminMaster = !roleErr && primary === "admin_master";
+    setAdminMasterView(adminMaster);
 
-    if (isAdminMaster) {
+    if (adminMaster) {
       const { data: rpcData, error: rpcErr } = await supabase.rpc("list_dominios_motoristas_for_admin");
       if (rpcErr) {
         toast.error("Não foi possível carregar os domínios dos motoristas.", { description: rpcErr.message });
@@ -565,6 +568,32 @@ export default function DominiosPage() {
     closeDialog();
   };
 
+  const handleAdminSetStatus = async (row: DominioRowView, nextStatus: "ativo" | "cancelado") => {
+    if (!isAdminMaster) return;
+    if (row.status === nextStatus) return;
+
+    setAdminUpdatingDomainId(row.id);
+    const { error } = await supabase
+      .from("dominios_usuario")
+      .update({ status: nextStatus })
+      .eq("id", row.id);
+
+    setAdminUpdatingDomainId(null);
+    if (error) {
+      toast.error("Não foi possível atualizar o status do domínio.", { description: error.message });
+      return;
+    }
+
+    setRows((prev) =>
+      prev.map((r) => (r.id === row.id ? { ...r, status: nextStatus, updated_at: new Date().toISOString() } : r)),
+    );
+    toast.success(
+      nextStatus === "ativo"
+        ? "Domínio aprovado e marcado como ativo."
+        : "Domínio reprovado e marcado como cancelado.",
+    );
+  };
+
   function origemLabel(r: DominioRow) {
     if (r.tipo_origem === "ja_registrado" && r.plataforma_registro) {
       return r.plataforma_registro;
@@ -586,34 +615,34 @@ export default function DominiosPage() {
 
   return (
     <div className="space-y-6">
-      {adminMasterView ? (
+      {isAdminMaster ? (
         <Alert className="border-border bg-muted/40 text-foreground">
           <Info className="h-4 w-4 text-muted-foreground" />
           <AlertTitle className="text-foreground">Gestão operacional</AlertTitle>
           <AlertDescription className="text-muted-foreground">
             Esta tela lista apenas domínios cadastrados pelos motoristas no painel deles. Novos registros e solicitações
             são feitos pelo próprio motorista em Ferramentas → Domínios; aqui você acompanha status e titular para
-            suporte e configuração.
+            suporte e configuração. Você também pode aprovar ou reprovar os domínios por aqui.
           </AlertDescription>
         </Alert>
-      ) : (
+      ) : roleResolved ? (
         <Alert className="border-amber-500/40 bg-amber-500/10 text-foreground">
           <Info className="h-4 w-4 text-amber-700 dark:text-amber-400" />
           <AlertTitle className="text-amber-900 dark:text-amber-100">Aviso</AlertTitle>
           <AlertDescription className="text-amber-900/90 dark:text-amber-50/95">{CUSTO_AVISO}</AlertDescription>
         </Alert>
-      )}
+      ) : null}
 
       <div
         className={
-          adminMasterView
+          isAdminMaster
             ? "flex flex-col gap-2"
             : "flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"
         }
       >
         <div>
           <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-            {adminMasterView ? (
+            {isAdminMaster ? (
               <>
                 <Users className="h-7 w-7 text-primary" />
                 Domínios dos motoristas
@@ -626,7 +655,7 @@ export default function DominiosPage() {
             )}
           </h1>
           <p className="text-muted-foreground text-sm mt-1">
-            {adminMasterView ? (
+            {isAdminMaster ? (
               <>
                 Visão consolidada dos domínios vinculados a contas de motorista (contas administrativas da plataforma
                 não aparecem aqui). Domínios ativos seguem disponíveis no fluxo Website de cada motorista.
@@ -639,7 +668,7 @@ export default function DominiosPage() {
             )}
           </p>
         </div>
-        {!adminMasterView && (
+        {roleResolved && !isAdminMaster && (
           <Button type="button" onClick={openDialog} className="shrink-0 gap-2">
             <Plus className="h-4 w-4" />
             Registrar um novo domínio
@@ -655,7 +684,7 @@ export default function DominiosPage() {
           </div>
         ) : rows.length === 0 ? (
           <div className="p-10 text-center text-muted-foreground text-sm">
-            {adminMasterView
+            {isAdminMaster
               ? "Nenhum domínio cadastrado por motoristas até o momento."
               : 'Nenhum domínio cadastrado. Use "Registrar um novo domínio" para adicionar ou solicitar registro.'}
           </div>
@@ -663,19 +692,20 @@ export default function DominiosPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                {adminMasterView && (
+                {isAdminMaster && (
                   <TableHead className="min-w-[140px] max-w-[220px]">Motorista</TableHead>
                 )}
                 <TableHead>Domínio</TableHead>
                 <TableHead className="hidden sm:table-cell w-44">Origem / plataforma</TableHead>
                 <TableHead className="w-36">Status</TableHead>
                 <TableHead className="w-40 text-right">Registrado em</TableHead>
+                {isAdminMaster && <TableHead className="w-[220px] text-right">Ações</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
               {rows.map((r) => (
                 <TableRow key={r.id}>
-                  {adminMasterView && (
+                  {isAdminMaster && (
                     <TableCell className="text-muted-foreground text-sm max-w-[220px] align-top">
                       <span className="line-clamp-2" title={r.motorista_nome || "Motorista sem nome"}>
                         {r.motorista_nome || "Motorista sem nome"}
@@ -694,6 +724,30 @@ export default function DominiosPage() {
                   <TableCell className="text-right text-muted-foreground text-sm">
                     {new Date(r.created_at).toLocaleDateString("pt-BR")}
                   </TableCell>
+                  {isAdminMaster && (
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant={r.status === "ativo" ? "default" : "outline"}
+                          disabled={adminUpdatingDomainId === r.id || r.status === "ativo"}
+                          onClick={() => void handleAdminSetStatus(r, "ativo")}
+                        >
+                          {adminUpdatingDomainId === r.id ? <Loader2 className="h-4 w-4 animate-spin" /> : "Aprovar"}
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant={r.status === "cancelado" ? "destructive" : "outline"}
+                          disabled={adminUpdatingDomainId === r.id || r.status === "cancelado"}
+                          onClick={() => void handleAdminSetStatus(r, "cancelado")}
+                        >
+                          {adminUpdatingDomainId === r.id ? <Loader2 className="h-4 w-4 animate-spin" /> : "Reprovar"}
+                        </Button>
+                      </div>
+                    </TableCell>
+                  )}
                 </TableRow>
               ))}
             </TableBody>
@@ -701,7 +755,7 @@ export default function DominiosPage() {
         )}
       </div>
 
-      {!adminMasterView && (
+      {roleResolved && !isAdminMaster && (
       <>
       <Dialog
         open={dialogMode !== "closed"}
