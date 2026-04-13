@@ -24,7 +24,7 @@ export const PAGINAS_MOTORISTA: { value: string; label: string }[] = [
   { value: "marketing/qrcode", label: "QR Codes" },
   { value: "network", label: "Network" },
   { value: "comunidade", label: "Comunidade" },
-  { value: "google", label: "Google" },
+  { value: "google", label: "Google Maps" },
   { value: "email-business", label: "E-mail Business" },
   { value: "website", label: "Website" },
   { value: "disparador", label: "Disparador" },

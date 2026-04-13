@@ -107,6 +107,7 @@ const TIPO_PT: Record<string, string> = {
 const STATUS_PT: Record<string, string> = {
   pendente: "Pendente / Em análise",
   em_andamento: "Em andamento",
+  pendente_verificacao: "Pendente verificação (Google Business Profile)",
   concluido: "Concluído",
   publicado: "Website publicado",
   recusado: "Recusado",

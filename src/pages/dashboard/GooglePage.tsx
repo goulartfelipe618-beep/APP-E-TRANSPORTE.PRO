@@ -7,14 +7,13 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import SlideCarousel from "@/components/SlideCarousel";
 import {
   Plus, Search, Shield, Building2, MapPin, Phone, Clock, Camera,
   Send, ExternalLink, Calendar, Info, CheckCircle2, Star, MessageSquare,
   FileText, Package, Settings, Image, PenLine, Globe, Tag, Users,
-  Megaphone, BarChart3, CirclePlus, Trash2, ChevronRight, Edit,
+  Megaphone, BarChart3, CirclePlus, Trash2, Edit,
   HelpCircle, Accessibility, Wifi, ParkingCircle, CreditCard, Award,
   ThumbsUp, Reply, Eye, TrendingUp, MousePointerClick, PhoneCall,
   Navigation, Loader2
@@ -24,6 +23,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useUserPlan } from "@/hooks/useUserPlan";
 import UpgradePlanDialog from "@/components/planos/UpgradePlanDialog";
+import GoogleBusinessSolicitationDialog from "@/components/google/GoogleBusinessSolicitationDialog";
 
 const DAYS = [
   { name: "Segunda-feira", short: "Seg", defaultOn: true },
@@ -56,26 +56,10 @@ export default function GooglePage() {
   const [upgradeOpen, setUpgradeOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("info");
-  const [submitting, setSubmitting] = useState(false);
   const [servicoAtivo, setServicoAtivo] = useState<any>(null);
 
-  // === Create form state ===
-  const [createStep, setCreateStep] = useState(0);
-  const [tipoEntidade, setTipoEntidade] = useState("motorista");
-  const [nomeEmpresa, setNomeEmpresa] = useState("");
-  const [categoriaPrincipal, setCategoriaPrincipal] = useState("");
-  const [categoriaSecundaria, setCategoriaSecundaria] = useState("");
-  const [descricao, setDescricao] = useState("");
+  /** Estado compartilhado com a UI de “gestão” (mock); wizard de criação usa componente próprio. */
   const [serviceArea, setServiceArea] = useState(true);
-  const [areaAtendimento, setAreaAtendimento] = useState("");
-  const [cep, setCep] = useState("");
-  const [cidade, setCidade] = useState("");
-  const [estado, setEstado] = useState("");
-  const [telefone, setTelefone] = useState("");
-  const [whatsappG, setWhatsappG] = useState("");
-  const [websiteG, setWebsiteG] = useState("");
-  const [logoUrl, setLogoUrl] = useState("");
-  const [capaUrl, setCapaUrl] = useState("");
   const [schedule, setSchedule] = useState(
     DAYS.map((d) => ({ ...d, open: "08:00", close: "18:00", enabled: d.defaultOn }))
   );
@@ -124,56 +108,49 @@ export default function GooglePage() {
     petFriendly: false,
   });
 
-  useEffect(() => {
-    const checkServico = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      const { data } = await (supabase.from("solicitacoes_servicos" as any).select("*").eq("user_id", user.id).eq("tipo_servico", "google").order("created_at", { ascending: false }).limit(1) as any);
-      if (data && data.length > 0) setServicoAtivo(data[0]);
-    };
-    checkServico();
-  }, []);
-
-  const handleSubmitGoogle = async () => {
-    if (!nomeEmpresa.trim()) { toast.error("Informe o nome da empresa."); return; }
-    if (!categoriaPrincipal) { toast.error("Selecione a categoria principal."); return; }
-    if (!telefone.trim()) { toast.error("Informe o telefone."); return; }
-
-    setSubmitting(true);
+  const refreshServicoGoogle = async () => {
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) { toast.error("Não autenticado"); setSubmitting(false); return; }
-    const { error } = await (supabase.from("solicitacoes_servicos" as any).insert({
-      user_id: user.id,
-      tipo_servico: "google",
-      dados_solicitacao: {
-        tipo_entidade: tipoEntidade,
-        nome_empresa: nomeEmpresa,
-        categoria_principal: categoriaPrincipal,
-        categoria_secundaria: categoriaSecundaria,
-        descricao,
-        service_area: serviceArea,
-        area_atendimento: areaAtendimento,
-        cep, cidade, estado,
-        telefone, whatsapp: whatsappG, website: websiteG,
-        horarios: schedule,
-        logo_url: logoUrl,
-        capa_url: capaUrl,
-      },
-    } as any) as any);
-    setSubmitting(false);
-    if (error) { toast.error("Erro: " + error.message); return; }
-    toast.success("Solicitação enviada com sucesso!");
-    setCreateOpen(false);
+    if (!user) return;
+    const { data } = await (supabase.from("solicitacoes_servicos" as any).select("*").eq("user_id", user.id).eq("tipo_servico", "google").order("created_at", { ascending: false }).limit(1) as any);
+    if (data && data.length > 0) setServicoAtivo(data[0]);
+    else setServicoAtivo(null);
   };
+
+  useEffect(() => {
+    void refreshServicoGoogle();
+  }, []);
 
   const hasProfile = !!servicoAtivo;
 
-  const pendingBanner = servicoAtivo && (servicoAtivo.status === "pendente" || servicoAtivo.status === "em_andamento") ? (
-    <div className="rounded-xl border border-yellow-500/30 bg-yellow-500/10 p-4 flex items-center gap-3">
-      <Info className="h-5 w-5 text-yellow-600" />
-      <div>
-        <p className="text-sm font-semibold text-foreground">Solicitação Google Business em análise</p>
-        <p className="text-xs text-muted-foreground">Status: <Badge variant="outline">{servicoAtivo.status === "pendente" ? "Pendente" : "Em andamento"}</Badge></p>
+  const pendingBanner =
+    servicoAtivo &&
+    (servicoAtivo.status === "pendente" ||
+      servicoAtivo.status === "em_andamento" ||
+      servicoAtivo.status === "pendente_verificacao") ? (
+    <div className="rounded-xl border border-yellow-500/30 bg-yellow-500/10 p-4 flex items-start gap-3">
+      <Info className="h-5 w-5 text-yellow-600 shrink-0 mt-0.5" />
+      <div className="space-y-1">
+        <p className="text-sm font-semibold text-foreground">
+          {servicoAtivo.status === "pendente_verificacao"
+            ? "Perfil aguardando verificação no Google"
+            : "Solicitação Google Business em análise"}
+        </p>
+        <p className="text-xs text-muted-foreground">
+          Status:{" "}
+          <Badge variant="outline">
+            {servicoAtivo.status === "pendente"
+              ? "Pendente"
+              : servicoAtivo.status === "em_andamento"
+                ? "Em andamento"
+                : "Pendente de verificação (Google)"}
+          </Badge>
+        </p>
+        {servicoAtivo.status === "pendente_verificacao" && (
+          <p className="text-xs text-muted-foreground pt-1">
+            O Google pode pedir <strong className="text-foreground">verificação por vídeo</strong> no aplicativo Google Business Profile
+            (mostrar veículo, painel ou documentos). Abra o app e siga as etapas indicadas pelo Google.
+          </p>
+        )}
       </div>
     </div>
   ) : null;
@@ -957,15 +934,6 @@ export default function GooglePage() {
     );
   }
 
-  // === CREATE DIALOG ===
-  const CREATE_STEPS = [
-    { label: "Informações", icon: Building2 },
-    { label: "Localização", icon: MapPin },
-    { label: "Contato", icon: Phone },
-    { label: "Horários", icon: Clock },
-    { label: "Fotos", icon: Camera },
-  ];
-
   // If profile exists, show management inline
   if (hasProfile) {
     return (
@@ -1012,7 +980,7 @@ export default function GooglePage() {
         </div>
         <Button onClick={() => {
           if (!hasPlan("apex")) { setUpgradeOpen(true); return; }
-          setCreateOpen(true); setCreateStep(0);
+          setCreateOpen(true);
         }}>
           <Plus className="h-4 w-4 mr-2" /> Novo Perfil
         </Button>
@@ -1020,7 +988,11 @@ export default function GooglePage() {
 
       <div className="rounded-xl border border-border bg-card p-4">
         <div className="flex items-center gap-2 mb-2"><Shield className="h-4 w-4 text-muted-foreground" /><span className="text-sm font-medium text-foreground">Como funciona</span></div>
-        <p className="text-sm text-muted-foreground">Preencha os dados do perfil no wizard. O sistema valida automaticamente o nome, categoria e endereço para reduzir chances de suspensão pelo Google. Motoristas sem ponto fixo devem ser configurados como "Service Area Business".</p>
+        <p className="text-sm text-muted-foreground">
+          O cadastro segue o modelo <strong className="text-foreground">Service Area Business (SAB)</strong>: endereço residencial só para verificação
+          (oculto no Maps), categoria e site definidos pela plataforma, áreas de atendimento com busca de cidades e telefone exclusivo na rede.
+          Isso reduz risco de banimento da conta Google usada pela API.
+        </p>
       </div>
 
       <div className="rounded-xl border border-dashed border-border p-12 text-center">
@@ -1029,155 +1001,17 @@ export default function GooglePage() {
         <p className="text-sm text-muted-foreground mb-4">Crie seu perfil no Google Business para aparecer nas buscas.</p>
         <Button onClick={() => {
           if (!hasPlan("apex")) { setUpgradeOpen(true); return; }
-          setCreateOpen(true); setCreateStep(0);
+          setCreateOpen(true);
         }}>
           <Plus className="h-4 w-4 mr-2" /> Criar Meu Perfil
         </Button>
       </div>
 
-      {/* CREATE DIALOG */}
-      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Novo Perfil Google Business</DialogTitle>
-          </DialogHeader>
-
-          <div className="flex items-center gap-1 overflow-x-auto pb-1">
-            {CREATE_STEPS.map((step, i) => {
-              const Icon = step.icon;
-              const active = i === createStep;
-              const done = i < createStep;
-              return (
-                <button
-                  key={step.label}
-                  onClick={() => setCreateStep(i)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors ${
-                    active ? "bg-primary text-primary-foreground" : done ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground"
-                  }`}
-                >
-                  <Icon className="h-3.5 w-3.5" />
-                  {step.label}
-                </button>
-              );
-            })}
-          </div>
-
-          <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-            <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${((createStep + 1) / CREATE_STEPS.length) * 100}%` }} />
-          </div>
-
-          {createStep === 0 && (
-            <div className="space-y-4">
-              <div>
-                <Label>Tipo de Entidade</Label>
-                <Select value={tipoEntidade} onValueChange={setTipoEntidade}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="motorista">Motorista</SelectItem><SelectItem value="empresa">Empresa</SelectItem></SelectContent></Select>
-              </div>
-              <div><Label>Nome da Empresa *</Label><Input value={nomeEmpresa} onChange={(e) => setNomeEmpresa(e.target.value)} placeholder="Ex: Transfer Executivo São Paulo" /></div>
-              <div>
-                <Label>Categoria Principal *</Label>
-                <Select value={categoriaPrincipal} onValueChange={setCategoriaPrincipal}><SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="transporte_executivo">Serviço de Transporte Executivo</SelectItem>
-                    <SelectItem value="taxi">Serviço de Táxi</SelectItem>
-                    <SelectItem value="aluguel">Aluguel de Veículos</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>Categoria Secundária</Label>
-                <Select value={categoriaSecundaria} onValueChange={setCategoriaSecundaria}><SelectTrigger><SelectValue placeholder="Opcional" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="transporte">Serviço de Transporte</SelectItem>
-                    <SelectItem value="turismo">Turismo</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>Descrição</Label>
-                <Textarea value={descricao} onChange={(e) => setDescricao(e.target.value)} placeholder="Descreva o serviço oferecido..." maxLength={750} />
-                <p className="text-xs text-muted-foreground mt-1">{descricao.length}/750 caracteres</p>
-              </div>
-            </div>
-          )}
-
-          {createStep === 1 && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between rounded-lg border border-border p-3">
-                <div>
-                  <p className="text-sm font-medium text-foreground">Service Area Business</p>
-                  <p className="text-xs text-muted-foreground">Ative se o serviço é móvel (sem ponto físico fixo).</p>
-                </div>
-                <Switch checked={serviceArea} onCheckedChange={setServiceArea} />
-              </div>
-              <div><Label>Área de Atendimento *</Label><Input value={areaAtendimento} onChange={(e) => setAreaAtendimento(e.target.value)} placeholder="Ex: São Paulo, Guarulhos, ABC Paulista" /></div>
-              <div className="grid grid-cols-2 gap-4">
-                <div><Label>CEP</Label><Input value={cep} onChange={(e) => setCep(e.target.value)} placeholder="00000-000" /></div>
-                <div><Label>Cidade</Label><Input value={cidade} onChange={(e) => setCidade(e.target.value)} /></div>
-              </div>
-              <div><Label>Estado</Label><Input value={estado} onChange={(e) => setEstado(e.target.value)} placeholder="SP" /></div>
-            </div>
-          )}
-
-          {createStep === 2 && (
-            <div className="space-y-4">
-              <div><Label>Telefone *</Label><Input value={telefone} onChange={(e) => setTelefone(e.target.value)} placeholder="(11) 99999-9999" /></div>
-              <div><Label>WhatsApp</Label><Input value={whatsappG} onChange={(e) => setWhatsappG(e.target.value)} placeholder="(11) 99999-9999" /></div>
-              <div><Label>Website</Label><Input value={websiteG} onChange={(e) => setWebsiteG(e.target.value)} placeholder="https://www.exemplo.com.br" /></div>
-            </div>
-          )}
-
-          {createStep === 3 && (
-            <div className="space-y-4">
-              <p className="text-sm text-muted-foreground">Configure o horário de funcionamento padrão.</p>
-              {schedule.map((day, i) => (
-                <div key={day.name} className="flex items-center gap-3">
-                  <Switch checked={day.enabled} onCheckedChange={(v) => setSchedule((s) => { const n = [...s]; n[i] = { ...n[i], enabled: v }; return n; })} />
-                  <span className="text-sm text-foreground w-20">{day.short}</span>
-                  {day.enabled ? (
-                    <>
-                      <Input type="time" value={day.open} className="w-28" onChange={(e) => setSchedule((s) => { const n = [...s]; n[i] = { ...n[i], open: e.target.value }; return n; })} />
-                      <span className="text-xs text-muted-foreground">às</span>
-                      <Input type="time" value={day.close} className="w-28" onChange={(e) => setSchedule((s) => { const n = [...s]; n[i] = { ...n[i], close: e.target.value }; return n; })} />
-                    </>
-                  ) : (
-                    <span className="text-sm text-muted-foreground">Fechado</span>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-
-          {createStep === 4 && (
-            <div className="space-y-4">
-              <div><Label>URL do Logo</Label><Input value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)} placeholder="https://..." /></div>
-              <div><Label>URL da Capa</Label><Input value={capaUrl} onChange={(e) => setCapaUrl(e.target.value)} placeholder="https://..." /></div>
-            </div>
-          )}
-
-          <div className="flex justify-between pt-2">
-            <Button variant="outline" onClick={() => { if (createStep === 0) setCreateOpen(false); else setCreateStep((s) => s - 1); }}>
-              Anterior
-            </Button>
-            {createStep === CREATE_STEPS.length - 1 ? (
-              <Button className="bg-primary text-primary-foreground" onClick={handleSubmitGoogle} disabled={submitting}>
-                <Send className="h-4 w-4 mr-2" /> {submitting ? "Enviando..." : "Enviar Solicitação"}
-              </Button>
-            ) : (
-              <Button onClick={() => {
-                if (createStep === 0) {
-                  if (!nomeEmpresa.trim()) { toast.error("Informe o nome da empresa."); return; }
-                  if (!categoriaPrincipal) { toast.error("Selecione a categoria principal."); return; }
-                }
-                if (createStep === 1 && !areaAtendimento.trim()) { toast.error("Informe a área de atendimento."); return; }
-                if (createStep === 2 && !telefone.trim()) { toast.error("Informe o telefone."); return; }
-                setCreateStep((s) => s + 1);
-              }}>
-                Próximo <ChevronRight className="h-4 w-4 ml-1" />
-              </Button>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
+      <GoogleBusinessSolicitationDialog
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        onSuccess={() => void refreshServicoGoogle()}
+      />
       <UpgradePlanDialog
         open={upgradeOpen}
         onOpenChange={setUpgradeOpen}

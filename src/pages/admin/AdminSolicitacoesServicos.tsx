@@ -12,7 +12,7 @@ import {
 import {
   Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle,
 } from "@/components/ui/sheet";
-import { RefreshCw, Filter, ClipboardList, Eye, Globe, Mail, Monitor, Search, CheckCircle2, Clock, XCircle, Loader2, FileDown } from "lucide-react";
+import { RefreshCw, Filter, ClipboardList, Eye, Globe, Mail, Monitor, Search, CheckCircle2, Clock, XCircle, Loader2, FileDown, Video } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { downloadSolicitacaoBriefingPdf } from "@/lib/solicitacaoServicoBriefingPdf";
@@ -76,6 +76,7 @@ const TIPO_ICONS: Record<string, any> = {
 const STATUS_COLORS: Record<string, string> = {
   pendente: "bg-yellow-500/10 text-yellow-700 border-yellow-500/30",
   em_andamento: "bg-blue-500/10 text-blue-700 border-blue-500/30",
+  pendente_verificacao: "bg-orange-500/10 text-orange-800 border-orange-500/30",
   concluido: "bg-green-500/10 text-green-700 border-green-500/30",
   publicado: "bg-emerald-500/10 text-emerald-800 border-emerald-500/30",
   recusado: "bg-red-500/10 text-red-700 border-red-500/30",
@@ -90,6 +91,19 @@ function statusSelectOptions(tipoServico: string, currentStatus: string) {
   ];
   if (tipoServico === "website") {
     return [...common, { value: "publicado", label: "Website publicado" }];
+  }
+  if (tipoServico === "google") {
+    const g = [
+      { value: "pendente", label: "Pendente" },
+      { value: "em_andamento", label: "Em andamento" },
+      { value: "pendente_verificacao", label: "Pendente verificação (Google)" },
+      { value: "concluido", label: "Concluído" },
+      { value: "recusado", label: "Recusado" },
+    ];
+    if (currentStatus === "publicado") {
+      return [...g, { value: "publicado", label: "Publicado (legado)" }];
+    }
+    return g;
   }
   if (currentStatus === "publicado") {
     return [...common, { value: "publicado", label: "Publicado (ajustar para outro status se necessário)" }];
@@ -270,6 +284,7 @@ export default function AdminSolicitacoesServicos() {
                 <SelectItem value="all">Todos</SelectItem>
                 <SelectItem value="pendente">Pendente</SelectItem>
                 <SelectItem value="em_andamento">Em Andamento</SelectItem>
+                <SelectItem value="pendente_verificacao">Pendente verificação (Google)</SelectItem>
                 <SelectItem value="concluido">Concluído</SelectItem>
                 <SelectItem value="publicado">Website publicado</SelectItem>
                 <SelectItem value="recusado">Recusado</SelectItem>
@@ -327,7 +342,9 @@ export default function AdminSolicitacoesServicos() {
                   const resumo =
                     s.tipo_servico === "email"
                       ? (dados.email_principal || dados.dominio || "—")
-                      : (dados.dominio || dados.nome_empresa || dados.template || "—");
+                      : s.tipo_servico === "google" && typeof dados.business_title === "string" && dados.business_title.trim()
+                        ? dados.business_title.trim()
+                        : (dados.dominio || dados.nome_empresa || dados.template || "—");
                   const u = userById[s.user_id];
                   return (
                     <TableRow key={s.id}>
@@ -352,12 +369,15 @@ export default function AdminSolicitacoesServicos() {
                         <Badge variant="outline" className={STATUS_COLORS[s.status]}>
                           {s.status === "pendente" && <Clock className="h-3 w-3 mr-1" />}
                           {s.status === "em_andamento" && <Loader2 className="h-3 w-3 mr-1" />}
+                          {s.status === "pendente_verificacao" && <Video className="h-3 w-3 mr-1" />}
                           {s.status === "concluido" && <CheckCircle2 className="h-3 w-3 mr-1" />}
                           {s.status === "publicado" && <CheckCircle2 className="h-3 w-3 mr-1" />}
                           {s.status === "recusado" && <XCircle className="h-3 w-3 mr-1" />}
                           {s.status === "publicado"
                             ? (s.tipo_servico === "website" ? "Website publicado" : "Publicado")
-                            : s.status}
+                            : s.status === "pendente_verificacao"
+                              ? "Pendente verificação"
+                              : s.status}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">{resumo}</TableCell>
