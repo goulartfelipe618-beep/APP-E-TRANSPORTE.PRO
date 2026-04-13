@@ -538,38 +538,44 @@ export default function WebsitePage() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 gap-8 lg:grid-cols-2 lg:gap-10 items-start">
-          <div className="space-y-3">
-            <p className="text-sm font-medium text-foreground flex items-center gap-2">
-              <LayoutTemplate className="h-4 w-4 text-muted-foreground" /> Modelo escolhido
-            </p>
-            <div
-              className={cn(
-                "relative mx-auto w-full max-w-md overflow-hidden rounded-xl border border-border bg-muted shadow-sm",
-                "aspect-square",
-              )}
-            >
-              {previewUrl ? (
-                <div className="group relative h-full w-full cursor-ns-resize overflow-hidden">
-                  <img
-                    src={previewUrl}
-                    alt={typeof dados.template === "string" ? dados.template : "Prévia do modelo"}
-                    className="h-[200%] w-full object-cover object-top transition-transform duration-[50s] ease-linear group-hover:-translate-y-[min(45%,12rem)]"
-                  />
-                  <p className="pointer-events-none absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-background/90 px-3 py-1 text-[10px] text-muted-foreground shadow border border-border">
-                    Passe o mouse para simular rolagem
-                  </p>
+        <div className="w-full rounded-xl border border-border bg-card shadow-sm overflow-hidden">
+          <div className="grid grid-cols-1 lg:grid-cols-2 lg:items-stretch divide-y lg:divide-y-0 lg:divide-x divide-border">
+            {/* Coluna mockup */}
+            <div className="flex flex-col p-6 sm:p-8 lg:min-h-[28rem]">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground flex items-center gap-2 mb-4">
+                <LayoutTemplate className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                Modelo escolhido
+              </p>
+              <div className="flex flex-1 min-h-0 items-center justify-center">
+                <div
+                  className={cn(
+                    "relative w-full max-w-[min(100%,20rem)] sm:max-w-[22rem] overflow-hidden rounded-lg border border-border/80 bg-muted",
+                    "aspect-square shadow-inner",
+                  )}
+                >
+                  {previewUrl ? (
+                    <div className="group relative h-full w-full cursor-ns-resize overflow-hidden rounded-lg">
+                      <img
+                        src={previewUrl}
+                        alt={typeof dados.template === "string" ? dados.template : "Prévia do modelo"}
+                        className="h-[200%] w-full object-cover object-top transition-transform duration-[50s] ease-linear group-hover:-translate-y-[min(45%,12rem)]"
+                      />
+                      <p className="pointer-events-none absolute bottom-2 left-1/2 z-10 -translate-x-1/2 rounded-full bg-background/95 px-3 py-1 text-[10px] text-muted-foreground shadow-sm border border-border">
+                        Passe o mouse para simular rolagem
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="flex h-full min-h-[200px] items-center justify-center p-6 text-center text-sm text-muted-foreground">
+                      Prévia indisponível. O modelo registrado:{" "}
+                      <span className="font-medium text-foreground">{String(dados.template || "—")}</span>
+                    </div>
+                  )}
                 </div>
-              ) : (
-                <div className="flex h-full min-h-[200px] items-center justify-center p-6 text-center text-sm text-muted-foreground">
-                  Prévia indisponível. O modelo registrado:{" "}
-                  <span className="font-medium text-foreground">{String(dados.template || "—")}</span>
-                </div>
-              )}
+              </div>
             </div>
-          </div>
 
-          <div className="space-y-5 rounded-xl border border-border bg-card p-6">
+            {/* Coluna status + resumo */}
+            <div className="flex flex-col gap-5 p-6 sm:p-8 bg-muted/20 lg:bg-muted/10">
             <div>
               <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Status do projeto</p>
               <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -636,6 +642,7 @@ export default function WebsitePage() {
                 {servicoAtivo.instrucoes_acesso}
               </div>
             ) : null}
+            </div>
           </div>
         </div>
       </div>
