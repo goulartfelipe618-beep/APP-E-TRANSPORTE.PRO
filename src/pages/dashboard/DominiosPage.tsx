@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Globe, Info, Loader2, Plus, Users } from "lucide-react";
+import { CheckCircle2, Globe, Info, Loader2, Plus, Users } from "lucide-react";
 import { FunctionsHttpError } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -716,10 +716,21 @@ export default function DominiosPage() {
                   <TableCell className="hidden sm:table-cell text-muted-foreground text-sm">
                     {origemLabel(r)}
                   </TableCell>
-                  <TableCell>
-                    <Badge variant={r.status === "ativo" ? "default" : "secondary"}>
-                      {STATUS_LABEL[r.status] || r.status}
-                    </Badge>
+                  <TableCell className="align-top">
+                    <div className="space-y-2">
+                      <Badge variant={r.status === "ativo" ? "default" : "secondary"}>
+                        {STATUS_LABEL[r.status] || r.status}
+                      </Badge>
+                      {!isAdminMaster && r.status === "ativo" && (
+                        <p className="flex items-start gap-1.5 text-xs text-green-700 dark:text-green-500 max-w-[min(100%,18rem)] leading-snug">
+                          <CheckCircle2 className="h-3.5 w-3.5 shrink-0 mt-0.5" aria-hidden />
+                          <span>
+                            Você já pode criar um site com este domínio. Acesse Ferramentas → Website e escolha este
+                            endereço na etapa do domínio.
+                          </span>
+                        </p>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell className="text-right text-muted-foreground text-sm">
                     {new Date(r.created_at).toLocaleDateString("pt-BR")}
