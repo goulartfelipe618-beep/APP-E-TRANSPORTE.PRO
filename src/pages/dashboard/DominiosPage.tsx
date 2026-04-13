@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { CheckCircle2, Globe, Info, Loader2, Plus, Users } from "lucide-react";
 import { FunctionsHttpError } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
@@ -697,69 +697,78 @@ export default function DominiosPage() {
                 )}
                 <TableHead>Domínio</TableHead>
                 <TableHead className="hidden sm:table-cell w-44">Origem / plataforma</TableHead>
-                <TableHead className="w-36">Status</TableHead>
+                <TableHead className={isAdminMaster ? "w-36" : "w-28 sm:w-32"}>Status</TableHead>
                 <TableHead className="w-40 text-right">Registrado em</TableHead>
                 {isAdminMaster && <TableHead className="w-[220px] text-right">Ações</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
               {rows.map((r) => (
-                <TableRow key={r.id}>
-                  {isAdminMaster && (
-                    <TableCell className="text-muted-foreground text-sm max-w-[220px] align-top">
-                      <span className="line-clamp-2" title={r.motorista_nome || "Motorista sem nome"}>
-                        {r.motorista_nome || "Motorista sem nome"}
-                      </span>
+                <Fragment key={r.id}>
+                  <TableRow>
+                    {isAdminMaster && (
+                      <TableCell className="text-muted-foreground text-sm max-w-[220px] align-top">
+                        <span className="line-clamp-2" title={r.motorista_nome || "Motorista sem nome"}>
+                          {r.motorista_nome || "Motorista sem nome"}
+                        </span>
+                      </TableCell>
+                    )}
+                    <TableCell className="font-medium text-foreground">{r.fqdn}</TableCell>
+                    <TableCell className="hidden sm:table-cell text-muted-foreground text-sm">
+                      {origemLabel(r)}
                     </TableCell>
-                  )}
-                  <TableCell className="font-medium text-foreground">{r.fqdn}</TableCell>
-                  <TableCell className="hidden sm:table-cell text-muted-foreground text-sm">
-                    {origemLabel(r)}
-                  </TableCell>
-                  <TableCell className="align-top">
-                    <div className="space-y-2">
+                    <TableCell className="align-top">
                       <Badge variant={r.status === "ativo" ? "default" : "secondary"}>
                         {STATUS_LABEL[r.status] || r.status}
                       </Badge>
-                      {!isAdminMaster && r.status === "ativo" && (
-                        <p className="flex items-start gap-1.5 text-xs text-green-700 dark:text-green-500 max-w-[min(100%,18rem)] leading-snug">
-                          <CheckCircle2 className="h-3.5 w-3.5 shrink-0 mt-0.5" aria-hidden />
-                          <span>
-                            Você já pode criar um site com este domínio. Acesse Ferramentas → Website e escolha este
-                            endereço na etapa do domínio.
-                          </span>
-                        </p>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-right text-muted-foreground text-sm">
-                    {new Date(r.created_at).toLocaleDateString("pt-BR")}
-                  </TableCell>
-                  {isAdminMaster && (
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant={r.status === "ativo" ? "default" : "outline"}
-                          disabled={adminUpdatingDomainId === r.id || r.status === "ativo"}
-                          onClick={() => void handleAdminSetStatus(r, "ativo")}
-                        >
-                          {adminUpdatingDomainId === r.id ? <Loader2 className="h-4 w-4 animate-spin" /> : "Aprovar"}
-                        </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant={r.status === "cancelado" ? "destructive" : "outline"}
-                          disabled={adminUpdatingDomainId === r.id || r.status === "cancelado"}
-                          onClick={() => void handleAdminSetStatus(r, "cancelado")}
-                        >
-                          {adminUpdatingDomainId === r.id ? <Loader2 className="h-4 w-4 animate-spin" /> : "Reprovar"}
-                        </Button>
-                      </div>
                     </TableCell>
+                    <TableCell className="text-right text-muted-foreground text-sm">
+                      {new Date(r.created_at).toLocaleDateString("pt-BR")}
+                    </TableCell>
+                    {isAdminMaster && (
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant={r.status === "ativo" ? "default" : "outline"}
+                            disabled={adminUpdatingDomainId === r.id || r.status === "ativo"}
+                            onClick={() => void handleAdminSetStatus(r, "ativo")}
+                          >
+                            {adminUpdatingDomainId === r.id ? <Loader2 className="h-4 w-4 animate-spin" /> : "Aprovar"}
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant={r.status === "cancelado" ? "destructive" : "outline"}
+                            disabled={adminUpdatingDomainId === r.id || r.status === "cancelado"}
+                            onClick={() => void handleAdminSetStatus(r, "cancelado")}
+                          >
+                            {adminUpdatingDomainId === r.id ? <Loader2 className="h-4 w-4 animate-spin" /> : "Reprovar"}
+                          </Button>
+                        </div>
+                      </TableCell>
+                    )}
+                  </TableRow>
+                  {!isAdminMaster && r.status === "ativo" && (
+                    <TableRow className="border-t-0 hover:bg-transparent">
+                      <TableCell
+                        colSpan={4}
+                        className="pt-0 pb-4 sm:pb-3 border-t-0 align-top"
+                      >
+                        <div className="flex items-start gap-2 rounded-md border border-green-600/30 bg-green-500/10 px-3 py-2.5 text-sm leading-snug text-green-800 dark:border-green-500/35 dark:bg-green-500/10 dark:text-green-400">
+                          <CheckCircle2 className="h-4 w-4 shrink-0 mt-0.5" aria-hidden />
+                          <p className="min-w-0 flex-1">
+                            Você já pode criar um site com este domínio. Acesse{" "}
+                            <span className="font-medium text-foreground">Ferramentas</span> →{" "}
+                            <span className="font-medium text-foreground">Website</span> e escolha este endereço na
+                            etapa do domínio.
+                          </p>
+                        </div>
+                      </TableCell>
+                    </TableRow>
                   )}
-                </TableRow>
+                </Fragment>
               ))}
             </TableBody>
           </Table>
