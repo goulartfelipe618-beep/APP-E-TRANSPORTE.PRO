@@ -186,10 +186,20 @@ export default function SistemaConfiguracoesPage() {
   const [enrollingMfa, setEnrollingMfa] = useState(false);
   const [enablingMfa, setEnablingMfa] = useState(false);
   const [mfaSetupError, setMfaSetupError] = useState<string>("");
+  const [isAdminMaster, setIsAdminMaster] = useState(false);
 
   useEffect(() => {
     loadSettings();
     loadContratual();
+  }, []);
+
+  useEffect(() => {
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data, error } = await supabase.rpc("is_admin_master", { _user_id: user.id });
+      if (!error) setIsAdminMaster(Boolean(data));
+    })();
   }, []);
 
   const loadContratual = async () => {
@@ -734,7 +744,7 @@ export default function SistemaConfiguracoesPage() {
         )}
       </div>
 
-      <LoginConfiguracoesSection />
+      {isAdminMaster ? <LoginConfiguracoesSection /> : null}
 
       {/* Informações Contratuais */}
       <div className="rounded-xl border border-border bg-card p-6 max-w-2xl">
