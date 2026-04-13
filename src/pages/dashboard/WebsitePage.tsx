@@ -3,11 +3,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  ArrowLeft, ArrowRight, Eye, Check,
+  ArrowLeft, ArrowRight, Eye, Check, Upload,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -62,12 +64,30 @@ const LANGUAGE_OPTIONS = ["Português", "Inglês", "Espanhol"];
 
 const PAGE_OPTIONS = [
   "Página inicial", "Sobre a empresa", "Serviços", "Frota",
-  "Orçamento online", "Destinos atendidos", "Blog", "Depoimentos de clientes",
+  "Destinos atendidos", "Blog", "Depoimentos de clientes",
 ];
 
 const INTEGRATION_OPTIONS = [
-  "WhatsApp", "Google Maps", "Google Business", "Instagram", "Sistema de reservas", "Pagamento online",
+  "WhatsApp", "Google Maps", "Instagram", "Sistema de reservas",
 ];
+
+const EMAIL_REGISTER_VALUE = "__email_business_cadastrar__";
+const EMAIL_LATER_VALUE = "__email_depois__";
+
+function formatVehicleLineFromWebhook(dw: unknown): string | null {
+  if (!dw || typeof dw !== "object") return null;
+  const o = dw as Record<string, unknown>;
+  if (o.possui_veiculo === false) return null;
+  const marca = String(o.marca_veiculo ?? "").trim();
+  const modelo = String(o.modelo_veiculo ?? "").trim();
+  const ano = String(o.ano_veiculo ?? "").trim();
+  const placa = String(o.placa_veiculo ?? "").trim();
+  const cor = String(o.cor_veiculo ?? "").trim();
+  if (!marca && !modelo && !placa) return null;
+  const parts = [marca, modelo].filter(Boolean).join(" ");
+  const suffix = [ano ? `(${ano})` : "", placa ? `— ${placa}` : "", cor ? `— ${cor}` : ""].filter(Boolean).join(" ");
+  return suffix ? `${parts} ${suffix}`.trim() : parts || null;
+}
 
 const STYLE_OPTIONS = ["Minimalista", "Luxo", "Corporativo", "Moderno", "Turístico"];
 
@@ -150,11 +170,14 @@ export default function WebsitePage() {
   const [responsavel, setResponsavel] = useState("");
   const [whatsapp, setWhatsapp] = useState("");
   const [telefoneSecundario, setTelefoneSecundario] = useState("");
-  const [email, setEmail] = useState("");
+  const [professionalEmailChoice, setProfessionalEmailChoice] = useState("");
+  const [emailBusinessEmails, setEmailBusinessEmails] = useState<string[]>([]);
   const [cnpj, setCnpj] = useState("");
   const [cidadeSede, setCidadeSede] = useState("");
   const [regiaoAtendida, setRegiaoAtendida] = useState("");
-  const [hasLogo, setHasLogo] = useState(false);
+  /** '' até escolher; obrigatório na etapa Marca */
+  const [logoChoice, setLogoChoice] = useState<"" | "sim" | "nao">("");
+  const [logoFile, setLogoFile] = useState<File | null>(null);
   const [preferredColors, setPreferredColors] = useState("");
   const [desiredStyle, setDesiredStyle] = useState("Minimalista");
 
@@ -166,9 +189,11 @@ export default function WebsitePage() {
   const [aeroportos, setAeroportos] = useState("");
   const [rotas, setRotas] = useState("");
 
-  // Step 5 - Frota
+  // Step 5 - Frota (cadastro em Motoristas → Cadastros)
   const [veiculos, setVeiculos] = useState("");
   const [amenidades, setAmenidades] = useState<string[]>([]);
+  const [cadastroVeiculos, setCadastroVeiculos] = useState<{ id: string; label: string }[]>([]);
+  const [veiculosSelecionadosIds, setVeiculosSelecionadosIds] = useState<string[]>([]);
 
   // Step 6 - Diferenciais
   const [diferenciais, setDiferenciais] = useState<string[]>([]);
@@ -219,6 +244,50 @@ export default function WebsitePage() {
   }, []);
 
   useEffect(() => {
+    setPaginas((p) => p.filter((x) => PAGE_OPTIONS.includes(x)));
+    setIntegracoes((i) => i.filter((x) => INTEGRATION_OPTIONS.includes(x)));
+  }, []);
+
+  useEffect(() => {
+    if (step !== "briefing") return;
+    let cancelled = false;
+    void (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user || cancelled) return;
+
+      const { data: svcRows } = await supabase
+        .from("solicitacoes_servicos" as any)
+        .select("dados_solicitacao")
+        .eq("user_id", user.id)
+        .eq("tipo_servico", "email") as any;
+
+      const emails = new Set<string>();
+      for (const row of (svcRows as { dados_solicitacao: unknown }[] | null) || []) {
+        const ds = row.dados_solicitacao as { email_principal?: string } | null;
+        const e = typeof ds?.email_principal === "string" ? ds.email_principal.trim() : "";
+        if (e) emails.add(e);
+      }
+      if (!cancelled) setEmailBusinessEmails([...emails].sort());
+
+      const { data: motRows } = await supabase
+        .from("solicitacoes_motoristas")
+        .select("id, dados_webhook")
+        .eq("user_id", user.id)
+        .eq("status", "cadastrado");
+
+      const list: { id: string; label: string }[] = [];
+      for (const m of motRows || []) {
+        const line = formatVehicleLineFromWebhook(m.dados_webhook);
+        if (line) list.push({ id: m.id, label: line });
+      }
+      if (!cancelled) setCadastroVeiculos(list);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [step]);
+
+  useEffect(() => {
     const checkServico = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
@@ -254,9 +323,57 @@ export default function WebsitePage() {
   };
 
   const handleSubmitSolicitacao = async () => {
+    if (!professionalEmailChoice) {
+      toast.error("Selecione o e-mail profissional ou uma opção da lista.");
+      return;
+    }
+    if (!logoChoice) {
+      toast.error("Indique se você possui logotipo.");
+      return;
+    }
+    if (logoChoice === "sim" && !logoFile) {
+      toast.error("Envie o arquivo da logo antes de enviar o briefing.");
+      return;
+    }
+    const linhasCadastroCheck = veiculosSelecionadosIds
+      .map((id) => cadastroVeiculos.find((c) => c.id === id)?.label)
+      .filter((x): x is string => !!x);
+    if (linhasCadastroCheck.length === 0 && !veiculos.trim()) {
+      toast.error("Informe ao menos um veículo (cadastro ou descrição) na etapa Frota.");
+      return;
+    }
+
     setSubmitting(true);
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { toast.error("Não autenticado"); setSubmitting(false); return; }
+
+    let logoUrl: string | null = null;
+    if (logoChoice === "sim" && logoFile) {
+      const safeName = logoFile.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+      const path = `${user.id}/${Date.now()}-${safeName}`;
+      const { error: upErr } = await supabase.storage.from("website-briefing").upload(path, logoFile, {
+        upsert: false,
+        cacheControl: "3600",
+      });
+      if (upErr) {
+        toast.error("Não foi possível enviar a logo.", { description: upErr.message });
+        setSubmitting(false);
+        return;
+      }
+      const { data: pub } = supabase.storage.from("website-briefing").getPublicUrl(path);
+      logoUrl = pub.publicUrl;
+    }
+
+    const emailProfissional =
+      professionalEmailChoice === EMAIL_LATER_VALUE ? "" : professionalEmailChoice;
+    const emailProfissionalOpcao =
+      professionalEmailChoice === EMAIL_LATER_VALUE ? "cadastrar_depois" : "selecionado";
+
+    const linhasCadastro = veiculosSelecionadosIds
+      .map((id) => cadastroVeiculos.find((c) => c.id === id)?.label)
+      .filter((x): x is string => !!x);
+    const veiculosTextoMerged = [...linhasCadastro, veiculos.trim()].filter(Boolean).join("\n");
+
     const { error } = await (supabase.from("solicitacoes_servicos" as any).insert({
       user_id: user.id,
       tipo_servico: "website",
@@ -268,11 +385,18 @@ export default function WebsitePage() {
         provedor: provider,
         possui_dominio: domainOption === "existing",
         nome_empresa: companyName, responsavel, whatsapp, telefone_secundario: telefoneSecundario,
-        email, cnpj, cidade_sede: cidadeSede, regiao_atendida: regiaoAtendida,
-        possui_logo: hasLogo, cores_preferidas: preferredColors, estilo: desiredStyle,
+        email: emailProfissional,
+        email_profissional_opcao: emailProfissionalOpcao,
+        cnpj, cidade_sede: cidadeSede, regiao_atendida: regiaoAtendida,
+        possui_logo: logoChoice === "sim",
+        logo_url: logoUrl,
+        sem_logo_arquivo: logoChoice === "nao",
+        cores_preferidas: preferredColors, estilo: desiredStyle,
         servicos: selectedServices, servico_outro: servicoOutro,
         aeroportos, rotas_principais: rotas,
-        veiculos, amenidades_veiculos: amenidades,
+        veiculos: veiculosTextoMerged,
+        veiculos_cadastro_ids: veiculosSelecionadosIds,
+        amenidades_veiculos: amenidades,
         diferenciais, diferencial_principal: diferencialPrincipal,
         publico_alvo: publicoAlvo, faixa_preco: faixaPreco,
         pagamentos, formas_reserva: formasReserva,
@@ -436,21 +560,53 @@ export default function WebsitePage() {
           {bs === 1 && (
             <div className="rounded-xl border border-border bg-card p-8 space-y-0">
               <div className="space-y-4">
-                <h2 className="text-lg font-bold text-foreground">Marca</h2>
+                <h2 className="text-lg font-bold text-foreground">🏷️ Marca</h2>
                 <p className="text-sm text-muted-foreground -mt-2">
                   Domínio do site: <span className="font-medium text-foreground">{domain || "—"}</span>{" "}
                   <button type="button" onClick={() => setStep("domain_pick")} className="text-primary hover:underline">
                     Alterar domínio
                   </button>
                 </p>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-3">
+                  <Label className="text-sm font-medium text-foreground">Possui logotipo? *</Label>
+                  <RadioGroup
+                    value={logoChoice || undefined}
+                    onValueChange={(v) => {
+                      const next = v as "sim" | "nao";
+                      setLogoChoice(next);
+                      if (next === "nao") setLogoFile(null);
+                    }}
+                    className="grid gap-3 sm:grid-cols-2"
+                  >
+                    <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-border bg-background px-4 py-3 has-[[data-state=checked]]:border-primary">
+                      <RadioGroupItem value="sim" id="logo-sim" />
+                      <span className="text-sm text-foreground">SIM, já possuo</span>
+                    </label>
+                    <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-border bg-background px-4 py-3 has-[[data-state=checked]]:border-primary">
+                      <RadioGroupItem value="nao" id="logo-nao" />
+                      <span className="text-sm text-foreground">NÃO</span>
+                    </label>
+                  </RadioGroup>
+                </div>
+                {logoChoice === "sim" && (
                   <div>
-                    <label className="text-sm font-medium text-foreground">Possui logotipo?</label>
-                    <div className="flex items-center gap-2 mt-1">
-                      <Checkbox checked={hasLogo} onCheckedChange={(v) => setHasLogo(!!v)} />
-                      <span className="text-sm text-foreground">Sim, já possuo</span>
-                    </div>
+                    <Label className="text-sm font-medium text-foreground">Upload da logo *</Label>
+                    <label className="mt-1.5 flex cursor-pointer items-center gap-2 rounded-lg border border-border bg-background px-4 py-2.5 transition-colors hover:bg-muted">
+                      <Upload className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      <span className="truncate text-sm text-muted-foreground">
+                        {logoFile ? logoFile.name : "Selecionar imagem (PNG, JPG, SVG…)"}
+                      </span>
+                      <input
+                        type="file"
+                        className="hidden"
+                        accept="image/*"
+                        onChange={(e) => setLogoFile(e.target.files?.[0] ?? null)}
+                      />
+                    </label>
+                    <p className="text-xs text-muted-foreground mt-1">Envio obrigatório quando você possui logotipo.</p>
                   </div>
+                )}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="text-sm font-medium text-foreground">Cores da marca</label>
                     <Input
@@ -460,21 +616,21 @@ export default function WebsitePage() {
                       className="mt-1"
                     />
                   </div>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-foreground">Estilo visual desejado</label>
-                  <Select value={desiredStyle} onValueChange={setDesiredStyle}>
-                    <SelectTrigger className="mt-1">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {STYLE_OPTIONS.map((s) => (
-                        <SelectItem key={s} value={s}>
-                          {s}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <div>
+                    <label className="text-sm font-medium text-foreground">Estilo visual desejado</label>
+                    <Select value={desiredStyle} onValueChange={setDesiredStyle}>
+                      <SelectTrigger className="mt-1">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {STYLE_OPTIONS.map((s) => (
+                          <SelectItem key={s} value={s}>
+                            {s}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
               </div>
             </div>
@@ -488,10 +644,41 @@ export default function WebsitePage() {
                 <div><label className="text-sm font-medium text-foreground">Nome do responsável</label><Input value={responsavel} onChange={e => setResponsavel(e.target.value)} className="mt-1" /></div>
                 <div><label className="text-sm font-medium text-foreground">WhatsApp principal *</label><Input value={whatsapp} onChange={e => setWhatsapp(e.target.value)} placeholder="(47) 99999-9999" className="mt-1" /></div>
                 <div><label className="text-sm font-medium text-foreground">Telefone secundário</label><Input value={telefoneSecundario} onChange={e => setTelefoneSecundario(e.target.value)} className="mt-1" /></div>
-                <div><label className="text-sm font-medium text-foreground">E-mail profissional *</label><Input value={email} onChange={e => setEmail(e.target.value)} className="mt-1" /></div>
+                <div className="md:col-span-2">
+                  <label className="text-sm font-medium text-foreground">E-mail profissional *</label>
+                  <p className="text-xs text-muted-foreground mt-0.5 mb-1.5">
+                    Lista dos e-mails solicitados em Ferramentas → E-mail Business. Você também pode cadastrar depois ou abrir o fluxo de cadastro.
+                  </p>
+                  <Select
+                    value={professionalEmailChoice || undefined}
+                    onValueChange={(v) => {
+                      if (v === EMAIL_REGISTER_VALUE) {
+                        setActivePage("email-business");
+                        toast.message("E-mail Business", {
+                          description: "Após cadastrar, volte ao Website e atualize esta lista (reabra o passo ou a página).",
+                        });
+                        return;
+                      }
+                      setProfessionalEmailChoice(v);
+                    }}
+                  >
+                    <SelectTrigger className="mt-1 w-full max-w-xl">
+                      <SelectValue placeholder="Selecione um e-mail ou uma opção…" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {emailBusinessEmails.map((em) => (
+                        <SelectItem key={em} value={em}>
+                          {em}
+                        </SelectItem>
+                      ))}
+                      <SelectItem value={EMAIL_REGISTER_VALUE}>Cadastrar E-mail Business…</SelectItem>
+                      <SelectItem value={EMAIL_LATER_VALUE}>Vou cadastrar depois</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
                 <div><label className="text-sm font-medium text-foreground">CNPJ (opcional)</label><Input value={cnpj} onChange={e => setCnpj(e.target.value)} className="mt-1" /></div>
                 <div><label className="text-sm font-medium text-foreground">Cidade sede *</label><Input value={cidadeSede} onChange={e => setCidadeSede(e.target.value)} className="mt-1" /></div>
-                <div><label className="text-sm font-medium text-foreground">Região atendida *</label><Input value={regiaoAtendida} onChange={e => setRegiaoAtendida(e.target.value)} placeholder="Ex: Balneário Camboriú, Itajaí, Navegantes..." className="mt-1" /></div>
+                <div className="md:col-span-2"><label className="text-sm font-medium text-foreground">Região atendida *</label><Input value={regiaoAtendida} onChange={e => setRegiaoAtendida(e.target.value)} placeholder="Ex: Balneário Camboriú, Itajaí, Navegantes..." className="mt-1" /></div>
               </div>
             </Section>
           )}
@@ -522,10 +709,45 @@ export default function WebsitePage() {
           {/* ── STEP 5: Frota ── */}
           {bs === 5 && (
             <Section title="🚘 Frota de Veículos">
+              <div className="space-y-3">
+                <label className="text-sm font-medium text-foreground">Veículos já cadastrados (Motoristas → Cadastros)</label>
+                <p className="text-xs text-muted-foreground">
+                  Os dados vêm do seu cadastro de motorista/veículo. Marque os que devem aparecer no site ou descreva outros abaixo.
+                </p>
+                {cadastroVeiculos.length === 0 ? (
+                  <div className="rounded-lg border border-border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
+                    Nenhum veículo encontrado no seu cadastro.{" "}
+                    <button
+                      type="button"
+                      className="text-primary font-medium underline-offset-2 hover:underline"
+                      onClick={() => setActivePage("motoristas/cadastros")}
+                    >
+                      Abrir Cadastros de motoristas
+                    </button>
+                  </div>
+                ) : (
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {cadastroVeiculos.map((v) => (
+                      <label key={v.id} className="flex cursor-pointer items-start gap-2 rounded-lg border border-border bg-background px-3 py-2">
+                        <Checkbox
+                          checked={veiculosSelecionadosIds.includes(v.id)}
+                          onCheckedChange={() => {
+                            setVeiculosSelecionadosIds((prev) =>
+                              prev.includes(v.id) ? prev.filter((x) => x !== v.id) : [...prev, v.id],
+                            );
+                          }}
+                          className="mt-0.5"
+                        />
+                        <span className="text-sm text-foreground leading-snug">{v.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
               <div>
-                <label className="text-sm font-medium text-foreground">Descreva seus veículos</label>
+                <label className="text-sm font-medium text-foreground">Descrição adicional / outros veículos</label>
                 <Textarea value={veiculos} onChange={e => setVeiculos(e.target.value)} placeholder="Toyota Corolla 2024 — 4 passageiros, 3 malas&#10;Spin 2023 — 6 passageiros, 5 malas" rows={5} className="mt-1" />
-                <p className="text-xs text-muted-foreground mt-1">Informe modelo, ano, capacidade de passageiros e malas de cada veículo.</p>
+                <p className="text-xs text-muted-foreground mt-1">Use este campo para complementar ou incluir veículos que ainda não estão no cadastro.</p>
               </div>
               <div>
                 <label className="text-sm font-medium text-foreground">Comodidades dos veículos</label>
@@ -658,7 +880,12 @@ export default function WebsitePage() {
                   ["Empresa", companyName || "—"],
                   ["Responsável", responsavel || "—"],
                   ["WhatsApp", whatsapp || "—"],
-                  ["E-mail", email || "—"],
+                  [
+                    "E-mail profissional",
+                    professionalEmailChoice === EMAIL_LATER_VALUE
+                      ? "Vou cadastrar depois"
+                      : professionalEmailChoice || "—",
+                  ],
                   ["Cidade sede", cidadeSede || "—"],
                   ["Região", regiaoAtendida || "—"],
                   ["Estilo", desiredStyle],
@@ -698,13 +925,30 @@ export default function WebsitePage() {
                   setUpgradeOpen(true);
                   return;
                 }
+                if (!logoChoice) {
+                  toast.error("Indique se você possui logotipo (SIM ou NÃO).");
+                  return;
+                }
+                if (logoChoice === "sim" && !logoFile) {
+                  toast.error("Envie o arquivo da logo. O upload é obrigatório quando você possui logotipo.");
+                  return;
+                }
               }
               if (bs === 2) {
                 if (!companyName.trim()) { toast.error("Preencha o nome da empresa."); return; }
                 if (!whatsapp.trim()) { toast.error("Preencha o WhatsApp."); return; }
-                if (!email.trim()) { toast.error("Preencha o e-mail."); return; }
+                if (!professionalEmailChoice) {
+                  toast.error("Selecione o e-mail profissional ou uma das opções da lista.");
+                  return;
+                }
                 if (!cidadeSede.trim()) { toast.error("Preencha a cidade sede."); return; }
                 if (!regiaoAtendida.trim()) { toast.error("Preencha a região atendida."); return; }
+              }
+              if (bs === 5) {
+                if (veiculosSelecionadosIds.length === 0 && !veiculos.trim()) {
+                  toast.error("Selecione ao menos um veículo cadastrado ou descreva a frota no campo de texto.");
+                  return;
+                }
               }
               if (bs === STEPS.length) { handleSubmitSolicitacao(); return; }
               setBs(s => s + 1);
