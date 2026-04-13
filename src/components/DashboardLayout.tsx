@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useLayoutEffect } from "react";
 import { syncPanelThemeForCurrentUser } from "@/lib/panelTheme";
 import { useSlowScrollContainer } from "@/hooks/useSlowScrollContainer";
-import PageLoader, { FROTA_SLIDE_LOADER_PAGES } from "@/components/PageLoader";
+import PageLoader from "@/components/PageLoader";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { Shield } from "lucide-react";
@@ -169,8 +169,8 @@ function DashboardContent() {
             ref={mainRef}
             className="relative z-0 flex-1 bg-background overflow-auto scroll-smooth [--main-pad-x:1.5rem] [--main-pad-y:1.5rem] px-[var(--main-pad-x)] py-[var(--main-pad-y)]"
           >
-            <PageLoader pageKey={activePage} showLoaderOnPages={FROTA_SLIDE_LOADER_PAGES}>
-              <PageComponent key={activePage} />
+            <PageLoader>
+              <PageComponent />
             </PageLoader>
           </main>
         </div>

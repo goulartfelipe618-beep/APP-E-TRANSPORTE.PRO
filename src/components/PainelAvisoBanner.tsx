@@ -118,7 +118,7 @@ export default function PainelAvisoBanner({ painel, activePage }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [activePage]);
+  }, []);
 
   const visíveis = useMemo(() => {
     if (!authReady || !userId) return [];

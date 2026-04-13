@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useState, ReactNode } from "react";
+import { createContext, useCallback, useContext, useState, ReactNode, startTransition } from "react";
 
 interface ActivePageContextType {
   activePage: string;
@@ -35,7 +35,9 @@ export function ActivePageProvider({
 
   const setActivePage = useCallback(
     (page: string) => {
-      setActivePageState(page);
+      startTransition(() => {
+        setActivePageState(page);
+      });
       if (storageKey && typeof window !== "undefined") {
         try {
           sessionStorage.setItem(storageKey, page);

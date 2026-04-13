@@ -120,7 +120,7 @@ export default function FullscreenBannerOverlay({ painel, activePage }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [activePage]);
+  }, []);
 
   const today = todayLocalISODate();
 
