@@ -12,9 +12,10 @@ import {
 import {
   Sheet, SheetContent, SheetHeader, SheetTitle,
 } from "@/components/ui/sheet";
-import { RefreshCw, Filter, ClipboardList, Eye, Globe, Mail, Monitor, Search, CheckCircle2, Clock, XCircle, Loader2 } from "lucide-react";
+import { RefreshCw, Filter, ClipboardList, Eye, Globe, Mail, Monitor, Search, CheckCircle2, Clock, XCircle, Loader2, FileDown } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { downloadSolicitacaoBriefingPdf } from "@/lib/solicitacaoServicoBriefingPdf";
 
 interface Solicitacao {
   id: string;
@@ -85,6 +86,40 @@ export default function AdminSolicitacoesServicos() {
     setEditComoUsar(s.como_usar || "");
     setEditObs(s.observacoes_admin || "");
     setEditStatus(s.status);
+  };
+
+  const handleDownloadPdf = () => {
+    if (!selected) return;
+    try {
+      downloadSolicitacaoBriefingPdf(
+        {
+          id: selected.id,
+          user_id: selected.user_id,
+          tipo_servico: selected.tipo_servico,
+          status: selected.status,
+          dados_solicitacao: selected.dados_solicitacao || {},
+          created_at: selected.created_at,
+          link_acesso: selected.link_acesso,
+          data_expiracao: selected.data_expiracao,
+          instrucoes_acesso: selected.instrucoes_acesso,
+          como_usar: selected.como_usar,
+          observacoes_admin: selected.observacoes_admin,
+        },
+        {
+          status: editStatus,
+          link_acesso: editLink || null,
+          data_expiracao: editExpiracao || null,
+          instrucoes_acesso: editInstrucoes || null,
+          como_usar: editComoUsar || null,
+          observacoes_admin: editObs || null,
+        },
+      );
+      toast.success("PDF gerado. Verifique sua pasta de downloads.");
+    } catch (e) {
+      toast.error("Não foi possível gerar o PDF.", {
+        description: e instanceof Error ? e.message : "Tente novamente.",
+      });
+    }
   };
 
   const handleSave = async () => {
@@ -239,6 +274,15 @@ export default function AdminSolicitacoesServicos() {
 
           {selected && (
             <div className="space-y-6 mt-6">
+              <Button type="button" variant="secondary" className="w-full gap-2" onClick={handleDownloadPdf}>
+                <FileDown className="h-4 w-4 shrink-0" />
+                Baixar briefing em PDF
+              </Button>
+              <p className="text-xs text-muted-foreground -mt-2">
+                Inclui todos os dados do formulário (website, Google, e-mail, etc.) e os campos da resposta administrativa
+                conforme preenchidos abaixo — salve antes se quiser o PDF com as últimas alterações gravadas no banco.
+              </p>
+
               {/* Dados da solicitação */}
               <div className="space-y-3">
                 <h4 className="text-sm font-bold text-foreground">Dados da Solicitação</h4>
