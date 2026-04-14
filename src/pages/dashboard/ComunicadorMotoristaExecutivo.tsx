@@ -2,7 +2,9 @@ import { useState, useCallback, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { usePainelMotoristaEvolutionAtivo } from "@/hooks/usePainelMotoristaEvolutionAtivo";
 import { ComunicadorEvolutionSection } from "@/components/comunicador/ComunicadorEvolutionSection";
 import {
   useComunicadoresEvolution,
@@ -14,8 +16,10 @@ import {
   fetchEvolutionMotoristaDeleteFromServer,
   formatPhoneBrDisplay,
 } from "@/lib/evolutionApi";
+import { Info } from "lucide-react";
 
 export default function ComunicadorMotoristaExecutivoPage() {
+  const { painelMotoristaEvolutionAtivo, ready: painelComunicadorReady } = usePainelMotoristaEvolutionAtivo();
   const { sistema, own, loading, reload } = useComunicadoresEvolution();
   const [busy, setBusy] = useState(false);
 
@@ -56,6 +60,7 @@ export default function ComunicadorMotoristaExecutivoPage() {
   );
 
   useEffect(() => {
+    if (!painelComunicadorReady || !painelMotoristaEvolutionAtivo) return;
     if (!own?.id) return;
     const needPoll =
       own.connection_status === "aguardando_scan" ||
@@ -79,7 +84,15 @@ export default function ComunicadorMotoristaExecutivoPage() {
       cancelled = true;
       clearInterval(id);
     };
-  }, [own?.id, own?.connection_status, own?.qr_code_base64, own?.telefone_conectado, applySyncToRow]);
+  }, [
+    painelComunicadorReady,
+    painelMotoristaEvolutionAtivo,
+    own?.id,
+    own?.connection_status,
+    own?.qr_code_base64,
+    own?.telefone_conectado,
+    applySyncToRow,
+  ]);
 
   const handleGerarProprio = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -171,6 +184,34 @@ export default function ComunicadorMotoristaExecutivoPage() {
       }
     }
   }, [reload, own, applySyncToRow]);
+
+  if (painelComunicadorReady && !painelMotoristaEvolutionAtivo) {
+    return (
+      <div className="space-y-6 max-w-2xl">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Comunicador</h1>
+          <p className="text-muted-foreground">Integração Evolution (WhatsApp)</p>
+        </div>
+        <Alert>
+          <Info className="h-4 w-4" />
+          <AlertTitle>Funcionalidade indisponível</AlertTitle>
+          <AlertDescription className="text-sm">
+            O administrador desativou o Comunicador Evolution no painel dos motoristas. Quando for reativado, o menu
+            voltará a aparecer em Configurações.
+          </AlertDescription>
+        </Alert>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">O que foi desligado?</CardTitle>
+            <CardDescription>
+              A ligação do WhatsApp próprio (QR Code na Evolution da plataforma) e a referência à linha oficial deixam de ser
+              oferecidas neste painel até nova liberação.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

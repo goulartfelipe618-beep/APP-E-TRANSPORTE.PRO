@@ -42,6 +42,7 @@ import {
   persistNetworkRetornoSolicitado,
 } from "@/lib/networkNacionalPrefs";
 import { cn } from "@/lib/utils";
+import { usePainelMotoristaEvolutionAtivo } from "@/hooks/usePainelMotoristaEvolutionAtivo";
 
 type ToolDef = { title: string; page: string; desc: string; icon: LucideIcon };
 
@@ -49,7 +50,7 @@ type Subsection = { title: string; items: ToolDef[] };
 
 type MajorSection = { id: string; label: string; subsections: Subsection[] };
 
-function buildHomeSections(showNetwork: boolean): MajorSection[] {
+function buildHomeSections(showNetwork: boolean, exibirComunicadorMotorista: boolean): MajorSection[] {
   const principal: Subsection[] = [
     {
       title: "Painel",
@@ -115,7 +116,9 @@ function buildHomeSections(showNetwork: boolean): MajorSection[] {
       items: [
         { title: "Configurações", page: "sistema/configuracoes", desc: "Dados da empresa, perfil e preferências.", icon: Settings },
         { title: "Automações", page: "sistema/automacoes", desc: "Webhooks e integrações automatizadas.", icon: Globe },
-        { title: "Comunicador", page: "sistema/comunicador", desc: "Canais WhatsApp oficiais e próprios.", icon: Monitor },
+        ...(exibirComunicadorMotorista
+          ? [{ title: "Comunicador", page: "sistema/comunicador", desc: "Canais WhatsApp oficiais e próprios.", icon: Monitor } as ToolDef]
+          : []),
       ],
     },
     {
@@ -166,6 +169,8 @@ function ToolCard({ tool, onOpen }: { tool: ToolDef; onOpen: (page: string) => v
 
 export default function HomePage() {
   const { setActivePage } = useActivePage();
+  const { painelMotoristaEvolutionAtivo, ready: painelComunicadorReady } = usePainelMotoristaEvolutionAtivo();
+  const exibirComunicadorMotorista = !painelComunicadorReady || painelMotoristaEvolutionAtivo;
   const [networkAceito, setNetworkAceito] = useState<boolean | null>(null);
   const [mostrarRegras, setMostrarRegras] = useState(false);
   const [primeirosPassosConcluidos, setPrimeirosPassosConcluidos] = useState<boolean | null>(null);
@@ -174,7 +179,10 @@ export default function HomePage() {
   const CAMPOS_PERFIL_OBRIGATORIOS = ["nome_completo", "nome_empresa", "cnpj", "telefone", "email", "cidade"];
   const CAMPOS_CONTRATUAIS_OBRIGATORIOS = ["razao_social", "cnpj", "endereco_sede", "telefone", "whatsapp", "email_oficial"];
 
-  const sections = useMemo(() => buildHomeSections(menuNetwork), [menuNetwork]);
+  const sections = useMemo(
+    () => buildHomeSections(menuNetwork, exibirComunicadorMotorista),
+    [menuNetwork, exibirComunicadorMotorista],
+  );
 
   const checkPrimeirosPassos = async () => {
     const {

@@ -466,6 +466,7 @@ export type Database = {
           id: string
           instance_name: string | null
           nome_dispositivo: string | null
+          painel_motorista_evolution_ativo: boolean
           qr_code_base64: string | null
           rotulo: string
           telefone_conectado: string | null
@@ -480,6 +481,7 @@ export type Database = {
           id?: string
           instance_name?: string | null
           nome_dispositivo?: string | null
+          painel_motorista_evolution_ativo?: boolean
           qr_code_base64?: string | null
           rotulo?: string
           telefone_conectado?: string | null
@@ -494,6 +496,7 @@ export type Database = {
           id?: string
           instance_name?: string | null
           nome_dispositivo?: string | null
+          painel_motorista_evolution_ativo?: boolean
           qr_code_base64?: string | null
           rotulo?: string
           telefone_conectado?: string | null

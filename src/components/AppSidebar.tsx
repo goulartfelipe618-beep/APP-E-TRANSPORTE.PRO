@@ -23,6 +23,7 @@ import { cn } from "@/lib/utils";
 import { useConfiguracoes } from "@/contexts/ConfiguracoesContext";
 import { useActivePage } from "@/contexts/ActivePageContext";
 import { persistNetworkHighlightDismissed } from "@/lib/networkNacionalPrefs";
+import { usePainelMotoristaEvolutionAtivo } from "@/hooks/usePainelMotoristaEvolutionAtivo";
 
 function readNetworkSpotlightHighlight() {
   if (typeof window === "undefined") return false;
@@ -31,7 +32,7 @@ function readNetworkSpotlightHighlight() {
   return aceito && !highlightShown;
 }
 
-const getMenuStructure = (showNetwork: boolean) => [
+const getMenuStructure = (showNetwork: boolean, exibirComunicadorMotorista: boolean) => [
   {
     label: "Principal",
     items: [
@@ -109,7 +110,9 @@ const getMenuStructure = (showNetwork: boolean) => [
         children: [
           { title: "Configurações", page: "sistema/configuracoes", icon: Settings },
           { title: "Automações", page: "sistema/automacoes", icon: Globe },
-          { title: "Comunicador", page: "sistema/comunicador", icon: Monitor },
+          ...(exibirComunicadorMotorista
+            ? [{ title: "Comunicador", page: "sistema/comunicador", icon: Monitor }]
+            : []),
         ],
       },
       { title: "Anotações", page: "anotacoes", icon: StickyNote },
@@ -127,6 +130,8 @@ export function AppSidebar() {
   const { darkMode, toggle: toggleTheme } = usePanelTheme("frota");
   const [networkAceito, setNetworkAceito] = useState(() => localStorage.getItem("network_nacional_aceito") === "sim");
   const [showNetworkHighlight, setShowNetworkHighlight] = useState(readNetworkSpotlightHighlight);
+  const { painelMotoristaEvolutionAtivo, ready: painelComunicadorReady } = usePainelMotoristaEvolutionAtivo();
+  const exibirComunicadorMotorista = !painelComunicadorReady || painelMotoristaEvolutionAtivo;
 
   useEffect(() => {
     const handler = () => {
@@ -195,7 +200,7 @@ export function AppSidebar() {
       </div>
 
       <SidebarContent className={cn(showNetworkHighlight && "relative z-30")}>
-        {getMenuStructure(networkAceito).map((group) => (
+        {getMenuStructure(networkAceito, exibirComunicadorMotorista).map((group) => (
           <SidebarGroup key={group.label}>
             <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
             <SidebarGroupContent>

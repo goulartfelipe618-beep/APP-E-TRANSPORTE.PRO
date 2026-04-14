@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -74,6 +75,8 @@ export default function ComunicadorAdminMasterPage() {
   const [evoUrl, setEvoUrl] = useState("");
   const [evoKey, setEvoKey] = useState("");
   const [evoCredsExist, setEvoCredsExist] = useState(false);
+  const [painelMotoristaAtivo, setPainelMotoristaAtivo] = useState(true);
+  const [painelMotoristaSaving, setPainelMotoristaSaving] = useState(false);
   /** Só `false` quando há credencial salva e o admin clicou em Editar. */
   const [evoEditing, setEvoEditing] = useState(true);
   const [savingKey, setSavingKey] = useState<UrlKey | null>(null);
@@ -125,16 +128,18 @@ export default function ComunicadorAdminMasterPage() {
     setEvoLoading(true);
     const { data: sys } = await supabase
       .from("comunicadores_evolution")
-      .select("id")
+      .select("id, painel_motorista_evolution_ativo")
       .eq("escopo", "sistema")
       .maybeSingle();
     if (!sys?.id) {
       setComunicadorSistemaId(null);
       setEvoCredsExist(false);
+      setPainelMotoristaAtivo(true);
       setEvoLoading(false);
       return;
     }
     setComunicadorSistemaId(sys.id);
+    setPainelMotoristaAtivo(sys.painel_motorista_evolution_ativo !== false);
     const { data: cr } = await supabase
       .from("comunicador_evolution_credenciais")
       .select("api_url, api_key")
@@ -210,6 +215,33 @@ export default function ComunicadorAdminMasterPage() {
   };
 
   const evoLocked = Boolean(evoCredsExist && evoUrl.trim() && !evoEditing);
+
+  const savePainelMotoristaAtivo = async (v: boolean) => {
+    if (!comunicadorSistemaId) {
+      toast.error("Comunicador oficial não encontrado.");
+      return;
+    }
+    setPainelMotoristaSaving(true);
+    try {
+      const { error } = await supabase
+        .from("comunicadores_evolution")
+        .update({ painel_motorista_evolution_ativo: v, updated_at: new Date().toISOString() })
+        .eq("id", comunicadorSistemaId);
+      if (error) throw error;
+      setPainelMotoristaAtivo(v);
+      toast.success(
+        v
+          ? "Motoristas executivos voltam a ver o menu e a página Comunicador."
+          : "Comunicador (Evolution) oculto no painel dos motoristas executivos.",
+      );
+      window.dispatchEvent(new Event("painel-motorista-evolution-changed"));
+    } catch (e) {
+      console.error(e);
+      toast.error(e instanceof Error ? e.message : "Não foi possível atualizar a preferência.");
+    } finally {
+      setPainelMotoristaSaving(false);
+    }
+  };
 
   const startEvoEdit = () => {
     setEvoEditing(true);
@@ -362,6 +394,35 @@ export default function ComunicadorAdminMasterPage() {
               </div>
             </>
           )}
+        </CardContent>
+      </Card>
+
+      <Card className="border-border">
+        <CardHeader>
+          <CardTitle className="text-lg">Painel do motorista executivo</CardTitle>
+          <CardDescription>
+            Quando desligado, o item <strong className="text-foreground">Comunicador</strong> some do menu (Configurações) e a
+            página deixa de ser acessível — útil enquanto a integração Evolution não estiver disponível ou em manutenção.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-lg border border-border bg-muted/20 p-4">
+            <div className="min-w-0 space-y-1">
+              <Label htmlFor="evo-painel-motorista" className="text-base font-medium text-foreground">
+                Exibir Comunicador (Evolution) para motoristas
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                Afeta apenas o painel <span className="font-medium text-foreground">Gestão de Frota</span>. O administrador
+                master continua a aceder a esta página.
+              </p>
+            </div>
+            <Switch
+              id="evo-painel-motorista"
+              checked={painelMotoristaAtivo}
+              disabled={!comunicadorSistemaId || evoLoading || painelMotoristaSaving}
+              onCheckedChange={(v) => void savePainelMotoristaAtivo(v)}
+            />
+          </div>
         </CardContent>
       </Card>
 

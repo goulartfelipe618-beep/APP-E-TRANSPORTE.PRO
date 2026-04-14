@@ -9,6 +9,7 @@ import { ActivePageProvider, useActivePage } from "@/contexts/ActivePageContext"
 import FloatingSupportChat from "@/components/FloatingSupportChat"; // [CHAT-FLOATING-IMPLEMENTACAO]
 import { NetworkSpotlightProvider } from "@/contexts/NetworkSpotlightContext";
 import { hydrateNetworkNacionalFromDb, persistNetworkHighlightDismissed } from "@/lib/networkNacionalPrefs";
+import { usePainelMotoristaEvolutionAtivo } from "@/hooks/usePainelMotoristaEvolutionAtivo";
 
 // Import all page components
 import HomePage from "@/pages/dashboard/Home";
@@ -93,7 +94,8 @@ function readNetworkSpotlightActive() {
 }
 
 function DashboardContent() {
-  const { activePage } = useActivePage();
+  const { activePage, setActivePage } = useActivePage();
+  const { painelMotoristaEvolutionAtivo, ready: painelComunicadorReady } = usePainelMotoristaEvolutionAtivo();
   const mainRef = useRef<HTMLElement>(null);
   useSlowScrollContainer(mainRef, activePage === "website");
   const [showOverlay, setShowOverlay] = useState(readNetworkSpotlightActive);
@@ -134,6 +136,13 @@ function DashboardContent() {
     window.addEventListener("network-highlight-dismissed", handler);
     return () => window.removeEventListener("network-highlight-dismissed", handler);
   }, []);
+
+  useEffect(() => {
+    if (!painelComunicadorReady) return;
+    if (activePage === "sistema/comunicador" && !painelMotoristaEvolutionAtivo) {
+      setActivePage("sistema/configuracoes");
+    }
+  }, [painelComunicadorReady, activePage, painelMotoristaEvolutionAtivo, setActivePage]);
 
   const dismissSpotlight = () => {
     setShowOverlay(false);
