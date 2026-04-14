@@ -1,4 +1,5 @@
 import jsPDF from "jspdf";
+import { googleBriefingRows } from "@/lib/googleBriefingDisplay";
 
 const MARGIN = 14;
 const PAGE_W = 210;
@@ -188,7 +189,10 @@ export function downloadSolicitacaoBriefingPdf(
   y += 5;
 
   const dados = row.dados_solicitacao && typeof row.dados_solicitacao === "object" ? row.dados_solicitacao : {};
-  const flat = flattenBriefingData(dados);
+  const flat =
+    row.tipo_servico === "google"
+      ? googleBriefingRows(dados as Record<string, unknown>)
+      : flattenBriefingData(dados);
   if (flat.length === 0) {
     y = checkY(doc, y, LINE_H);
     doc.text("Nenhum dado estruturado registrado.", MARGIN, y);

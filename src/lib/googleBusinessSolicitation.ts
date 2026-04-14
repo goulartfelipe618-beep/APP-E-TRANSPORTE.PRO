@@ -156,16 +156,20 @@ export function buildGoogleSolicitacaoPayload(params: {
   regularHours: GbpDaySchedule[];
 }): Record<string, unknown> {
   const automatic = buildGbpAutomaticEnvelope(params.userId);
+  const plataforma_gbp_resumo =
+    `Perfil SAB (área de atendimento; endereço de verificação não aparece no Maps). ` +
+    `Categoria definida pela API: ${automatic.primary_category.displayLabel}. ` +
+    `Site sugerido no perfil: ${automatic.website_uri}.`;
+
   return {
-    schema_version: 2,
+    schema_version: 3,
     business_title: params.businessTitle.trim(),
     verification_address: params.verificationAddress,
     service_areas: params.serviceAreas,
     primary_phone: params.primaryPhoneDigits,
     primary_phone_display: formatBrazilPhoneDisplay(params.primaryPhoneDigits),
     regular_hours: params.regularHours,
-    gbp_automatic_envelope: automatic,
-    /** Campos legados removidos do preenchimento manual; mantidos vazios para compatibilidade com leitores antigos */
+    plataforma_gbp_resumo,
     nome_empresa: params.businessTitle.trim(),
     service_area: true,
     area_atendimento: params.serviceAreas.map((a) => a.label).join(", "),

@@ -93,10 +93,10 @@ const getMenuStructure = (showNetwork: boolean) => [
       { title: "QR Codes", page: "marketing/qrcode", icon: Search },
       ...(showNetwork ? [{ title: "Network", page: "network", icon: Globe }] : []),
       { title: "Comunidade", page: "comunidade", icon: Users },
-      { title: "Google Maps", page: "google", icon: Search },
       { title: "E-mail Business", page: "email-business", icon: Mail },
       { title: "Website", page: "website", icon: Monitor },
       { title: "Domínios", page: "dominios", icon: Link2 },
+      { title: "Google Maps", page: "google", icon: Search },
       { title: "Disparador", page: "disparador", icon: Megaphone },
     ],
   },
@@ -244,7 +244,7 @@ export function AppSidebar() {
 
                   const page = (item as { page: string }).page;
                   const isNetworkItem = item.title === "Network";
-                  const isDisparador = item.title === "Disparador";
+                  const isBetaMenu = page === "google" || page === "disparador";
                   const dimFlat = showNetworkHighlight && !isNetworkItem;
                   return (
                     <SidebarMenuItem
@@ -253,10 +253,10 @@ export function AppSidebar() {
                         "relative",
                         dimFlat && "opacity-40",
                         isNetworkItem && showNetworkHighlight && "z-40 opacity-100",
-                        isDisparador && collapsed && "pt-3",
+                        isBetaMenu && collapsed && "pt-3",
                       )}
                     >
-                      {isDisparador && collapsed && (
+                      {isBetaMenu && collapsed && (
                         <span
                           className="absolute left-1/2 top-0 z-10 -translate-x-1/2 rounded bg-amber-500 px-1 py-0.5 text-[7px] font-bold uppercase leading-none tracking-wide text-white shadow-sm"
                           aria-hidden
@@ -264,15 +264,15 @@ export function AppSidebar() {
                           BETA
                         </span>
                       )}
-                      <div className={cn("flex w-full flex-col", isDisparador && !collapsed && "gap-0.5")}>
-                        {isDisparador && !collapsed && (
+                      <div className={cn("flex w-full flex-col", isBetaMenu && !collapsed && "gap-0.5")}>
+                        {isBetaMenu && !collapsed && (
                           <span className="px-2 text-[10px] font-bold uppercase tracking-widest text-amber-600 dark:text-amber-500">
                             BETA
                           </span>
                         )}
                         <SidebarMenuButton
                           onClick={() => handleNavigate(page)}
-                          title={isDisparador ? "Disparador (BETA)" : undefined}
+                          title={isBetaMenu ? `${item.title} (BETA)` : undefined}
                           className={cn(
                             "cursor-pointer",
                             isActive(page) && "bg-muted text-primary font-medium",

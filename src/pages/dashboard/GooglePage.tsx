@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import SlideCarousel from "@/components/SlideCarousel";
 import {
-  Plus, Search, Shield, Building2, MapPin, Phone, Clock, Camera,
+  Search, Shield, Building2, MapPin, Phone, Clock, Camera,
   Send, ExternalLink, Calendar, Info, CheckCircle2, Star, MessageSquare,
   FileText, Package, Settings, Image, PenLine, Globe, Tag, Users,
   Megaphone, BarChart3, CirclePlus, Trash2, Edit,
@@ -18,12 +18,22 @@ import {
   ThumbsUp, Reply, Eye, TrendingUp, MousePointerClick, PhoneCall,
   Navigation, Loader2
 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useUserPlan } from "@/hooks/useUserPlan";
 import UpgradePlanDialog from "@/components/planos/UpgradePlanDialog";
-import GoogleBusinessSolicitationDialog from "@/components/google/GoogleBusinessSolicitationDialog";
+import MapboxAddressInput from "@/components/mapbox/MapboxAddressInput";
+import ServiceAreaMultiInput from "@/components/google/ServiceAreaMultiInput";
+import {
+  buildGoogleSolicitacaoPayload,
+  formatBrazilPhoneDisplay,
+  normalizeBrazilPhoneDigits,
+  validateGbpBusinessTitle,
+  type GbpDaySchedule,
+  type GbpServiceAreaPlace,
+  type GbpVerificationAddress,
+} from "@/lib/googleBusinessSolicitation";
 
 const DAYS = [
   { name: "Segunda-feira", short: "Seg", defaultOn: true },
@@ -54,9 +64,49 @@ const MANAGEMENT_TABS = [
 export default function GooglePage() {
   const { hasPlan, plano, refetch: refetchPlano } = useUserPlan();
   const [upgradeOpen, setUpgradeOpen] = useState(false);
-  const [createOpen, setCreateOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("info");
   const [servicoAtivo, setServicoAtivo] = useState<any>(null);
+  const [submittingBriefing, setSubmittingBriefing] = useState(false);
+
+  const [infoBusinessName, setInfoBusinessName] = useState("");
+  const [infoPrimaryCategory, setInfoPrimaryCategory] = useState("");
+  const [infoSecondaryCategory, setInfoSecondaryCategory] = useState("");
+  const [infoDescription, setInfoDescription] = useState("");
+  const [infoOpeningYear, setInfoOpeningYear] = useState("");
+  const [infoShortName, setInfoShortName] = useState("");
+
+  const [vCep, setVCep] = useState("");
+  const [vLogradouro, setVLogradouro] = useState("");
+  const [vNumero, setVNumero] = useState("");
+  const [vComplemento, setVComplemento] = useState("");
+  const [vBairro, setVBairro] = useState("");
+  const [vCidade, setVCidade] = useState("");
+  const [vUf, setVUf] = useState("");
+  const [vMapboxLine, setVMapboxLine] = useState("");
+  const [vLat, setVLat] = useState<number | null>(null);
+  const [vLng, setVLng] = useState<number | null>(null);
+  const [gbpServiceAreas, setGbpServiceAreas] = useState<GbpServiceAreaPlace[]>([]);
+
+  const [phoneDigits, setPhoneDigits] = useState("");
+  const [phoneSecDigits, setPhoneSecDigits] = useState("");
+  const [whatsDigits, setWhatsDigits] = useState("");
+  const [contactWebsite, setContactWebsite] = useState("");
+  const [contactBooking, setContactBooking] = useState("");
+  const [contactMenu, setContactMenu] = useState("");
+  const [socialFb, setSocialFb] = useState("");
+  const [socialIg, setSocialIg] = useState("");
+  const [socialLi, setSocialLi] = useState("");
+  const [socialYt, setSocialYt] = useState("");
+
+  const [locEndereco, setLocEndereco] = useState("");
+  const [locBairro, setLocBairro] = useState("");
+  const [locCep, setLocCep] = useState("");
+  const [locCidade, setLocCidade] = useState("");
+  const [locEstado, setLocEstado] = useState("");
+  const [locPais, setLocPais] = useState("Brasil");
+  const [locLat, setLocLat] = useState("");
+  const [locLng, setLocLng] = useState("");
+  const [locAreaTexto, setLocAreaTexto] = useState("");
 
   /** Estado compartilhado com a UI de “gestão” (mock); wizard de criação usa componente próprio. */
   const [serviceArea, setServiceArea] = useState(true);
@@ -121,6 +171,254 @@ export default function GooglePage() {
   }, []);
 
   const hasProfile = !!servicoAtivo;
+  const bloqueadoEnvio =
+    !!servicoAtivo &&
+    ["pendente", "em_andamento", "pendente_verificacao"].includes(String(servicoAtivo.status));
+  const podeEnviarNovoBriefing = !servicoAtivo || servicoAtivo.status === "recusado";
+
+  const hydratedIdRef = useRef<string | null>(null);
+
+  const aplicarDadosBriefing = useCallback((d: Record<string, unknown>) => {
+    if (typeof d.business_title === "string") setInfoBusinessName(d.business_title);
+    const info = (d.informacoes_perfil || d.informacoes_negocio) as Record<string, unknown> | undefined;
+    if (info && typeof info === "object") {
+      if (typeof info.categoria_principal === "string") setInfoPrimaryCategory(info.categoria_principal);
+      if (typeof info.categoria_secundaria === "string") setInfoSecondaryCategory(info.categoria_secundaria);
+      if (typeof info.descricao === "string") setInfoDescription(info.descricao);
+      if (typeof info.ano_abertura === "string" || typeof info.ano_abertura === "number") {
+        setInfoOpeningYear(String(info.ano_abertura));
+      }
+      if (typeof info.identificador_curto === "string") setInfoShortName(info.identificador_curto);
+    }
+    const ver = d.verification_address as Record<string, unknown> | undefined;
+    if (ver && typeof ver === "object") {
+      setVCep(String(ver.cep ?? ""));
+      setVLogradouro(String(ver.logradouro ?? ""));
+      setVNumero(String(ver.numero ?? ""));
+      setVComplemento(String(ver.complemento ?? ""));
+      setVBairro(String(ver.bairro ?? ""));
+      setVCidade(String(ver.cidade ?? ""));
+      setVUf(String(ver.uf ?? ""));
+      setVMapboxLine(typeof ver.linha_completa === "string" ? ver.linha_completa : "");
+      setVLat(typeof ver.latitude === "number" ? ver.latitude : null);
+      setVLng(typeof ver.longitude === "number" ? ver.longitude : null);
+    }
+    if (Array.isArray(d.service_areas)) setGbpServiceAreas(d.service_areas as GbpServiceAreaPlace[]);
+    if (typeof d.primary_phone === "string") setPhoneDigits(d.primary_phone);
+    const c = d.contato_exibicao as Record<string, unknown> | undefined;
+    if (c && typeof c === "object") {
+      if (typeof c.telefone_secundario === "string") {
+        setPhoneSecDigits(normalizeBrazilPhoneDigits(c.telefone_secundario));
+      }
+      if (typeof c.whatsapp === "string") setWhatsDigits(normalizeBrazilPhoneDigits(c.whatsapp));
+      if (typeof c.website === "string") setContactWebsite(c.website);
+      if (typeof c.link_agendamento === "string") setContactBooking(c.link_agendamento);
+      if (typeof c.link_menu === "string") setContactMenu(c.link_menu);
+      if (typeof c.facebook === "string") setSocialFb(c.facebook);
+      if (typeof c.instagram === "string") setSocialIg(c.instagram);
+      if (typeof c.linkedin === "string") setSocialLi(c.linkedin);
+      if (typeof c.youtube === "string") setSocialYt(c.youtube);
+    }
+    const loc = d.localizacao_opcional_maps as Record<string, unknown> | undefined;
+    if (loc && typeof loc === "object") {
+      if (typeof loc.endereco === "string") setLocEndereco(loc.endereco);
+      if (typeof loc.bairro === "string") setLocBairro(loc.bairro);
+      if (typeof loc.cep === "string") setLocCep(loc.cep);
+      if (typeof loc.cidade === "string") setLocCidade(loc.cidade);
+      if (typeof loc.estado === "string") setLocEstado(loc.estado);
+      if (typeof loc.pais === "string") setLocPais(loc.pais);
+      if (loc.latitude != null) setLocLat(String(loc.latitude));
+      if (loc.longitude != null) setLocLng(String(loc.longitude));
+      if (typeof loc.areas_texto_livre === "string") setLocAreaTexto(loc.areas_texto_livre);
+    }
+    if (Array.isArray(d.regular_hours)) {
+      setSchedule(
+        DAYS.map((day, i) => {
+          const found = (d.regular_hours as { dayIndex?: number; enabled?: boolean; open?: string; close?: string }[]).find(
+            (h) => h.dayIndex === i,
+          );
+          return {
+            ...day,
+            enabled: found ? !!found.enabled : day.defaultOn,
+            open: found?.open || "08:00",
+            close: found?.close || "18:00",
+          };
+        }),
+      );
+    }
+    if (Array.isArray(d.horarios_especiais)) setSpecialHours(d.horarios_especiais as any[]);
+    if (Array.isArray(d.publicacoes_rascunho)) setPosts(d.publicacoes_rascunho as any[]);
+    if (Array.isArray(d.produtos_rascunho)) setProducts(d.produtos_rascunho as any[]);
+    if (Array.isArray(d.servicos_rascunho)) setServices(d.servicos_rascunho as any[]);
+    if (d.atributos && typeof d.atributos === "object" && !Array.isArray(d.atributos)) {
+      setAttributes((prev) => ({ ...prev, ...(d.atributos as typeof attributes) }));
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!servicoAtivo?.id || !servicoAtivo?.dados_solicitacao) return;
+    if (hydratedIdRef.current === servicoAtivo.id) return;
+    hydratedIdRef.current = servicoAtivo.id;
+    aplicarDadosBriefing(servicoAtivo.dados_solicitacao as Record<string, unknown>);
+  }, [servicoAtivo, aplicarDadosBriefing]);
+
+  const verificationAddress = (): GbpVerificationAddress => ({
+    cep: vCep.trim(),
+    logradouro: vLogradouro.trim(),
+    numero: vNumero.trim(),
+    complemento: vComplemento.trim(),
+    bairro: vBairro.trim(),
+    cidade: vCidade.trim(),
+    uf: vUf.trim().toUpperCase().slice(0, 2),
+    linha_completa: vMapboxLine.trim() || undefined,
+    latitude: vLat,
+    longitude: vLng,
+  });
+
+  const handleEnviarBriefingCompleto = async () => {
+    if (!hasPlan("apex")) {
+      setUpgradeOpen(true);
+      return;
+    }
+    if (bloqueadoEnvio) {
+      toast.error("Já existe uma solicitação em análise. Aguarde o retorno da equipe.");
+      return;
+    }
+    if (!podeEnviarNovoBriefing) {
+      toast.error("Não é possível enviar um novo briefing neste status.");
+      return;
+    }
+    const titleCheck = validateGbpBusinessTitle(infoBusinessName);
+    if (!titleCheck.ok) {
+      toast.error(titleCheck.message);
+      return;
+    }
+    if (!infoPrimaryCategory) {
+      toast.error("Selecione a categoria principal do negócio.");
+      setActiveTab("info");
+      return;
+    }
+    if (infoDescription.trim().length < 20) {
+      toast.error("Preencha a descrição do negócio (mínimo 20 caracteres).");
+      setActiveTab("info");
+      return;
+    }
+    const va = verificationAddress();
+    if (!va.cep || !va.logradouro || !va.numero || !va.bairro || !va.cidade || !va.uf || va.uf.length < 2) {
+      toast.error("Na aba Localização, preencha o endereço de verificação (CEP, rua, número, bairro, cidade e UF).");
+      setActiveTab("location");
+      return;
+    }
+    if (gbpServiceAreas.length < 1) {
+      toast.error("Adicione pelo menos uma cidade ou região em Áreas de atendimento.");
+      setActiveTab("location");
+      return;
+    }
+    const digits = normalizeBrazilPhoneDigits(phoneDigits);
+    if (digits.length < 10) {
+      toast.error("Informe o telefone principal (WhatsApp / contato) na aba Contato.");
+      setActiveTab("contact");
+      return;
+    }
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      toast.error("Sessão expirada. Faça login novamente.");
+      return;
+    }
+
+    setSubmittingBriefing(true);
+    try {
+      const { data: free, error: rpcErr } = await supabase.rpc(
+        "motorista_telefone_disponivel_para_google" as any,
+        { p_user_id: user.id, p_telefone: digits } as any,
+      );
+      if (rpcErr) {
+        toast.error("Não foi possível validar o telefone. Tente novamente.");
+        return;
+      }
+      if (free !== true) {
+        toast.error("Este número já está em uso por outro cadastro. Use um telefone exclusivo para o Google.");
+        return;
+      }
+
+      const regular_hours: GbpDaySchedule[] = schedule.map((day, i) => ({
+        dayIndex: i,
+        dayShort: day.short,
+        dayName: day.name,
+        enabled: day.enabled,
+        open: day.open,
+        close: day.close,
+      }));
+
+      const core = buildGoogleSolicitacaoPayload({
+        userId: user.id,
+        businessTitle: infoBusinessName.trim(),
+        verificationAddress: va,
+        serviceAreas: gbpServiceAreas,
+        primaryPhoneDigits: digits,
+        regularHours: regular_hours,
+      });
+
+      const contato_exibicao: Record<string, string> = {};
+      const sec = normalizeBrazilPhoneDigits(phoneSecDigits);
+      if (sec.length >= 10) contato_exibicao.telefone_secundario = formatBrazilPhoneDisplay(sec);
+      const w = normalizeBrazilPhoneDigits(whatsDigits);
+      if (w.length >= 10) contato_exibicao.whatsapp = formatBrazilPhoneDisplay(w);
+      if (contactWebsite.trim()) contato_exibicao.website = contactWebsite.trim();
+      if (contactBooking.trim()) contato_exibicao.link_agendamento = contactBooking.trim();
+      if (contactMenu.trim()) contato_exibicao.link_menu = contactMenu.trim();
+      if (socialFb.trim()) contato_exibicao.facebook = socialFb.trim();
+      if (socialIg.trim()) contato_exibicao.instagram = socialIg.trim();
+      if (socialLi.trim()) contato_exibicao.linkedin = socialLi.trim();
+      if (socialYt.trim()) contato_exibicao.youtube = socialYt.trim();
+
+      const localizacao_opcional_maps: Record<string, string> = {};
+      if (locEndereco.trim()) localizacao_opcional_maps.endereco = locEndereco.trim();
+      if (locBairro.trim()) localizacao_opcional_maps.bairro = locBairro.trim();
+      if (locCep.trim()) localizacao_opcional_maps.cep = locCep.trim();
+      if (locCidade.trim()) localizacao_opcional_maps.cidade = locCidade.trim();
+      if (locEstado.trim()) localizacao_opcional_maps.estado = locEstado.trim();
+      if (locPais.trim()) localizacao_opcional_maps.pais = locPais.trim();
+      if (locLat.trim()) localizacao_opcional_maps.latitude = locLat.trim();
+      if (locLng.trim()) localizacao_opcional_maps.longitude = locLng.trim();
+      if (locAreaTexto.trim()) localizacao_opcional_maps.areas_texto_livre = locAreaTexto.trim();
+
+      const dados_solicitacao: Record<string, unknown> = {
+        ...core,
+        informacoes_perfil: {
+          categoria_principal: infoPrimaryCategory,
+          categoria_secundaria: infoSecondaryCategory || undefined,
+          descricao: infoDescription.trim(),
+          ano_abertura: infoOpeningYear.trim() || undefined,
+          identificador_curto: infoShortName.trim() || undefined,
+        },
+        contato_exibicao: Object.keys(contato_exibicao).length ? contato_exibicao : undefined,
+        localizacao_opcional_maps: Object.keys(localizacao_opcional_maps).length ? localizacao_opcional_maps : undefined,
+        horarios_especiais: specialHours.length ? specialHours : undefined,
+        publicacoes_rascunho: posts.length ? posts : undefined,
+        produtos_rascunho: products.length ? products : undefined,
+        servicos_rascunho: services.length ? services : undefined,
+        atributos: attributes,
+      };
+
+      const { error } = await supabase.from("solicitacoes_servicos" as any).insert({
+        user_id: user.id,
+        tipo_servico: "google",
+        dados_solicitacao: dados_solicitacao,
+      } as any);
+
+      if (error) {
+        toast.error("Erro ao enviar: " + error.message);
+        return;
+      }
+      toast.success("Briefing enviado para análise da equipe.");
+      hydratedIdRef.current = null;
+      await refreshServicoGoogle();
+    } finally {
+      setSubmittingBriefing(false);
+    }
+  };
 
   const pendingBanner =
     servicoAtivo &&
@@ -226,10 +524,20 @@ export default function GooglePage() {
                     <p className="text-sm text-muted-foreground">Edite as informações básicas do seu perfil no Google.</p>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
-                    <div className="col-span-2"><Label>Nome do Negócio *</Label><Input placeholder="Ex: Transfer Executivo São Paulo" /></div>
+                    <div className="col-span-2">
+                      <Label>Nome do Negócio *</Label>
+                      <Input
+                        value={infoBusinessName}
+                        onChange={(e) => setInfoBusinessName(e.target.value)}
+                        placeholder="Ex: João Silva Transportes (sem cidade, preço ou promoção)"
+                        maxLength={58}
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">Conforme regras do Google — nome ou razão social, até 58 caracteres.</p>
+                    </div>
                     <div>
                       <Label>Categoria Principal *</Label>
-                      <Select><SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                      <Select value={infoPrimaryCategory || undefined} onValueChange={setInfoPrimaryCategory}>
+                        <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="transporte_executivo">Serviço de Transporte Executivo</SelectItem>
                           <SelectItem value="taxi">Serviço de Táxi</SelectItem>
@@ -242,7 +550,8 @@ export default function GooglePage() {
                     </div>
                     <div>
                       <Label>Categoria Secundária</Label>
-                      <Select><SelectTrigger><SelectValue placeholder="Opcional" /></SelectTrigger>
+                      <Select value={infoSecondaryCategory || undefined} onValueChange={setInfoSecondaryCategory}>
+                        <SelectTrigger><SelectValue placeholder="Opcional" /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="transporte">Serviço de Transporte</SelectItem>
                           <SelectItem value="turismo">Turismo</SelectItem>
@@ -252,19 +561,24 @@ export default function GooglePage() {
                     </div>
                     <div className="col-span-2">
                       <Label>Descrição do Negócio</Label>
-                      <Textarea placeholder="Descreva seus serviços em detalhes..." maxLength={750} className="min-h-[120px]" />
-                      <p className="text-xs text-muted-foreground mt-1">0/750 caracteres</p>
+                      <Textarea
+                        value={infoDescription}
+                        onChange={(e) => setInfoDescription(e.target.value)}
+                        placeholder="Descreva seus serviços em detalhes..."
+                        maxLength={750}
+                        className="min-h-[120px]"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">{infoDescription.length}/750 caracteres (mínimo 20 para enviar)</p>
                     </div>
                     <div>
                       <Label>Ano de Abertura</Label>
-                      <Input type="number" placeholder="2020" />
+                      <Input type="number" placeholder="2020" value={infoOpeningYear} onChange={(e) => setInfoOpeningYear(e.target.value)} />
                     </div>
                     <div>
                       <Label>Identificador Curto (short name)</Label>
-                      <Input placeholder="minha-empresa" />
+                      <Input value={infoShortName} onChange={(e) => setInfoShortName(e.target.value)} placeholder="minha-empresa" />
                     </div>
                   </div>
-                  <Button className="bg-primary text-primary-foreground"><Send className="h-4 w-4 mr-2" /> Salvar Informações</Button>
                 </div>
               )}
 

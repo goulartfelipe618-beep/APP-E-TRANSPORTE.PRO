@@ -16,6 +16,7 @@ import { RefreshCw, Filter, ClipboardList, Eye, Globe, Mail, Monitor, Search, Ch
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { downloadSolicitacaoBriefingPdf } from "@/lib/solicitacaoServicoBriefingPdf";
+import { googleBriefingRows } from "@/lib/googleBriefingDisplay";
 
 interface Solicitacao {
   id: string;
@@ -500,6 +501,73 @@ export default function AdminSolicitacoesServicos() {
                                 <span className="text-muted-foreground shrink-0">{key.replace(/_/g, " ")}</span>
                                 <span className="text-foreground font-medium text-right break-all">
                                   {typeof val === "boolean" ? (val ? "Sim" : "Não") : Array.isArray(val) ? val.join(", ") : String(val ?? "—")}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </details>
+                      ) : null}
+                    </div>
+                  </div>
+                );
+              })() : selected.tipo_servico === "google" ? (() => {
+                const gRows = googleBriefingRows((selected.dados_solicitacao || {}) as Record<string, unknown>);
+                const d = (selected.dados_solicitacao || {}) as Record<string, unknown>;
+                const extraKeys = Object.keys(d).filter(
+                  (k) =>
+                    ![
+                      "schema_version",
+                      "business_title",
+                      "nome_empresa",
+                      "verification_address",
+                      "service_areas",
+                      "area_atendimento",
+                      "service_area",
+                      "primary_phone",
+                      "primary_phone_display",
+                      "regular_hours",
+                      "plataforma_gbp_resumo",
+                      "gbp_automatic_envelope",
+                      "informacoes_perfil",
+                      "informacoes_negocio",
+                      "contato_exibicao",
+                      "localizacao_opcional_maps",
+                      "horarios_especiais",
+                      "publicacoes_rascunho",
+                      "produtos_rascunho",
+                      "servicos_rascunho",
+                      "atributos",
+                    ].includes(k),
+                );
+                return (
+                  <div className="space-y-3">
+                    <h4 className="text-sm font-bold text-foreground">Briefing Google Business Profile</h4>
+                    <p className="text-xs text-muted-foreground">
+                      Resumo legível do que o motorista enviou. Rascunhos (publicações, produtos, serviços) aparecem como contagem;
+                      use o PDF para o quadro completo em texto.
+                    </p>
+                    <div className="rounded-lg border border-border bg-muted/30 p-4 text-sm space-y-3 max-h-[28rem] overflow-y-auto">
+                      {gRows.length === 0 ? (
+                        <p className="text-muted-foreground">Nenhum dado estruturado.</p>
+                      ) : (
+                        gRows.map((row, idx) => (
+                          <div key={`${row.label}-${idx}`} className="flex flex-col gap-0.5 sm:flex-row sm:justify-between sm:gap-4 border-b border-border/80 pb-2 last:border-0 last:pb-0">
+                            <span className="text-muted-foreground shrink-0 max-w-[46%]">{row.label}</span>
+                            <span className="text-foreground font-medium text-right break-words whitespace-pre-wrap">{row.value || "—"}</span>
+                          </div>
+                        ))
+                      )}
+                      {extraKeys.length > 0 ? (
+                        <details className="rounded-md border border-dashed border-border bg-background/50 px-3 py-2">
+                          <summary className="cursor-pointer text-xs font-medium text-muted-foreground">
+                            Campos técnicos adicionais ({extraKeys.length})
+                          </summary>
+                          <div className="mt-2 space-y-1.5 max-h-36 overflow-y-auto text-xs">
+                            {extraKeys.map((key) => (
+                              <div key={key} className="flex justify-between gap-2">
+                                <span className="text-muted-foreground shrink-0">{key.replace(/_/g, " ")}</span>
+                                <span className="text-foreground font-medium text-right break-all">
+                                  {typeof d[key] === "object" ? JSON.stringify(d[key]) : String(d[key] ?? "—")}
                                 </span>
                               </div>
                             ))}

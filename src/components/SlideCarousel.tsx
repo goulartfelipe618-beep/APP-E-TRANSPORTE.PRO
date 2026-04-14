@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, type CSSProperties } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 
@@ -112,7 +112,7 @@ export default function SlideCarousel({
     return () => clearInterval(timer);
   }, [nextSlide, displaySlides.length]);
 
-  if (loading || displaySlides.length === 0) return null;
+  const isBanner = variant === "banner";
 
   /** Encosta nas bordas internas do `<main>` usando `--main-pad-x` / `--main-pad-y` definidos no layout. */
   const bleedStyle: CSSProperties | undefined =
@@ -130,13 +130,45 @@ export default function SlideCarousel({
         }
       : undefined;
 
+  const frameClassName = cn(
+    "relative box-border min-w-0 shrink-0 overflow-hidden p-0",
+    isBanner
+      ? cn(
+          "aspect-[1922/330] min-h-[120px]",
+          fullBleed
+            ? "rounded-none border-0 bg-muted/30 shadow-none"
+            : "rounded-none rounded-b-xl border-b border-border bg-muted/30",
+        )
+      : cn(
+          "aspect-[16/5] min-h-[140px] sm:min-h-[180px]",
+          fullBleed ? "rounded-none border-0 shadow-none" : "rounded-xl",
+        ),
+    className,
+  );
+
+  if (!loading && displaySlides.length === 0) return null;
+
+  if (loading) {
+    return (
+      <div
+        style={bleedStyle}
+        className={frameClassName}
+        aria-busy="true"
+        aria-label="Carregando banner"
+      >
+        <div className="absolute inset-0 flex items-center justify-center bg-muted/50">
+          <Loader2 className="h-9 w-9 animate-spin text-muted-foreground" />
+        </div>
+      </div>
+    );
+  }
+
   const currentSlideData = displaySlides[currentSlide];
   const showText =
     variant !== "banner" &&
     currentSlideData?.mostrar_texto &&
     (currentSlideData.titulo || currentSlideData.subtitulo);
   const linkUrl = currentSlideData?.link_url;
-  const isBanner = variant === "banner";
 
   const renderSlide = (slide: (typeof displaySlides)[0], index: number) => {
     const isActive = index === currentSlide;
@@ -183,24 +215,7 @@ export default function SlideCarousel({
   };
 
   return (
-    <div
-      style={bleedStyle}
-      className={cn(
-        "relative box-border min-w-0 shrink-0 overflow-hidden p-0",
-        isBanner
-          ? cn(
-              "aspect-[1922/330] min-h-[120px]",
-              fullBleed
-                ? "rounded-none border-0 bg-muted/30 shadow-none"
-                : "rounded-none rounded-b-xl border-b border-border bg-muted/30",
-            )
-          : cn(
-              "aspect-[16/5] min-h-[140px] sm:min-h-[180px]",
-              fullBleed ? "rounded-none border-0 shadow-none" : "rounded-xl",
-            ),
-        className,
-      )}
-    >
+    <div style={bleedStyle} className={frameClassName}>
       <div className="absolute inset-0 min-h-0">
         {displaySlides.map((s, i) => renderSlide(s, i))}
       </div>

@@ -103,9 +103,9 @@ function buildHomeSections(showNetwork: boolean): MajorSection[] {
       ? [{ title: "Network", page: "network", desc: "Oportunidades de viagens com outros motoristas.", icon: Globe } as ToolDef]
       : []),
     { title: "Comunidade", page: "comunidade", desc: "Canal com a comunidade da plataforma.", icon: Users },
-    { title: "Google Maps", page: "google", desc: "Presença no Google Meu Negócio e buscas.", icon: Search },
     { title: "E-mail Business", page: "email-business", desc: "E-mail profissional com domínio próprio.", icon: Mail },
     { title: "Website", page: "website", desc: "Site institucional integrado à operação.", icon: Monitor },
+    { title: "Google Maps", page: "google", desc: "Presença no Google Meu Negócio e buscas.", icon: Search },
     { title: "Disparador", page: "disparador", desc: "Envio de mensagens em massa (WhatsApp dedicado).", icon: Megaphone },
   ];
 
