@@ -126,32 +126,66 @@ export default function ComunicadorAdminMasterPage() {
 
   const loadEvolutionCreds = useCallback(async () => {
     setEvoLoading(true);
-    const { data: sys } = await supabase
-      .from("comunicadores_evolution")
-      .select("id, painel_motorista_evolution_ativo")
-      .eq("escopo", "sistema")
-      .maybeSingle();
-    if (!sys?.id) {
-      setComunicadorSistemaId(null);
-      setEvoCredsExist(false);
-      setPainelMotoristaAtivo(true);
+    try {
+      // 1) Sempre carregar só o `id` da linha sistema — evita falha total se a coluna da flag ainda não existir no PostgREST.
+      let { data: sysRow } = await supabase
+        .from("comunicadores_evolution")
+        .select("id")
+        .eq("escopo", "sistema")
+        .maybeSingle();
+
+      let sistemaId = sysRow?.id as string | undefined;
+      if (!sistemaId) {
+        const { error: insErr } = await supabase.from("comunicadores_evolution").insert({
+          escopo: "sistema",
+          rotulo: "E-Transporte.pro — Comunicador oficial",
+          connection_status: "desconectado",
+        });
+        if (insErr && !String(insErr.message || "").toLowerCase().includes("duplicate")) {
+          console.error(insErr);
+        }
+        const retry = await supabase
+          .from("comunicadores_evolution")
+          .select("id")
+          .eq("escopo", "sistema")
+          .maybeSingle();
+        sistemaId = retry.data?.id as string | undefined;
+      }
+
+      if (!sistemaId) {
+        setComunicadorSistemaId(null);
+        setEvoCredsExist(false);
+        setPainelMotoristaAtivo(true);
+        return;
+      }
+
+      setComunicadorSistemaId(sistemaId);
+
+      const { data: painelRow, error: painelErr } = await supabase
+        .from("comunicadores_evolution")
+        .select("painel_motorista_evolution_ativo")
+        .eq("id", sistemaId)
+        .maybeSingle();
+      if (!painelErr && painelRow && typeof (painelRow as { painel_motorista_evolution_ativo?: boolean }).painel_motorista_evolution_ativo === "boolean") {
+        setPainelMotoristaAtivo((painelRow as { painel_motorista_evolution_ativo: boolean }).painel_motorista_evolution_ativo !== false);
+      } else {
+        setPainelMotoristaAtivo(true);
+      }
+
+      const { data: cr } = await supabase
+        .from("comunicador_evolution_credenciais")
+        .select("api_url, api_key")
+        .eq("comunicador_id", sistemaId)
+        .maybeSingle();
+      const url = (cr?.api_url as string)?.trim() || "";
+      const hasKey = Boolean((cr?.api_key as string)?.trim());
+      setEvoUrl(url);
+      setEvoKey("");
+      setEvoCredsExist(hasKey);
+      setEvoEditing(!(hasKey && url));
+    } finally {
       setEvoLoading(false);
-      return;
     }
-    setComunicadorSistemaId(sys.id);
-    setPainelMotoristaAtivo(sys.painel_motorista_evolution_ativo !== false);
-    const { data: cr } = await supabase
-      .from("comunicador_evolution_credenciais")
-      .select("api_url, api_key")
-      .eq("comunicador_id", sys.id)
-      .maybeSingle();
-    const url = (cr?.api_url as string)?.trim() || "";
-    const hasKey = Boolean((cr?.api_key as string)?.trim());
-    setEvoUrl(url);
-    setEvoKey("");
-    setEvoCredsExist(hasKey);
-    setEvoEditing(!(hasKey && url));
-    setEvoLoading(false);
   }, []);
 
   useEffect(() => {
@@ -217,17 +251,37 @@ export default function ComunicadorAdminMasterPage() {
   const evoLocked = Boolean(evoCredsExist && evoUrl.trim() && !evoEditing);
 
   const savePainelMotoristaAtivo = async (v: boolean) => {
-    if (!comunicadorSistemaId) {
-      toast.error("Comunicador oficial não encontrado.");
-      return;
-    }
     setPainelMotoristaSaving(true);
     try {
+      let targetId = comunicadorSistemaId;
+      if (!targetId) {
+        const { data: row } = await supabase
+          .from("comunicadores_evolution")
+          .select("id")
+          .eq("escopo", "sistema")
+          .maybeSingle();
+        targetId = row?.id ?? null;
+        if (targetId) setComunicadorSistemaId(targetId);
+      }
+      if (!targetId) {
+        toast.error("Não foi possível localizar o comunicador oficial. Verifique a tabela comunicadores_evolution no banco.");
+        return;
+      }
       const { error } = await supabase
         .from("comunicadores_evolution")
         .update({ painel_motorista_evolution_ativo: v, updated_at: new Date().toISOString() })
-        .eq("id", comunicadorSistemaId);
-      if (error) throw error;
+        .eq("id", targetId);
+      if (error) {
+        const msg = error.message || "";
+        if (msg.includes("painel_motorista_evolution") || msg.toLowerCase().includes("column") || msg.includes("schema cache")) {
+          toast.error(
+            "O banco ainda não tem a coluna desta opção. Aplique a migração 20260414140000_comunicadores_evolution_painel_motorista.sql no Supabase.",
+          );
+        } else {
+          toast.error(msg || "Não foi possível atualizar.");
+        }
+        return;
+      }
       setPainelMotoristaAtivo(v);
       toast.success(
         v
@@ -419,7 +473,7 @@ export default function ComunicadorAdminMasterPage() {
             <Switch
               id="evo-painel-motorista"
               checked={painelMotoristaAtivo}
-              disabled={!comunicadorSistemaId || evoLoading || painelMotoristaSaving}
+              disabled={painelMotoristaSaving}
               onCheckedChange={(v) => void savePainelMotoristaAtivo(v)}
             />
           </div>

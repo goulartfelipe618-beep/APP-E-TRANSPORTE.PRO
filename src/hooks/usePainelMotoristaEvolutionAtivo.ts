@@ -10,16 +10,28 @@ export function usePainelMotoristaEvolutionAtivo() {
   const [ready, setReady] = useState(false);
 
   const reload = useCallback(async () => {
-    const { data, error } = await supabase
+    const { data: idRow, error: idErr } = await supabase
       .from("comunicadores_evolution")
-      .select("painel_motorista_evolution_ativo")
+      .select("id")
       .eq("escopo", "sistema")
       .maybeSingle();
 
-    if (error || data == null) {
+    if (idErr || idRow?.id == null) {
       setAtivo(true);
+      setReady(true);
+      return;
+    }
+
+    const { data: painelRow, error: painelErr } = await supabase
+      .from("comunicadores_evolution")
+      .select("painel_motorista_evolution_ativo")
+      .eq("id", idRow.id)
+      .maybeSingle();
+
+    if (!painelErr && painelRow && typeof painelRow.painel_motorista_evolution_ativo === "boolean") {
+      setAtivo(painelRow.painel_motorista_evolution_ativo !== false);
     } else {
-      setAtivo(data.painel_motorista_evolution_ativo !== false);
+      setAtivo(true);
     }
     setReady(true);
   }, []);
