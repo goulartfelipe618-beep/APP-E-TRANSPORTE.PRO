@@ -16,6 +16,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useConfiguracoes } from "@/contexts/ConfiguracoesContext";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import MapboxAddressInput from "@/components/mapbox/MapboxAddressInput";
 import { isMapboxConfigured } from "@/lib/mapboxGeocode";
@@ -187,10 +188,22 @@ export default function SistemaConfiguracoesPage() {
   const [enablingMfa, setEnablingMfa] = useState(false);
   const [mfaSetupError, setMfaSetupError] = useState<string>("");
   const [isAdminMaster, setIsAdminMaster] = useState(false);
+  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
 
   useEffect(() => {
-    loadSettings();
-    loadContratual();
+    let cancelled = false;
+    void (async () => {
+      try {
+        await Promise.all([loadSettings(), loadContratual()]);
+      } finally {
+        if (!cancelled) setInitialLoadComplete(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // Carregamento inicial único; loadSettings/loadContratual estabilizam estado local.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -541,6 +554,26 @@ export default function SistemaConfiguracoesPage() {
       setSavingPassword(false);
     }
   };
+
+  if (!initialLoadComplete) {
+    return (
+      <div className="space-y-6 max-w-2xl" aria-busy="true" aria-label="Carregando configurações">
+        <div className="space-y-2">
+          <Skeleton className="h-8 w-52" />
+          <Skeleton className="h-4 w-80 max-w-full" />
+        </div>
+        {[0, 1, 2, 3].map((k) => (
+          <div key={k} className="rounded-xl border border-border bg-card p-6 space-y-4">
+            <Skeleton className="h-5 w-44" />
+            <Skeleton className="h-4 w-full max-w-lg" />
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-4/5 max-w-md" />
+          </div>
+        ))}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
