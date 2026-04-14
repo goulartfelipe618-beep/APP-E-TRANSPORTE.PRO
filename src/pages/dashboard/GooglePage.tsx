@@ -9,6 +9,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import SlideCarousel from "@/components/SlideCarousel";
+import FerramentaBetaBloqueioAviso from "@/components/painel/FerramentaBetaBloqueioAviso";
+import FerramentaConstrucaoOverlay from "@/components/painel/FerramentaConstrucaoOverlay";
+import { usePlataformaFerramentasDisponibilidade } from "@/hooks/usePlataformaFerramentasDisponibilidade";
 import {
   Search, Shield, Building2, MapPin, Phone, Clock, Camera,
   Send, ExternalLink, Calendar, Info, CheckCircle2, Star, MessageSquare,
@@ -64,6 +67,10 @@ const MANAGEMENT_TABS = [
 
 export default function GooglePage() {
   const { hasPlan, plano, refetch: refetchPlano } = useUserPlan();
+  const { flags: ferramentasFlags } = usePlataformaFerramentasDisponibilidade();
+  const googleConsumoLiberado = ferramentasFlags.google_maps_consumo_liberado;
+  const googleFerramentaBloqueada = !googleConsumoLiberado;
+
   const [upgradeOpen, setUpgradeOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("info");
@@ -172,6 +179,10 @@ export default function GooglePage() {
     void refreshServicoGoogle();
   }, []);
 
+  useEffect(() => {
+    if (!googleConsumoLiberado) setCreateOpen(false);
+  }, [googleConsumoLiberado]);
+
   const hasProfile = !!servicoAtivo;
   const bloqueadoEnvio =
     !!servicoAtivo &&
@@ -278,6 +289,10 @@ export default function GooglePage() {
   });
 
   const handleEnviarBriefingCompleto = async () => {
+    if (!googleConsumoLiberado) {
+      toast.error("Esta ferramenta ainda não está disponível para uso. Aguarde a liberação da plataforma.");
+      return;
+    }
     if (!hasPlan("apex")) {
       setUpgradeOpen(true);
       return;
@@ -1250,13 +1265,9 @@ export default function GooglePage() {
     );
   }
 
-  // If profile exists, show management inline
   if (hasProfile) {
     return (
       <div className="space-y-6">
-        {pendingBanner}
-        {activeBanner}
-
         <SlideCarousel
           pagina="google"
           breakoutTop={false}
@@ -1266,18 +1277,20 @@ export default function GooglePage() {
             { titulo: "Aumente Sua Visibilidade", subtitulo: "Destaque-se nos resultados de busca com avaliações positivas e informações completas do seu serviço." },
           ]}
         />
-
-        <div>
-          <h2 className="text-xl font-bold text-foreground">Gerenciar Perfil Google Business</h2>
-          <p className="text-sm text-muted-foreground">Edite todas as informações do seu perfil no Google.</p>
-        </div>
-
-        {renderManagementInline()}
+        {googleFerramentaBloqueada && <FerramentaBetaBloqueioAviso />}
+        <FerramentaConstrucaoOverlay disabled={googleFerramentaBloqueada} className="space-y-6">
+          {pendingBanner}
+          {activeBanner}
+          <div>
+            <h2 className="text-xl font-bold text-foreground">Gerenciar Perfil Google Business</h2>
+            <p className="text-sm text-muted-foreground">Edite todas as informações do seu perfil no Google.</p>
+          </div>
+          {renderManagementInline()}
+        </FerramentaConstrucaoOverlay>
       </div>
     );
   }
 
-  // No profile yet — show create option
   return (
     <div className="space-y-6">
       <SlideCarousel
@@ -1289,42 +1302,64 @@ export default function GooglePage() {
         ]}
       />
 
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-bold text-foreground">Google Business Profile</h2>
-          <p className="text-muted-foreground">Crie seu perfil no Google Meu Negócio</p>
+      {googleFerramentaBloqueada && <FerramentaBetaBloqueioAviso />}
+
+      <FerramentaConstrucaoOverlay disabled={googleFerramentaBloqueada} className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-xl font-bold text-foreground">Google Business Profile</h2>
+            <p className="text-muted-foreground">Crie seu perfil no Google Meu Negócio</p>
+          </div>
+          <Button
+            onClick={() => {
+              if (!googleConsumoLiberado) {
+                toast.error("Esta ferramenta ainda não está disponível para uso. Aguarde a liberação da plataforma.");
+                return;
+              }
+              if (!hasPlan("apex")) {
+                setUpgradeOpen(true);
+                return;
+              }
+              setCreateOpen(true);
+            }}
+          >
+            <Plus className="h-4 w-4 mr-2" /> Novo Perfil
+          </Button>
         </div>
-        <Button onClick={() => {
-          if (!hasPlan("apex")) { setUpgradeOpen(true); return; }
-          setCreateOpen(true);
-        }}>
-          <Plus className="h-4 w-4 mr-2" /> Novo Perfil
-        </Button>
-      </div>
 
-      <div className="rounded-xl border border-border bg-card p-4">
-        <div className="flex items-center gap-2 mb-2"><Shield className="h-4 w-4 text-muted-foreground" /><span className="text-sm font-medium text-foreground">Como funciona</span></div>
-        <p className="text-sm text-muted-foreground">
-          O cadastro segue o modelo <strong className="text-foreground">Service Area Business (SAB)</strong>: endereço residencial só para verificação
-          (oculto no Maps), categoria e site definidos pela plataforma, áreas de atendimento com busca de cidades e telefone exclusivo na rede.
-          Isso reduz risco de banimento da conta Google usada pela API.
-        </p>
-      </div>
+        <div className="rounded-xl border border-border bg-card p-4">
+          <div className="flex items-center gap-2 mb-2"><Shield className="h-4 w-4 text-muted-foreground" /><span className="text-sm font-medium text-foreground">Como funciona</span></div>
+          <p className="text-sm text-muted-foreground">
+            O cadastro segue o modelo <strong className="text-foreground">Service Area Business (SAB)</strong>: endereço residencial só para verificação
+            (oculto no Maps), categoria e site definidos pela plataforma, áreas de atendimento com busca de cidades e telefone exclusivo na rede.
+            Isso reduz risco de banimento da conta Google usada pela API.
+          </p>
+        </div>
 
-      <div className="rounded-xl border border-dashed border-border p-12 text-center">
-        <Building2 className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
-        <p className="text-foreground font-medium mb-1">Nenhum perfil criado</p>
-        <p className="text-sm text-muted-foreground mb-4">Crie seu perfil no Google Business para aparecer nas buscas.</p>
-        <Button onClick={() => {
-          if (!hasPlan("apex")) { setUpgradeOpen(true); return; }
-          setCreateOpen(true);
-        }}>
-          <Plus className="h-4 w-4 mr-2" /> Criar Meu Perfil
-        </Button>
-      </div>
+        <div className="rounded-xl border border-dashed border-border p-12 text-center">
+          <Building2 className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+          <p className="text-foreground font-medium mb-1">Nenhum perfil criado</p>
+          <p className="text-sm text-muted-foreground mb-4">Crie seu perfil no Google Business para aparecer nas buscas.</p>
+          <Button
+            onClick={() => {
+              if (!googleConsumoLiberado) {
+                toast.error("Esta ferramenta ainda não está disponível para uso. Aguarde a liberação da plataforma.");
+                return;
+              }
+              if (!hasPlan("apex")) {
+                setUpgradeOpen(true);
+                return;
+              }
+              setCreateOpen(true);
+            }}
+          >
+            <Plus className="h-4 w-4 mr-2" /> Criar Meu Perfil
+          </Button>
+        </div>
+      </FerramentaConstrucaoOverlay>
 
       <GoogleBusinessSolicitationDialog
-        open={createOpen}
+        open={createOpen && googleConsumoLiberado}
         onOpenChange={setCreateOpen}
         onSuccess={() => void refreshServicoGoogle()}
       />

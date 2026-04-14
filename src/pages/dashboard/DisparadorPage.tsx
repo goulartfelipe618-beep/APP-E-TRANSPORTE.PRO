@@ -1,4 +1,7 @@
 import SlideCarousel from "@/components/SlideCarousel";
+import FerramentaBetaBloqueioAviso from "@/components/painel/FerramentaBetaBloqueioAviso";
+import FerramentaConstrucaoOverlay from "@/components/painel/FerramentaConstrucaoOverlay";
+import { usePlataformaFerramentasDisponibilidade } from "@/hooks/usePlataformaFerramentasDisponibilidade";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -58,7 +61,15 @@ const WARNINGS = [
 ];
 
 export default function DisparadorPage() {
+  const { flags } = usePlataformaFerramentasDisponibilidade();
+  const disparadorLiberado = flags.disparador_consumo_liberado;
+  const disparadorBloqueado = !disparadorLiberado;
+
   const handleAccessDispatcher = () => {
+    if (!disparadorLiberado) {
+      toast.error("Esta ferramenta ainda não está disponível para uso. Aguarde a liberação da plataforma.");
+      return;
+    }
     const w = window.open(DISPARADOR_URL, "_blank", "noopener,noreferrer");
     if (!w) {
       toast.error("Não foi possível abrir uma nova aba. Verifique o bloqueador de pop-ups.");
@@ -68,7 +79,9 @@ export default function DisparadorPage() {
   return (
     <div className="space-y-8">
       <SlideCarousel pagina="disparador" />
+      {disparadorBloqueado && <FerramentaBetaBloqueioAviso />}
 
+      <FerramentaConstrucaoOverlay disabled={disparadorBloqueado} className="space-y-8">
       {/* Hero */}
       <div className="text-center space-y-2">
         <div className="inline-flex items-center gap-2 bg-primary/10 text-primary px-4 py-1.5 rounded-full text-sm font-semibold">
@@ -156,6 +169,7 @@ export default function DisparadorPage() {
           </Button>
         </CardContent>
       </Card>
+      </FerramentaConstrucaoOverlay>
     </div>
   );
 }

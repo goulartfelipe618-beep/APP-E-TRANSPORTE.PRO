@@ -30,6 +30,7 @@ import { isMissingFonteColumnError } from "@/lib/painelAvisoPersist";
 import { renderAvisoTextoComMarcacao } from "@/lib/painelAvisoTexto";
 import { ConfirmDeleteDialog } from "@/components/ConfirmDeleteDialog";
 import AdminFullscreenBannersSection from "@/pages/admin/AdminFullscreenBannersSection";
+import PlataformaFerramentasBetaSection from "@/pages/admin/PlataformaFerramentasBetaSection";
 import {
   Select,
   SelectContent,
@@ -252,6 +253,8 @@ export default function AdminAvisosPage() {
       </div>
 
       <AdminFullscreenBannersSection />
+
+      <PlataformaFerramentasBetaSection />
 
       {loading ? (
         <div className="flex items-center gap-2 text-muted-foreground py-12">

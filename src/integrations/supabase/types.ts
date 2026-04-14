@@ -960,6 +960,27 @@ export type Database = {
         }
         Relationships: []
       }
+      plataforma_ferramentas_disponibilidade: {
+        Row: {
+          disparador_consumo_liberado: boolean
+          google_maps_consumo_liberado: boolean
+          id: number
+          updated_at: string
+        }
+        Insert: {
+          disparador_consumo_liberado?: boolean
+          google_maps_consumo_liberado?: boolean
+          id?: number
+          updated_at?: string
+        }
+        Update: {
+          disparador_consumo_liberado?: boolean
+          google_maps_consumo_liberado?: boolean
+          id?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       qr_codes: {
         Row: {
           ativo: boolean
