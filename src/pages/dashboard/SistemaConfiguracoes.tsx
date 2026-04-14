@@ -22,6 +22,7 @@ import MapboxAddressInput from "@/components/mapbox/MapboxAddressInput";
 import { isMapboxConfigured } from "@/lib/mapboxGeocode";
 import { persistNetworkRetornoSolicitado, persistNetworkSair } from "@/lib/networkNacionalPrefs";
 import LoginConfiguracoesSection from "@/pages/dashboard/LoginConfiguracoesSection";
+import { assertUploadMagicBytes, extensionForDetectedMime } from "@/lib/validateUploadMagicBytes";
 
 const FONT_OPTIONS = [
   { value: "montserrat", label: "Montserrat" },
@@ -357,7 +358,17 @@ export default function SistemaConfiguracoesPage() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { toast.error("Não autenticado"); setUploading(false); return; }
 
-    const filePath = `${user.id}/logo-${Date.now()}.${logoFile.name.split('.').pop()}`;
+    let logoExt = "png";
+    try {
+      const { mime } = await assertUploadMagicBytes(logoFile, "raster-image", 8 * 1024 * 1024);
+      logoExt = extensionForDetectedMime(mime);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Ficheiro inválido");
+      setUploading(false);
+      return;
+    }
+
+    const filePath = `${user.id}/logo-${Date.now()}.${logoExt}`;
     const { error: upErr } = await supabase.storage.from("logos").upload(filePath, logoFile, { upsert: true });
     if (upErr) { toast.error("Erro no upload"); setUploading(false); return; }
 
@@ -420,7 +431,17 @@ export default function SistemaConfiguracoesPage() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { toast.error("Não autenticado"); setUploadingLogoContratual(""); return; }
 
-    const filePath = `${user.id}/logo-contratual-${Date.now()}.${file.name.split('.').pop()}`;
+    let ext = "png";
+    try {
+      const { mime } = await assertUploadMagicBytes(file, "raster-image", 8 * 1024 * 1024);
+      ext = extensionForDetectedMime(mime);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Ficheiro inválido");
+      setUploadingLogoContratual("");
+      return;
+    }
+
+    const filePath = `${user.id}/logo-contratual-${Date.now()}.${ext}`;
     const { error: upErr } = await supabase.storage.from("logos").upload(filePath, file, { upsert: true });
     if (upErr) { toast.error("Erro no upload"); setUploadingLogoContratual(""); return; }
 

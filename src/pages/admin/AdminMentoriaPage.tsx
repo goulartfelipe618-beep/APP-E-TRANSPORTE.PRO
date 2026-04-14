@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Plus, Trash2, GraduationCap, Pencil, Upload, Video, Image as ImageIcon, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { ConfirmDeleteDialog } from "@/components/ConfirmDeleteDialog";
+import { assertUploadMagicBytes, extensionForDetectedMime } from "@/lib/validateUploadMagicBytes";
 
 interface MentoriaCard {
   id: string;
@@ -47,7 +48,14 @@ export default function AdminMentoriaPage() {
   useEffect(() => { fetchCards(); }, []);
 
   const uploadFile = async (file: File, folder: string): Promise<string | null> => {
-    const ext = file.name.split(".").pop();
+    let ext = "bin";
+    try {
+      const { mime } = await assertUploadMagicBytes(file, "raster-or-video", 80 * 1024 * 1024);
+      ext = extensionForDetectedMime(mime);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Ficheiro inválido");
+      return null;
+    }
     const path = `${folder}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
     const { error } = await supabase.storage.from("mentoria").upload(path, file);
     if (error) { toast.error(`Erro no upload: ${error.message}`); return null; }

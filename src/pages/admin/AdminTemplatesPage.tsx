@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { Plus, Pencil, Trash2, Eye, ImageIcon, Upload, X } from "lucide-react";
 import { ConfirmDeleteDialog } from "@/components/ConfirmDeleteDialog";
+import { assertUploadMagicBytes, extensionForDetectedMime } from "@/lib/validateUploadMagicBytes";
 
 interface Template {
   id: string;
@@ -82,24 +83,36 @@ export default function AdminTemplatesPage() {
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    const input = e.target;
     if (!file) return;
-
-    if (!file.type.startsWith("image/")) {
-      toast.error("Selecione apenas arquivos de imagem");
-      return;
-    }
 
     if (file.size > 10 * 1024 * 1024) {
       toast.error("Imagem deve ter no máximo 10MB");
       return;
     }
 
-    setImagemFile(file);
-    setImagemPreview(URL.createObjectURL(file));
+    void (async () => {
+      try {
+        await assertUploadMagicBytes(file, "raster-image", 10 * 1024 * 1024);
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Ficheiro inválido");
+        input.value = "";
+        return;
+      }
+      setImagemFile(file);
+      setImagemPreview(URL.createObjectURL(file));
+    })();
   };
 
   const uploadImage = async (file: File): Promise<string | null> => {
-    const ext = file.name.split(".").pop();
+    let ext = "jpg";
+    try {
+      const { mime } = await assertUploadMagicBytes(file, "raster-image", 10 * 1024 * 1024);
+      ext = extensionForDetectedMime(mime);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Ficheiro inválido");
+      return null;
+    }
     const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${ext}`;
     const filePath = `templates/${fileName}`;
 

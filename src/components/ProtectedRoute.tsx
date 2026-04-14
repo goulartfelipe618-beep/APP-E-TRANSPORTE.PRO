@@ -3,6 +3,10 @@ import { Navigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { clearAuthStartedAt, isAuthExpired, readAuthStartedAt, setAuthStartedAt } from "@/lib/authExpiry";
 
+/**
+ * Rotas autenticadas do painel (motorista executivo). O JWT é gerido pelo cliente Supabase
+ * com PKCE + sessionStorage e autoRefreshToken (ver `integrations/supabase/client.ts`).
+ */
 export default function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [authenticated, setAuthenticated] = useState(false);

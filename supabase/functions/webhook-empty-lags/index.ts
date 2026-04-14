@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { timingSafeEqualUtf8 } from "../_shared/webhook_hmac.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -17,10 +18,10 @@ Deno.serve(async (req) => {
     });
   }
 
-  // Validate webhook secret
-  const secret = req.headers.get("x-webhook-secret");
-  const expectedSecret = Deno.env.get("WEBHOOK_EMPTY_LEGS_SECRET");
-  if (!secret || secret !== expectedSecret) {
+  // Validate webhook secret (comparação em tempo constante)
+  const secret = req.headers.get("x-webhook-secret") ?? "";
+  const expectedSecret = Deno.env.get("WEBHOOK_EMPTY_LEGS_SECRET") ?? "";
+  if (!expectedSecret || !timingSafeEqualUtf8(secret, expectedSecret)) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), {
       status: 401,
       headers: { ...corsHeaders, "Content-Type": "application/json" },

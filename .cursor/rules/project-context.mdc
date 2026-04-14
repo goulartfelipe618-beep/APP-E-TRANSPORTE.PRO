@@ -1,0 +1,32 @@
+---
+description: Contexto do projeto, docs oficiais (Cursor Settings) e estilo UI/código
+alwaysApply: true
+---
+
+## Documentação externa (Cursor → Settings → Features → Docs)
+
+Adiciona manualmente **"+ Add new doc"** com estas URLs para o modelo usar APIs atuais:
+
+- **Supabase:** https://supabase.com/docs
+- **Zod:** https://zod.dev
+- **Vite:** https://vitejs.dev/guide/
+
+(O repositório não consegue ativar isto por ficheiro; é só no painel do Cursor.)
+
+## Estilo de código e UI
+
+- **CSS:** usar sempre **Tailwind CSS** para estilização (classes utilitárias, `cn()` onde já existir no projeto).
+- **Ícones:** preferir **Lucide React** (`lucide-react`).
+- **Visual:** estética **Dark Mode** com acento **laranja** `#FF6600` (orange de destaque) ao sugerir novas interfaces ou CTAs — alinhado ao painel SaaS premium existente.
+- **TypeScript:** **tipagem estrita**; evitar `any`; reutilizar tipos de `@/integrations/supabase/types` quando fizer sentido.
+- **Componentes UI:** seguir padrões **shadcn/ui** já presentes em `src/components/ui/`.
+
+## Stack de referência
+
+- React 18 + Vite + React Router
+- Supabase (Auth, Postgres, Storage, Edge Functions)
+- TanStack Query onde já estiver em uso
+
+## Segurança (resumo)
+
+- Ver `README_SECURITY.md` na raiz (RLS, uploads, API Node, `npm run security-check`).

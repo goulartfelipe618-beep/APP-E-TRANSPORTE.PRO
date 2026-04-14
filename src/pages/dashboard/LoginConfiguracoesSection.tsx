@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { mergeLoginPainelConfig, type LoginPainelConfig } from "@/lib/loginPainelConfig";
+import { assertUploadMagicBytes, extensionForDetectedMime } from "@/lib/validateUploadMagicBytes";
 
 const LANGUAGE_OPTIONS = [
   { value: "pt-BR", label: "Portugues (Brasil)" },
@@ -37,7 +38,14 @@ export default function LoginConfiguracoesSection() {
   }, []);
 
   const uploadImage = async (file: File): Promise<string | null> => {
-    const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
+    let ext = "jpg";
+    try {
+      const { mime } = await assertUploadMagicBytes(file, "raster-image", 6 * 1024 * 1024);
+      ext = extensionForDetectedMime(mime);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Ficheiro inválido");
+      return null;
+    }
     const path = `login/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
     const { error } = await supabase.storage.from("login-assets").upload(path, file, {
       cacheControl: "3600",

@@ -25,6 +25,7 @@ import {
 import { useConfiguracoes } from "@/contexts/ConfiguracoesContext";
 import { ConfirmDeleteDialog } from "@/components/ConfirmDeleteDialog";
 import { cn } from "@/lib/utils";
+import { assertUploadMagicBytes, extensionForDetectedMime } from "@/lib/validateUploadMagicBytes";
 
 type CommunityProfile = {
   user_id: string;
@@ -349,10 +350,11 @@ export default function CommunityFeed({ panel = "motorista" }: CommunityFeedProp
 
         for (let i = 0; i < newPostFiles.length; i += 1) {
           const file = newPostFiles[i];
-          const isVideo = file.type.startsWith("video/");
+          const { mime } = await assertUploadMagicBytes(file, "raster-or-video", 25 * 1024 * 1024);
+          const isVideo = mime.startsWith("video/");
           const mediaType = isVideo ? "video" : "image";
-          const sanitized = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-          const filePath = `${currentUserId}/${postId}/${Date.now()}-${i}-${sanitized}`;
+          const ext = extensionForDetectedMime(mime);
+          const filePath = `${currentUserId}/${postId}/${Date.now()}-${i}.${ext}`;
 
           const { error: uploadError } = await supabase.storage
             .from("community-media")

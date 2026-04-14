@@ -1,0 +1,13 @@
+node_modules/
+dist/
+.git/
+logs/
+*.log
+coverage/
+playwright-report/
+test-results/
+.turbo/
+.cache/
+*.tsbuildinfo
+supabase/.temp/
+.vercel/

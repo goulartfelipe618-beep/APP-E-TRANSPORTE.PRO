@@ -1,9 +1,10 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { requireWebhookHmacIfConfigured } from "../_shared/webhook_hmac.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+    "authorization, x-client-info, apikey, content-type, x-webhook-signature, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
@@ -156,6 +157,28 @@ Deno.serve(async (req) => {
       );
     }
 
+    const rawBody = await req.text();
+    const hmacCheck = await requireWebhookHmacIfConfigured(
+      rawBody,
+      req.headers.get("x-webhook-signature"),
+    );
+    if (!hmacCheck.ok) {
+      return new Response(hmacCheck.body, {
+        status: hmacCheck.status,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    let body: Record<string, any>;
+    try {
+      body = JSON.parse(rawBody || "{}") as Record<string, any>;
+    } catch {
+      return new Response(JSON.stringify({ error: "JSON inválido" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, serviceRoleKey);
@@ -197,8 +220,6 @@ Deno.serve(async (req) => {
         { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
-
-    const body = await req.json();
 
     // If automation is disabled, store as test entry
     if (!automacao.ativo) {

@@ -18,10 +18,22 @@ if (!SUPABASE_URL?.trim() || !SUPABASE_PUBLISHABLE_KEY?.trim()) {
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
+const browserSessionStorage =
+  typeof globalThis !== "undefined" && typeof (globalThis as unknown as { sessionStorage?: Storage }).sessionStorage !== "undefined"
+    ? (globalThis as unknown as { sessionStorage: Storage }).sessionStorage
+    : undefined;
+
+/**
+ * Persistência de sessão em sessionStorage (por aba) + PKCE.
+ * Evita gravar tokens manualmente em localStorage (recomendação de hardening SaaS).
+ * Documentação: Auth — storage; Frontend — tokens.
+ */
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
   auth: {
-    storage: localStorage,
-    persistSession: true,
-    autoRefreshToken: true,
-  }
+    flowType: "pkce",
+    storage: browserSessionStorage,
+    persistSession: Boolean(browserSessionStorage),
+    autoRefreshToken: Boolean(browserSessionStorage),
+    detectSessionInUrl: true,
+  },
 });

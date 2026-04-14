@@ -18,6 +18,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { assertUploadMagicBytes, extensionForDetectedMime } from "@/lib/validateUploadMagicBytes";
 import { PAGINAS_MOTORISTA, PAGINAS_TAXI } from "@/lib/painelAvisosPages";
 import { ConfirmDeleteDialog } from "@/components/ConfirmDeleteDialog";
 
@@ -101,7 +102,14 @@ export default function AdminFullscreenBannersSection() {
   };
 
   const uploadImage = async (f: File): Promise<string | null> => {
-    const ext = f.name.split(".").pop()?.toLowerCase() || "jpg";
+    let ext = "jpg";
+    try {
+      const { mime } = await assertUploadMagicBytes(f, "raster-image", 8 * 1024 * 1024);
+      ext = extensionForDetectedMime(mime);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Ficheiro inválido");
+      return null;
+    }
     const path = `banners/${crypto.randomUUID()}.${ext}`;
     const { error } = await supabase.storage.from("fullscreen-banners").upload(path, f, {
       cacheControl: "3600",

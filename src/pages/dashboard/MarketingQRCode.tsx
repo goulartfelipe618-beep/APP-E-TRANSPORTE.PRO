@@ -17,6 +17,7 @@ import {
   getQrPreviewFgBg,
 } from "@/lib/qrCodeDownload";
 import { cn } from "@/lib/utils";
+import { assertSafeHttpUrlForNavigation } from "@/lib/safeExternalUrl";
 
 interface QRCode {
   id: string;
@@ -383,7 +384,18 @@ export default function MarketingQRCodePage() {
                   >
                     <Download className="h-3.5 w-3.5 mr-1" /> Baixar
                   </Button>
-                  <Button variant="outline" size="sm" onClick={() => window.open(qr.url_destino, "_blank")}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      try {
+                        const u = assertSafeHttpUrlForNavigation(qr.url_destino);
+                        window.open(u.href, "_blank", "noopener,noreferrer");
+                      } catch {
+                        toast.error("Link de destino inválido ou não permitido.");
+                      }
+                    }}
+                  >
                     <ExternalLink className="h-3.5 w-3.5" />
                   </Button>
                 </div>

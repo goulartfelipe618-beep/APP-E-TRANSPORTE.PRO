@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { ConfirmDeleteDialog } from "@/components/ConfirmDeleteDialog";
+import { assertUploadMagicBytes, extensionForDetectedMime } from "@/lib/validateUploadMagicBytes";
 
 interface Slide {
   id: string;
@@ -114,8 +115,17 @@ export default function SlidesPage() {
         return;
       }
     }
+    let ext = "png";
+    try {
+      const { mime } = await assertUploadMagicBytes(file, "raster-image", 8 * 1024 * 1024);
+      ext = extensionForDetectedMime(mime);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Ficheiro inválido");
+      e.target.value = "";
+      return;
+    }
+
     setUploading(true);
-    const ext = file.name.split(".").pop();
     const path = `slides/${Date.now()}.${ext}`;
     const { error } = await supabase.storage.from("logos").upload(path, file, { upsert: true });
     if (error) {

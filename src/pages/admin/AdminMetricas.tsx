@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { BarChart3, ArrowLeftRight, Users, UserCheck, MapPin, Globe, Mail, TrendingUp } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { isRlsOrPermissionError } from "@/lib/supabaseRlsErrors";
 
 interface Metrics {
   totalTransfers: number;
@@ -19,51 +21,87 @@ interface Metrics {
 export default function AdminMetricas() {
   const [metrics, setMetrics] = useState<Metrics | null>(null);
   const [loading, setLoading] = useState(true);
+  const [permissionNotice, setPermissionNotice] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchMetrics = async () => {
+      let rlsBlocked = false;
+
+      const countOrZero = async (label: string, table: string) => {
+        const { count, error } = await supabase.from(table).select("*", { count: "exact", head: true });
+        if (error) {
+          if (isRlsOrPermissionError(error)) {
+            rlsBlocked = true;
+            return 0;
+          }
+          console.error(`[AdminMetricas] ${label}`, error);
+          return 0;
+        }
+        return count ?? 0;
+      };
+
+      const rowsOrEmpty = async <T extends Record<string, unknown>>(
+        label: string,
+        q: PromiseLike<{ data: unknown; error: { message?: string; code?: string; status?: number; details?: string } | null }>,
+      ): Promise<T[]> => {
+        const { data, error } = await q;
+        if (error) {
+          if (isRlsOrPermissionError(error)) {
+            rlsBlocked = true;
+            return [];
+          }
+          console.error(`[AdminMetricas] ${label}`, error);
+          return [];
+        }
+        return (data || []) as T[];
+      };
+
       const [
-        { count: totalTransfers },
-        { count: totalGrupos },
-        { count: totalSolicitacoesTransfer },
-        { count: totalSolicitacoesGrupos },
-        { count: totalSolicitacoesMotoristas },
-        { count: totalSitesCriados },
-        { count: totalAutomacoes },
-        { data: motoristas },
-        { data: solMotoristas },
-        { data: solTransfer },
-        { data: solGrupos },
+        totalTransfers,
+        totalGrupos,
+        totalSolicitacoesTransfer,
+        totalSolicitacoesGrupos,
+        totalSolicitacoesMotoristas,
+        totalSitesCriados,
+        totalAutomacoes,
+        motoristas,
+        solMotoristas,
+        solTransfer,
+        solGrupos,
       ] = await Promise.all([
-        supabase.from("reservas_transfer").select("*", { count: "exact", head: true }),
-        supabase.from("reservas_grupos").select("*", { count: "exact", head: true }),
-        supabase.from("solicitacoes_transfer").select("*", { count: "exact", head: true }),
-        supabase.from("solicitacoes_grupos").select("*", { count: "exact", head: true }),
-        supabase.from("solicitacoes_motoristas").select("*", { count: "exact", head: true }),
-        supabase.from("configuracoes").select("*", { count: "exact", head: true }),
-        supabase.from("automacoes").select("*", { count: "exact", head: true }),
-        supabase.from("solicitacoes_motoristas").select("cidade"),
-        supabase.from("solicitacoes_motoristas").select("cidade"),
-        supabase.from("solicitacoes_transfer").select("embarque"),
-        supabase.from("solicitacoes_grupos").select("destino"),
+        countOrZero("reservas_transfer", "reservas_transfer"),
+        countOrZero("reservas_grupos", "reservas_grupos"),
+        countOrZero("solicitacoes_transfer", "solicitacoes_transfer"),
+        countOrZero("solicitacoes_grupos", "solicitacoes_grupos"),
+        countOrZero("solicitacoes_motoristas", "solicitacoes_motoristas"),
+        countOrZero("configuracoes", "configuracoes"),
+        countOrZero("automacoes", "automacoes"),
+        rowsOrEmpty("motoristas cidades", supabase.from("solicitacoes_motoristas").select("cidade")),
+        rowsOrEmpty("sol motoristas", supabase.from("solicitacoes_motoristas").select("cidade")),
+        rowsOrEmpty("sol transfer", supabase.from("solicitacoes_transfer").select("embarque")),
+        rowsOrEmpty("sol grupos", supabase.from("solicitacoes_grupos").select("destino")),
       ]);
 
-      // Aggregate cities for motoristas
+      if (rlsBlocked) {
+        setPermissionNotice(
+          "Alguns totais ou listagens regionais estão limitados pelas políticas RLS (apenas dados visíveis para a sua sessão). " +
+            "Se precisar de métricas globais, confirme que a conta tem papel de staff (admin) nas políticas Postgres.",
+        );
+      }
+
       const cidadesMotoristas = aggregateField(motoristas || [], "cidade");
       const cidadesSolicitacoesMotoristas = aggregateField(solMotoristas || [], "cidade");
-
-      // For transfer, use embarque as region indicator
       const cidadesSolicitacoesTransfer = aggregateField(solTransfer || [], "embarque");
       const cidadesSolicitacoesGrupos = aggregateField(solGrupos || [], "destino");
 
       setMetrics({
-        totalTransfers: totalTransfers || 0,
-        totalGrupos: totalGrupos || 0,
-        totalSolicitacoesTransfer: totalSolicitacoesTransfer || 0,
-        totalSolicitacoesGrupos: totalSolicitacoesGrupos || 0,
-        totalSolicitacoesMotoristas: totalSolicitacoesMotoristas || 0,
-        totalSitesCriados: totalSitesCriados || 0,
-        totalAutomacoes: totalAutomacoes || 0,
+        totalTransfers,
+        totalGrupos,
+        totalSolicitacoesTransfer,
+        totalSolicitacoesGrupos,
+        totalSolicitacoesMotoristas,
+        totalSitesCriados,
+        totalAutomacoes,
         cidadesMotoristas,
         cidadesSolicitacoesMotoristas,
         cidadesSolicitacoesTransfer,
@@ -71,7 +109,7 @@ export default function AdminMetricas() {
       });
       setLoading(false);
     };
-    fetchMetrics();
+    void fetchMetrics();
   }, []);
 
   if (loading) {
@@ -93,6 +131,14 @@ export default function AdminMetricas() {
         </h1>
         <p className="text-muted-foreground mt-1">Visão geral de toda a operação — demandas, regiões e crescimento.</p>
       </div>
+
+      {permissionNotice ? (
+        <Alert variant="default" className="border-amber-500/50 bg-amber-500/10">
+          <TrendingUp className="h-4 w-4 text-amber-600" />
+          <AlertTitle>Limiar de permissões (RLS)</AlertTitle>
+          <AlertDescription>{permissionNotice}</AlertDescription>
+        </Alert>
+      ) : null}
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">

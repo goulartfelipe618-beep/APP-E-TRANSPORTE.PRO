@@ -25,6 +25,9 @@ test-results/
 .env
 .env.*
 !.env.example
+*.pem
+secrets.json
+serviceAccount*.json
 
 # Supabase CLI cache
 supabase/.temp/

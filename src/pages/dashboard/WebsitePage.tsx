@@ -12,6 +12,7 @@ import {
   ArrowLeft, ArrowRight, Eye, Check, Upload, Monitor, LayoutTemplate, Clock,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { assertUploadMagicBytes, extensionForDetectedMime } from "@/lib/validateUploadMagicBytes";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -439,8 +440,16 @@ export default function WebsitePage() {
 
     let logoUrl: string | null = null;
     if (logoChoice === "sim" && logoFile) {
-      const safeName = logoFile.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-      const path = `${user.id}/${Date.now()}-${safeName}`;
+      let ext = "png";
+      try {
+        const { mime } = await assertUploadMagicBytes(logoFile, "raster-or-pdf", 12 * 1024 * 1024);
+        ext = extensionForDetectedMime(mime);
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Logo inválida");
+        setSubmitting(false);
+        return;
+      }
+      const path = `${user.id}/${Date.now()}-logo.${ext}`;
       const { error: upErr } = await supabase.storage.from("website-briefing").upload(path, logoFile, {
         upsert: false,
         cacheControl: "3600",

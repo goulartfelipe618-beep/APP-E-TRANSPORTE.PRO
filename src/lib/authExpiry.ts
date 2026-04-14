@@ -3,9 +3,20 @@ import { supabase } from "@/integrations/supabase/client";
 export const AUTH_STARTED_AT_KEY = "etp_auth_started_at_v1";
 export const AUTH_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24h
 
+/** Alinhado à sessão Supabase em sessionStorage — não persistir estado de sessão em localStorage. */
+function sessionStore(): Storage | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return window.sessionStorage;
+  } catch {
+    return null;
+  }
+}
+
 function safeReadNumber(key: string): number | null {
   try {
-    const raw = localStorage.getItem(key);
+    const store = sessionStore();
+    const raw = store?.getItem(key) ?? localStorage.getItem(key);
     if (!raw) return null;
     const n = Number(raw);
     if (!Number.isFinite(n) || n <= 0) return null;
@@ -22,7 +33,9 @@ export function readAuthStartedAt(): number | null {
 
 export function setAuthStartedAt(ts: number = Date.now()): void {
   try {
-    localStorage.setItem(AUTH_STARTED_AT_KEY, String(ts));
+    const store = sessionStore();
+    if (store) store.setItem(AUTH_STARTED_AT_KEY, String(ts));
+    else localStorage.setItem(AUTH_STARTED_AT_KEY, String(ts));
   } catch {
     /* ignore */
   }
@@ -30,6 +43,7 @@ export function setAuthStartedAt(ts: number = Date.now()): void {
 
 export function clearAuthStartedAt(): void {
   try {
+    sessionStore()?.removeItem(AUTH_STARTED_AT_KEY);
     localStorage.removeItem(AUTH_STARTED_AT_KEY);
   } catch {
     /* ignore */
