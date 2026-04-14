@@ -166,7 +166,8 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
-      }      anotacoes: {
+      },
+      anotacoes: {
         Row: {
           conteudo: string | null
           created_at: string

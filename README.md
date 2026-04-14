@@ -1,73 +1,80 @@
-# Welcome to your Lovable project
+# Cheerful Bond Builder — E-Transporte.pro
 
-## Project info
+Painel web **React + Vite + TypeScript** com **Supabase** (Auth, Postgres, Storage, Edge Functions), áreas **Dashboard**, **Taxi** e **Admin**, integrações (mapas, PDF, QR Code, Evolution/WhatsApp, webhooks).
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+## Requisitos
 
-## How can I edit this code?
+- Node.js 20+ (recomendado)
+- npm
+- Projeto Supabase (URL + chave anon/publishable)
 
-There are several ways of editing your application.
-
-**Use Lovable**
-
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
+## Arranque local
 
 ```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+git clone <URL_DO_REPOSITORIO>
+cd cheerful-bond-builder
+npm install
+cp .env.example .env
+# Edite .env com VITE_SUPABASE_* (ver .env.example)
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+A aplicação abre em `http://localhost:8080` (porta definida no Vite).
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+## Variáveis de ambiente
 
-**Use GitHub Codespaces**
+Ver **`.env.example`** na raiz. Resumo:
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+| Variável | Onde |
+|----------|------|
+| `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, `VITE_SUPABASE_PROJECT_ID` | Browser / build |
+| `VITE_MAPBOX_ACCESS_TOKEN` | Geocoding (opcional) |
+| `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `ALLOWED_ORIGINS`, `PORT`… | API Node (`npm run server`) |
 
-## What technologies are used for this project?
+Nunca commite `.env`. Segredos de webhooks e service role ficam no **Supabase Dashboard** / servidor, não no frontend.
 
-This project is built with:
+## Scripts npm
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+| Comando | Descrição |
+|---------|-----------|
+| `npm run dev` | Servidor de desenvolvimento Vite |
+| `npm run build` | Build de produção |
+| `npm run preview` | Pré-visualizar o build |
+| `npm run lint` | ESLint (`--quiet` para só erros) |
+| `npm run test` | Vitest (unitários) |
+| `npm run server` | API Node opcional (`server/`) |
+| `npm run security-check` | `npm audit` (high/critical) + checagens de ficheiros sensíveis |
 
-## How can I deploy this project?
+## Estrutura do repositório
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+- **`src/pages/`** — páginas por rota (login, dashboard, admin, etc.)
+- **`src/components/`** — UI reutilizável e layouts
+- **`src/lib/`**, **`src/hooks/`** — utilitários e hooks
+- **`src/integrations/supabase/`** — cliente Supabase e tipos gerados
+- **`supabase/migrations/`** — SQL de esquema e RLS
+- **`supabase/functions/`** — Edge Functions (Deno)
+- **`server/`** — Express opcional (Helmet, rate limit, Zod, webhooks)
+- **`README_SECURITY.md`** — checklist de segurança (RLS, uploads, API)
 
-## Can I connect a custom domain to my Lovable project?
+## Deploy
 
-Yes, you can!
+- **Frontend:** Vercel (ou outro host estático) com as mesmas variáveis `VITE_*` usadas no build.
+- **Supabase:** aplicar migrações (`supabase db push` ou pipeline CI) e configurar secrets das functions.
+- **API Node:** só se usar `server/` em produção (variáveis `SUPABASE_*`, `ALLOWED_ORIGINS`).
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+## Qualidade e otimização
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+- **TypeScript:** `npx tsc --noEmit` (projeto usa `strict: false` no app; endurecer é trabalho incremental).
+- **ESLint:** `any` explícito está como **aviso** para não bloquear o legado; objetivo é substituir por tipos (`@/integrations/supabase/types`).
+- **Bundle:** `React.lazy` + `Suspense` nas rotas pesadas; `manualChunks` no Vite para `recharts`, `jspdf`/`html2canvas`, mapas e ícones.
+- **Erros React:** `AppErrorBoundary` em `src/main.tsx`.
+
+## Documentação extra
+
+- **`README_SECURITY.md`** — alinhado a boas práticas do projeto (CSP, webhooks HMAC, uploads, RLS).
+
+## ADR (resumo)
+
+1. **Auth:** Supabase JWT no cliente; rotas protegidas com componentes `Protected*Route`.
+2. **Dados:** RLS obrigatório em tabelas expostas ao PostgREST; funções `is_platform_staff` / admin conforme migrações.
+3. **API Node:** camada opcional para validação forte e limites de taxa, sem substituir RLS.

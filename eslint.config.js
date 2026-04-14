@@ -21,6 +21,8 @@ export default tseslint.config(
       ...reactHooks.configs.recommended.rules,
       "react-refresh/only-export-components": ["warn", { allowConstantExport: true }],
       "@typescript-eslint/no-unused-vars": "off",
+      // Guia Cheerful-BO: reduzir `any` gradualmente; não bloquear CI em legado.
+      "@typescript-eslint/no-explicit-any": "warn",
     },
   },
 );

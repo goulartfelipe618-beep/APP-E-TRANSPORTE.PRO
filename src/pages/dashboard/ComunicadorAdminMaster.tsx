@@ -128,7 +128,7 @@ export default function ComunicadorAdminMasterPage() {
     setEvoLoading(true);
     try {
       // 1) Sempre carregar só o `id` da linha sistema — evita falha total se a coluna da flag ainda não existir no PostgREST.
-      let { data: sysRow } = await supabase
+      const { data: sysRow } = await supabase
         .from("comunicadores_evolution")
         .select("id")
         .eq("escopo", "sistema")

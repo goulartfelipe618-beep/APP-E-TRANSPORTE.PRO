@@ -83,7 +83,7 @@ export async function downloadQrCodePng(
     canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("Falha ao gerar imagem"))), "image/png");
   });
 
-  const safe = filenameBase.replace(/[^\w\-]+/g, "_").slice(0, 80) || "qrcode";
+  const safe = filenameBase.replace(/[^\w-]+/g, "_").slice(0, 80) || "qrcode";
   const suffix = `${sizePx}px-${scheme === "light" ? "qr-preto" : "qr-branco"}-${solidBackground ? "com-fundo" : "sem-fundo"}`;
   const filename = `${safe}-${suffix}.png`;
 

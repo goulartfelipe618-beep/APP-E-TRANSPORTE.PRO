@@ -1,19 +1,29 @@
+import { lazy, Suspense } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes, Navigate } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import Login from "./pages/Login";
-import NotFound from "./pages/NotFound";
-import DashboardLayout from "./components/DashboardLayout";
-import TaxiDashboardLayout from "./components/TaxiDashboardLayout";
-import AdminLayout from "./components/AdminLayout";
 import ProtectedRoute from "./components/ProtectedRoute";
 import ProtectedTaxiRoute from "./components/ProtectedTaxiRoute";
 import ProtectedAdminRoute from "./components/ProtectedAdminRoute";
 import { ConfiguracoesProvider } from "./contexts/ConfiguracoesContext";
-import MfaChallengePage from "./pages/MfaChallenge";
 import AuthExpiryGuard from "./components/AuthExpiryGuard";
+
+const NotFound = lazy(() => import("./pages/NotFound"));
+const DashboardLayout = lazy(() => import("./components/DashboardLayout"));
+const TaxiDashboardLayout = lazy(() => import("./components/TaxiDashboardLayout"));
+const AdminLayout = lazy(() => import("./components/AdminLayout"));
+const MfaChallengePage = lazy(() => import("./pages/MfaChallenge"));
+
+function RouteFallback() {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-background text-sm text-muted-foreground">
+      A carregar…
+    </div>
+  );
+}
 
 const queryClient = new QueryClient();
 
@@ -25,15 +35,17 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AuthExpiryGuard />
-        <Routes>
-          <Route path="/" element={<Navigate to="/login" replace />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/mfa" element={<MfaChallengePage />} />
-          <Route path="/dashboard" element={<ProtectedRoute><DashboardLayout /></ProtectedRoute>} />
-          <Route path="/taxi" element={<ProtectedTaxiRoute><TaxiDashboardLayout /></ProtectedTaxiRoute>} />
-          <Route path="/admin" element={<ProtectedAdminRoute><AdminLayout /></ProtectedAdminRoute>} />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+        <Suspense fallback={<RouteFallback />}>
+          <Routes>
+            <Route path="/" element={<Navigate to="/login" replace />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/mfa" element={<MfaChallengePage />} />
+            <Route path="/dashboard" element={<ProtectedRoute><DashboardLayout /></ProtectedRoute>} />
+            <Route path="/taxi" element={<ProtectedTaxiRoute><TaxiDashboardLayout /></ProtectedTaxiRoute>} />
+            <Route path="/admin" element={<ProtectedAdminRoute><AdminLayout /></ProtectedAdminRoute>} />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </Suspense>
       </BrowserRouter>
     </TooltipProvider>
     </ConfiguracoesProvider>

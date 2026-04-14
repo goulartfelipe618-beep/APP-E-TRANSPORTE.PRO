@@ -40,6 +40,29 @@ export default defineConfig(({ mode }) => {
         "@": path.resolve(__dirname, "./src"),
       },
     },
+    build: {
+      rollupOptions: {
+        output: {
+          // Apenas libs pesadas e bem isoladas — evita chunks circulares (vendor ↔ react).
+          manualChunks(id) {
+            const normalized = id.replace(/\\/g, "/");
+            if (!normalized.includes("node_modules/")) return;
+            const rest = normalized.split("node_modules/")[1];
+            if (!rest) return;
+            const segments = rest.split("/");
+            const pkg =
+              segments[0]?.startsWith("@") && segments[1]
+                ? `${segments[0]}/${segments[1]}`
+                : (segments[0] ?? "");
+            if (pkg === "recharts") return "charts";
+            if (pkg === "jspdf" || pkg === "html2canvas") return "pdf";
+            if (pkg === "leaflet" || pkg === "react-leaflet") return "maps";
+            if (pkg === "lucide-react") return "icons";
+          },
+        },
+      },
+      chunkSizeWarningLimit: 900,
+    },
     define: {
       "import.meta.env.VITE_SUPABASE_URL": JSON.stringify(url),
       "import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY": JSON.stringify(key),

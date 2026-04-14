@@ -10,7 +10,6 @@ export default function AuthExpiryGuard() {
   const expiredHandledRef = useRef(false);
 
   useEffect(() => {
-    let interval: number | undefined;
     let mounted = true;
 
     const handleExpiry = async () => {
@@ -72,13 +71,13 @@ export default function AuthExpiryGuard() {
       }
     });
 
-    interval = window.setInterval(() => {
+    const interval = window.setInterval(() => {
       void checkOnce();
     }, CHECK_EVERY_MS);
 
     return () => {
       mounted = false;
-      if (interval) window.clearInterval(interval);
+      window.clearInterval(interval);
       subscription.unsubscribe();
     };
   }, [navigate]);

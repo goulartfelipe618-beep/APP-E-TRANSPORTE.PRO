@@ -204,7 +204,6 @@ export default function SistemaConfiguracoesPage() {
       cancelled = true;
     };
     // Carregamento inicial único; loadSettings/loadContratual estabilizam estado local.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {

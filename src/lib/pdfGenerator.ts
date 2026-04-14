@@ -396,7 +396,7 @@ function addTwoColumnFields(doc: jsPDF, leftFields: { l: string; v: string }[], 
 
 function addPriceBlock(doc: jsPDF, items: { label: string; value: string }[], total: string, startY: number): number {
   const blockH = Math.max(32, 12 + items.length * 6);
-  let y = checkPage(doc, startY, blockH + 4);
+  const y = checkPage(doc, startY, blockH + 4);
 
   drawRect(doc, MARGIN, y, CONTENT_W, blockH, CLR.priceBg, 4);
 
