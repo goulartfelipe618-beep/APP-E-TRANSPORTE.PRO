@@ -23,6 +23,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useUserPlan } from "@/hooks/useUserPlan";
 import UpgradePlanDialog from "@/components/planos/UpgradePlanDialog";
+import GoogleBusinessSolicitationDialog from "@/components/google/GoogleBusinessSolicitationDialog";
 import MapboxAddressInput from "@/components/mapbox/MapboxAddressInput";
 import ServiceAreaMultiInput from "@/components/google/ServiceAreaMultiInput";
 import {
