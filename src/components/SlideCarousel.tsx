@@ -3,7 +3,7 @@ import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 
-export interface SlideCarouselSlide {
+interface SlideCarouselSlide {
   id: string;
   titulo: string;
   subtitulo: string;
