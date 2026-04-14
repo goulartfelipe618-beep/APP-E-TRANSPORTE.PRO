@@ -65,6 +65,7 @@ const MANAGEMENT_TABS = [
 export default function GooglePage() {
   const { hasPlan, plano, refetch: refetchPlano } = useUserPlan();
   const [upgradeOpen, setUpgradeOpen] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("info");
   const [servicoAtivo, setServicoAtivo] = useState<any>(null);
   const [submittingBriefing, setSubmittingBriefing] = useState(false);
