@@ -13,10 +13,10 @@ import {
   Search, Shield, Building2, MapPin, Phone, Clock, Camera,
   Send, ExternalLink, Calendar, Info, CheckCircle2, Star, MessageSquare,
   FileText, Package, Settings, Image, PenLine, Globe, Tag, Users,
-  Megaphone, BarChart3, CirclePlus, Trash2, Edit,
+  Megaphone, BarChart3, CirclePlus, Plus, Trash2, Edit,
   HelpCircle, Accessibility, Wifi, ParkingCircle, CreditCard, Award,
   ThumbsUp, Reply, Eye, TrendingUp, MousePointerClick, PhoneCall,
-  Navigation, Loader2
+  Navigation, Loader2,
 } from "lucide-react";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
