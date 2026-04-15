@@ -182,13 +182,29 @@ export default function CommunityFeed({ panel = "motorista" }: CommunityFeedProp
     }
 
     const [postsRes, mediaRes, mentionsRes, likesRes, commentsRes, profilesRes, categoriesRes] = await Promise.all([
-      supabase.from("community_posts").select("*").order("created_at", { ascending: false }),
-      supabase.from("community_post_media").select("*").order("position", { ascending: true }),
-      supabase.from("community_post_mentions").select("*"),
-      supabase.from("community_post_likes").select("*"),
-      supabase.from("community_post_comments").select("*").order("created_at", { ascending: true }),
+      supabase
+        .from("community_posts")
+        .select("id,author_user_id,category_id,content,created_at,updated_at,is_edited")
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("community_post_media")
+        .select("id,post_id,media_type,media_url,position")
+        .order("position", { ascending: true }),
+      supabase
+        .from("community_post_mentions")
+        .select("post_id,mentioned_user_id")
+        .order("created_at", { ascending: true }),
+      supabase.from("community_post_likes").select("post_id,user_id").order("created_at", { ascending: true }),
+      supabase
+        .from("community_post_comments")
+        .select("id,post_id,user_id,content,created_at,updated_at,is_edited")
+        .order("created_at", { ascending: true }),
       supabase.from("configuracoes").select("user_id,nome_completo,nome_projeto,logo_url"),
-      supabase.from("community_categories").select("*").eq("is_active", true).order("name", { ascending: true }),
+      supabase
+        .from("community_categories")
+        .select("id,name,is_active,created_by_user_id")
+        .eq("is_active", true)
+        .order("name", { ascending: true }),
     ]);
 
     if (postsRes.error || mediaRes.error || mentionsRes.error || likesRes.error || commentsRes.error || profilesRes.error || categoriesRes.error) {
@@ -251,6 +267,46 @@ export default function CommunityFeed({ panel = "motorista" }: CommunityFeedProp
         .sort((a, b) => displayName(a).localeCompare(displayName(b))),
     [profiles, currentUserId],
   );
+
+  const mediaByPost = useMemo(() => {
+    const map: Record<string, CommunityMedia[]> = {};
+    for (const m of media) {
+      const list = map[m.post_id];
+      if (list) list.push(m);
+      else map[m.post_id] = [m];
+    }
+    return map;
+  }, [media]);
+
+  const mentionsByPost = useMemo(() => {
+    const map: Record<string, CommunityMention[]> = {};
+    for (const m of mentions) {
+      const list = map[m.post_id];
+      if (list) list.push(m);
+      else map[m.post_id] = [m];
+    }
+    return map;
+  }, [mentions]);
+
+  const likesByPost = useMemo(() => {
+    const map: Record<string, CommunityLike[]> = {};
+    for (const l of likes) {
+      const list = map[l.post_id];
+      if (list) list.push(l);
+      else map[l.post_id] = [l];
+    }
+    return map;
+  }, [likes]);
+
+  const commentsByPost = useMemo(() => {
+    const map: Record<string, CommunityComment[]> = {};
+    for (const c of comments) {
+      const list = map[c.post_id];
+      if (list) list.push(c);
+      else map[c.post_id] = [c];
+    }
+    return map;
+  }, [comments]);
 
   const toggleMention = (userId: string) => {
     setSelectedMentions((prev) => (prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId]));
@@ -627,10 +683,10 @@ export default function CommunityFeed({ panel = "motorista" }: CommunityFeedProp
             {visiblePosts.map((post) => {
               const authorProfile = profiles[post.author_user_id];
               const authorName = displayName(authorProfile);
-              const postMedia = media.filter((m) => m.post_id === post.id);
-              const postMentions = mentions.filter((m) => m.post_id === post.id);
-              const postLikes = likes.filter((l) => l.post_id === post.id);
-              const postComments = comments.filter((c) => c.post_id === post.id);
+              const postMedia = mediaByPost[post.id] ?? [];
+              const postMentions = mentionsByPost[post.id] ?? [];
+              const postLikes = likesByPost[post.id] ?? [];
+              const postComments = commentsByPost[post.id] ?? [];
               const userLiked = !!currentUserId && postLikes.some((l) => l.user_id === currentUserId);
 
               return (
