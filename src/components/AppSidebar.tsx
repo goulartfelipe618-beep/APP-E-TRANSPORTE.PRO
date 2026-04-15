@@ -5,7 +5,7 @@ import {
   FileText, BookOpen, Map, Users, UserCheck, Handshake,
   ClipboardList, CalendarDays, Car, Megaphone, BarChart3,
   Globe, Search, Mail, Monitor, Settings, StickyNote, Link2,
-  Bell, Moon, Sun, LogOut, GraduationCap, Plane,
+  Bell, Moon, Sun, LogOut, GraduationCap, Plane, FlaskConical,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -89,7 +89,16 @@ const getMenuStructure = (showNetwork: boolean, exibirComunicadorMotorista: bool
           { title: "Leads", page: "campanhas/leads", icon: UserCheck },
         ],
       },
-      { title: "Geolocalização", page: "transfer/geolocalizacao", icon: Map },
+      {
+        title: "Geolocalização, Maps e disparos",
+        icon: FlaskConical,
+        betaSection: true,
+        children: [
+          { title: "Geolocalização", page: "transfer/geolocalizacao", icon: Map },
+          { title: "Google Maps", page: "google", icon: Search },
+          { title: "Disparador", page: "disparador", icon: Megaphone },
+        ],
+      },
       { title: "Receptivos", page: "marketing/receptivos", icon: Globe },
       { title: "QR Codes", page: "marketing/qrcode", icon: Search },
       ...(showNetwork ? [{ title: "Network", page: "network", icon: Globe }] : []),
@@ -97,8 +106,6 @@ const getMenuStructure = (showNetwork: boolean, exibirComunicadorMotorista: bool
       { title: "E-mail Business", page: "email-business", icon: Mail },
       { title: "Website", page: "website", icon: Monitor },
       { title: "Domínios", page: "dominios", icon: Link2 },
-      { title: "Google Maps", page: "google", icon: Search },
-      { title: "Disparador", page: "disparador", icon: Megaphone },
     ],
   },
   {
@@ -208,6 +215,9 @@ export function AppSidebar() {
                 {group.items.map((item) => {
                   if ("children" in item && item.children && item.children.length > 0) {
                     const groupActive = isGroupActive(item.children);
+                    const isBetaSection = Boolean(
+                      (item as { betaSection?: boolean }).betaSection,
+                    );
                     return (
                       <Collapsible
                         key={item.title}
@@ -216,12 +226,40 @@ export function AppSidebar() {
                       >
                         <SidebarMenuItem>
                           <CollapsibleTrigger asChild>
-                            <SidebarMenuButton className={cn("w-full justify-between", groupActive && "text-primary")}>
-                              <span className="flex items-center gap-2">
-                                <item.icon className="h-4 w-4" />
-                                {!collapsed && <span>{item.title}</span>}
-                              </span>
-                              {!collapsed && <ChevronDown className="h-4 w-4 transition-transform group-data-[state=open]:rotate-180" />}
+                            <SidebarMenuButton
+                              title={isBetaSection ? `${item.title} — funcionalidades em BETA` : undefined}
+                              className={cn(
+                                "w-full",
+                                groupActive && "text-primary",
+                                isBetaSection && collapsed && "relative",
+                              )}
+                            >
+                              <div className="flex w-full min-w-0 items-center justify-between gap-1">
+                                <span className="flex min-w-0 flex-1 items-center gap-2">
+                                  <item.icon className="h-4 w-4 shrink-0" />
+                                  {!collapsed && (
+                                    <span className="truncate text-left">{item.title}</span>
+                                  )}
+                                  {!collapsed && isBetaSection && (
+                                    <span className="shrink-0 rounded bg-amber-500 px-1.5 py-0.5 text-[9px] font-bold uppercase leading-none tracking-wide text-white">
+                                      BETA
+                                    </span>
+                                  )}
+                                </span>
+                                <span className="flex shrink-0 items-center gap-0.5">
+                                  {isBetaSection && collapsed && (
+                                    <span
+                                      className="rounded bg-amber-500 px-1 py-0.5 text-[7px] font-bold uppercase leading-none tracking-wide text-white"
+                                      aria-hidden
+                                    >
+                                      BETA
+                                    </span>
+                                  )}
+                                  {!collapsed && (
+                                    <ChevronDown className="h-4 w-4 transition-transform group-data-[state=open]:rotate-180" />
+                                  )}
+                                </span>
+                              </div>
                             </SidebarMenuButton>
                           </CollapsibleTrigger>
                           <CollapsibleContent>
@@ -249,7 +287,6 @@ export function AppSidebar() {
 
                   const page = (item as { page: string }).page;
                   const isNetworkItem = item.title === "Network";
-                  const isBetaMenu = page === "google" || page === "disparador";
                   const dimFlat = showNetworkHighlight && !isNetworkItem;
                   return (
                     <SidebarMenuItem
@@ -258,38 +295,21 @@ export function AppSidebar() {
                         "relative",
                         dimFlat && "opacity-40",
                         isNetworkItem && showNetworkHighlight && "z-40 opacity-100",
-                        isBetaMenu && collapsed && "pt-3",
                       )}
                     >
-                      {isBetaMenu && collapsed && (
-                        <span
-                          className="absolute left-1/2 top-0 z-10 -translate-x-1/2 rounded bg-amber-500 px-1 py-0.5 text-[7px] font-bold uppercase leading-none tracking-wide text-white shadow-sm"
-                          aria-hidden
-                        >
-                          BETA
-                        </span>
-                      )}
-                      <div className={cn("flex w-full flex-col", isBetaMenu && !collapsed && "gap-0.5")}>
-                        {isBetaMenu && !collapsed && (
-                          <span className="px-2 text-[10px] font-bold uppercase tracking-widest text-amber-600 dark:text-amber-500">
-                            BETA
-                          </span>
+                      <SidebarMenuButton
+                        onClick={() => handleNavigate(page)}
+                        className={cn(
+                          "cursor-pointer",
+                          isActive(page) && "bg-muted text-primary font-medium",
+                          isNetworkItem &&
+                            showNetworkHighlight &&
+                            "bg-sidebar text-foreground ring-2 ring-primary shadow-md rounded-md",
                         )}
-                        <SidebarMenuButton
-                          onClick={() => handleNavigate(page)}
-                          title={isBetaMenu ? `${item.title} (BETA)` : undefined}
-                          className={cn(
-                            "cursor-pointer",
-                            isActive(page) && "bg-muted text-primary font-medium",
-                            isNetworkItem &&
-                              showNetworkHighlight &&
-                              "bg-sidebar text-foreground ring-2 ring-primary shadow-md rounded-md",
-                          )}
-                        >
-                          <item.icon className="h-4 w-4 mr-2" />
-                          {!collapsed && <span>{item.title}</span>}
-                        </SidebarMenuButton>
-                      </div>
+                      >
+                        <item.icon className="h-4 w-4 mr-2" />
+                        {!collapsed && <span>{item.title}</span>}
+                      </SidebarMenuButton>
                     </SidebarMenuItem>
                   );
                 })}
