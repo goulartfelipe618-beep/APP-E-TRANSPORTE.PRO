@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Plus, Trash2, Users, Search, RefreshCw, Crown } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { PLAN_LABELS, PLAN_COLORS, PlanType, PLANS_PAID_ORDER, normalizeUserPlano } from "@/hooks/useUserPlan";
+import { PLAN_LABELS, PLAN_COLORS, PlanType, PLAN_ORDER, normalizeUserPlano } from "@/hooks/useUserPlan";
 import { ConfirmDeleteDialog } from "@/components/ConfirmDeleteDialog";
 import { purgeStoredStateForUserId } from "@/lib/hardDelete";
 
@@ -171,7 +171,7 @@ export default function AdminUsuariosCadastrados() {
   const handleOpenPlanDialog = (user: UserItem) => {
     setSelectedUser(user);
     const p = normalizeUserPlano(user.plano);
-    setSelectedPlan(p === "free" ? "pro" : p);
+    setSelectedPlan(p);
     setPlanDialogOpen(true);
   };
 
@@ -344,7 +344,7 @@ export default function AdminUsuariosCadastrados() {
                 <Select value={formPlano} onValueChange={(v) => setFormPlano(v as PlanType)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {PLANS_PAID_ORDER.map((p) => (
+                    {PLAN_ORDER.map((p) => (
                       <SelectItem key={p} value={p}>{PLAN_LABELS[p]}</SelectItem>
                     ))}
                   </SelectContent>
@@ -376,13 +376,13 @@ export default function AdminUsuariosCadastrados() {
               <Select value={selectedPlan} onValueChange={(v) => setSelectedPlan(v as PlanType)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {PLANS_PAID_ORDER.map((p) => (
+                  {PLAN_ORDER.map((p) => (
                     <SelectItem key={p} value={p}>{PLAN_LABELS[p]}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground mt-1">
-                O plano FREE existe apenas para pré-cadastros vindos do site; em Cadastrados o plano pago é PRÓ.
+                Você pode definir FREE ou PRÓ conforme a estratégia comercial do cliente.
               </p>
             </div>
             <Button onClick={handleUpdatePlan} disabled={updatingPlan} className="w-full">

@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef, useLayoutEffect } from "react";
-import { toast } from "sonner";
 import { syncPanelThemeForCurrentUser } from "@/lib/panelTheme";
 import { useSlowScrollContainer } from "@/hooks/useSlowScrollContainer";
 import PageLoader from "@/components/PageLoader";
@@ -49,8 +48,6 @@ import AtualizacoesPage from "@/pages/dashboard/AtualizacoesPage";
 import CommunityPage from "@/pages/dashboard/CommunityPage";
 import PainelAvisoBanner from "@/components/PainelAvisoBanner";
 import FullscreenBannerOverlay from "@/components/FullscreenBannerOverlay";
-import { useUserPlan } from "@/hooks/useUserPlan";
-import { isFrotaFreePage } from "@/lib/frotaPlanFreePages";
 
 const PAGE_MAP: Record<string, React.ComponentType> = {
   home: HomePage,
@@ -98,7 +95,6 @@ function readNetworkSpotlightActive() {
 
 function DashboardContent() {
   const { activePage, setActivePage } = useActivePage();
-  const { plano, loading: planLoading } = useUserPlan();
   const { painelMotoristaEvolutionAtivo, ready: painelComunicadorReady } = usePainelMotoristaEvolutionAtivo();
   const mainRef = useRef<HTMLElement>(null);
   useSlowScrollContainer(mainRef, activePage === "website");
@@ -147,16 +143,6 @@ function DashboardContent() {
       setActivePage("sistema/configuracoes");
     }
   }, [painelComunicadorReady, activePage, painelMotoristaEvolutionAtivo, setActivePage]);
-
-  useEffect(() => {
-    if (planLoading) return;
-    if (plano === "pro") return;
-    if (isFrotaFreePage(activePage)) return;
-    setActivePage("home");
-    toast.message("Plano FREE", {
-      description: "Esta área faz parte do plano PRÓ. Use o menu para confirmar o PRÓ ou fale com o administrador.",
-    });
-  }, [planLoading, plano, activePage, setActivePage]);
 
   const dismissSpotlight = () => {
     setShowOverlay(false);

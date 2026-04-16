@@ -76,6 +76,7 @@ export default function GooglePage() {
   const [activeTab, setActiveTab] = useState("info");
   const [servicoAtivo, setServicoAtivo] = useState<any>(null);
   const [submittingBriefing, setSubmittingBriefing] = useState(false);
+  const freePlanReadOnly = plano === "free";
 
   const [infoBusinessName, setInfoBusinessName] = useState("");
   const [infoPrimaryCategory, setInfoPrimaryCategory] = useState("");
@@ -508,7 +509,18 @@ export default function GooglePage() {
   // === INLINE MANAGEMENT SECTION ===
   function renderManagementInline() {
     return (
-      <div className="flex rounded-xl border border-border overflow-hidden bg-card" style={{ minHeight: "600px" }}>
+      <div className="space-y-3">
+        {freePlanReadOnly && (
+          <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-900 dark:text-amber-200">
+            Visualização FREE: você pode ver as configurações, mas a edição e o envio ficam disponíveis no plano PRÓ.
+          </div>
+        )}
+        <div
+          className="relative flex rounded-xl border border-border overflow-hidden bg-card"
+          style={{ minHeight: "600px" }}
+        >
+          {freePlanReadOnly && <div className="absolute inset-0 z-20 cursor-not-allowed" />}
+          <div className={freePlanReadOnly ? "pointer-events-none select-none opacity-75" : ""}>
         {/* Sidebar */}
         <div className="w-56 border-r border-border bg-muted/30 p-3 space-y-1 overflow-y-auto shrink-0">
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2 mb-2">Gerenciar</p>
@@ -1262,6 +1274,8 @@ export default function GooglePage() {
               )}
             </div>
           </div>
+        </div>
+      </div>
     );
   }
 

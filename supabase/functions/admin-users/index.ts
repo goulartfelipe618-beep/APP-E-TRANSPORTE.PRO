@@ -139,11 +139,8 @@ Deno.serve(async (req) => {
 
       // Create plan record (only for non-admin_master)
       if (role !== "admin_master") {
-        const paidPlans = ["pro"];
-        const userPlano =
-          role === "admin_transfer" || role === "admin_taxi"
-            ? paidPlans.includes(plano) ? plano : "pro"
-            : plano || "free";
+        const validPlans = ["free", "pro"];
+        const userPlano = validPlans.includes(plano) ? plano : "pro";
         await supabaseAdmin.from("user_plans").insert({
           user_id: newUser.user.id,
           plano: userPlano,
@@ -164,16 +161,6 @@ Deno.serve(async (req) => {
 
       if (!["free", "pro"].includes(plano)) {
         return new Response(JSON.stringify({ error: "Plano inválido. Use free ou pro." }), { status: 400, headers: corsHeaders });
-      }
-
-      if (plano === "free") {
-        return new Response(
-          JSON.stringify({
-            error:
-              "O plano FREE não pode ser atribuído em usuários cadastrados. FREE é apenas para solicitações vindas do site.",
-          }),
-          { status: 400, headers: corsHeaders },
-        );
       }
 
       // Upsert plan

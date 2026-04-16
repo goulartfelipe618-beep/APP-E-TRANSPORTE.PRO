@@ -96,6 +96,7 @@ export default function EmailBusinessPage() {
   const [listLoading, setListLoading] = useState(true);
   const { plano, refetch: refetchPlano } = useUserPlan();
   const [upgradeOpen, setUpgradeOpen] = useState(false);
+  const freePlanReadOnly = plano === "free";
 
   // wizard state
   const [wizardActive, setWizardActive] = useState(false);
@@ -174,14 +175,14 @@ export default function EmailBusinessPage() {
   };
 
   const handleSubmitEmail = async () => {
-    const isFirstFree = wizardMode === "first";
-    if (!isFirstFree && plano === "free") {
+    if (freePlanReadOnly) {
       setUpgradeOpen(true);
       toast.message("Plano necessário", {
-        description: "Para solicitar caixas adicionais de e-mail, confirme um plano pago no painel.",
+        description: "No plano FREE você pode visualizar este módulo, mas o cadastro de e-mails é exclusivo do plano PRÓ.",
       });
       return;
     }
+    const isFirstFree = wizardMode === "first";
     setSubmitting(true);
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { toast.error("Não autenticado"); setSubmitting(false); return; }
@@ -215,12 +216,26 @@ export default function EmailBusinessPage() {
   const goToDomainMenu = () => setActivePage("dominios");
 
   const openWizardFirst = () => {
+    if (freePlanReadOnly) {
+      setUpgradeOpen(true);
+      toast.message("Plano necessário", {
+        description: "No plano FREE você pode visualizar este módulo, mas o cadastro de e-mails é exclusivo do plano PRÓ.",
+      });
+      return;
+    }
     resetWizardFields();
     setWizardMode("first");
     setWizardActive(true);
   };
 
   const openWizardAdditional = () => {
+    if (freePlanReadOnly) {
+      setUpgradeOpen(true);
+      toast.message("Plano necessário", {
+        description: "No plano FREE você pode visualizar este módulo, mas o cadastro de e-mails é exclusivo do plano PRÓ.",
+      });
+      return;
+    }
     resetWizardFields();
     setWizardMode("additional");
     setWizardActive(true);
@@ -402,6 +417,11 @@ export default function EmailBusinessPage() {
               </div>
             </div>
 
+            {freePlanReadOnly && (
+              <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-900 dark:text-amber-200">
+                Visualização FREE: você pode ver o módulo de E-mail Business, mas novos cadastros são exclusivos do plano PRÓ.
+              </div>
+            )}
             <div className="text-center">
               <Button size="lg" onClick={openWizardFirst}>
                 Contratar E-mail Business <ArrowRight className="h-4 w-4 ml-2" />

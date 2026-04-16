@@ -39,6 +39,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import type { Tables } from "@/integrations/supabase/types";
+import { useUserPlan } from "@/hooks/useUserPlan";
 
 type DominioRow = Tables<"dominios_usuario">;
 type DominioRowView = DominioRow & { motorista_nome?: string };
@@ -283,6 +284,8 @@ async function checkDomainAvailability(fqdn: string): Promise<{
 }
 
 export default function DominiosPage() {
+  const { plano } = useUserPlan();
+  const freePlanReadOnly = plano === "free";
   const [rows, setRows] = useState<DominioRowView[]>([]);
   const [loading, setLoading] = useState(true);
   const [adminMasterView, setAdminMasterView] = useState<boolean | null>(null);
@@ -442,6 +445,10 @@ export default function DominiosPage() {
   };
 
   const openDialog = () => {
+    if (freePlanReadOnly) {
+      toast.error("No plano FREE você pode visualizar os domínios, mas o cadastro/registro é exclusivo do plano PRÓ.");
+      return;
+    }
     resetDialogFields();
     setDialogMode("choose");
   };
@@ -669,9 +676,9 @@ export default function DominiosPage() {
           </p>
         </div>
         {roleResolved && !isAdminMaster && (
-          <Button type="button" onClick={openDialog} className="shrink-0 gap-2">
+          <Button type="button" onClick={openDialog} className="shrink-0 gap-2" disabled={freePlanReadOnly}>
             <Plus className="h-4 w-4" />
-            Registrar um novo domínio
+            {freePlanReadOnly ? "Cadastro de domínio (PRÓ)" : "Registrar um novo domínio"}
           </Button>
         )}
       </div>

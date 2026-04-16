@@ -27,7 +27,6 @@ import { persistNetworkHighlightDismissed } from "@/lib/networkNacionalPrefs";
 import { usePainelMotoristaEvolutionAtivo } from "@/hooks/usePainelMotoristaEvolutionAtivo";
 import { useUserPlan } from "@/hooks/useUserPlan";
 import { isFrotaFreePage } from "@/lib/frotaPlanFreePages";
-import UpgradePlanDialog from "@/components/planos/UpgradePlanDialog";
 
 function ProBadge() {
   return (
@@ -160,8 +159,7 @@ export function AppSidebar() {
   const [showNetworkHighlight, setShowNetworkHighlight] = useState(readNetworkSpotlightHighlight);
   const { painelMotoristaEvolutionAtivo, ready: painelComunicadorReady } = usePainelMotoristaEvolutionAtivo();
   const exibirComunicadorMotorista = !painelComunicadorReady || painelMotoristaEvolutionAtivo;
-  const { plano, loading: planLoading, refetch: refetchPlano } = useUserPlan();
-  const [upgradeOpen, setUpgradeOpen] = useState(false);
+  const { plano, loading: planLoading } = useUserPlan();
   const freeRestricted = !planLoading && plano === "free";
   const proOnly = (page: string) => !isFrotaFreePage(page);
   const groupHasProOnlyChild = (children: { page: string }[]) => children.some((c) => proOnly(c.page));
@@ -202,11 +200,6 @@ export function AppSidebar() {
   };
 
   const tryNavigate = (page: string) => {
-    if (freeRestricted && proOnly(page)) {
-      setUpgradeOpen(true);
-      if (isMobile) setOpenMobile(false);
-      return;
-    }
     goPage(page);
   };
 
@@ -412,13 +405,6 @@ export function AppSidebar() {
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarFooter>
-
-      <UpgradePlanDialog
-        open={upgradeOpen}
-        onOpenChange={setUpgradeOpen}
-        selfServiceUpgrade={plano === "free"}
-        onUpgradeSuccess={() => void refetchPlano()}
-      />
     </Sidebar>
   );
 }
