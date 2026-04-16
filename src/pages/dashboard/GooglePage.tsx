@@ -5,6 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -31,9 +32,15 @@ import MapboxAddressInput from "@/components/mapbox/MapboxAddressInput";
 import ServiceAreaMultiInput from "@/components/google/ServiceAreaMultiInput";
 import {
   buildGoogleSolicitacaoPayload,
+  buildGbpWebsiteUriForUser,
   formatBrazilPhoneDisplay,
+  GBP_ALLOWED_PRIMARY_CATEGORIES,
   normalizeBrazilPhoneDigits,
+  normalizeStoredGbpCategoryId,
+  sanitizeGbpBusinessDescription,
+  validateGbpBusinessDescription,
   validateGbpBusinessTitle,
+  validateGbpScheduleDeRisk,
   type GbpDaySchedule,
   type GbpServiceAreaPlace,
   type GbpVerificationAddress,
@@ -101,7 +108,7 @@ export default function GooglePage() {
   const [phoneDigits, setPhoneDigits] = useState("");
   const [phoneSecDigits, setPhoneSecDigits] = useState("");
   const [whatsDigits, setWhatsDigits] = useState("");
-  const [contactWebsite, setContactWebsite] = useState("");
+  const [googlePanelUserId, setGooglePanelUserId] = useState<string | null>(null);
   const [contactBooking, setContactBooking] = useState("");
   const [contactMenu, setContactMenu] = useState("");
   const [socialFb, setSocialFb] = useState("");
@@ -119,8 +126,6 @@ export default function GooglePage() {
   const [locLng, setLocLng] = useState("");
   const [locAreaTexto, setLocAreaTexto] = useState("");
 
-  /** Estado compartilhado com a UI de “gestão” (mock); wizard de criação usa componente próprio. */
-  const [serviceArea, setServiceArea] = useState(true);
   const [schedule, setSchedule] = useState(
     DAYS.map((d) => ({ ...d, open: "08:00", close: "18:00", enabled: d.defaultOn }))
   );
@@ -182,6 +187,12 @@ export default function GooglePage() {
   }, []);
 
   useEffect(() => {
+    void supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user?.id) setGooglePanelUserId(user.id);
+    });
+  }, []);
+
+  useEffect(() => {
     if (!ferramentasLoading && !googleConsumoLiberado) setCreateOpen(false);
   }, [ferramentasLoading, googleConsumoLiberado]);
 
@@ -197,8 +208,14 @@ export default function GooglePage() {
     if (typeof d.business_title === "string") setInfoBusinessName(d.business_title);
     const info = (d.informacoes_perfil || d.informacoes_negocio) as Record<string, unknown> | undefined;
     if (info && typeof info === "object") {
-      if (typeof info.categoria_principal === "string") setInfoPrimaryCategory(info.categoria_principal);
-      if (typeof info.categoria_secundaria === "string") setInfoSecondaryCategory(info.categoria_secundaria);
+      if (typeof info.categoria_principal === "string") {
+        const pc = normalizeStoredGbpCategoryId(info.categoria_principal);
+        setInfoPrimaryCategory(pc || "");
+      }
+      if (typeof info.categoria_secundaria === "string") {
+        const sc = normalizeStoredGbpCategoryId(info.categoria_secundaria);
+        setInfoSecondaryCategory(sc || "");
+      }
       if (typeof info.descricao === "string") setInfoDescription(info.descricao);
       if (typeof info.ano_abertura === "string" || typeof info.ano_abertura === "number") {
         setInfoOpeningYear(String(info.ano_abertura));
@@ -226,7 +243,6 @@ export default function GooglePage() {
         setPhoneSecDigits(normalizeBrazilPhoneDigits(c.telefone_secundario));
       }
       if (typeof c.whatsapp === "string") setWhatsDigits(normalizeBrazilPhoneDigits(c.whatsapp));
-      if (typeof c.website === "string") setContactWebsite(c.website);
       if (typeof c.link_agendamento === "string") setContactBooking(c.link_agendamento);
       if (typeof c.link_menu === "string") setContactMenu(c.link_menu);
       if (typeof c.facebook === "string") setSocialFb(c.facebook);
@@ -316,14 +332,39 @@ export default function GooglePage() {
       toast.error(titleCheck.message);
       return;
     }
-    if (!infoPrimaryCategory) {
-      toast.error("Selecione a categoria principal do negócio.");
+    const primaryCat = normalizeStoredGbpCategoryId(infoPrimaryCategory);
+    if (!primaryCat) {
+      toast.error("Selecione uma categoria principal permitida pelo Google (lista fixa).");
       setActiveTab("info");
       return;
     }
-    if (infoDescription.trim().length < 20) {
-      toast.error("Preencha a descrição do negócio (mínimo 20 caracteres).");
+    const secondaryCat = normalizeStoredGbpCategoryId(infoSecondaryCategory);
+    if (infoSecondaryCategory && !secondaryCat) {
+      toast.error("Categoria secundária inválida. Escolha uma das opções oficiais ou \"Nenhuma\".");
       setActiveTab("info");
+      return;
+    }
+    if (secondaryCat && secondaryCat === primaryCat) {
+      toast.error("A categoria secundária deve ser diferente da principal.");
+      setActiveTab("info");
+      return;
+    }
+    const descSanitized = sanitizeGbpBusinessDescription(infoDescription);
+    const descCheck = validateGbpBusinessDescription(descSanitized);
+    if (!descCheck.ok) {
+      toast.error(descCheck.message);
+      setActiveTab("info");
+      return;
+    }
+    if (descSanitized.length < 20) {
+      toast.error("Após remover links e telefones, a descrição ficou curta demais (mínimo 20 caracteres).");
+      setActiveTab("info");
+      return;
+    }
+    const scheduleRisk = validateGbpScheduleDeRisk(schedule);
+    if (!scheduleRisk.ok) {
+      toast.error(scheduleRisk.message);
+      setActiveTab("hours");
       return;
     }
     const va = verificationAddress();
@@ -381,14 +422,15 @@ export default function GooglePage() {
         serviceAreas: gbpServiceAreas,
         primaryPhoneDigits: digits,
         regularHours: regular_hours,
+        primaryCategoryId: primaryCat,
       });
 
       const contato_exibicao: Record<string, string> = {};
+      contato_exibicao.website = buildGbpWebsiteUriForUser(user.id);
       const sec = normalizeBrazilPhoneDigits(phoneSecDigits);
       if (sec.length >= 10) contato_exibicao.telefone_secundario = formatBrazilPhoneDisplay(sec);
       const w = normalizeBrazilPhoneDigits(whatsDigits);
       if (w.length >= 10) contato_exibicao.whatsapp = formatBrazilPhoneDisplay(w);
-      if (contactWebsite.trim()) contato_exibicao.website = contactWebsite.trim();
       if (contactBooking.trim()) contato_exibicao.link_agendamento = contactBooking.trim();
       if (contactMenu.trim()) contato_exibicao.link_menu = contactMenu.trim();
       if (socialFb.trim()) contato_exibicao.facebook = socialFb.trim();
@@ -410,9 +452,9 @@ export default function GooglePage() {
       const dados_solicitacao: Record<string, unknown> = {
         ...core,
         informacoes_perfil: {
-          categoria_principal: infoPrimaryCategory,
-          categoria_secundaria: infoSecondaryCategory || undefined,
-          descricao: infoDescription.trim(),
+          categoria_principal: primaryCat,
+          categoria_secundaria: secondaryCat || undefined,
+          descricao: descSanitized,
           ano_abertura: infoOpeningYear.trim() || undefined,
           identificador_curto: infoShortName.trim() || undefined,
         },
@@ -573,42 +615,64 @@ export default function GooglePage() {
                         maxLength={58}
                       />
                       <p className="text-xs text-muted-foreground mt-1">Conforme regras do Google — nome ou razão social, até 58 caracteres.</p>
+                      <Alert className="mt-2 border-border bg-muted/30">
+                        <AlertTitle className="text-xs font-medium text-foreground">Nome sem “pegadinhas”</AlertTitle>
+                        <AlertDescription className="text-[11px] text-muted-foreground">
+                          Não use cidades, 24h, preço, “melhor”, símbolos chamativos nem slogans. Só nome fantasia ou motorista — reduz suspensão em cadeia na rede.
+                        </AlertDescription>
+                      </Alert>
                     </div>
                     <div>
-                      <Label>Categoria Principal *</Label>
+                      <Label>Categoria principal *</Label>
                       <Select value={infoPrimaryCategory || undefined} onValueChange={setInfoPrimaryCategory}>
-                        <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                        <SelectTrigger><SelectValue placeholder="Selecione uma categoria oficial…" /></SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="transporte_executivo">Serviço de Transporte Executivo</SelectItem>
-                          <SelectItem value="taxi">Serviço de Táxi</SelectItem>
-                          <SelectItem value="aluguel_veiculos">Aluguel de Veículos</SelectItem>
-                          <SelectItem value="limusine">Serviço de Limusine</SelectItem>
-                          <SelectItem value="transporte_aeroporto">Transporte para Aeroporto</SelectItem>
-                          <SelectItem value="shuttle">Serviço de Shuttle</SelectItem>
+                          {GBP_ALLOWED_PRIMARY_CATEGORIES.map((c) => (
+                            <SelectItem key={c.id} value={c.id}>
+                              {c.displayLabelPt} ({c.displayLabelEn})
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Apenas categorias aceitas pelo Google para transporte sem loja física (evita suspensão por categoria incorreta).
+                      </p>
                     </div>
                     <div>
-                      <Label>Categoria Secundária</Label>
-                      <Select value={infoSecondaryCategory || undefined} onValueChange={setInfoSecondaryCategory}>
+                      <Label>Categoria secundária</Label>
+                      <Select
+                        value={infoSecondaryCategory || "none"}
+                        onValueChange={(v) => setInfoSecondaryCategory(v === "none" ? "" : v)}
+                      >
                         <SelectTrigger><SelectValue placeholder="Opcional" /></SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="transporte">Serviço de Transporte</SelectItem>
-                          <SelectItem value="turismo">Turismo</SelectItem>
-                          <SelectItem value="transfer">Transfer</SelectItem>
+                          <SelectItem value="none">Nenhuma</SelectItem>
+                          {GBP_ALLOWED_PRIMARY_CATEGORIES.map((c) => (
+                            <SelectItem key={`sec-${c.id}`} value={c.id}>
+                              {c.displayLabelPt}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
                     <div className="col-span-2">
-                      <Label>Descrição do Negócio</Label>
+                      <Label>Descrição do negócio</Label>
                       <Textarea
                         value={infoDescription}
                         onChange={(e) => setInfoDescription(e.target.value)}
-                        placeholder="Descreva seus serviços em detalhes..."
+                        placeholder="Descreva seus serviços em frases normais, sem links, telefones nem texto todo em maiúsculas…"
                         maxLength={750}
                         className="min-h-[120px]"
                       />
                       <p className="text-xs text-muted-foreground mt-1">{infoDescription.length}/750 caracteres (mínimo 20 para enviar)</p>
+                      <Alert className="mt-3 border-amber-500/40 bg-amber-500/5">
+                        <AlertTitle className="text-sm text-foreground">Regras do Google (descrição)</AlertTitle>
+                        <AlertDescription className="text-xs text-muted-foreground space-y-1">
+                          <span className="block">Não use URLs, www ou telefones (há campos próprios).</span>
+                          <span className="block">Evite descrição inteira em MAIÚSCULAS.</span>
+                          <span className="block">No envio, links e telefones detectados são removidos automaticamente.</span>
+                        </AlertDescription>
+                      </Alert>
                     </div>
                     <div>
                       <Label>Ano de Abertura</Label>
@@ -626,40 +690,73 @@ export default function GooglePage() {
               {activeTab === "location" && (
                 <div className="space-y-6">
                   <div>
-                    <h3 className="text-lg font-bold text-foreground mb-1">Localização e Área de Atendimento</h3>
-                    <p className="text-sm text-muted-foreground">Defina onde sua empresa está e as regiões que atende.</p>
+                    <h3 className="text-lg font-bold text-foreground mb-1">Localização e área de atendimento (SAB)</h3>
+                    <p className="text-sm text-muted-foreground">
+                      O perfil é sempre tratado como empresa de área de atendimento: o endereço abaixo é só para verificação e não aparece no Maps.
+                    </p>
                   </div>
-                  <div className="flex items-center justify-between rounded-lg border border-border p-4">
-                    <div>
-                      <p className="text-sm font-medium text-foreground">Service Area Business (SAB)</p>
-                      <p className="text-xs text-muted-foreground">Ative se o serviço é móvel, sem ponto físico fixo. Recomendado para motoristas.</p>
-                    </div>
-                    <Switch checked={serviceArea} onCheckedChange={setServiceArea} />
-                  </div>
-                  {serviceArea && (
-                    <div>
-                      <Label>Áreas de Atendimento *</Label>
-                      <Textarea placeholder="São Paulo, Guarulhos, ABC Paulista, Campinas..." className="min-h-[80px]" />
-                      <p className="text-xs text-muted-foreground mt-1">Separe as cidades/regiões por vírgula</p>
-                    </div>
-                  )}
-                  <div className="grid grid-cols-2 gap-4">
-                    <div><Label>Endereço</Label><Input placeholder="Av. Paulista, 1000" /></div>
-                    <div><Label>Bairro</Label><Input placeholder="Bela Vista" /></div>
-                    <div><Label>CEP</Label><Input placeholder="00000-000" /></div>
-                    <div><Label>Cidade</Label><Input placeholder="São Paulo" /></div>
-                    <div><Label>Estado</Label><Input placeholder="SP" /></div>
-                    <div><Label>País</Label><Input placeholder="Brasil" defaultValue="Brasil" /></div>
-                  </div>
+                  <Alert className="border-primary/30 bg-primary/5">
+                    <AlertTitle className="text-sm text-foreground">Área de serviço obrigatória</AlertTitle>
+                    <AlertDescription className="text-xs text-muted-foreground">
+                      Não publique o endereço residencial como loja. Indique apenas cidades/regiões onde você atende; o Google usa isso no mapa de cobertura.
+                    </AlertDescription>
+                  </Alert>
                   <div>
-                    <Label>Coordenadas (Latitude, Longitude)</Label>
-                    <div className="grid grid-cols-2 gap-4">
-                      <Input placeholder="-23.5505" />
-                      <Input placeholder="-46.6333" />
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-1">Opcional. Ajuda a posicionar seu pin no Maps com precisão.</p>
+                    <Label>Cidades e regiões atendidas *</Label>
+                    <ServiceAreaMultiInput
+                      areas={gbpServiceAreas}
+                      onChange={setGbpServiceAreas}
+                      disabled={freePlanReadOnly}
+                      className="mt-1"
+                    />
                   </div>
-                  <Button className="bg-primary text-primary-foreground"><Send className="h-4 w-4 mr-2" /> Salvar Localização</Button>
+                  <div className="rounded-xl border border-border bg-muted/20 p-4 space-y-3">
+                    <p className="text-sm font-medium text-foreground">Endereço de verificação (oculto no Google Maps)</p>
+                    <MapboxAddressInput
+                      value={vMapboxLine}
+                      onChangeAddress={setVMapboxLine}
+                      onCoordinatesChange={(lat, lng) => {
+                        setVLat(lat);
+                        setVLng(lng);
+                      }}
+                      onPlaceContext={(cidade, estado) => {
+                        if (cidade) setVCidade(cidade);
+                        if (estado) setVUf(estado.slice(0, 2).toUpperCase());
+                      }}
+                      disabled={freePlanReadOnly}
+                      placeholder="Busque rua, número, bairro, cidade…"
+                    />
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                      <div className="col-span-2 sm:col-span-1">
+                        <Label>CEP *</Label>
+                        <Input value={vCep} onChange={(e) => setVCep(e.target.value)} placeholder="00000-000" disabled={freePlanReadOnly} />
+                      </div>
+                      <div className="col-span-2">
+                        <Label>Logradouro *</Label>
+                        <Input value={vLogradouro} onChange={(e) => setVLogradouro(e.target.value)} placeholder="Rua, avenida…" disabled={freePlanReadOnly} />
+                      </div>
+                      <div>
+                        <Label>Número *</Label>
+                        <Input value={vNumero} onChange={(e) => setVNumero(e.target.value)} placeholder="Nº" disabled={freePlanReadOnly} />
+                      </div>
+                      <div>
+                        <Label>Complemento</Label>
+                        <Input value={vComplemento} onChange={(e) => setVComplemento(e.target.value)} placeholder="Apto, bloco…" disabled={freePlanReadOnly} />
+                      </div>
+                      <div>
+                        <Label>Bairro *</Label>
+                        <Input value={vBairro} onChange={(e) => setVBairro(e.target.value)} disabled={freePlanReadOnly} />
+                      </div>
+                      <div>
+                        <Label>Cidade *</Label>
+                        <Input value={vCidade} onChange={(e) => setVCidade(e.target.value)} disabled={freePlanReadOnly} />
+                      </div>
+                      <div>
+                        <Label>UF *</Label>
+                        <Input value={vUf} onChange={(e) => setVUf(e.target.value.toUpperCase().slice(0, 2))} placeholder="SP" maxLength={2} disabled={freePlanReadOnly} />
+                      </div>
+                    </div>
+                  </div>
                 </div>
               )}
 
@@ -667,39 +764,84 @@ export default function GooglePage() {
               {activeTab === "contact" && (
                 <div className="space-y-6">
                   <div>
-                    <h3 className="text-lg font-bold text-foreground mb-1">Informações de Contato</h3>
-                    <p className="text-sm text-muted-foreground">Telefone, website e links de contato.</p>
+                    <h3 className="text-lg font-bold text-foreground mb-1">Informações de contato</h3>
+                    <p className="text-sm text-muted-foreground">Use o mesmo telefone principal em redes e materiais para evitar inconsistência detectada pelo Google.</p>
                   </div>
+                  <Alert className="border-primary/30 bg-primary/5">
+                    <AlertTitle className="text-sm text-foreground">Website no perfil Google</AlertTitle>
+                    <AlertDescription className="text-xs text-muted-foreground">
+                      A plataforma fixa a URL pública do catálogo por motorista (única e rastreável). Ela é enviada automaticamente no briefing — não altere para um domínio “limpo” que não esteja vinculado a você.
+                    </AlertDescription>
+                  </Alert>
                   <div className="grid grid-cols-2 gap-4">
-                    <div><Label>Telefone Principal *</Label><Input placeholder="(11) 99999-9999" /></div>
-                    <div><Label>Telefone Secundário</Label><Input placeholder="(11) 3333-3333" /></div>
-                    <div><Label>WhatsApp</Label><Input placeholder="(11) 99999-9999" /></div>
-                    <div><Label>Website</Label><Input placeholder="https://www.exemplo.com.br" /></div>
-                    <div><Label>Link de Agendamento</Label><Input placeholder="https://booking.exemplo.com" /></div>
-                    <div><Label>Link do Menu/Cardápio</Label><Input placeholder="https://..." /></div>
+                    <div>
+                      <Label>Telefone principal *</Label>
+                      <Input
+                        inputMode="numeric"
+                        value={formatBrazilPhoneDisplay(phoneDigits)}
+                        onChange={(e) => setPhoneDigits(normalizeBrazilPhoneDigits(e.target.value))}
+                        placeholder="(11) 99999-9999"
+                        disabled={freePlanReadOnly}
+                      />
+                    </div>
+                    <div>
+                      <Label>Telefone secundário</Label>
+                      <Input
+                        inputMode="numeric"
+                        value={formatBrazilPhoneDisplay(phoneSecDigits)}
+                        onChange={(e) => setPhoneSecDigits(normalizeBrazilPhoneDigits(e.target.value))}
+                        placeholder="(11) 3333-3333"
+                        disabled={freePlanReadOnly}
+                      />
+                    </div>
+                    <div>
+                      <Label>WhatsApp</Label>
+                      <Input
+                        inputMode="numeric"
+                        value={formatBrazilPhoneDisplay(whatsDigits)}
+                        onChange={(e) => setWhatsDigits(normalizeBrazilPhoneDigits(e.target.value))}
+                        placeholder="(11) 99999-9999"
+                        disabled={freePlanReadOnly}
+                      />
+                    </div>
+                    <div className="col-span-2">
+                      <Label>Website (definido pela plataforma)</Label>
+                      <Input
+                        readOnly
+                        className="bg-muted/50 font-mono text-xs"
+                        value={googlePanelUserId ? buildGbpWebsiteUriForUser(googlePanelUserId) : "A carregar…"}
+                      />
+                    </div>
+                    <div>
+                      <Label>Link de agendamento</Label>
+                      <Input value={contactBooking} onChange={(e) => setContactBooking(e.target.value)} placeholder="https://…" disabled={freePlanReadOnly} />
+                    </div>
+                    <div>
+                      <Label>Link do menu / cardápio</Label>
+                      <Input value={contactMenu} onChange={(e) => setContactMenu(e.target.value)} placeholder="https://…" disabled={freePlanReadOnly} />
+                    </div>
                   </div>
                   <div>
-                    <Label>Links de Redes Sociais</Label>
+                    <Label>Redes sociais</Label>
                     <div className="space-y-2 mt-2">
                       <div className="flex items-center gap-2">
-                        <span className="text-sm text-muted-foreground w-24">Facebook</span>
-                        <Input placeholder="https://facebook.com/..." className="flex-1" />
+                        <span className="text-sm text-muted-foreground w-24 shrink-0">Facebook</span>
+                        <Input value={socialFb} onChange={(e) => setSocialFb(e.target.value)} placeholder="https://facebook.com/…" className="flex-1" disabled={freePlanReadOnly} />
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="text-sm text-muted-foreground w-24">Instagram</span>
-                        <Input placeholder="https://instagram.com/..." className="flex-1" />
+                        <span className="text-sm text-muted-foreground w-24 shrink-0">Instagram</span>
+                        <Input value={socialIg} onChange={(e) => setSocialIg(e.target.value)} placeholder="https://instagram.com/…" className="flex-1" disabled={freePlanReadOnly} />
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="text-sm text-muted-foreground w-24">LinkedIn</span>
-                        <Input placeholder="https://linkedin.com/..." className="flex-1" />
+                        <span className="text-sm text-muted-foreground w-24 shrink-0">LinkedIn</span>
+                        <Input value={socialLi} onChange={(e) => setSocialLi(e.target.value)} placeholder="https://linkedin.com/…" className="flex-1" disabled={freePlanReadOnly} />
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="text-sm text-muted-foreground w-24">YouTube</span>
-                        <Input placeholder="https://youtube.com/..." className="flex-1" />
+                        <span className="text-sm text-muted-foreground w-24 shrink-0">YouTube</span>
+                        <Input value={socialYt} onChange={(e) => setSocialYt(e.target.value)} placeholder="https://youtube.com/…" className="flex-1" disabled={freePlanReadOnly} />
                       </div>
                     </div>
                   </div>
-                  <Button className="bg-primary text-primary-foreground"><Send className="h-4 w-4 mr-2" /> Salvar Contato</Button>
                 </div>
               )}
 
@@ -730,11 +872,17 @@ export default function GooglePage() {
                       </div>
                     ))}
                   </div>
-                  <div className="flex items-center gap-3 p-3 rounded-lg border border-primary/30 bg-primary/5">
-                    <Info className="h-4 w-4 text-primary shrink-0" />
-                    <p className="text-xs text-muted-foreground">Para serviços 24h, defina abertura 00:00 e fechamento 23:59.</p>
-                  </div>
-                  <Button className="bg-primary text-primary-foreground"><Send className="h-4 w-4 mr-2" /> Salvar Horários</Button>
+                  <Alert className="border-amber-500/40 bg-amber-500/5">
+                    <AlertTitle className="text-sm text-foreground">Horários realistas</AlertTitle>
+                    <AlertDescription className="text-xs text-muted-foreground space-y-1">
+                      <span className="block">
+                        Marcar 24 horas em todos os dias, sem histórico no Google, aumenta risco de verificação manual no transporte.
+                      </span>
+                      <span className="block">
+                        O envio do briefing é bloqueado se todos os dias estiverem abertos o dia todo (00:00–23:59 ou equivalente). Use horários que reflitam quando você atende chamados.
+                      </span>
+                    </AlertDescription>
+                  </Alert>
                 </div>
               )}
 
@@ -809,9 +957,17 @@ export default function GooglePage() {
               {activeTab === "photos" && (
                 <div className="space-y-6">
                   <div>
-                    <h3 className="text-lg font-bold text-foreground mb-1">Fotos do Perfil</h3>
+                    <h3 className="text-lg font-bold text-foreground mb-1">Fotos do perfil</h3>
                     <p className="text-sm text-muted-foreground">Gerencie todas as fotos do seu perfil no Google.</p>
                   </div>
+                  <Alert className="border-amber-500/40 bg-amber-500/5">
+                    <AlertTitle className="text-sm text-foreground">Política de fotos (evite suspensão)</AlertTitle>
+                    <AlertDescription className="text-xs text-muted-foreground space-y-1">
+                      <span className="block">Use apenas fotos originais (o Google penaliza imagens de banco genéricas).</span>
+                      <span className="block">Evite texto grande sobreposto e logos que cubram grande parte da imagem.</span>
+                      <span className="block">Mostre veículos e cenários reais da sua operação — não envie fotos de frota que você não utiliza.</span>
+                    </AlertDescription>
+                  </Alert>
                   <div className="grid grid-cols-2 gap-4">
                     <Card className="p-4 space-y-3">
                       <div className="flex items-center gap-2">

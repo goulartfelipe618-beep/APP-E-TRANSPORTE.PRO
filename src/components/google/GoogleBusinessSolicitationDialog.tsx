@@ -20,9 +20,10 @@ import ServiceAreaMultiInput from "@/components/google/ServiceAreaMultiInput";
 import {
   buildGoogleSolicitacaoPayload,
   formatBrazilPhoneDisplay,
+  getGbpCategoryLabelForId,
   normalizeBrazilPhoneDigits,
   validateGbpBusinessTitle,
-  GBP_FIXED_PRIMARY_CATEGORY,
+  validateGbpScheduleDeRisk,
   buildGbpWebsiteUriForUser,
   type GbpDaySchedule,
   type GbpServiceAreaPlace,
@@ -141,7 +142,7 @@ export default function GoogleBusinessSolicitationDialog({ open, onOpenChange, o
     if (i === 1) {
       const a = verificationAddress();
       if (!a.cep || !a.logradouro || !a.numero || !a.bairro || !a.cidade || !a.uf || a.uf.length < 2) {
-        toast.error("Preencha CEP, rua, número, bairro, cidade e UF do endereço residencial.");
+        toast.error("Preencha CEP, rua, número, bairro, cidade e UF do endereço de verificação (não aparece no Google Maps).");
         return false;
       }
     }
@@ -155,6 +156,13 @@ export default function GoogleBusinessSolicitationDialog({ open, onOpenChange, o
       const d = normalizeBrazilPhoneDigits(phoneDigits);
       if (d.length < 10) {
         toast.error("Informe um telefone / WhatsApp válido (DDD + número).");
+        return false;
+      }
+    }
+    if (i === 4) {
+      const r = validateGbpScheduleDeRisk(schedule);
+      if (!r.ok) {
+        toast.error(r.message);
         return false;
       }
     }
@@ -183,6 +191,12 @@ export default function GoogleBusinessSolicitationDialog({ open, onOpenChange, o
         return;
       }
 
+      const hr = validateGbpScheduleDeRisk(schedule);
+      if (!hr.ok) {
+        toast.error(hr.message);
+        return;
+      }
+
       const payload = buildGoogleSolicitacaoPayload({
         userId: user.id,
         businessTitle,
@@ -190,6 +204,7 @@ export default function GoogleBusinessSolicitationDialog({ open, onOpenChange, o
         serviceAreas,
         primaryPhoneDigits: digits,
         regularHours: schedule,
+        primaryCategoryId: "transportation_service",
       });
 
       const { error } = await supabase.from("solicitacoes_servicos" as any).insert({
@@ -424,7 +439,7 @@ export default function GoogleBusinessSolicitationDialog({ open, onOpenChange, o
               <p className="font-medium text-foreground">Definido pela plataforma (API)</p>
               <ul className="list-disc list-inside space-y-1 text-muted-foreground">
                 <li>Perfil como empresa de área de atendimento (SAB) — endereço oculto no Maps</li>
-                <li>Categoria principal: {GBP_FIXED_PRIMARY_CATEGORY.displayLabel}</li>
+                <li>Categoria principal (padrão solicitação rápida): {getGbpCategoryLabelForId("transportation_service")}</li>
                 <li>
                   Site no perfil:{" "}
                   <span className="font-mono text-xs break-all text-foreground">
