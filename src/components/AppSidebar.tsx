@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
 import { usePanelTheme } from "@/hooks/usePanelTheme";
+import type { LucideIcon } from "lucide-react";
 import {
   LayoutDashboard, Home, Activity, MapPin, ArrowLeftRight,
   FileText, BookOpen, Map, Users, UserCheck, Handshake,
   ClipboardList, Car, Megaphone, BarChart3,
   Globe, Search, Mail, Monitor, Settings, StickyNote, Link2,
-  Bell, Moon, Sun, LogOut, GraduationCap, Plane, FlaskConical,
+  Bell, Moon, Sun, LogOut, GraduationCap, Plane,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -43,7 +44,17 @@ function readNetworkSpotlightHighlight() {
   return aceito && !highlightShown;
 }
 
-const getMenuStructure = (showNetwork: boolean, exibirComunicadorMotorista: boolean) => [
+type MenuGroup = {
+  label: string;
+  /** Legenda em destaque amarelo (ex.: BETA), alinhada a Principal / Ferramentas. */
+  labelTone?: "beta";
+  items: Array<
+    | { title: string; icon: LucideIcon; children: Array<{ title: string; page: string; icon: LucideIcon }> }
+    | { title: string; page: string; icon: LucideIcon }
+  >;
+};
+
+const getMenuStructure = (showNetwork: boolean, exibirComunicadorMotorista: boolean): MenuGroup[] => [
   {
     label: "Principal",
     items: [
@@ -100,16 +111,6 @@ const getMenuStructure = (showNetwork: boolean, exibirComunicadorMotorista: bool
           { title: "Leads", page: "campanhas/leads", icon: UserCheck },
         ],
       },
-      {
-        title: "Geolocalização, Maps e disparos",
-        icon: FlaskConical,
-        betaSection: true,
-        children: [
-          { title: "Geolocalização", page: "transfer/geolocalizacao", icon: Map },
-          { title: "Google Maps", page: "google", icon: Search },
-          { title: "Disparador", page: "disparador", icon: Megaphone },
-        ],
-      },
       { title: "Receptivos", page: "marketing/receptivos", icon: Globe },
       { title: "QR Codes", page: "marketing/qrcode", icon: Search },
       ...(showNetwork ? [{ title: "Network", page: "network", icon: Globe }] : []),
@@ -117,6 +118,15 @@ const getMenuStructure = (showNetwork: boolean, exibirComunicadorMotorista: bool
       { title: "E-mail Business", page: "email-business", icon: Mail },
       { title: "Website", page: "website", icon: Monitor },
       { title: "Domínios", page: "dominios", icon: Link2 },
+    ],
+  },
+  {
+    label: "BETA",
+    labelTone: "beta",
+    items: [
+      { title: "Geolocalização", page: "transfer/geolocalizacao", icon: Map },
+      { title: "Google Maps", page: "google", icon: Search },
+      { title: "Disparador", page: "disparador", icon: Megaphone },
     ],
   },
   {
@@ -234,15 +244,19 @@ export function AppSidebar() {
       <SidebarContent className={cn(showNetworkHighlight && "relative z-30")}>
         {getMenuStructure(networkAceito, exibirComunicadorMotorista).map((group) => (
           <SidebarGroup key={group.label}>
-            <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
+            <SidebarGroupLabel
+              className={cn(
+                group.labelTone === "beta" &&
+                  "font-semibold uppercase tracking-wide text-amber-600 dark:text-amber-400",
+              )}
+            >
+              {group.label}
+            </SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
                 {group.items.map((item) => {
                   if ("children" in item && item.children && item.children.length > 0) {
                     const groupActive = isGroupActive(item.children);
-                    const isBetaSection = Boolean(
-                      (item as { betaSection?: boolean }).betaSection,
-                    );
                     return (
                       <Collapsible
                         key={item.title}
@@ -252,12 +266,7 @@ export function AppSidebar() {
                         <SidebarMenuItem>
                           <CollapsibleTrigger asChild>
                             <SidebarMenuButton
-                              title={isBetaSection ? `${item.title} — funcionalidades em BETA` : undefined}
-                              className={cn(
-                                "w-full",
-                                groupActive && "text-primary",
-                                isBetaSection && collapsed && "relative",
-                              )}
+                              className={cn("w-full", groupActive && "text-primary")}
                             >
                               <div className="flex w-full min-w-0 items-center justify-between gap-1">
                                 <span className="flex min-w-0 flex-1 items-center gap-2">
@@ -270,21 +279,8 @@ export function AppSidebar() {
                                   {!collapsed && (
                                     <span className="truncate text-left">{item.title}</span>
                                   )}
-                                  {!collapsed && isBetaSection && (
-                                    <span className="shrink-0 rounded bg-amber-500 px-1.5 py-0.5 text-[9px] font-bold uppercase leading-none tracking-wide text-white">
-                                      BETA
-                                    </span>
-                                  )}
                                 </span>
                                 <span className="flex shrink-0 items-center gap-0.5">
-                                  {isBetaSection && collapsed && (
-                                    <span
-                                      className="rounded bg-amber-500 px-1 py-0.5 text-[7px] font-bold uppercase leading-none tracking-wide text-white"
-                                      aria-hidden
-                                    >
-                                      BETA
-                                    </span>
-                                  )}
                                   {!collapsed && (
                                     <ChevronDown className="h-4 w-4 transition-transform group-data-[state=open]:rotate-180" />
                                   )}

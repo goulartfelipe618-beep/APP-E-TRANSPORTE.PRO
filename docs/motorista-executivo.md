@@ -130,7 +130,8 @@ Todas as chaves abaixo têm componente React associado. A ordem segue o código.
 - **Principal → Grupos:** Solicitações, Reservas, Contrato.  
 - **Principal → Motoristas:** Cadastros, Parcerias, Solicitações.  
 - **Principal (itens):** Veículos, Empty Legs, Mentoria.  
-- **Ferramentas:** Campanhas (Ativos, Leads), Geolocalização, Receptivos, QR Codes, [Network], Comunidade, E-mail Business, Website, Domínios, Google Maps (BETA), Disparador (BETA).  
+- **Ferramentas:** Campanhas (Ativos, Leads), Receptivos, QR Codes, [Network], Comunidade, E-mail Business, Website, Domínios.
+- **BETA** (legenda amarela, como os outros grupos): Geolocalização, Google Maps, Disparador.  
 - **Configurações → Sistema:** Configurações, Automações, [Comunicador].  
 - **Configurações:** Anotações, Tickets.  
 - **Rodapé:** Notificações (sem ação), tema claro/escuro, Sair.
@@ -525,7 +526,7 @@ Cada subsecção segue o modelo: **objetivo**, **fontes de dados**, **ações da
 
 **Objetivo:** Gestão de presença Google (GBP), briefing, tabs de informação, horários, fotos, etc.
 
-**Dados / gates:** `useUserPlan`, `usePlataformaFerramentasDisponibilidade` (`google_maps_consumo_liberado`); UI **BETA** na sidebar.
+**Dados / gates:** `useUserPlan`, `usePlataformaFerramentasDisponibilidade` (`google_maps_consumo_liberado`); no menu, grupo **BETA** (legenda amarela).
 
 **Funções:** Múltiplas áreas (ver `GooglePage.tsx` — dezenas de secções); `UpgradePlanDialog` quando aplicável.
 
@@ -668,7 +669,7 @@ Cada subsecção segue o modelo: **objetivo**, **fontes de dados**, **ações da
 ### 7.3 Pedir link de geolocalização ao cliente
 
 1. Ter reserva em **Transfer** ou **Grupos → Reservas**.  
-2. **Ferramentas → Geolocalização** → **Novo Link**.  
+2. **BETA → Geolocalização** → **Novo Link**.  
 3. Escolher reserva e preencher opções → confirmação «Dados enviados ao webhook de geolocalização».
 
 ### 7.4 Converter candidato a motorista em ficha
