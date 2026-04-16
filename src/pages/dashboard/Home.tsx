@@ -6,7 +6,6 @@ import {
   BarChart3,
   Car,
   ArrowLeftRight,
-  Handshake,
   ShieldCheck,
   AlertTriangle,
   CheckCircle2,
@@ -80,7 +79,6 @@ function buildHomeSections(showNetwork: boolean, exibirComunicadorMotorista: boo
       title: "Motoristas",
       items: [
         { title: "Cadastros", page: "motoristas/cadastros", desc: "Motoristas parceiros e fichas completas.", icon: UserCheck },
-        { title: "Parcerias", page: "motoristas/parcerias", desc: "Rede de parceiros e acordos.", icon: Handshake },
         { title: "Solicitações", page: "motoristas/solicitacoes", desc: "Novos contatos que querem dirigir na operação.", icon: ClipboardList },
       ],
     },

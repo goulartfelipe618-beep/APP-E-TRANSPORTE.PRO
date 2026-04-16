@@ -14,7 +14,6 @@ export const FROTA_FREE_PAGE_IDS = new Set<string>([
   "grupos/reservas",
   "grupos/contrato",
   "motoristas/cadastros",
-  "motoristas/parcerias",
   "motoristas/solicitacoes",
   "veiculos",
   "empty-legs",

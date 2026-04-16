@@ -88,7 +88,6 @@ Todas as chaves abaixo têm componente React associado. A ordem segue o código.
 | `grupos/reservas` | `GruposReservas.tsx` |
 | `grupos/contrato` | `GruposContrato.tsx` |
 | `motoristas/cadastros` | `MotoristaCadastros.tsx` |
-| `motoristas/parcerias` | `MotoristaParcerias.tsx` |
 | `motoristas/solicitacoes` | `MotoristaSolicitacoes.tsx` |
 | `motoristas/agendamentos` | `MotoristaAgendamentos.tsx` |
 | `veiculos` | `Veiculos.tsx` |
@@ -360,7 +359,7 @@ Cada subsecção segue o modelo: **objetivo**, **fontes de dados**, **ações da
 
 **Dados:** `solicitacoes_motoristas` com **`status === "cadastrado"`** apenas.
 
-**Funções:** Pesquisa local; vista grelha/lista; **Novo motorista** (`CadastrarMotoristaDialog`); consumo de `sessionStorage` `MOTORISTA_FROM_SOLICITACAO_KEY` para pré-preencher quando se vem da conversão.
+**Funções:** Pesquisa local; vista grelha/lista; **Novo motorista** (`CadastrarMotoristaDialog`) focado apenas em dados pessoais/documentos/pagamento; consumo de `sessionStorage` `MOTORISTA_FROM_SOLICITACAO_KEY` para pré-preencher quando se vem da conversão.
 
 **Vantagens:** Base filtrada só de quem já está no estado operacional «cadastrado».
 
@@ -375,20 +374,6 @@ Cada subsecção segue o modelo: **objetivo**, **fontes de dados**, **ações da
 **Funções:** Ver (`DetalhesSolicitacaoMotoristaSheet`); **Converter em cadastro** (guarda payload em `sessionStorage`, navega para `motoristas/cadastros`, abre dialog) — **desativado** se `status === "cadastrado"`; comunicar; PDF. Export CSV **sem handler**.
 
 **Vantagens:** Ligação directa solicitação → wizard de cadastro completo.
-
----
-
-### 6.14 Motoristas — Parcerias (`motoristas/parcerias`)
-
-**Objetivo:** Cadastro de **empresas parceiras** com veículos e subparceiros.
-
-**Dados:** **Apenas estado React** (`useState`) — **não há** `insert`/`select` Supabase no ficheiro. Ao recarregar a página, **perde-se** a lista salva apenas em memória.
-
-**Funções:** Formulário multi-tab (Empresa, Documentos, Veículos, Subparceiros); validação mínima (Razão Social + CNPJ); grelha/lista local; export/import UI mencionado no código visual se existir.
-
-**Vantagens:** Prototipo rico de formulário para demos ou planeamento offline.
-
-**Limitações críticas:** **Sem persistência** no servidor nesta versão.
 
 ---
 
@@ -408,15 +393,13 @@ Cada subsecção segue o modelo: **objetivo**, **fontes de dados**, **ações da
 
 ### 6.16 Veículos (`veiculos`)
 
-**Objetivo:** Consulta unificada da frota.
+**Objetivo:** Centralizar o **cadastro completo de veículos** e parâmetros de cálculo de corridas.
 
-**Dados:** **Nenhum** — KPIs fixos «0»; lista vazia estática.
+**Dados:** Tabela `veiculos_frota` (RLS ativa por `user_id = auth.uid()` e staff) + bucket `veiculos-imagens`.
 
-**Funções:** Campos de filtro visuais sem estado.
+**Funções:** Botão **+ Novo veículo**; cadastro completo (carro/van, placa/chassi/renavam, documentos visuais via imagens), parâmetros operacionais (`valor_km`, `valor_hora`, `tarifa_base`, `valor_minimo_corrida`, `distancia_minima_km`), regras de tempo, regras de cobrança (KM/hora/híbrido, multiplicador ida e volta, preço fixo por rota), taxas adicionais (noturna, aeroporto, pedágio, extras), listagem e pesquisa.
 
-**Vantagens:** Estrutura visual preparada.
-
-**Limitações:** **Sem CRUD** nem query.
+**Segurança:** Upload com validação real de MIME por `assertUploadMagicBytes` antes de `storage.upload`.
 
 ---
 
@@ -736,7 +719,7 @@ Cada subsecção segue o modelo: **objetivo**, **fontes de dados**, **ações da
 
 ## 12. Conclusão
 
-O painel do motorista executivo concentra **toda a operação comercial e técnica** da frota: desde o **primeiro contacto** (solicitações e campanhas) até **reserva, contrato, PDF, comunicação automatizada, mapa, domínio, site, e-mail, Google, WhatsApp, comunidade e network**. A revisão deste manual deixou explícito **onde o código está completo** (Transfer, Grupos, Reservas, Contratos, Receptivos, QR, Leads, Automações, etc.) e **onde ainda há placeholders** (Métricas estáticas, Veículos, export CSV em algumas solicitações, Parcerias só em memória, Agendamentos sem backend visível).
+O painel do motorista executivo concentra **toda a operação comercial e técnica** da frota: desde o **primeiro contacto** (solicitações e campanhas) até **reserva, contrato, PDF, comunicação automatizada, mapa, domínio, site, e-mail, Google, WhatsApp, comunidade e network**. A revisão deste manual deixou explícito **onde o código está completo** (Transfer, Grupos, Reservas, Contratos, Receptivos, QR, Leads, Automações, Veículos, etc.) e **onde ainda há placeholders** (Métricas estáticas, export CSV em algumas solicitações, Agendamentos sem backend visível).
 
 Para **treino interno**, priorize: **Home → Atualizações → Transfer/Grupos → Reservas → Contrato → Automações → Campanhas/Leads → Comunidade/Network → Configurações**.
 

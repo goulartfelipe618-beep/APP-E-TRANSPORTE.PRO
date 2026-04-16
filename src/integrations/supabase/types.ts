@@ -1768,6 +1768,108 @@ export type Database = {
         }
         Relationships: []
       }
+      veiculos_frota: {
+        Row: {
+          ano: string
+          chassi: string | null
+          combustivel: string
+          cor: string | null
+          created_at: string
+          distancia_minima_km: number
+          fracao_tempo_min: number
+          id: string
+          imagens_json: Json | null
+          marca: string
+          modelo: string
+          multiplicador_ida_volta: number
+          observacoes: string | null
+          pedagio_modo: string
+          permitir_preco_fixo_rota: boolean
+          placa: string
+          renavam: string | null
+          status: string
+          tarifa_base: number
+          taxa_aeroporto_fixa: number
+          taxa_noturna_percentual: number
+          taxas_extras_json: Json | null
+          tempo_tolerancia_min: number
+          tipo_cobranca: string
+          tipo_veiculo: string
+          updated_at: string
+          user_id: string
+          valor_hora: number
+          valor_hora_espera: number
+          valor_km: number
+          valor_minimo_corrida: number
+        }
+        Insert: {
+          ano: string
+          chassi?: string | null
+          combustivel: string
+          cor?: string | null
+          created_at?: string
+          distancia_minima_km?: number
+          fracao_tempo_min?: number
+          id?: string
+          imagens_json?: Json | null
+          marca: string
+          modelo: string
+          multiplicador_ida_volta?: number
+          observacoes?: string | null
+          pedagio_modo?: string
+          permitir_preco_fixo_rota?: boolean
+          placa: string
+          renavam?: string | null
+          status?: string
+          tarifa_base?: number
+          taxa_aeroporto_fixa?: number
+          taxa_noturna_percentual?: number
+          taxas_extras_json?: Json | null
+          tempo_tolerancia_min?: number
+          tipo_cobranca?: string
+          tipo_veiculo: string
+          updated_at?: string
+          user_id: string
+          valor_hora?: number
+          valor_hora_espera?: number
+          valor_km?: number
+          valor_minimo_corrida?: number
+        }
+        Update: {
+          ano?: string
+          chassi?: string | null
+          combustivel?: string
+          cor?: string | null
+          created_at?: string
+          distancia_minima_km?: number
+          fracao_tempo_min?: number
+          id?: string
+          imagens_json?: Json | null
+          marca?: string
+          modelo?: string
+          multiplicador_ida_volta?: number
+          observacoes?: string | null
+          pedagio_modo?: string
+          permitir_preco_fixo_rota?: boolean
+          placa?: string
+          renavam?: string | null
+          status?: string
+          tarifa_base?: number
+          taxa_aeroporto_fixa?: number
+          taxa_noturna_percentual?: number
+          taxas_extras_json?: Json | null
+          tempo_tolerancia_min?: number
+          tipo_cobranca?: string
+          tipo_veiculo?: string
+          updated_at?: string
+          user_id?: string
+          valor_hora?: number
+          valor_hora_espera?: number
+          valor_km?: number
+          valor_minimo_corrida?: number
+        }
+        Relationships: []
+      }
       user_plans: {
         Row: {
           created_at: string

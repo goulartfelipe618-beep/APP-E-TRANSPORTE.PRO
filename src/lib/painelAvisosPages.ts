@@ -12,7 +12,6 @@ export const PAGINAS_MOTORISTA: { value: string; label: string }[] = [
   { value: "grupos/reservas", label: "Grupos — Reservas" },
   { value: "grupos/contrato", label: "Grupos — Contrato" },
   { value: "motoristas/cadastros", label: "Motoristas — Cadastros" },
-  { value: "motoristas/parcerias", label: "Motoristas — Parcerias" },
   { value: "motoristas/solicitacoes", label: "Motoristas — Solicitações" },
   { value: "motoristas/agendamentos", label: "Motoristas — Agendamentos" },
   { value: "veiculos", label: "Veículos" },

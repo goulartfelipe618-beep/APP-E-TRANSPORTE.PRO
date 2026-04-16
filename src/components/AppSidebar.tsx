@@ -3,7 +3,7 @@ import { usePanelTheme } from "@/hooks/usePanelTheme";
 import type { LucideIcon } from "lucide-react";
 import {
   LayoutDashboard, Home, Activity, MapPin, ArrowLeftRight,
-  FileText, BookOpen, Map, Users, UserCheck, Handshake,
+  FileText, BookOpen, Map, Users, UserCheck,
   ClipboardList, Car, Megaphone, BarChart3,
   Globe, Search, Mail, Monitor, Settings, StickyNote, Link2,
   Bell, Moon, Sun, LogOut, GraduationCap, Plane,
@@ -90,7 +90,6 @@ const getMenuStructure = (showNetwork: boolean, exibirComunicadorMotorista: bool
         icon: UserCheck,
         children: [
           { title: "Cadastros", page: "motoristas/cadastros", icon: UserCheck },
-          { title: "Parcerias", page: "motoristas/parcerias", icon: Handshake },
           { title: "Solicitações", page: "motoristas/solicitacoes", icon: ClipboardList },
         ],
       },

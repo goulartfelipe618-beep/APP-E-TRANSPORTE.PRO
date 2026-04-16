@@ -4,9 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { User, FileText, CreditCard, Car, ArrowLeft, ArrowRight, Upload } from "lucide-react";
+import { User, FileText, CreditCard, ArrowLeft, ArrowRight, Upload } from "lucide-react";
 import { toast } from "sonner";
 import type { MotoristaInitialData } from "@/lib/motoristaFromSolicitacao";
 import { parseDadosWebhook, pickStr } from "@/lib/motoristaFromSolicitacao";
@@ -18,7 +17,6 @@ const TABS = [
   { label: "Pessoal", icon: User },
   { label: "Documentos", icon: FileText },
   { label: "Pagamento", icon: CreditCard },
-  { label: "Veículo", icon: Car },
 ];
 
 function FileRow({
@@ -59,16 +57,8 @@ interface Props {
   initialData?: MotoristaInitialData | null;
 }
 
-function normPossuiVeiculo(raw: string): boolean {
-  const s = raw.trim().toLowerCase();
-  if (!s) return true;
-  if (s === "não" || s === "nao" || s === "n" || s === "false" || s === "0") return false;
-  return true;
-}
-
 export default function CadastrarMotoristaDialog({ open, onOpenChange, onCreated, initialData }: Props) {
   const [tabIndex, setTabIndex] = useState(0);
-  const [possuiVeiculo, setPossuiVeiculo] = useState(true);
 
   const [nome, setNome] = useState("");
   const [cpf, setCpf] = useState("");
@@ -90,22 +80,10 @@ export default function CadastrarMotoristaDialog({ open, onOpenChange, onCreated
   const [arCnhF, setArCnhF] = useState<File | null>(null);
   const [arCnhV, setArCnhV] = useState<File | null>(null);
   const [arResid, setArResid] = useState<File | null>(null);
-  const [arCrlv, setArCrlv] = useState<File | null>(null);
-  const [arSeguro, setArSeguro] = useState<File | null>(null);
 
   const [tipoPagamento, setTipoPagamento] = useState("");
   const [pixChave, setPixChave] = useState("");
 
-  const [marca, setMarca] = useState("");
-  const [modelo, setModelo] = useState("");
-  const [ano, setAno] = useState("");
-  const [cor, setCor] = useState("");
-  const [placa, setPlaca] = useState("");
-  const [combustivel, setCombustivel] = useState("");
-  const [renavam, setRenavam] = useState("");
-  const [chassi, setChassi] = useState("");
-  const [statusVeiculo, setStatusVeiculo] = useState("ativo");
-  const [obsVeiculo, setObsVeiculo] = useState("");
   const [saving, setSaving] = useState(false);
 
   const resetEmpty = useCallback(() => {
@@ -128,21 +106,8 @@ export default function CadastrarMotoristaDialog({ open, onOpenChange, onCreated
     setArCnhF(null);
     setArCnhV(null);
     setArResid(null);
-    setArCrlv(null);
-    setArSeguro(null);
     setTipoPagamento("");
     setPixChave("");
-    setMarca("");
-    setModelo("");
-    setAno("");
-    setCor("");
-    setPlaca("");
-    setCombustivel("");
-    setRenavam("");
-    setChassi("");
-    setStatusVeiculo("ativo");
-    setObsVeiculo("");
-    setPossuiVeiculo(true);
     setTabIndex(0);
   }, []);
 
@@ -163,13 +128,6 @@ export default function CadastrarMotoristaDialog({ open, onOpenChange, onCreated
       setEnderecoCompleto(pickStr(dw, "endereco", "_endereco"));
       setCep(pickStr(dw, "cep"));
       setCategoriaCnh(pickStr(dw, "categoria_cnh", "categoria"));
-      const pv = pickStr(dw, "possui_veiculo", "_possui_veiculo");
-      setPossuiVeiculo(normPossuiVeiculo(pv));
-      setMarca(pickStr(dw, "marca_veiculo", "marca"));
-      setModelo(pickStr(dw, "modelo_veiculo", "modelo"));
-      setAno(pickStr(dw, "ano_veiculo", "ano"));
-      setPlaca(pickStr(dw, "placa_veiculo", "placa"));
-      setObsVeiculo(pickStr(dw, "experiencia", "_experiencia"));
       setTabIndex(0);
       toast.message("Revise e complete todos os campos obrigatórios antes de salvar.", { duration: 5000 });
     } else {
@@ -212,19 +170,8 @@ export default function CadastrarMotoristaDialog({ open, onOpenChange, onCreated
     return null;
   };
 
-  const validateTab3 = (): string | null => {
-    if (!possuiVeiculo) return null;
-    if (!marca.trim()) return "Informe a marca do veículo.";
-    if (!modelo.trim()) return "Informe o modelo do veículo.";
-    if (!ano.trim()) return "Informe o ano do veículo.";
-    if (!placa.trim()) return "Informe a placa do veículo.";
-    if (!combustivel) return "Selecione o combustível.";
-    if (strict && (!arCrlv || !arSeguro)) return "Anexe CRLV e seguro do veículo.";
-    return null;
-  };
-
   const validateAll = (): string | null =>
-    validateTab0() ?? validateTab1() ?? validateTab2() ?? validateTab3();
+    validateTab0() ?? validateTab1() ?? validateTab2();
 
   const goNext = () => {
     if (tabIndex === 0) {
@@ -257,8 +204,7 @@ export default function CadastrarMotoristaDialog({ open, onOpenChange, onCreated
       toast.error(err);
       if (validateTab0()) setTabIndex(0);
       else if (validateTab1()) setTabIndex(1);
-      else if (validateTab2()) setTabIndex(2);
-      else setTabIndex(3);
+      else setTabIndex(2);
       return;
     }
     setSaving(true);
@@ -269,17 +215,6 @@ export default function CadastrarMotoristaDialog({ open, onOpenChange, onCreated
       cep: cep || null,
       categoria_cnh: categoriaCnh || null,
       validade_cnh: validadeCnh || null,
-      possui_veiculo: possuiVeiculo,
-      marca_veiculo: marca || null,
-      modelo_veiculo: modelo || null,
-      ano_veiculo: ano || null,
-      cor_veiculo: cor || null,
-      placa_veiculo: placa || null,
-      combustivel_veiculo: combustivel || null,
-      renavam_veiculo: renavam || null,
-      chassi_veiculo: chassi || null,
-      status_veiculo: statusVeiculo || null,
-      observacoes_veiculo: obsVeiculo || null,
       tipo_pagamento: tipoPagamento || null,
       pix_chave: pixChave || null,
       observacoes_internas: observacoesInternas || null,
@@ -353,7 +288,7 @@ export default function CadastrarMotoristaDialog({ open, onOpenChange, onCreated
 
         {strict && (
           <p className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-900 dark:text-amber-100">
-            Preencha <strong>todos</strong> os dados do motorista e do veículo (quando aplicável). Não é possível salvar com campos obrigatórios vazios.
+            Preencha <strong>todos</strong> os dados obrigatórios do motorista. O cadastro de veículos fica no menu <strong>Veículos</strong>.
           </p>
         )}
 
@@ -538,97 +473,6 @@ export default function CadastrarMotoristaDialog({ open, onOpenChange, onCreated
                 <Label>Chave PIX *</Label>
                 <Input className="mt-1" value={pixChave} onChange={(e) => setPixChave(e.target.value)} placeholder="CPF, e-mail, telefone ou aleatória" />
               </div>
-            )}
-          </div>
-        )}
-
-        {tabIndex === 3 && (
-          <div className="space-y-4">
-            <div className="flex items-center gap-3">
-              <Switch checked={possuiVeiculo} onCheckedChange={setPossuiVeiculo} id="pv" />
-              <label htmlFor="pv" className="text-sm text-foreground">
-                Este motorista possui veículo próprio
-              </label>
-            </div>
-
-            {possuiVeiculo && (
-              <>
-                <fieldset className="space-y-4">
-                  <legend className="w-full border-b border-border pb-2 text-sm font-semibold text-foreground">Dados do veículo</legend>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label>Marca *</Label>
-                      <Input className="mt-1" value={marca} onChange={(e) => setMarca(e.target.value)} />
-                    </div>
-                    <div>
-                      <Label>Modelo *</Label>
-                      <Input className="mt-1" value={modelo} onChange={(e) => setModelo(e.target.value)} />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-3 gap-4">
-                    <div>
-                      <Label>Ano *</Label>
-                      <Input className="mt-1" value={ano} onChange={(e) => setAno(e.target.value)} />
-                    </div>
-                    <div>
-                      <Label>Cor</Label>
-                      <Input className="mt-1" value={cor} onChange={(e) => setCor(e.target.value)} />
-                    </div>
-                    <div>
-                      <Label>Placa *</Label>
-                      <Input className="mt-1" value={placa} onChange={(e) => setPlaca(e.target.value)} />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-3 gap-4">
-                    <div>
-                      <Label>Combustível *</Label>
-                      <Select value={combustivel || undefined} onValueChange={setCombustivel}>
-                        <SelectTrigger className="mt-1">
-                          <SelectValue placeholder="Tipo" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="flex">Flex</SelectItem>
-                          <SelectItem value="gasolina">Gasolina</SelectItem>
-                          <SelectItem value="diesel">Diesel</SelectItem>
-                          <SelectItem value="eletrico">Elétrico</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label>RENAVAM</Label>
-                      <Input className="mt-1" value={renavam} onChange={(e) => setRenavam(e.target.value)} />
-                    </div>
-                    <div>
-                      <Label>Chassi</Label>
-                      <Input className="mt-1" value={chassi} onChange={(e) => setChassi(e.target.value)} />
-                    </div>
-                  </div>
-                </fieldset>
-
-                <div>
-                  <Label>Status do veículo</Label>
-                  <Select value={statusVeiculo} onValueChange={setStatusVeiculo}>
-                    <SelectTrigger className="mt-1 w-40">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="ativo">Ativo</SelectItem>
-                      <SelectItem value="inativo">Inativo</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <fieldset className="space-y-4">
-                  <legend className="w-full border-b border-border pb-2 text-sm font-semibold text-foreground">Documentos do veículo</legend>
-                  <FileRow label="CRLV" required={strict} file={arCrlv} onFile={setArCrlv} />
-                  <FileRow label="Seguro" required={strict} file={arSeguro} onFile={setArSeguro} />
-                </fieldset>
-
-                <div>
-                  <Label>Observações do veículo</Label>
-                  <Textarea className="mt-1" placeholder="Anotações sobre o veículo..." value={obsVeiculo} onChange={(e) => setObsVeiculo(e.target.value)} />
-                </div>
-              </>
             )}
           </div>
         )}
