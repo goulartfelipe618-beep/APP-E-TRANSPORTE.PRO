@@ -397,7 +397,7 @@ Cada subsecção segue o modelo: **objetivo**, **fontes de dados**, **ações da
 
 **Dados:** Tabela `veiculos_frota` (RLS ativa por `user_id = auth.uid()` e staff) + bucket `veiculos-imagens`.
 
-**Funções:** Botão **+ Novo veículo**; cadastro completo (carro/van, placa/chassi/renavam, documentos visuais via imagens), parâmetros operacionais (`valor_km`, `valor_hora`, `tarifa_base`, `valor_minimo_corrida`, `distancia_minima_km`), regras de tempo, regras de cobrança (KM/hora/híbrido, multiplicador ida e volta, preço fixo por rota), taxas adicionais (noturna, aeroporto, pedágio, extras), listagem e pesquisa.
+**Funções:** Botão **+ Novo veículo**; cadastro completo (todos os campos obrigatórios; carro/van; placa/chassi/renavam; imagem de capa **1220×880 px** para cards; galeria de imagens), parâmetros operacionais (`valor_km`, `valor_hora`, `tarifa_base`, `valor_minimo_corrida`, `distancia_minima_km`), regras de tempo, regras de cobrança (KM/hora/híbrido, multiplicador ida e volta, preço fixo por rota), taxas adicionais (noturna, aeroporto, pedágio, extras), listagem com **vista em cards ou tabela**, pesquisa.
 
 **Segurança:** Upload com validação real de MIME por `assertUploadMagicBytes` antes de `storage.upload`.
 

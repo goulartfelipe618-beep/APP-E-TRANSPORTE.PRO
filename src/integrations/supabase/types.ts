@@ -1778,6 +1778,7 @@ export type Database = {
           distancia_minima_km: number
           fracao_tempo_min: number
           id: string
+          imagem_capa_url: string | null
           imagens_json: Json | null
           marca: string
           modelo: string
@@ -1811,6 +1812,7 @@ export type Database = {
           distancia_minima_km?: number
           fracao_tempo_min?: number
           id?: string
+          imagem_capa_url?: string | null
           imagens_json?: Json | null
           marca: string
           modelo: string
@@ -1844,6 +1846,7 @@ export type Database = {
           distancia_minima_km?: number
           fracao_tempo_min?: number
           id?: string
+          imagem_capa_url?: string | null
           imagens_json?: Json | null
           marca?: string
           modelo?: string
