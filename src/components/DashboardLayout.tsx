@@ -6,7 +6,7 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { Shield } from "lucide-react";
 import { ActivePageProvider, useActivePage } from "@/contexts/ActivePageContext";
-import FloatingSupportChat from "@/components/FloatingSupportChat"; // [CHAT-FLOATING-IMPLEMENTACAO]
+import FloatingSupportChat from "@/components/FloatingSupportChat";
 import { NetworkSpotlightProvider } from "@/contexts/NetworkSpotlightContext";
 import { hydrateNetworkNacionalFromDb, persistNetworkHighlightDismissed } from "@/lib/networkNacionalPrefs";
 import { usePainelMotoristaEvolutionAtivo } from "@/hooks/usePainelMotoristaEvolutionAtivo";
@@ -183,7 +183,7 @@ function DashboardContent() {
             </PageLoader>
           </main>
         </div>
-        <FloatingSupportChat /> {/* [CHAT-FLOATING-IMPLEMENTACAO] */}
+        <FloatingSupportChat />
         <FullscreenBannerOverlay painel="motorista" activePage={activePage} />
       </div>
     </NetworkSpotlightProvider>

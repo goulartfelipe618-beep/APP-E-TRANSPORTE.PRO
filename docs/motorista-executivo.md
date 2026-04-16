@@ -195,7 +195,7 @@ Este painel **não contradiz** o manual de segurança do repositório (`README_S
 | `SidebarTrigger` + cabeçalho | Colapsar sidebar; título da aplicação. |
 | `PainelAvisoBanner` | Avisos de `admin_avisos_plataforma` para `painel="motorista"` e, se não for global, filtro por `paginas_motorista`. |
 | `FullscreenBannerOverlay` | Banners fullscreen configuráveis pelo admin para páginas do painel motorista. |
-| `FloatingSupportChat` | Botão flutuante; iframe **Typebot** se `VITE_TYPEBOT_CHAT_URL` definido; senão mensagem a indicar variável em falta. |
+| `FloatingSupportChat` | Carrega o **widget Chatwoot** (SDK) uma vez; URL e token podem ser sobrescritos com `VITE_CHATWOOT_BASE_URL` e `VITE_CHATWOOT_WEBSITE_TOKEN`. |
 | `PageLoader` | Contém a página ativa com transição de carregamento. |
 | `ActivePageProvider` | Estado `activePage`; `storageKey="etp_nav_dashboard"` — última página pode ser restaurada no mesmo browser. |
 
@@ -717,7 +717,7 @@ Cada subsecção segue o modelo: **objetivo**, **fontes de dados**, **ações da
 | Agendamentos sem dados | UI placeholder | Não usar para agendar ainda. |
 | Geolocalização — lista de links vazia | Sem integração de leitura | Normal; o fluxo implementado é **só envio** ao webhook. |
 | Disparador bloqueado | `disparador_consumo_liberado` falso | Contactar administração da plataforma. |
-| Chat interno vazio | `VITE_TYPEBOT_CHAT_URL` | Configurar env ou pedir à equipa técnica. |
+| Chat não aparece | Chatwoot / bloqueador de scripts | Confirmar `https://chatwoot.e-transporte.pro` acessível; variáveis `VITE_CHATWOOT_*` se usar instância própria. |
 | Notificações na sidebar sem efeito | Sem `onClick` | Usar Atualizações / Tickets. |
 | Sessão expira às 24h | `authExpiry` | Voltar a autenticar. |
 
