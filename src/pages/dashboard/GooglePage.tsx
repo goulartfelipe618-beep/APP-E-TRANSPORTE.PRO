@@ -38,6 +38,7 @@ import {
   type GbpServiceAreaPlace,
   type GbpVerificationAddress,
 } from "@/lib/googleBusinessSolicitation";
+import { cn } from "@/lib/utils";
 
 const DAYS = [
   { name: "Segunda-feira", short: "Seg", defaultOn: true },
@@ -519,14 +520,19 @@ export default function GooglePage() {
             Visualização FREE: você pode ver as configurações, mas a edição e o envio ficam disponíveis no plano PRÓ.
           </div>
         )}
-        <div
-          className="relative flex rounded-xl border border-border overflow-hidden bg-card"
-          style={{ minHeight: "600px" }}
-        >
-          {freePlanReadOnly && <div className="absolute inset-0 z-20 cursor-not-allowed" />}
-          <div className={freePlanReadOnly ? "pointer-events-none select-none opacity-75" : ""}>
-        {/* Sidebar */}
-        <div className="w-56 border-r border-border bg-muted/30 p-3 space-y-1 overflow-y-auto shrink-0">
+        <div className="relative flex min-h-[600px] min-w-0 flex-row overflow-hidden rounded-xl border border-border bg-card">
+          {freePlanReadOnly && (
+            <div className="pointer-events-auto absolute inset-0 z-20 cursor-not-allowed" aria-hidden />
+          )}
+          <div
+            className={cn(
+              "flex min-h-0 min-w-0 flex-1 flex-row",
+              freePlanReadOnly && "pointer-events-none select-none opacity-75",
+            )}
+          >
+            {/* Sidebar — esquerda */}
+            <aside className="flex w-56 shrink-0 flex-col border-r border-border bg-muted/30 p-3">
+              <div className="min-h-0 flex-1 space-y-1 overflow-y-auto">
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2 mb-2">Gerenciar</p>
               {MANAGEMENT_TABS.map((tab) => {
                 const Icon = tab.icon;
@@ -545,10 +551,11 @@ export default function GooglePage() {
                   </button>
                 );
               })}
-            </div>
+              </div>
+            </aside>
 
-            {/* Content */}
-            <div className="flex-1 overflow-y-auto p-6">
+            {/* Conteúdo das abas — direita */}
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto bg-background/40 p-6">
               {/* INFO */}
               {activeTab === "info" && (
                 <div className="space-y-6">
