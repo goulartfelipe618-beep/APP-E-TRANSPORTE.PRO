@@ -67,9 +67,9 @@ const MANAGEMENT_TABS = [
 
 export default function GooglePage() {
   const { hasPlan, plano, refetch: refetchPlano } = useUserPlan();
-  const { flags: ferramentasFlags } = usePlataformaFerramentasDisponibilidade();
+  const { flags: ferramentasFlags, loading: ferramentasLoading } = usePlataformaFerramentasDisponibilidade();
   const googleConsumoLiberado = ferramentasFlags.google_maps_consumo_liberado;
-  const googleFerramentaBloqueada = !googleConsumoLiberado;
+  const googleFerramentaBloqueada = !ferramentasLoading && !googleConsumoLiberado;
 
   const [upgradeOpen, setUpgradeOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
@@ -181,8 +181,8 @@ export default function GooglePage() {
   }, []);
 
   useEffect(() => {
-    if (!googleConsumoLiberado) setCreateOpen(false);
-  }, [googleConsumoLiberado]);
+    if (!ferramentasLoading && !googleConsumoLiberado) setCreateOpen(false);
+  }, [ferramentasLoading, googleConsumoLiberado]);
 
   const hasProfile = !!servicoAtivo;
   const bloqueadoEnvio =
@@ -290,6 +290,10 @@ export default function GooglePage() {
   });
 
   const handleEnviarBriefingCompleto = async () => {
+    if (ferramentasLoading) {
+      toast.info("A carregar permissões da plataforma…");
+      return;
+    }
     if (!googleConsumoLiberado) {
       toast.error("Esta ferramenta ainda não está disponível para uso. Aguarde a liberação da plataforma.");
       return;
@@ -1325,7 +1329,9 @@ export default function GooglePage() {
             <p className="text-muted-foreground">Crie seu perfil no Google Meu Negócio</p>
           </div>
           <Button
+            disabled={ferramentasLoading}
             onClick={() => {
+              if (ferramentasLoading) return;
               if (!googleConsumoLiberado) {
                 toast.error("Esta ferramenta ainda não está disponível para uso. Aguarde a liberação da plataforma.");
                 return;
@@ -1355,7 +1361,9 @@ export default function GooglePage() {
           <p className="text-foreground font-medium mb-1">Nenhum perfil criado</p>
           <p className="text-sm text-muted-foreground mb-4">Crie seu perfil no Google Business para aparecer nas buscas.</p>
           <Button
+            disabled={ferramentasLoading}
             onClick={() => {
+              if (ferramentasLoading) return;
               if (!googleConsumoLiberado) {
                 toast.error("Esta ferramenta ainda não está disponível para uso. Aguarde a liberação da plataforma.");
                 return;
@@ -1373,7 +1381,7 @@ export default function GooglePage() {
       </FerramentaConstrucaoOverlay>
 
       <GoogleBusinessSolicitationDialog
-        open={createOpen && googleConsumoLiberado}
+        open={createOpen && !ferramentasLoading && googleConsumoLiberado}
         onOpenChange={setCreateOpen}
         onSuccess={() => void refreshServicoGoogle()}
       />

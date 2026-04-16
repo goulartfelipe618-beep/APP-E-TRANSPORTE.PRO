@@ -1,12 +1,15 @@
+import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useState } from "react";
 import { Loader2, Sparkles } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { PLATAFORMA_FERRAMENTAS_DISPONIBILIDADE_QUERY_KEY } from "@/hooks/usePlataformaFerramentasDisponibilidade";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 
 export default function PlataformaFerramentasBetaSection() {
+  const queryClient = useQueryClient();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [googleOk, setGoogleOk] = useState(false);
@@ -50,6 +53,7 @@ export default function PlataformaFerramentasBetaSection() {
         await load();
         return;
       }
+      await queryClient.invalidateQueries({ queryKey: PLATAFORMA_FERRAMENTAS_DISPONIBILIDADE_QUERY_KEY });
       toast.success("Preferências atualizadas.");
     } finally {
       setSaving(false);

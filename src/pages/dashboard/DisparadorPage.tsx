@@ -61,11 +61,15 @@ const WARNINGS = [
 ];
 
 export default function DisparadorPage() {
-  const { flags } = usePlataformaFerramentasDisponibilidade();
+  const { flags, loading: ferramentasLoading } = usePlataformaFerramentasDisponibilidade();
   const disparadorLiberado = flags.disparador_consumo_liberado;
-  const disparadorBloqueado = !disparadorLiberado;
+  const disparadorBloqueado = !ferramentasLoading && !disparadorLiberado;
 
   const handleAccessDispatcher = () => {
+    if (ferramentasLoading) {
+      toast.info("A carregar permissões da plataforma…");
+      return;
+    }
     if (!disparadorLiberado) {
       toast.error("Esta ferramenta ainda não está disponível para uso. Aguarde a liberação da plataforma.");
       return;
@@ -164,7 +168,7 @@ export default function DisparadorPage() {
           <p className="text-sm text-muted-foreground max-w-lg mx-auto">
             Certifique-se de ter um chip secundário em mãos antes de iniciar. O disparador abre em uma nova aba.
           </p>
-          <Button type="button" className="gap-2" onClick={handleAccessDispatcher}>
+          <Button type="button" className="gap-2" disabled={ferramentasLoading} onClick={handleAccessDispatcher}>
             <Send className="h-4 w-4" /> Acessar Disparador
           </Button>
         </CardContent>
