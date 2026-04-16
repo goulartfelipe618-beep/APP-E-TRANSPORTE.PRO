@@ -58,6 +58,13 @@ Isto reduz uploads maliciosos disfarçados de imagem e alinha-se às boas práti
 - **`AdminMetricas`**: contadores e agregações regionais degradam para `0` / listas vazias quando o RLS bloqueia leituras globais, com aviso em ecrã em vez de falha silenciosa.
 - Outras páginas admin com listagens globais devem seguir o mesmo padrão (tratar `error` + `isRlsOrPermissionError`).
 
+## Planos (`user_plans`)
+
+- Valores persistidos: **`free`** e **`pro`** (legados `seed` / `grow` / `rise` / `apex` são normalizados no cliente e migrados no Postgres para `pro`; ver `supabase/migrations/20260430220000_user_plans_free_pro.sql`).
+- **FREE → PRÓ** pelo utilizador: Edge Function `self-upgrade-plan` com JWT; só a partir de `free`; escrita em `user_plans` no servidor com **service role** (não confiar só no menu do browser).
+- **Admin:** `admin-users` (`update_plan`, `finalize_landing_lead`) valida `free` | `pro`; FREE não é atribuído manualmente a utilizadores já em Cadastrados (regra de negócio).
+- O menu do motorista executivo restringe páginas no cliente (`frotaPlanFreePages`); **não substitui RLS** — dados sensíveis seguem protegidos por políticas nas tabelas.
+
 ## Webhooks (Node + Edge)
 
 - **Edge (`supabase/functions/_shared/webhook_hmac.ts`):** validação HMAC opcional com `WEBHOOK_INBOUND_HMAC_SECRET` e cabeçalho `x-webhook-signature` (corpo bruto UTF-8), usada por exemplo em `webhook-solicitacao`.

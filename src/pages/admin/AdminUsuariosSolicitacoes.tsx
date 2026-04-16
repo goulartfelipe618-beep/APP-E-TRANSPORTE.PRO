@@ -26,7 +26,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { PLAN_LABELS, PLANS_PAID_ORDER, PlanType } from "@/hooks/useUserPlan";
+import { PLAN_LABELS, PLANS_PAID_ORDER, PlanType, normalizeUserPlano } from "@/hooks/useUserPlan";
 import { ConfirmDeleteDialog } from "@/components/ConfirmDeleteDialog";
 
 /** Dispara atualização da lista em Usuários > Cadastrados sem F5 */
@@ -122,7 +122,7 @@ export default function AdminUsuariosSolicitacoes() {
   const [savingId, setSavingId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<SolicitacaoComPlano | null>(null);
   const [finalizeTarget, setFinalizeTarget] = useState<SolicitacaoComPlano | null>(null);
-  const [finalizePlano, setFinalizePlano] = useState<PlanType>("seed");
+  const [finalizePlano, setFinalizePlano] = useState<PlanType>("pro");
   const [acessoDeleteId, setAcessoDeleteId] = useState<string | null>(null);
   const [acessoDeleteLoading, setAcessoDeleteLoading] = useState(false);
 
@@ -344,10 +344,8 @@ export default function AdminUsuariosSolicitacoes() {
           <div className="flex items-center justify-between">
             <p className="text-sm text-muted-foreground max-w-3xl">
               O webhook cria o login em <strong className="text-foreground">FREE</strong>. Em{" "}
-              <strong className="text-foreground">Cadastrar</strong>, escolha <strong className="text-foreground">Seed</strong>,{" "}
-              <strong className="text-foreground">Grow</strong>, <strong className="text-foreground">Rise</strong> ou{" "}
-              <strong className="text-foreground">Apex</strong> para concluir o cadastro em Usuários → Cadastrados e retirar da
-              fila.
+              <strong className="text-foreground">Cadastrar</strong>, confirme o plano <strong className="text-foreground">PRÓ</strong>{" "}
+              para concluir o cadastro em Usuários → Cadastrados e retirar da fila.
             </p>
             <Button variant="outline" size="icon" onClick={() => void fetchMotoristas()} disabled={loadingMotorista}>
               {loadingMotorista ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
@@ -408,7 +406,7 @@ export default function AdminUsuariosSolicitacoes() {
                           {new Date(s.created_at).toLocaleDateString("pt-BR")}
                         </TableCell>
                         <TableCell>
-                          <Badge variant="outline">{s.plano}</Badge>
+                          <Badge variant="outline">{PLAN_LABELS[normalizeUserPlano(s.plano)]}</Badge>
                         </TableCell>
                         <TableCell>
                           <Badge
@@ -431,7 +429,7 @@ export default function AdminUsuariosSolicitacoes() {
                                   : "Definir plano pago e confirmar em Cadastrados"
                               }
                               onClick={() => {
-                                setFinalizePlano("seed");
+                                setFinalizePlano("pro");
                                 setFinalizeTarget(s);
                               }}
                             >

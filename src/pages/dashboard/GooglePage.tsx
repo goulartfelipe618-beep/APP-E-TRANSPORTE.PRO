@@ -293,7 +293,7 @@ export default function GooglePage() {
       toast.error("Esta ferramenta ainda não está disponível para uso. Aguarde a liberação da plataforma.");
       return;
     }
-    if (!hasPlan("apex")) {
+    if (!hasPlan("pro")) {
       setUpgradeOpen(true);
       return;
     }
@@ -1316,7 +1316,7 @@ export default function GooglePage() {
                 toast.error("Esta ferramenta ainda não está disponível para uso. Aguarde a liberação da plataforma.");
                 return;
               }
-              if (!hasPlan("apex")) {
+              if (!hasPlan("pro")) {
                 setUpgradeOpen(true);
                 return;
               }
@@ -1346,7 +1346,7 @@ export default function GooglePage() {
                 toast.error("Esta ferramenta ainda não está disponível para uso. Aguarde a liberação da plataforma.");
                 return;
               }
-              if (!hasPlan("apex")) {
+              if (!hasPlan("pro")) {
                 setUpgradeOpen(true);
                 return;
               }
@@ -1366,7 +1366,6 @@ export default function GooglePage() {
       <UpgradePlanDialog
         open={upgradeOpen}
         onOpenChange={setUpgradeOpen}
-        requiredPlan="apex"
         selfServiceUpgrade={plano === "free"}
         onUpgradeSuccess={() => void refetchPlano()}
       />

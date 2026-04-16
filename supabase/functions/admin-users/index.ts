@@ -139,10 +139,10 @@ Deno.serve(async (req) => {
 
       // Create plan record (only for non-admin_master)
       if (role !== "admin_master") {
-        const paidPlans = ["seed", "grow", "rise", "apex"];
+        const paidPlans = ["pro"];
         const userPlano =
           role === "admin_transfer" || role === "admin_taxi"
-            ? paidPlans.includes(plano) ? plano : "seed"
+            ? paidPlans.includes(plano) ? plano : "pro"
             : plano || "free";
         await supabaseAdmin.from("user_plans").insert({
           user_id: newUser.user.id,
@@ -162,8 +162,8 @@ Deno.serve(async (req) => {
         return new Response(JSON.stringify({ error: "user_id e plano são obrigatórios" }), { status: 400, headers: corsHeaders });
       }
 
-      if (!["free", "seed", "grow", "rise", "apex"].includes(plano)) {
-        return new Response(JSON.stringify({ error: "Plano inválido" }), { status: 400, headers: corsHeaders });
+      if (!["free", "pro"].includes(plano)) {
+        return new Response(JSON.stringify({ error: "Plano inválido. Use free ou pro." }), { status: 400, headers: corsHeaders });
       }
 
       if (plano === "free") {
@@ -201,11 +201,11 @@ Deno.serve(async (req) => {
         });
       }
 
-      const paidPlans = ["seed", "grow", "rise", "apex"] as const;
+      const paidPlans = ["pro"] as const;
       const planoFinal = String(bodyPlano || "").toLowerCase().trim();
       if (!paidPlans.includes(planoFinal as (typeof paidPlans)[number])) {
         return new Response(
-          JSON.stringify({ error: "plano é obrigatório: seed, grow, rise ou apex" }),
+          JSON.stringify({ error: "plano é obrigatório: pro (plano PRÓ)" }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
         );
       }

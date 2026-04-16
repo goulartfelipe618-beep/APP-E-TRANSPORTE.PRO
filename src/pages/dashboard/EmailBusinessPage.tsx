@@ -421,7 +421,6 @@ export default function EmailBusinessPage() {
       <UpgradePlanDialog
         open={upgradeOpen}
         onOpenChange={setUpgradeOpen}
-        requiredPlan="seed"
         selfServiceUpgrade={plano === "free"}
         onUpgradeSuccess={() => void refetchPlano()}
       />

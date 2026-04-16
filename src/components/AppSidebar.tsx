@@ -3,7 +3,7 @@ import { usePanelTheme } from "@/hooks/usePanelTheme";
 import {
   LayoutDashboard, Home, Activity, MapPin, ArrowLeftRight,
   FileText, BookOpen, Map, Users, UserCheck, Handshake,
-  ClipboardList, CalendarDays, Car, Megaphone, BarChart3,
+  ClipboardList, Car, Megaphone, BarChart3,
   Globe, Search, Mail, Monitor, Settings, StickyNote, Link2,
   Bell, Moon, Sun, LogOut, GraduationCap, Plane, FlaskConical,
 } from "lucide-react";
@@ -24,6 +24,17 @@ import { useConfiguracoes } from "@/contexts/ConfiguracoesContext";
 import { useActivePage } from "@/contexts/ActivePageContext";
 import { persistNetworkHighlightDismissed } from "@/lib/networkNacionalPrefs";
 import { usePainelMotoristaEvolutionAtivo } from "@/hooks/usePainelMotoristaEvolutionAtivo";
+import { useUserPlan } from "@/hooks/useUserPlan";
+import { isFrotaFreePage } from "@/lib/frotaPlanFreePages";
+import UpgradePlanDialog from "@/components/planos/UpgradePlanDialog";
+
+function ProBadge() {
+  return (
+    <span className="inline-flex shrink-0 items-center rounded bg-amber-500/20 px-1.5 py-0.5 text-[10px] font-bold uppercase leading-none tracking-wide text-amber-800 dark:text-amber-300">
+      PRÓ
+    </span>
+  );
+}
 
 function readNetworkSpotlightHighlight() {
   if (typeof window === "undefined") return false;
@@ -139,6 +150,11 @@ export function AppSidebar() {
   const [showNetworkHighlight, setShowNetworkHighlight] = useState(readNetworkSpotlightHighlight);
   const { painelMotoristaEvolutionAtivo, ready: painelComunicadorReady } = usePainelMotoristaEvolutionAtivo();
   const exibirComunicadorMotorista = !painelComunicadorReady || painelMotoristaEvolutionAtivo;
+  const { plano, loading: planLoading, refetch: refetchPlano } = useUserPlan();
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
+  const freeRestricted = !planLoading && plano === "free";
+  const proOnly = (page: string) => !isFrotaFreePage(page);
+  const groupHasProOnlyChild = (children: { page: string }[]) => children.some((c) => proOnly(c.page));
 
   useEffect(() => {
     const handler = () => {
@@ -168,11 +184,20 @@ export function AppSidebar() {
   const isActive = (page: string) => activePage === page;
   const isGroupActive = (children: { page: string }[]) =>
     children.some((c) => activePage === c.page);
-  const handleNavigate = (page: string) => {
+  const goPage = (page: string) => {
     setActivePage(page);
     if (isMobile) {
       setOpenMobile(false);
     }
+  };
+
+  const tryNavigate = (page: string) => {
+    if (freeRestricted && proOnly(page)) {
+      setUpgradeOpen(true);
+      if (isMobile) setOpenMobile(false);
+      return;
+    }
+    goPage(page);
   };
 
   const handleLogout = async () => {
@@ -237,6 +262,11 @@ export function AppSidebar() {
                               <div className="flex w-full min-w-0 items-center justify-between gap-1">
                                 <span className="flex min-w-0 flex-1 items-center gap-2">
                                   <item.icon className="h-4 w-4 shrink-0" />
+                                  {freeRestricted && groupHasProOnlyChild(item.children) ? (
+                                    <span className="shrink-0">
+                                      <ProBadge />
+                                    </span>
+                                  ) : null}
                                   {!collapsed && (
                                     <span className="truncate text-left">{item.title}</span>
                                   )}
@@ -267,12 +297,17 @@ export function AppSidebar() {
                               {item.children.map((child) => (
                                 <SidebarMenuSubItem key={child.page}>
                                   <SidebarMenuSubButton
-                                    onClick={() => handleNavigate(child.page)}
+                                    onClick={() => tryNavigate(child.page)}
                                     className={cn(
                                       "text-sm cursor-pointer w-full",
                                       isActive(child.page) && "text-primary font-medium"
                                     )}
                                   >
+                                    {freeRestricted && proOnly(child.page) ? (
+                                      <span className="mr-1.5 shrink-0">
+                                        <ProBadge />
+                                      </span>
+                                    ) : null}
                                     <child.icon className="mr-2 h-3.5 w-3.5 shrink-0" />
                                     <span className="min-w-0 truncate">{child.title}</span>
                                   </SidebarMenuSubButton>
@@ -298,7 +333,7 @@ export function AppSidebar() {
                       )}
                     >
                       <SidebarMenuButton
-                        onClick={() => handleNavigate(page)}
+                        onClick={() => tryNavigate(page)}
                         className={cn(
                           "cursor-pointer",
                           isActive(page) && "bg-muted text-primary font-medium",
@@ -307,6 +342,11 @@ export function AppSidebar() {
                             "bg-sidebar text-foreground ring-2 ring-primary shadow-md rounded-md",
                         )}
                       >
+                        {freeRestricted && proOnly(page) ? (
+                          <span className="mr-1.5 shrink-0">
+                            <ProBadge />
+                          </span>
+                        ) : null}
                         <item.icon className="mr-2 h-4 w-4 shrink-0" />
                         {!collapsed && <span className="min-w-0 truncate">{item.title}</span>}
                       </SidebarMenuButton>
@@ -376,6 +416,13 @@ export function AppSidebar() {
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarFooter>
+
+      <UpgradePlanDialog
+        open={upgradeOpen}
+        onOpenChange={setUpgradeOpen}
+        selfServiceUpgrade={plano === "free"}
+        onUpgradeSuccess={() => void refetchPlano()}
+      />
     </Sidebar>
   );
 }

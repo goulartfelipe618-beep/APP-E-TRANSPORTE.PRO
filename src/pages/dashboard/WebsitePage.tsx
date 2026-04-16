@@ -666,7 +666,6 @@ export default function WebsitePage() {
         <UpgradePlanDialog
           open={upgradeOpen}
           onOpenChange={setUpgradeOpen}
-          requiredPlan="rise"
           selfServiceUpgrade={plano === "free"}
           onUpgradeSuccess={() => void refetchPlano()}
         />
@@ -721,7 +720,6 @@ export default function WebsitePage() {
         <UpgradePlanDialog
           open={upgradeOpen}
           onOpenChange={setUpgradeOpen}
-          requiredPlan="rise"
           selfServiceUpgrade={plano === "free"}
           onUpgradeSuccess={() => void refetchPlano()}
         />
@@ -1221,7 +1219,6 @@ export default function WebsitePage() {
       <UpgradePlanDialog
         open={upgradeOpen}
         onOpenChange={setUpgradeOpen}
-        requiredPlan="rise"
         selfServiceUpgrade={plano === "free"}
         onUpgradeSuccess={() => void refetchPlano()}
       />

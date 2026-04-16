@@ -5,7 +5,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const PAID = ["seed", "grow", "rise", "apex"] as const;
+const PAID = ["pro"] as const;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -47,7 +47,7 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const raw = String(body.plano || "").toLowerCase().trim();
     if (!PAID.includes(raw as (typeof PAID)[number])) {
-      return new Response(JSON.stringify({ error: "Plano inválido. Use seed, grow, rise ou apex." }), {
+      return new Response(JSON.stringify({ error: "Plano inválido. Utilize pro (plano PRÓ)." }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });

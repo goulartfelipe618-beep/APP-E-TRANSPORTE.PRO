@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Plus, Trash2, Users, Search, RefreshCw, Crown } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { PLAN_LABELS, PLAN_COLORS, PlanType, PLANS_PAID_ORDER } from "@/hooks/useUserPlan";
+import { PLAN_LABELS, PLAN_COLORS, PlanType, PLANS_PAID_ORDER, normalizeUserPlano } from "@/hooks/useUserPlan";
 import { ConfirmDeleteDialog } from "@/components/ConfirmDeleteDialog";
 import { purgeStoredStateForUserId } from "@/lib/hardDelete";
 
@@ -47,7 +47,7 @@ export default function AdminUsuariosCadastrados() {
   const [formEmail, setFormEmail] = useState("");
   const [formPassword, setFormPassword] = useState("");
   const [formRole, setFormRole] = useState("");
-  const [formPlano, setFormPlano] = useState<PlanType>("seed");
+  const [formPlano, setFormPlano] = useState<PlanType>("pro");
   const [creating, setCreating] = useState(false);
   const [updatingPlan, setUpdatingPlan] = useState(false);
   const [deleteUserId, setDeleteUserId] = useState<string | null>(null);
@@ -127,7 +127,7 @@ export default function AdminUsuariosCadastrados() {
       setFormEmail("");
       setFormPassword("");
       setFormRole("");
-      setFormPlano("seed");
+      setFormPlano("pro");
       fetchUsers();
     }
     setCreating(false);
@@ -170,8 +170,8 @@ export default function AdminUsuariosCadastrados() {
 
   const handleOpenPlanDialog = (user: UserItem) => {
     setSelectedUser(user);
-    const p = (user.plano || "free") as PlanType;
-    setSelectedPlan(p === "free" ? "seed" : p);
+    const p = normalizeUserPlano(user.plano);
+    setSelectedPlan(p === "free" ? "pro" : p);
     setPlanDialogOpen(true);
   };
 
@@ -279,8 +279,8 @@ export default function AdminUsuariosCadastrados() {
                   {u.role === "admin_master" || u.plano === "n/a" ? (
                     <span className="text-sm text-muted-foreground">—</span>
                   ) : (
-                    <Badge variant="outline" className={PLAN_COLORS[(u.plano || "free") as PlanType]}>
-                      {PLAN_LABELS[(u.plano || "free") as PlanType]}
+                    <Badge variant="outline" className={PLAN_COLORS[normalizeUserPlano(u.plano)]}>
+                      {PLAN_LABELS[normalizeUserPlano(u.plano)]}
                     </Badge>
                   )}
                 </TableCell>
@@ -328,7 +328,7 @@ export default function AdminUsuariosCadastrados() {
               <Select value={formRole} onValueChange={(v) => {
                 setFormRole(v);
                 if (v === "admin_master") setFormPlano("free");
-                if (v === "admin_transfer" || v === "admin_taxi") setFormPlano("seed");
+                if (v === "admin_transfer" || v === "admin_taxi") setFormPlano("pro");
               }}>
                 <SelectTrigger><SelectValue placeholder="Selecione o tipo" /></SelectTrigger>
                 <SelectContent>
@@ -382,7 +382,7 @@ export default function AdminUsuariosCadastrados() {
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground mt-1">
-                O plano FREE existe apenas para pré-cadastros vindos do site; usuários em Cadastrados usam planos pagos.
+                O plano FREE existe apenas para pré-cadastros vindos do site; em Cadastrados o plano pago é PRÓ.
               </p>
             </div>
             <Button onClick={handleUpdatePlan} disabled={updatingPlan} className="w-full">
