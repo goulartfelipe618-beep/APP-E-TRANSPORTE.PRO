@@ -116,6 +116,7 @@ const getMenuStructure = (showNetwork: boolean, exibirComunicadorMotorista: bool
       { title: "E-mail Business", page: "email-business", icon: Mail },
       { title: "Website", page: "website", icon: Monitor },
       { title: "Domínios", page: "dominios", icon: Link2 },
+      { title: "Google Maps", page: "google", icon: MapPin },
     ],
   },
   {
@@ -123,7 +124,6 @@ const getMenuStructure = (showNetwork: boolean, exibirComunicadorMotorista: bool
     labelTone: "beta",
     items: [
       { title: "Geolocalização", page: "transfer/geolocalizacao", icon: Map },
-      { title: "Google Maps", page: "google", icon: Search },
       { title: "Disparador", page: "disparador", icon: Megaphone },
     ],
   },
