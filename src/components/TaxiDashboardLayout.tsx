@@ -44,18 +44,18 @@ function TaxiContent() {
   }, []);
 
   return (
-    <div className="min-h-screen flex w-full">
+    <div className="flex min-h-svh w-full max-w-[100vw] overflow-x-hidden">
       <TaxiSidebar />
-      <div className="flex-1 flex flex-col">
-        <header className="h-12 flex items-center border-b border-border bg-card px-4 gap-3">
-          <SidebarTrigger />
-          <div className="flex items-center gap-2">
-            <Car className="h-5 w-5 text-muted-foreground" />
-            <span className="text-sm font-medium text-foreground">E-Transporte.pro — Gestão de Táxi</span>
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        <header className="flex h-12 min-h-12 shrink-0 items-center gap-2 border-b border-border bg-card px-2 sm:gap-3 sm:px-4">
+          <SidebarTrigger className="shrink-0" />
+          <div className="flex min-w-0 flex-1 items-center gap-2">
+            <Car className="h-5 w-5 shrink-0 text-muted-foreground" />
+            <span className="truncate text-sm font-medium text-foreground">E-Transporte.pro — Gestão de Táxi</span>
           </div>
         </header>
         <PainelAvisoBanner painel="taxi" activePage={activePage} />
-        <main className="flex-1 bg-background overflow-auto [--main-pad-x:1.5rem] [--main-pad-y:1.5rem] px-[var(--main-pad-x)] py-[var(--main-pad-y)]">
+        <main className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto bg-background [--main-pad-x:1rem] [--main-pad-y:1rem] px-[var(--main-pad-x)] py-[var(--main-pad-y)] sm:[--main-pad-x:1.5rem] sm:[--main-pad-y:1.5rem]">
           <PageLoader>
             <PageComponent />
           </PageLoader>

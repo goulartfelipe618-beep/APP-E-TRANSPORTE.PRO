@@ -81,18 +81,18 @@ export function TaxiSidebar() {
 
   return (
     <Sidebar collapsible="icon" className="border-r border-border">
-      <div className="p-4 flex items-center gap-3 border-b border-border">
+      <div className="flex shrink-0 items-center gap-3 border-b border-border p-3 sm:p-4">
         {config.logo_url ? (
-          <img src={config.logo_url} alt="Logo" className="h-8 w-8 rounded-full object-cover" />
+          <img src={config.logo_url} alt="Logo" className="h-8 w-8 shrink-0 rounded-full object-cover" />
         ) : (
-          <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary">
             <Car className="h-4 w-4 text-primary-foreground" />
           </div>
         )}
         {!collapsed && (
-          <div>
-            <p className="text-sm font-bold text-foreground">{config.nome_projeto}</p>
-            <p className="text-xs text-muted-foreground">Gestão de Táxi</p>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-bold text-foreground">{config.nome_projeto}</p>
+            <p className="truncate text-xs text-muted-foreground">Gestão de Táxi</p>
           </div>
         )}
       </div>
@@ -110,12 +110,14 @@ export function TaxiSidebar() {
                       <Collapsible key={item.title} defaultOpen={groupActive}>
                         <SidebarMenuItem>
                           <CollapsibleTrigger asChild>
-                            <SidebarMenuButton className={cn("w-full justify-between", groupActive && "text-primary")}>
-                              <span className="flex items-center gap-2">
-                                <item.icon className="h-4 w-4" />
-                                {!collapsed && <span>{item.title}</span>}
+                            <SidebarMenuButton className={cn("w-full min-w-0 justify-between gap-1", groupActive && "text-primary")}>
+                              <span className="flex min-w-0 flex-1 items-center gap-2">
+                                <item.icon className="h-4 w-4 shrink-0" />
+                                {!collapsed && <span className="truncate text-left">{item.title}</span>}
                               </span>
-                              {!collapsed && <ChevronDown className="h-4 w-4 transition-transform group-data-[state=open]:rotate-180" />}
+                              {!collapsed && (
+                                <ChevronDown className="h-4 w-4 shrink-0 transition-transform group-data-[state=open]:rotate-180" />
+                              )}
                             </SidebarMenuButton>
                           </CollapsibleTrigger>
                           <CollapsibleContent>
@@ -125,12 +127,12 @@ export function TaxiSidebar() {
                                   <SidebarMenuSubButton
                                     onClick={() => setActivePage(child.page)}
                                     className={cn(
-                                      "text-sm cursor-pointer w-full",
-                                      isActive(child.page) && "text-primary font-medium"
+                                      "w-full min-w-0 cursor-pointer text-sm",
+                                      isActive(child.page) && "text-primary font-medium",
                                     )}
                                   >
-                                    <child.icon className="h-3.5 w-3.5 mr-2" />
-                                    {child.title}
+                                    <child.icon className="mr-2 h-3.5 w-3.5 shrink-0" />
+                                    <span className="min-w-0 truncate">{child.title}</span>
                                   </SidebarMenuSubButton>
                                 </SidebarMenuSubItem>
                               ))}
@@ -151,8 +153,8 @@ export function TaxiSidebar() {
                           isActive(page) && "bg-muted text-primary font-medium"
                         )}
                       >
-                        <item.icon className="h-4 w-4 mr-2" />
-                        {!collapsed && <span>{item.title}</span>}
+                        <item.icon className="mr-2 h-4 w-4 shrink-0" />
+                        {!collapsed && <span className="min-w-0 truncate">{item.title}</span>}
                       </SidebarMenuButton>
                     </SidebarMenuItem>
                   );
@@ -163,24 +165,26 @@ export function TaxiSidebar() {
         ))}
       </SidebarContent>
 
-      <SidebarFooter className="border-t border-border">
+      <SidebarFooter className="shrink-0 border-t border-border">
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton className="w-full">
-              <Bell className="h-4 w-4 mr-2" />
-              {!collapsed && <span>Notificações</span>}
+            <SidebarMenuButton className="w-full min-w-0">
+              <Bell className="mr-2 h-4 w-4 shrink-0" />
+              {!collapsed && <span className="min-w-0 truncate">Notificações</span>}
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>
-            <SidebarMenuButton className="w-full" onClick={() => void toggleTheme()}>
-              {darkMode ? <Sun className="h-4 w-4 mr-2" /> : <Moon className="h-4 w-4 mr-2" />}
-              {!collapsed && <span>{darkMode ? "Modo Claro" : "Modo Escuro"}</span>}
+            <SidebarMenuButton className="w-full min-w-0" onClick={() => void toggleTheme()}>
+              {darkMode ? <Sun className="mr-2 h-4 w-4 shrink-0" /> : <Moon className="mr-2 h-4 w-4 shrink-0" />}
+              {!collapsed && (
+                <span className="min-w-0 truncate">{darkMode ? "Modo Claro" : "Modo Escuro"}</span>
+              )}
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>
-            <SidebarMenuButton className="w-full" onClick={handleLogout}>
-              <LogOut className="h-4 w-4 mr-2" />
-              {!collapsed && <span>Sair</span>}
+            <SidebarMenuButton className="w-full min-w-0" onClick={handleLogout}>
+              <LogOut className="mr-2 h-4 w-4 shrink-0" />
+              {!collapsed && <span className="min-w-0 truncate">Sair</span>}
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>

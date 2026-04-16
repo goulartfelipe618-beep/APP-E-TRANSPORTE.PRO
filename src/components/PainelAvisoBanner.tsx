@@ -163,19 +163,19 @@ export default function PainelAvisoBanner({ painel, activePage }: Props) {
             key={a.id}
             role="status"
             className={cn(
-              "flex w-full flex-wrap items-start gap-3 border-b px-4 py-3 text-sm shadow-sm last:border-b-0 sm:flex-nowrap",
+              "flex w-full min-w-0 flex-col gap-3 border-b px-3 py-3 text-sm shadow-sm last:border-b-0 sm:flex-row sm:flex-wrap sm:items-start sm:px-4",
               COR_CLASS[a.cor] ?? COR_CLASS.amarelo,
             )}
           >
             <p
               className={cn(
-                "min-w-0 flex-1 basis-full whitespace-pre-wrap leading-snug sm:basis-auto sm:min-h-[2rem]",
+                "min-w-0 w-full whitespace-pre-wrap break-words leading-snug sm:flex-1 sm:min-h-[2rem]",
                 avisoFonteClassName(a.fonte),
               )}
             >
               {renderAvisoTextoComMarcacao(a.texto)}
             </p>
-            <div className="ml-auto flex shrink-0 items-center gap-3">
+            <div className="flex w-full shrink-0 items-center justify-end gap-2 sm:ml-auto sm:w-auto sm:justify-start sm:gap-3">
               {showNeverAgain ? (
                 <div className="flex items-center gap-2">
                   <Checkbox

@@ -155,28 +155,30 @@ function DashboardContent() {
 
   return (
     <NetworkSpotlightProvider active={showOverlay}>
-      <div className="min-h-screen flex w-full">
+      <div className="flex min-h-svh w-full max-w-[100vw] overflow-x-hidden">
         <AppSidebar />
-        <div className="relative flex flex-1 min-w-0 flex-col">
+        <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
           {showOverlay && (
             <button
               type="button"
               aria-label="Fechar destaque do menu Network"
-              className="absolute inset-0 z-40 bg-black/60 animate-fade-in cursor-default border-0 p-0"
+              className="absolute inset-0 z-40 animate-fade-in cursor-default border-0 bg-black/60 p-0"
               onClick={dismissSpotlight}
             />
           )}
-          <header className="relative z-0 h-12 flex items-center border-b border-border bg-card px-4 gap-3">
-            <SidebarTrigger />
-            <div className="flex items-center gap-2">
-              <Shield className="h-5 w-5 text-muted-foreground" />
-              <span className="text-sm font-medium text-foreground">E-Transporte.pro — Gestão de Frota</span>
+          <header className="relative z-0 flex h-12 min-h-12 shrink-0 items-center gap-2 border-b border-border bg-card px-2 sm:gap-3 sm:px-4">
+            <SidebarTrigger className="shrink-0" />
+            <div className="flex min-w-0 flex-1 items-center gap-2">
+              <Shield className="h-5 w-5 shrink-0 text-muted-foreground" />
+              <span className="truncate text-sm font-medium text-foreground">
+                E-Transporte.pro — Gestão de Frota
+              </span>
             </div>
           </header>
           <PainelAvisoBanner painel="motorista" activePage={activePage} />
           <main
             ref={mainRef}
-            className="relative z-0 flex-1 bg-background overflow-auto scroll-smooth [--main-pad-x:1.5rem] [--main-pad-y:1.5rem] px-[var(--main-pad-x)] py-[var(--main-pad-y)]"
+            className="relative z-0 min-h-0 flex-1 overflow-x-hidden overflow-y-auto scroll-smooth bg-background [--main-pad-x:1rem] [--main-pad-y:1rem] px-[var(--main-pad-x)] py-[var(--main-pad-y)] sm:[--main-pad-x:1.5rem] sm:[--main-pad-y:1.5rem]"
           >
             <PageLoader>
               <PageComponent />

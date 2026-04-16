@@ -173,7 +173,7 @@ export default function FullscreenBannerOverlay({ painel, activePage }: Props) {
   return (
     <div
       className={cn(
-        "fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4 transition-opacity ease-out",
+        "fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-3 pt-[max(0.75rem,env(safe-area-inset-top))] pb-[max(0.75rem,env(safe-area-inset-bottom))] transition-opacity ease-out sm:p-4",
         fadingOut ? "pointer-events-none opacity-0" : "opacity-100",
       )}
       style={{ transitionDuration: `${FADE_MS}ms` }}
@@ -182,23 +182,26 @@ export default function FullscreenBannerOverlay({ painel, activePage }: Props) {
       aria-label="Banner promocional"
     >
       <div
-        className="relative w-[560px] max-w-[min(560px,calc(100vw-2rem))] h-[400px] max-h-[min(400px,calc(100vh-4rem))] shrink-0 overflow-hidden rounded-none border border-white/10 shadow-2xl"
+        className="relative mx-auto h-[min(400px,calc(100dvh-6rem))] w-full max-w-[min(560px,calc(100vw-1.5rem))] shrink-0 overflow-hidden rounded-lg border border-white/10 shadow-2xl sm:rounded-none"
       >
         <img
           src={current.imagem_url}
           alt=""
-          className="absolute inset-0 h-full w-full object-contain bg-black"
+          className="absolute inset-0 h-full w-full bg-black object-contain"
         />
-        <div className="absolute right-2 top-2 z-10 flex items-center gap-3">
+        <div className="absolute left-2 right-2 top-2 z-10 flex flex-wrap items-start justify-end gap-2">
           {showCheckbox ? (
-            <div className="flex items-center gap-2 rounded-none bg-black/50 px-2 py-1.5 backdrop-blur-sm">
+            <div className="flex max-w-full min-w-0 items-center gap-2 rounded-md bg-black/50 px-2 py-1.5 backdrop-blur-sm sm:max-w-[calc(100%-3rem)]">
               <Checkbox
                 id={checkboxId}
                 checked={neverAgain}
                 onCheckedChange={(v) => setNeverAgain(v === true)}
-                className="border-white/70 data-[state=checked]:bg-white data-[state=checked]:text-neutral-900"
+                className="shrink-0 border-white/70 data-[state=checked]:bg-white data-[state=checked]:text-neutral-900"
               />
-              <Label htmlFor={checkboxId} className="cursor-pointer text-sm font-normal text-white">
+              <Label
+                htmlFor={checkboxId}
+                className="min-w-0 cursor-pointer text-xs font-normal leading-snug text-white sm:text-sm"
+              >
                 Não mostrar novamente
               </Label>
             </div>

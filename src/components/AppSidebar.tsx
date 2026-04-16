@@ -187,21 +187,21 @@ export function AppSidebar() {
     >
       <div
         className={cn(
-          "p-4 flex items-center gap-3 border-b border-border",
+          "flex shrink-0 items-center gap-3 border-b border-border p-3 sm:p-4",
           showNetworkHighlight && "relative z-30 opacity-40",
         )}
       >
         {config.logo_url ? (
-          <img src={config.logo_url} alt="Logo" className="h-8 w-8 rounded-full object-cover" />
+          <img src={config.logo_url} alt="Logo" className="h-8 w-8 shrink-0 rounded-full object-cover" />
         ) : (
-          <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary">
             <Car className="h-4 w-4 text-primary-foreground" />
           </div>
         )}
         {!collapsed && (
-          <div>
-            <p className="text-sm font-bold text-foreground">{config.nome_projeto}</p>
-            <p className="text-xs text-muted-foreground">Gestão de Frota</p>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-bold text-foreground">{config.nome_projeto}</p>
+            <p className="truncate text-xs text-muted-foreground">Gestão de Frota</p>
           </div>
         )}
       </div>
@@ -273,8 +273,8 @@ export function AppSidebar() {
                                       isActive(child.page) && "text-primary font-medium"
                                     )}
                                   >
-                                    <child.icon className="h-3.5 w-3.5 mr-2" />
-                                    {child.title}
+                                    <child.icon className="mr-2 h-3.5 w-3.5 shrink-0" />
+                                    <span className="min-w-0 truncate">{child.title}</span>
                                   </SidebarMenuSubButton>
                                 </SidebarMenuSubItem>
                               ))}
@@ -307,8 +307,8 @@ export function AppSidebar() {
                             "bg-sidebar text-foreground ring-2 ring-primary shadow-md rounded-md",
                         )}
                       >
-                        <item.icon className="h-4 w-4 mr-2" />
-                        {!collapsed && <span>{item.title}</span>}
+                        <item.icon className="mr-2 h-4 w-4 shrink-0" />
+                        {!collapsed && <span className="min-w-0 truncate">{item.title}</span>}
                       </SidebarMenuButton>
                     </SidebarMenuItem>
                   );
@@ -322,8 +322,9 @@ export function AppSidebar() {
       {showNetworkHighlight && (
         <div
           className={cn(
-            "fixed z-[100] max-h-[min(24rem,calc(100vh-2rem))] w-[min(22rem,calc(100vw-1.5rem))] overflow-y-auto rounded-xl border border-neutral-200 bg-white p-5 text-neutral-900 shadow-2xl animate-fade-in",
-            collapsed ? "left-[3.75rem] top-[22%]" : "left-[calc(var(--sidebar-width)+0.75rem)] top-[22%]",
+            "fixed z-[100] mx-auto max-h-[min(24rem,calc(100dvh-2rem))] w-[min(22rem,calc(100vw-1.5rem))] overflow-y-auto overscroll-contain rounded-xl border border-neutral-200 bg-white p-4 text-neutral-900 shadow-2xl animate-fade-in sm:p-5",
+            "inset-x-3 top-[max(0.75rem,env(safe-area-inset-top))] max-w-lg lg:mx-0 lg:max-w-[min(22rem,calc(100vw-1.5rem))]",
+            collapsed ? "lg:left-[3.75rem] lg:right-auto lg:top-[22%]" : "lg:left-[calc(var(--sidebar-width)+0.75rem)] lg:right-auto lg:top-[22%]",
           )}
           role="dialog"
           aria-labelledby="network-spotlight-title"
@@ -348,27 +349,29 @@ export function AppSidebar() {
 
       <SidebarFooter
         className={cn(
-          "border-t border-border",
+          "shrink-0 border-t border-border",
           showNetworkHighlight && "relative z-30 opacity-40",
         )}
       >
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton className="w-full">
-              <Bell className="h-4 w-4 mr-2" />
-              {!collapsed && <span>Notificações</span>}
+            <SidebarMenuButton className="w-full min-w-0">
+              <Bell className="mr-2 h-4 w-4 shrink-0" />
+              {!collapsed && <span className="min-w-0 truncate">Notificações</span>}
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>
-            <SidebarMenuButton className="w-full" onClick={() => void toggleTheme()}>
-              {darkMode ? <Sun className="h-4 w-4 mr-2" /> : <Moon className="h-4 w-4 mr-2" />}
-              {!collapsed && <span>{darkMode ? "Modo Claro" : "Modo Escuro"}</span>}
+            <SidebarMenuButton className="w-full min-w-0" onClick={() => void toggleTheme()}>
+              {darkMode ? <Sun className="mr-2 h-4 w-4 shrink-0" /> : <Moon className="mr-2 h-4 w-4 shrink-0" />}
+              {!collapsed && (
+                <span className="min-w-0 truncate">{darkMode ? "Modo Claro" : "Modo Escuro"}</span>
+              )}
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>
-            <SidebarMenuButton className="w-full" onClick={handleLogout}>
-              <LogOut className="h-4 w-4 mr-2" />
-              {!collapsed && <span>Sair</span>}
+            <SidebarMenuButton className="w-full min-w-0" onClick={handleLogout}>
+              <LogOut className="mr-2 h-4 w-4 shrink-0" />
+              {!collapsed && <span className="min-w-0 truncate">Sair</span>}
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>

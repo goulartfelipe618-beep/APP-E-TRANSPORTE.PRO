@@ -63,20 +63,22 @@ function AdminContent() {
   }, []);
 
   return (
-    <div className="min-h-screen flex w-full bg-background">
+    <div className="flex min-h-svh w-full max-w-[100vw] overflow-x-hidden bg-background">
       <AdminSidebar />
-      <div className="flex-1 flex flex-col">
-        <header className="h-12 flex items-center border-b border-border px-4">
-          <SidebarTrigger />
-          <span className="ml-3 text-sm font-semibold text-foreground">{config.nome_projeto || "Painel Admin Master"}</span>
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        <header className="flex h-12 min-h-12 shrink-0 items-center gap-2 border-b border-border px-2 sm:px-4">
+          <SidebarTrigger className="shrink-0" />
+          <span className="min-w-0 flex-1 truncate text-sm font-semibold text-foreground sm:ml-1">
+            {config.nome_projeto || "Painel Admin Master"}
+          </span>
         </header>
         <main
           ref={mainRef}
           className={cn(
-            "flex-1 min-h-0 overflow-auto scroll-smooth",
+            "min-h-0 flex-1 overflow-x-hidden overflow-y-auto scroll-smooth",
             activePage === "comunidade"
               ? "[--main-pad-x:0px] [--main-pad-y:0px] px-0 pb-6 pt-0"
-              : "[--main-pad-x:1.5rem] [--main-pad-y:1.5rem] px-[var(--main-pad-x)] py-[var(--main-pad-y)]",
+              : "[--main-pad-x:1rem] [--main-pad-y:1rem] px-[var(--main-pad-x)] py-[var(--main-pad-y)] sm:[--main-pad-x:1.5rem] sm:[--main-pad-y:1.5rem]",
           )}
         >
           <PageComponent key={activePage} />
