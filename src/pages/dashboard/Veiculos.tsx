@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Car, LayoutGrid, Link2, List, Plus, Search, Settings2 } from "lucide-react";
+import { Car, LayoutGrid, Link2, List, Pencil, Plus, Search, Settings2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -36,7 +36,8 @@ export default function VeiculosPage() {
   const [veiculos, setVeiculos] = useState<VeiculoRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [openCreate, setOpenCreate] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingVeiculoId, setEditingVeiculoId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>(() => readInitialView());
 
   const load = useCallback(async () => {
@@ -65,6 +66,21 @@ export default function VeiculosPage() {
     }
   };
 
+  const openCreate = () => {
+    setEditingVeiculoId(null);
+    setDialogOpen(true);
+  };
+
+  const openEdit = (id: string) => {
+    setEditingVeiculoId(id);
+    setDialogOpen(true);
+  };
+
+  const handleDialogOpenChange = (open: boolean) => {
+    setDialogOpen(open);
+    if (!open) setEditingVeiculoId(null);
+  };
+
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
     if (!term) return veiculos;
@@ -84,7 +100,7 @@ export default function VeiculosPage() {
             Cadastro completo e centralizado da frota para cálculo automático de corridas.
           </p>
         </div>
-        <Button onClick={() => setOpenCreate(true)} className="w-full shrink-0 sm:w-auto">
+        <Button onClick={openCreate} className="w-full shrink-0 sm:w-auto">
           <Plus className="mr-2 h-4 w-4" />
           Novo veículo
         </Button>
@@ -201,13 +217,23 @@ export default function VeiculosPage() {
                 <p className="text-xs leading-relaxed text-muted-foreground">
                   Bandeirada: R$ {v.tarifa_base.toFixed(2)} | Mínimo: R$ {v.valor_minimo_corrida.toFixed(2)}
                 </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="mt-2 w-full border-[#FF6600]/40 text-[#FF6600] hover:bg-[#FF6600]/10"
+                  onClick={() => openEdit(v.id)}
+                >
+                  <Pencil className="mr-2 h-4 w-4" />
+                  Editar
+                </Button>
               </div>
             </article>
           ))}
         </div>
       ) : (
         <div className="min-w-0 overflow-x-auto rounded-xl border border-border bg-card">
-          <table className="w-full min-w-[640px] text-left text-sm">
+          <table className="w-full min-w-[720px] text-left text-sm">
             <thead className="border-b border-border bg-muted/40">
               <tr>
                 <th className="w-24 p-2 sm:p-3">Capa</th>
@@ -217,6 +243,7 @@ export default function VeiculosPage() {
                 <th className="p-2 sm:p-3">Status</th>
                 <th className="hidden p-2 sm:table-cell sm:p-3">KM / Hora</th>
                 <th className="hidden p-2 md:table-cell md:p-3">Bandeirada / Mín.</th>
+                <th className="w-[1%] whitespace-nowrap p-2 text-right sm:p-3">Ações</th>
               </tr>
             </thead>
             <tbody>
@@ -256,6 +283,18 @@ export default function VeiculosPage() {
                   <td className="hidden whitespace-nowrap p-2 text-xs md:table-cell md:p-3">
                     R$ {v.tarifa_base.toFixed(2)} / R$ {v.valor_minimo_corrida.toFixed(2)}
                   </td>
+                  <td className="p-2 text-right sm:p-3">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="border-[#FF6600]/40 text-[#FF6600] hover:bg-[#FF6600]/10"
+                      onClick={() => openEdit(v.id)}
+                    >
+                      <Pencil className="mr-1.5 h-3.5 w-3.5 sm:mr-2 sm:h-4 sm:w-4" />
+                      <span className="hidden sm:inline">Editar</span>
+                    </Button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -267,9 +306,10 @@ export default function VeiculosPage() {
       )}
 
       <CadastrarVeiculoDialog
-        open={openCreate}
-        onOpenChange={setOpenCreate}
-        onCreated={() => {
+        open={dialogOpen}
+        veiculoId={editingVeiculoId}
+        onOpenChange={handleDialogOpenChange}
+        onSaved={() => {
           void load();
         }}
       />

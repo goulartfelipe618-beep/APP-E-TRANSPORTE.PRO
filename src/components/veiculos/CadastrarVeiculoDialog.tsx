@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,6 +9,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Upload } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import type { Json } from "@/integrations/supabase/types";
 import { assertUploadMagicBytes, extensionForDetectedMime } from "@/lib/validateUploadMagicBytes";
 import { validateVehicleCoverDimensions, VEHICLE_COVER_DIMENSIONS } from "@/lib/validateVehicleCoverDimensions";
 import { cn } from "@/lib/utils";
@@ -16,7 +17,9 @@ import { cn } from "@/lib/utils";
 type Props = {
   open: boolean;
   onOpenChange: (next: boolean) => void;
-  onCreated?: () => void;
+  /** Se definido, abre em modo edição para este veículo. */
+  veiculoId?: string | null;
+  onSaved?: () => void;
 };
 
 type UploadField = { key: string; label: string };
@@ -36,8 +39,27 @@ const IMAGE_FIELDS: UploadField[] = [
   { key: "interna_4", label: "Interna 4" },
 ];
 
-export default function CadastrarVeiculoDialog({ open, onOpenChange, onCreated }: Props) {
+function taxasExtrasFromJson(json: Json | null): string {
+  if (!json || typeof json !== "object" || Array.isArray(json)) return "";
+  const o = json as Record<string, unknown>;
+  const d = o.descricao ?? o.observacao ?? o.texto;
+  return typeof d === "string" ? d : "";
+}
+
+function imagensJsonToRecord(json: Json | null): Record<string, string> {
+  if (!json || typeof json !== "object" || Array.isArray(json)) return {};
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(json as Record<string, unknown>)) {
+    if (k === "capa") continue;
+    if (typeof v === "string" && v.startsWith("http")) out[k] = v;
+  }
+  return out;
+}
+
+export default function CadastrarVeiculoDialog({ open, onOpenChange, veiculoId = null, onSaved }: Props) {
+  const isEdit = Boolean(veiculoId);
   const [saving, setSaving] = useState(false);
+  const [loadingVehicle, setLoadingVehicle] = useState(false);
   const [tipoVeiculo, setTipoVeiculo] = useState<"carro" | "van">("carro");
   const [marca, setMarca] = useState("");
   const [modelo, setModelo] = useState("");
@@ -66,12 +88,101 @@ export default function CadastrarVeiculoDialog({ open, onOpenChange, onCreated }
   const [taxasExtras, setTaxasExtras] = useState("");
   const [files, setFiles] = useState<Record<string, File | null>>({});
   const [capaFile, setCapaFile] = useState<File | null>(null);
+  const [existingCapaUrl, setExistingCapaUrl] = useState<string | null>(null);
+  const [existingImagens, setExistingImagens] = useState<Record<string, string>>({});
 
   const imageKeys = useMemo(() => IMAGE_FIELDS.map((f) => f.key), []);
+
+  const resetForm = useCallback(() => {
+    setTipoVeiculo("carro");
+    setMarca("");
+    setModelo("");
+    setAno("");
+    setCor("");
+    setPlaca("");
+    setCombustivel("");
+    setRenavam("");
+    setChassi("");
+    setStatus("");
+    setObservacoes("");
+    setTipoCobranca("");
+    setValorKm("");
+    setValorHora("");
+    setTarifaBase("");
+    setValorMinimo("");
+    setKmMinimo("");
+    setToleranciaMinutos("");
+    setValorHoraEspera("");
+    setFracaoMinutos("");
+    setMultiplicadorIdaVolta("");
+    setPrecoFixoRota("");
+    setTaxaNoturnaPct("");
+    setTaxaAeroportoFixa("");
+    setPedagioModo("");
+    setTaxasExtras("");
+    setFiles({});
+    setCapaFile(null);
+    setExistingCapaUrl(null);
+    setExistingImagens({});
+  }, []);
 
   const setFile = (key: string, file: File | null) => {
     setFiles((prev) => ({ ...prev, [key]: file }));
   };
+
+  useEffect(() => {
+    if (!open) return;
+    if (!veiculoId) {
+      resetForm();
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      setLoadingVehicle(true);
+      const { data, error } = await supabase.from("veiculos_frota").select("*").eq("id", veiculoId).maybeSingle();
+      if (cancelled) return;
+      setLoadingVehicle(false);
+      if (error || !data) {
+        toast.error(error?.message || "Veículo não encontrado.");
+        onOpenChange(false);
+        return;
+      }
+      const row = data;
+      setTipoVeiculo(row.tipo_veiculo === "van" ? "van" : "carro");
+      setMarca(row.marca ?? "");
+      setModelo(row.modelo ?? "");
+      setAno(row.ano ?? "");
+      setCor(row.cor ?? "");
+      setPlaca(row.placa ?? "");
+      setCombustivel(row.combustivel ?? "");
+      setRenavam(row.renavam ?? "");
+      setChassi(row.chassi ?? "");
+      setStatus(row.status ?? "");
+      setObservacoes(row.observacoes ?? "");
+      setTipoCobranca((row.tipo_cobranca as "km" | "hora" | "hibrido") || "");
+      setValorKm(String(row.valor_km ?? ""));
+      setValorHora(String(row.valor_hora ?? ""));
+      setTarifaBase(String(row.tarifa_base ?? ""));
+      setValorMinimo(String(row.valor_minimo_corrida ?? ""));
+      setKmMinimo(String(row.distancia_minima_km ?? ""));
+      setToleranciaMinutos(String(row.tempo_tolerancia_min ?? ""));
+      setValorHoraEspera(String(row.valor_hora_espera ?? ""));
+      setFracaoMinutos(String(row.fracao_tempo_min ?? ""));
+      setMultiplicadorIdaVolta(String(row.multiplicador_ida_volta ?? ""));
+      setPrecoFixoRota(row.permitir_preco_fixo_rota ? "sim" : "nao");
+      setTaxaNoturnaPct(String(row.taxa_noturna_percentual ?? ""));
+      setTaxaAeroportoFixa(String(row.taxa_aeroporto_fixa ?? ""));
+      setPedagioModo((row.pedagio_modo as "manual" | "automatico") || "");
+      setTaxasExtras(taxasExtrasFromJson(row.taxas_extras_json));
+      setFiles({});
+      setCapaFile(null);
+      setExistingCapaUrl(row.imagem_capa_url ?? null);
+      setExistingImagens(imagensJsonToRecord(row.imagens_json));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, veiculoId, onOpenChange, resetForm]);
 
   const asNumber = (value: string): number => {
     const normalized = value.replace(",", ".").trim();
@@ -131,21 +242,28 @@ export default function CadastrarVeiculoDialog({ open, onOpenChange, onCreated }
     if (!pedagioModo) return "Selecione o modo de pedágio (manual ou automático).";
     if (!taxasExtras.trim()) return "Preencha as taxas extras configuráveis.";
 
-    if (!capaFile) return "Adicione a imagem de capa do veículo (1220×880 px).";
-    const capaErr = await validateVehicleCoverDimensions(capaFile);
-    if (capaErr) return capaErr;
+    const hasCapa = capaFile || (isEdit && existingCapaUrl);
+    if (!hasCapa) return "Adicione a imagem de capa do veículo (1220×880 px).";
+    if (capaFile) {
+      const capaErr = await validateVehicleCoverDimensions(capaFile);
+      if (capaErr) return capaErr;
+    }
 
     for (const key of imageKeys) {
-      if (!files[key]) return `Envie a imagem obrigatória: ${IMAGE_FIELDS.find((f) => f.key === key)?.label ?? key}.`;
+      const hasFile = !!files[key];
+      const hasExisting = isEdit && !!existingImagens[key];
+      if (!hasFile && !hasExisting) {
+        return `Envie a imagem obrigatória: ${IMAGE_FIELDS.find((f) => f.key === key)?.label ?? key}.`;
+      }
     }
 
     return null;
   };
 
-  const uploadOne = async (userId: string, veiculoId: string, fieldKey: string, file: File): Promise<string> => {
+  const uploadOne = async (userId: string, id: string, fieldKey: string, file: File): Promise<string> => {
     const { mime } = await assertUploadMagicBytes(file, "raster-image", 10 * 1024 * 1024);
     const ext = extensionForDetectedMime(mime);
-    const path = `${userId}/${veiculoId}/${fieldKey}.${ext}`;
+    const path = `${userId}/${id}/${fieldKey}.${ext}`;
     const { error } = await supabase.storage.from("veiculos-imagens").upload(path, file, {
       cacheControl: "3600",
       upsert: true,
@@ -171,20 +289,30 @@ export default function CadastrarVeiculoDialog({ open, onOpenChange, onCreated }
       } = await supabase.auth.getUser();
       if (!user) throw new Error("Sessão inválida. Faça login novamente.");
 
-      const veiculoId = crypto.randomUUID();
+      const id = isEdit && veiculoId ? veiculoId : crypto.randomUUID();
 
-      const imagemCapaUrl = await uploadOne(user.id, veiculoId, "capa", capaFile!);
+      let imagemCapaUrl: string;
+      if (capaFile) {
+        imagemCapaUrl = await uploadOne(user.id, id, "capa", capaFile);
+      } else if (existingCapaUrl) {
+        imagemCapaUrl = existingCapaUrl;
+      } else {
+        throw new Error("Imagem de capa em falta.");
+      }
 
       const imagens: Record<string, string> = {};
       for (const key of imageKeys) {
         const file = files[key];
-        if (!file) throw new Error(`Ficheiro em falta: ${key}`);
-        imagens[key] = await uploadOne(user.id, veiculoId, key, file);
+        if (file) {
+          imagens[key] = await uploadOne(user.id, id, key, file);
+        } else if (existingImagens[key]) {
+          imagens[key] = existingImagens[key];
+        } else {
+          throw new Error(`Imagem em falta: ${key}`);
+        }
       }
 
-      const { error } = await supabase.from("veiculos_frota").insert({
-        id: veiculoId,
-        user_id: user.id,
+      const payload = {
         tipo_veiculo: tipoVeiculo,
         marca: marca.trim(),
         modelo: modelo.trim(),
@@ -210,273 +338,308 @@ export default function CadastrarVeiculoDialog({ open, onOpenChange, onCreated }
         taxa_noturna_percentual: asNumber(taxaNoturnaPct),
         taxa_aeroporto_fixa: asNumber(taxaAeroportoFixa),
         pedagio_modo: pedagioModo,
-        taxas_extras_json: { descricao: taxasExtras.trim() },
-        imagens_json: imagens,
+        taxas_extras_json: { descricao: taxasExtras.trim() } as Json,
+        imagens_json: imagens as Json,
         imagem_capa_url: imagemCapaUrl,
-      });
-      if (error) throw new Error(error.message);
+      };
 
-      toast.success("Veículo cadastrado com sucesso.");
+      if (isEdit && veiculoId) {
+        const { error } = await supabase.from("veiculos_frota").update(payload).eq("id", veiculoId);
+        if (error) throw new Error(error.message);
+        toast.success("Veículo atualizado com sucesso.");
+      } else {
+        const { error } = await supabase.from("veiculos_frota").insert({
+          id,
+          user_id: user.id,
+          ...payload,
+        });
+        if (error) throw new Error(error.message);
+        toast.success("Veículo cadastrado com sucesso.");
+      }
+
       onOpenChange(false);
-      onCreated?.();
+      onSaved?.();
     } catch (error) {
-      const msg = error instanceof Error ? error.message : "Erro ao cadastrar veículo.";
+      const msg = error instanceof Error ? error.message : "Erro ao salvar veículo.";
       toast.error(msg);
     } finally {
       setSaving(false);
     }
   };
 
+  const capaLabel = capaFile?.name || (isEdit && existingCapaUrl ? "Capa atual (substituir opcional)" : "Selecionar imagem (máx. 10MB)");
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[92vh] w-[min(100vw-1.5rem,56rem)] max-w-4xl overflow-y-auto overflow-x-hidden p-4 sm:p-6">
         <DialogHeader>
-          <DialogTitle>Novo veículo</DialogTitle>
+          <DialogTitle>{isEdit ? "Editar veículo" : "Novo veículo"}</DialogTitle>
         </DialogHeader>
 
-        <p className="text-xs text-muted-foreground sm:text-sm">
-          Todos os campos são obrigatórios. A capa deve ter exactamente{" "}
-          <strong className="text-foreground">
-            {VEHICLE_COVER_DIMENSIONS.width}×{VEHICLE_COVER_DIMENSIONS.height} px
-          </strong>{" "}
-          e aparecerá nos cards da lista.
-        </p>
+        {loadingVehicle && isEdit ? (
+          <p className="py-8 text-center text-sm text-muted-foreground">Carregando dados do veículo…</p>
+        ) : (
+          <>
+            <p className="text-xs text-muted-foreground sm:text-sm">
+              Todos os campos são obrigatórios. A capa deve ter exactamente{" "}
+              <strong className="text-foreground">
+                {VEHICLE_COVER_DIMENSIONS.width}×{VEHICLE_COVER_DIMENSIONS.height} px
+              </strong>
+              {isEdit && existingCapaUrl && !capaFile ? " — já existe uma capa; pode manter ou enviar nova." : " e aparecerá nos cards da lista."}
+            </p>
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div>
-            <Label>Tipo de veículo *</Label>
-            <Select value={tipoVeiculo} onValueChange={(v) => setTipoVeiculo(v as "carro" | "van")}>
-              <SelectTrigger className="mt-1">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="carro">Carro</SelectItem>
-                <SelectItem value="van">VAN</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label>Status *</Label>
-            <Select value={status || undefined} onValueChange={setStatus}>
-              <SelectTrigger className="mt-1">
-                <SelectValue placeholder="Selecione" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ativo">Ativo</SelectItem>
-                <SelectItem value="inativo">Inativo</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label>Marca *</Label>
-            <Input className="mt-1" value={marca} onChange={(e) => setMarca(e.target.value)} />
-          </div>
-          <div>
-            <Label>Modelo *</Label>
-            <Input className="mt-1" value={modelo} onChange={(e) => setModelo(e.target.value)} />
-          </div>
-          <div>
-            <Label>Ano *</Label>
-            <Input className="mt-1" value={ano} onChange={(e) => setAno(e.target.value)} />
-          </div>
-          <div>
-            <Label>Cor *</Label>
-            <Input className="mt-1" value={cor} onChange={(e) => setCor(e.target.value)} />
-          </div>
-          <div>
-            <Label>Placa *</Label>
-            <Input className="mt-1" value={placa} onChange={(e) => setPlaca(e.target.value)} />
-          </div>
-          <div>
-            <Label>Combustível *</Label>
-            <Select value={combustivel || undefined} onValueChange={setCombustivel}>
-              <SelectTrigger className="mt-1">
-                <SelectValue placeholder="Selecione" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="flex">Flex</SelectItem>
-                <SelectItem value="gasolina">Gasolina</SelectItem>
-                <SelectItem value="diesel">Diesel</SelectItem>
-                <SelectItem value="eletrico">Elétrico</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label>RENAVAM *</Label>
-            <Input className="mt-1" value={renavam} onChange={(e) => setRenavam(e.target.value)} />
-          </div>
-          <div>
-            <Label>Chassi *</Label>
-            <Input className="mt-1" value={chassi} onChange={(e) => setChassi(e.target.value)} />
-          </div>
-        </div>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
+                <Label>Tipo de veículo *</Label>
+                <Select value={tipoVeiculo} onValueChange={(v) => setTipoVeiculo(v as "carro" | "van")}>
+                  <SelectTrigger className="mt-1">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="carro">Carro</SelectItem>
+                    <SelectItem value="van">VAN</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Status *</Label>
+                <Select value={status || undefined} onValueChange={setStatus}>
+                  <SelectTrigger className="mt-1">
+                    <SelectValue placeholder="Selecione" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ativo">Ativo</SelectItem>
+                    <SelectItem value="inativo">Inativo</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Marca *</Label>
+                <Input className="mt-1" value={marca} onChange={(e) => setMarca(e.target.value)} />
+              </div>
+              <div>
+                <Label>Modelo *</Label>
+                <Input className="mt-1" value={modelo} onChange={(e) => setModelo(e.target.value)} />
+              </div>
+              <div>
+                <Label>Ano *</Label>
+                <Input className="mt-1" value={ano} onChange={(e) => setAno(e.target.value)} />
+              </div>
+              <div>
+                <Label>Cor *</Label>
+                <Input className="mt-1" value={cor} onChange={(e) => setCor(e.target.value)} />
+              </div>
+              <div>
+                <Label>Placa *</Label>
+                <Input className="mt-1" value={placa} onChange={(e) => setPlaca(e.target.value)} />
+              </div>
+              <div>
+                <Label>Combustível *</Label>
+                <Select value={combustivel || undefined} onValueChange={setCombustivel}>
+                  <SelectTrigger className="mt-1">
+                    <SelectValue placeholder="Selecione" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="flex">Flex</SelectItem>
+                    <SelectItem value="gasolina">Gasolina</SelectItem>
+                    <SelectItem value="diesel">Diesel</SelectItem>
+                    <SelectItem value="eletrico">Elétrico</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>RENAVAM *</Label>
+                <Input className="mt-1" value={renavam} onChange={(e) => setRenavam(e.target.value)} />
+              </div>
+              <div>
+                <Label>Chassi *</Label>
+                <Input className="mt-1" value={chassi} onChange={(e) => setChassi(e.target.value)} />
+              </div>
+            </div>
 
-        <fieldset className="space-y-4 rounded-lg border border-border p-3 sm:p-4">
-          <legend className="px-1 text-sm font-semibold text-foreground">Imagem de capa (cards) *</legend>
-          <div>
-            <Label>
-              Capa {VEHICLE_COVER_DIMENSIONS.width}×{VEHICLE_COVER_DIMENSIONS.height} px *
-            </Label>
-            <label className="mt-1 flex min-w-0 cursor-pointer items-center gap-2 rounded-lg border border-border bg-background px-3 py-2.5 transition-colors hover:bg-muted sm:px-4">
-              <Upload className="h-4 w-4 shrink-0 text-muted-foreground" />
-              <span className="min-w-0 truncate text-sm text-muted-foreground">
-                {capaFile?.name || "Selecionar imagem (máx. 10MB)"}
-              </span>
-              <input
-                type="file"
-                className="hidden"
-                accept="image/*"
-                onChange={(e) => setCapaFile(e.target.files?.[0] ?? null)}
-              />
-            </label>
-          </div>
-        </fieldset>
-
-        <fieldset className="space-y-4 rounded-lg border border-border p-3 sm:p-4">
-          <legend className="px-1 text-sm font-semibold text-foreground">Dados operacionais e cálculo *</legend>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <div>
-              <Label>Valor por KM *</Label>
-              <Input className="mt-1" value={valorKm} onChange={(e) => setValorKm(e.target.value)} />
-            </div>
-            <div>
-              <Label>Valor por hora *</Label>
-              <Input className="mt-1" value={valorHora} onChange={(e) => setValorHora(e.target.value)} />
-            </div>
-            <div>
-              <Label>Tarifa base *</Label>
-              <Input className="mt-1" value={tarifaBase} onChange={(e) => setTarifaBase(e.target.value)} />
-            </div>
-            <div>
-              <Label>Valor mínimo *</Label>
-              <Input className="mt-1" value={valorMinimo} onChange={(e) => setValorMinimo(e.target.value)} />
-            </div>
-            <div>
-              <Label>Distância mínima (KM) *</Label>
-              <Input className="mt-1" value={kmMinimo} onChange={(e) => setKmMinimo(e.target.value)} />
-            </div>
-            <div>
-              <Label>Tipo de cobrança *</Label>
-              <Select value={tipoCobranca || undefined} onValueChange={(v) => setTipoCobranca(v as "km" | "hora" | "hibrido")}>
-                <SelectTrigger className="mt-1">
-                  <SelectValue placeholder="Selecione" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="km">Por KM</SelectItem>
-                  <SelectItem value="hora">Por hora</SelectItem>
-                  <SelectItem value="hibrido">Híbrido</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Tolerância (min) *</Label>
-              <Input className="mt-1" value={toleranciaMinutos} onChange={(e) => setToleranciaMinutos(e.target.value)} />
-            </div>
-            <div>
-              <Label>Valor/hora espera *</Label>
-              <Input className="mt-1" value={valorHoraEspera} onChange={(e) => setValorHoraEspera(e.target.value)} />
-            </div>
-            <div>
-              <Label>Cobrança por fração (min) *</Label>
-              <Input className="mt-1" value={fracaoMinutos} onChange={(e) => setFracaoMinutos(e.target.value)} />
-            </div>
-            <div>
-              <Label>Multiplicador ida e volta *</Label>
-              <Input className="mt-1" value={multiplicadorIdaVolta} onChange={(e) => setMultiplicadorIdaVolta(e.target.value)} />
-            </div>
-            <div className="sm:col-span-2 lg:col-span-3">
-              <Label className="mb-2 block">Permitir preço fixo por rota *</Label>
-              <RadioGroup
-                value={precoFixoRota === "" ? undefined : precoFixoRota}
-                onValueChange={(v) => setPrecoFixoRota(v as "sim" | "nao")}
-                className="flex flex-wrap gap-4"
-              >
-                <div className="flex items-center gap-2">
-                  <RadioGroupItem value="sim" id="pf-sim" />
-                  <Label htmlFor="pf-sim" className="font-normal">
-                    Sim
-                  </Label>
+            <fieldset className="space-y-4 rounded-lg border border-border p-3 sm:p-4">
+              <legend className="px-1 text-sm font-semibold text-foreground">Imagem de capa (cards) *</legend>
+              {isEdit && existingCapaUrl && !capaFile ? (
+                <div className="mb-3 overflow-hidden rounded-lg border border-border">
+                  <img src={existingCapaUrl} alt="Capa atual" className="aspect-[1220/880] w-full object-cover" />
                 </div>
-                <div className="flex items-center gap-2">
-                  <RadioGroupItem value="nao" id="pf-nao" />
-                  <Label htmlFor="pf-nao" className="font-normal">
-                    Não
-                  </Label>
-                </div>
-              </RadioGroup>
-            </div>
-          </div>
-        </fieldset>
-
-        <fieldset className="space-y-4 rounded-lg border border-border p-3 sm:p-4">
-          <legend className="px-1 text-sm font-semibold text-foreground">Taxas adicionais *</legend>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <div>
-              <Label>Taxa noturna (%) *</Label>
-              <Input className="mt-1" value={taxaNoturnaPct} onChange={(e) => setTaxaNoturnaPct(e.target.value)} placeholder="0 se não aplicar" />
-            </div>
-            <div>
-              <Label>Taxa aeroporto (fixa) *</Label>
-              <Input className="mt-1" value={taxaAeroportoFixa} onChange={(e) => setTaxaAeroportoFixa(e.target.value)} placeholder="0 se não aplicar" />
-            </div>
-            <div>
-              <Label>Pedágio *</Label>
-              <Select value={pedagioModo || undefined} onValueChange={(v) => setPedagioModo(v as "manual" | "automatico")}>
-                <SelectTrigger className="mt-1">
-                  <SelectValue placeholder="Selecione" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="manual">Manual</SelectItem>
-                  <SelectItem value="automatico">Automático</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <div>
-            <Label>Taxas extras configuráveis *</Label>
-            <Textarea
-              className="mt-1"
-              rows={3}
-              placeholder="Descreva todas as taxas extras aplicáveis."
-              value={taxasExtras}
-              onChange={(e) => setTaxasExtras(e.target.value)}
-            />
-          </div>
-        </fieldset>
-
-        <fieldset className="space-y-4 rounded-lg border border-border p-3 sm:p-4">
-          <legend className="px-1 text-sm font-semibold text-foreground">Imagens do veículo *</legend>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            {IMAGE_FIELDS.map((field) => (
-              <div key={field.key} className="min-w-0">
-                <Label>{field.label} *</Label>
+              ) : null}
+              <div>
+                <Label>
+                  Capa {VEHICLE_COVER_DIMENSIONS.width}×{VEHICLE_COVER_DIMENSIONS.height} px *
+                </Label>
                 <label className="mt-1 flex min-w-0 cursor-pointer items-center gap-2 rounded-lg border border-border bg-background px-3 py-2.5 transition-colors hover:bg-muted sm:px-4">
                   <Upload className="h-4 w-4 shrink-0 text-muted-foreground" />
-                  <span className="min-w-0 truncate text-sm text-muted-foreground">
-                    {files[field.key]?.name || "Selecionar imagem (máx. 10MB)"}
-                  </span>
+                  <span className="min-w-0 truncate text-sm text-muted-foreground">{capaLabel}</span>
                   <input
                     type="file"
                     className="hidden"
                     accept="image/*"
-                    onChange={(e) => setFile(field.key, e.target.files?.[0] ?? null)}
+                    onChange={(e) => setCapaFile(e.target.files?.[0] ?? null)}
                   />
                 </label>
               </div>
-            ))}
-          </div>
-        </fieldset>
+            </fieldset>
 
-        <div>
-          <Label>Observações do veículo *</Label>
-          <Textarea className="mt-1" value={observacoes} onChange={(e) => setObservacoes(e.target.value)} rows={3} />
-        </div>
+            <fieldset className="space-y-4 rounded-lg border border-border p-3 sm:p-4">
+              <legend className="px-1 text-sm font-semibold text-foreground">Dados operacionais e cálculo *</legend>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <div>
+                  <Label>Valor por KM *</Label>
+                  <Input className="mt-1" value={valorKm} onChange={(e) => setValorKm(e.target.value)} />
+                </div>
+                <div>
+                  <Label>Valor por hora *</Label>
+                  <Input className="mt-1" value={valorHora} onChange={(e) => setValorHora(e.target.value)} />
+                </div>
+                <div>
+                  <Label>Tarifa base *</Label>
+                  <Input className="mt-1" value={tarifaBase} onChange={(e) => setTarifaBase(e.target.value)} />
+                </div>
+                <div>
+                  <Label>Valor mínimo *</Label>
+                  <Input className="mt-1" value={valorMinimo} onChange={(e) => setValorMinimo(e.target.value)} />
+                </div>
+                <div>
+                  <Label>Distância mínima (KM) *</Label>
+                  <Input className="mt-1" value={kmMinimo} onChange={(e) => setKmMinimo(e.target.value)} />
+                </div>
+                <div>
+                  <Label>Tipo de cobrança *</Label>
+                  <Select value={tipoCobranca || undefined} onValueChange={(v) => setTipoCobranca(v as "km" | "hora" | "hibrido")}>
+                    <SelectTrigger className="mt-1">
+                      <SelectValue placeholder="Selecione" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="km">Por KM</SelectItem>
+                      <SelectItem value="hora">Por hora</SelectItem>
+                      <SelectItem value="hibrido">Híbrido</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Tolerância (min) *</Label>
+                  <Input className="mt-1" value={toleranciaMinutos} onChange={(e) => setToleranciaMinutos(e.target.value)} />
+                </div>
+                <div>
+                  <Label>Valor/hora espera *</Label>
+                  <Input className="mt-1" value={valorHoraEspera} onChange={(e) => setValorHoraEspera(e.target.value)} />
+                </div>
+                <div>
+                  <Label>Cobrança por fração (min) *</Label>
+                  <Input className="mt-1" value={fracaoMinutos} onChange={(e) => setFracaoMinutos(e.target.value)} />
+                </div>
+                <div>
+                  <Label>Multiplicador ida e volta *</Label>
+                  <Input className="mt-1" value={multiplicadorIdaVolta} onChange={(e) => setMultiplicadorIdaVolta(e.target.value)} />
+                </div>
+                <div className="sm:col-span-2 lg:col-span-3">
+                  <Label className="mb-2 block">Permitir preço fixo por rota *</Label>
+                  <RadioGroup
+                    value={precoFixoRota === "" ? undefined : precoFixoRota}
+                    onValueChange={(v) => setPrecoFixoRota(v as "sim" | "nao")}
+                    className="flex flex-wrap gap-4"
+                  >
+                    <div className="flex items-center gap-2">
+                      <RadioGroupItem value="sim" id="pf-sim" />
+                      <Label htmlFor="pf-sim" className="font-normal">
+                        Sim
+                      </Label>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <RadioGroupItem value="nao" id="pf-nao" />
+                      <Label htmlFor="pf-nao" className="font-normal">
+                        Não
+                      </Label>
+                    </div>
+                  </RadioGroup>
+                </div>
+              </div>
+            </fieldset>
 
-        <div className="flex justify-end pt-1">
-          <Button onClick={() => void handleSave()} disabled={saving} className={cn("w-full sm:w-auto")}>
-            {saving ? "Salvando..." : "Salvar veículo"}
-          </Button>
-        </div>
+            <fieldset className="space-y-4 rounded-lg border border-border p-3 sm:p-4">
+              <legend className="px-1 text-sm font-semibold text-foreground">Taxas adicionais *</legend>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <div>
+                  <Label>Taxa noturna (%) *</Label>
+                  <Input className="mt-1" value={taxaNoturnaPct} onChange={(e) => setTaxaNoturnaPct(e.target.value)} placeholder="0 se não aplicar" />
+                </div>
+                <div>
+                  <Label>Taxa aeroporto (fixa) *</Label>
+                  <Input className="mt-1" value={taxaAeroportoFixa} onChange={(e) => setTaxaAeroportoFixa(e.target.value)} placeholder="0 se não aplicar" />
+                </div>
+                <div>
+                  <Label>Pedágio *</Label>
+                  <Select value={pedagioModo || undefined} onValueChange={(v) => setPedagioModo(v as "manual" | "automatico")}>
+                    <SelectTrigger className="mt-1">
+                      <SelectValue placeholder="Selecione" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="manual">Manual</SelectItem>
+                      <SelectItem value="automatico">Automático</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div>
+                <Label>Taxas extras configuráveis *</Label>
+                <Textarea
+                  className="mt-1"
+                  rows={3}
+                  placeholder="Descreva todas as taxas extras aplicáveis."
+                  value={taxasExtras}
+                  onChange={(e) => setTaxasExtras(e.target.value)}
+                />
+              </div>
+            </fieldset>
+
+            <fieldset className="space-y-4 rounded-lg border border-border p-3 sm:p-4">
+              <legend className="px-1 text-sm font-semibold text-foreground">Imagens do veículo *</legend>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {IMAGE_FIELDS.map((field) => {
+                  const existing = existingImagens[field.key];
+                  const hasNew = !!files[field.key];
+                  return (
+                    <div key={field.key} className="min-w-0">
+                      <Label>{field.label} *</Label>
+                      {isEdit && existing && !hasNew ? (
+                        <div className="mt-1 space-y-2">
+                          <div className="overflow-hidden rounded-md border border-border">
+                            <img src={existing} alt="" className="h-24 w-full object-cover" loading="lazy" />
+                          </div>
+                          <p className="text-xs text-muted-foreground">Substituir (opcional)</p>
+                        </div>
+                      ) : null}
+                      <label className="mt-1 flex min-w-0 cursor-pointer items-center gap-2 rounded-lg border border-border bg-background px-3 py-2.5 transition-colors hover:bg-muted sm:px-4">
+                        <Upload className="h-4 w-4 shrink-0 text-muted-foreground" />
+                        <span className="min-w-0 truncate text-sm text-muted-foreground">
+                          {files[field.key]?.name || (isEdit && existing ? "Nova imagem…" : "Selecionar imagem (máx. 10MB)")}
+                        </span>
+                        <input
+                          type="file"
+                          className="hidden"
+                          accept="image/*"
+                          onChange={(e) => setFile(field.key, e.target.files?.[0] ?? null)}
+                        />
+                      </label>
+                    </div>
+                  );
+                })}
+              </div>
+            </fieldset>
+
+            <div>
+              <Label>Observações do veículo *</Label>
+              <Textarea className="mt-1" value={observacoes} onChange={(e) => setObservacoes(e.target.value)} rows={3} />
+            </div>
+
+            <div className="flex justify-end pt-1">
+              <Button onClick={() => void handleSave()} disabled={saving || loadingVehicle} className={cn("w-full sm:w-auto")}>
+                {saving ? "Salvando…" : isEdit ? "Atualizar veículo" : "Salvar veículo"}
+              </Button>
+            </div>
+          </>
+        )}
       </DialogContent>
     </Dialog>
   );
