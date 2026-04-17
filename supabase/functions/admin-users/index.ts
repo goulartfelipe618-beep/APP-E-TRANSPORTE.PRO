@@ -105,7 +105,7 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify(users), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // CREATE USER
+    // CREATE USER (apenas admin_master — verificado acima)
     if (req.method === "POST" && action === "create") {
       const body = await req.json();
       const { email, password, role, plano } = body;
@@ -114,12 +114,21 @@ Deno.serve(async (req) => {
         return new Response(JSON.stringify({ error: "Email, senha e função são obrigatórios" }), { status: 400, headers: corsHeaders });
       }
 
+      const emailNorm = String(email).trim().toLowerCase();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailNorm)) {
+        return new Response(JSON.stringify({ error: "E-mail inválido" }), { status: 400, headers: corsHeaders });
+      }
+
+      if (String(password).length < 6) {
+        return new Response(JSON.stringify({ error: "A senha deve ter pelo menos 6 caracteres" }), { status: 400, headers: corsHeaders });
+      }
+
       if (!["admin_transfer", "admin_taxi", "admin_master"].includes(role)) {
         return new Response(JSON.stringify({ error: "Função inválida" }), { status: 400, headers: corsHeaders });
       }
 
       const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
-        email,
+        email: emailNorm,
         password,
         email_confirm: true,
       });
@@ -150,7 +159,7 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ success: true, user_id: newUser.user.id }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // UPDATE PLAN
+    // UPDATE PLAN: FREE ↔ PRÓ (apenas contas com plano — não admin_master)
     if (req.method === "POST" && action === "update_plan") {
       const body = await req.json();
       const { user_id, plano } = body;
@@ -161,6 +170,22 @@ Deno.serve(async (req) => {
 
       if (!["free", "pro"].includes(plano)) {
         return new Response(JSON.stringify({ error: "Plano inválido. Use free ou pro." }), { status: 400, headers: corsHeaders });
+      }
+
+      const { data: targetRoles } = await supabaseAdmin
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", user_id);
+
+      const roles = (targetRoles || []).map((r: { role: string }) => r.role);
+      if (roles.includes("admin_master")) {
+        return new Response(
+          JSON.stringify({ error: "Não é possível definir plano FREE/PRÓ para a conta de administrador master." }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+      if (roles.length === 0) {
+        return new Response(JSON.stringify({ error: "Utilizador sem função registada." }), { status: 400, headers: corsHeaders });
       }
 
       // Upsert plan

@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Trash2, Users, Search, RefreshCw, Crown } from "lucide-react";
 import { toast } from "sonner";
@@ -94,13 +94,21 @@ export default function AdminUsuariosCadastrados() {
   const showPlanField = formRole === "admin_transfer" || formRole === "admin_taxi";
 
   const handleCreate = async () => {
-    if (!formEmail || !formPassword || !formRole) {
-      toast.error("Preencha todos os campos");
+    if (!formEmail.trim() || !formPassword || !formRole) {
+      toast.error("Preencha e-mail, senha e tipo de utilizador.");
+      return;
+    }
+    if (formPassword.length < 6) {
+      toast.error("A senha deve ter pelo menos 6 caracteres.");
       return;
     }
     setCreating(true);
     const { data: { session } } = await supabase.auth.getSession();
-    if (!session) { setCreating(false); return; }
+    if (!session) {
+      toast.error("Sessão expirada.");
+      setCreating(false);
+      return;
+    }
 
     const res = await fetch(
       `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-users?action=create`,
@@ -111,18 +119,18 @@ export default function AdminUsuariosCadastrados() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          email: formEmail,
+          email: formEmail.trim(),
           password: formPassword,
           role: formRole,
           plano: showPlanField ? formPlano : undefined,
         }),
       }
     );
-    const data = await res.json();
-    if (data.error) {
-      toast.error(data.error);
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data.error) {
+      toast.error(typeof data?.error === "string" ? data.error : `Erro ao criar utilizador (${res.status})`);
     } else {
-      toast.success("Usuário criado com sucesso!");
+      toast.success("Utilizador criado com sucesso. Pode iniciar sessão com o e-mail e a senha definidos.");
       setDialogOpen(false);
       setFormEmail("");
       setFormPassword("");
@@ -192,9 +200,9 @@ export default function AdminUsuariosCadastrados() {
         body: JSON.stringify({ user_id: selectedUser.id, plano: selectedPlan }),
       }
     );
-    const data = await res.json();
-    if (data.error) {
-      toast.error(data.error);
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data.error) {
+      toast.error(typeof data?.error === "string" ? data.error : `Erro ao atualizar plano (${res.status})`);
     } else {
       toast.success(`Plano atualizado para ${PLAN_LABELS[selectedPlan]}`);
       setPlanDialogOpen(false);
@@ -217,11 +225,14 @@ export default function AdminUsuariosCadastrados() {
             <Users className="h-6 w-6 text-primary" />
             Usuários Cadastrados
           </h1>
-          <p className="text-muted-foreground text-sm">Gerencie os usuários que possuem acesso ao dashboard.</p>
+          <p className="text-muted-foreground text-sm max-w-xl">
+            Crie contas com e-mail e senha, e altere o plano entre <strong className="text-foreground">FREE</strong> e{" "}
+            <strong className="text-foreground">PRÓ</strong> para motoristas e taxistas (ícone da coroa na tabela). Apenas o administrador master acede a esta página.
+          </p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="icon" onClick={fetchUsers}><RefreshCw className="h-4 w-4" /></Button>
-          <Button onClick={() => setDialogOpen(true)}><Plus className="h-4 w-4 mr-2" /> Novo Usuário</Button>
+          <Button onClick={() => setDialogOpen(true)}><Plus className="h-4 w-4 mr-2" /> Novo utilizador</Button>
         </div>
       </div>
 
@@ -312,16 +323,32 @@ export default function AdminUsuariosCadastrados() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Novo Usuário</DialogTitle>
+            <DialogTitle>Novo utilizador</DialogTitle>
+            <DialogDescription>
+              Cria uma conta no Supabase Auth com o e-mail e a palavra-passe indicados. O utilizador pode iniciar sessão de imediato (e-mail já confirmado).
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
               <Label>E-mail *</Label>
-              <Input placeholder="usuario@email.com" value={formEmail} onChange={(e) => setFormEmail(e.target.value)} />
+              <Input
+                type="email"
+                autoComplete="off"
+                placeholder="utilizador@email.com"
+                value={formEmail}
+                onChange={(e) => setFormEmail(e.target.value)}
+              />
             </div>
             <div>
               <Label>Senha *</Label>
-              <Input type="password" placeholder="Mínimo 6 caracteres" value={formPassword} onChange={(e) => setFormPassword(e.target.value)} />
+              <Input
+                type="password"
+                autoComplete="new-password"
+                placeholder="Mínimo 6 caracteres"
+                minLength={6}
+                value={formPassword}
+                onChange={(e) => setFormPassword(e.target.value)}
+              />
             </div>
             <div>
               <Label>Tipo de Usuário *</Label>
@@ -352,7 +379,7 @@ export default function AdminUsuariosCadastrados() {
               </div>
             )}
             <Button onClick={handleCreate} disabled={creating} className="w-full">
-              {creating ? "Criando..." : "Criar Usuário"}
+              {creating ? "A criar…" : "Criar utilizador"}
             </Button>
           </div>
         </DialogContent>
@@ -364,15 +391,18 @@ export default function AdminUsuariosCadastrados() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Crown className="h-5 w-5 text-primary" />
-              Alterar Plano
+              Alterar plano (FREE ↔ PRÓ)
             </DialogTitle>
+            <DialogDescription>
+              Atualiza o plano deste utilizador na plataforma. Não está disponível para a conta de administrador master.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              Usuário: <span className="text-foreground font-medium">{selectedUser?.email}</span>
+              Utilizador: <span className="text-foreground font-medium">{selectedUser?.email}</span>
             </p>
             <div>
-              <Label>Novo Plano</Label>
+              <Label>Novo plano</Label>
               <Select value={selectedPlan} onValueChange={(v) => setSelectedPlan(v as PlanType)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -382,11 +412,11 @@ export default function AdminUsuariosCadastrados() {
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground mt-1">
-                Você pode definir FREE ou PRÓ conforme a estratégia comercial do cliente.
+                Pode alternar entre FREE (limitado) e PRÓ (painel completo) quando necessário.
               </p>
             </div>
             <Button onClick={handleUpdatePlan} disabled={updatingPlan} className="w-full">
-              {updatingPlan ? "Atualizando..." : "Salvar Plano"}
+              {updatingPlan ? "A guardar…" : "Guardar plano"}
             </Button>
           </div>
         </DialogContent>
