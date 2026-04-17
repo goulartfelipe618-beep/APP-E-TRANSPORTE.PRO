@@ -23,15 +23,7 @@ import { isMapboxConfigured } from "@/lib/mapboxGeocode";
 import { persistNetworkRetornoSolicitado, persistNetworkSair } from "@/lib/networkNacionalPrefs";
 import LoginConfiguracoesSection from "@/pages/dashboard/LoginConfiguracoesSection";
 import { assertUploadMagicBytes, extensionForDetectedMime } from "@/lib/validateUploadMagicBytes";
-
-const FONT_OPTIONS = [
-  { value: "montserrat", label: "Montserrat" },
-  { value: "inter", label: "Inter" },
-  { value: "roboto", label: "Roboto" },
-  { value: "opensans", label: "Open Sans" },
-  { value: "lato", label: "Lato" },
-  { value: "poppins", label: "Poppins" },
-];
+import { FONTES_GLOBAIS, FONTE_GLOBAL_PADRAO, resolveFonteCss } from "@/lib/fontesGlobais";
 
 const COOLDOWN_DAYS = 60;
 
@@ -152,7 +144,7 @@ export default function SistemaConfiguracoesPage() {
 
   // Global
   const [nomeProjeto, setNomeProjeto] = useState("");
-  const [fonteGlobal, setFonteGlobal] = useState("montserrat");
+  const [fonteGlobal, setFonteGlobal] = useState<string>(FONTE_GLOBAL_PADRAO);
   const [logoUrl, setLogoUrl] = useState("");
   const [uploading, setUploading] = useState(false);
   const [logoEditing, setLogoEditing] = useState(false);
@@ -178,6 +170,7 @@ export default function SistemaConfiguracoesPage() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [savingPassword, setSavingPassword] = useState(false);
+  const [currentAccountEmail, setCurrentAccountEmail] = useState("");
 
   // 2FA (TOTP)
   const [twoFaDialogOpen, setTwoFaDialogOpen] = useState(false);
@@ -210,6 +203,7 @@ export default function SistemaConfiguracoesPage() {
     (async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
+      if (user.email) setCurrentAccountEmail(user.email);
       const { data, error } = await supabase.rpc("is_admin_master", { _user_id: user.id });
       if (!error) setIsAdminMaster(Boolean(data));
     })();
@@ -269,7 +263,7 @@ export default function SistemaConfiguracoesPage() {
       setNomeEmpresa(d.nome_empresa || "");
       setCnpjPerfil(d.cnpj || "");
       setNomeProjeto(d.nome_projeto || "E-Transporte.pro");
-      setFonteGlobal(d.fonte_global || "montserrat");
+      setFonteGlobal(d.fonte_global || FONTE_GLOBAL_PADRAO);
       setLogoUrl(d.logo_url || "");
       if (d.nome_completo && d.telefone && d.email && d.cidade && d.nome_empresa && d.cnpj) {
         setProfileEditing(false);
@@ -333,12 +327,27 @@ export default function SistemaConfiguracoesPage() {
 
   const handleSaveNomeProjeto = async () => {
     const ok = await upsertField({ nome_projeto: nomeProjeto });
-    if (ok) { toast.success("Nome do projeto salvo"); setNomeProjetoEditing(false); await refreshConfig(); }
+    if (ok) {
+      toast.success("Nome do projeto salvo");
+      setNomeProjetoEditing(false);
+      await refreshConfig();
+      window.dispatchEvent(new Event("configuracoes-updated"));
+    }
   };
 
   const handleSaveFonte = async () => {
+    const valido = FONTES_GLOBAIS.some((f) => f.value === fonteGlobal);
+    if (!valido) {
+      toast.error("Fonte inválida. Selecione uma opção da lista.");
+      return;
+    }
     const ok = await upsertField({ fonte_global: fonteGlobal });
-    if (ok) { toast.success("Fonte global salva"); setFonteEditing(false); await refreshConfig(); }
+    if (ok) {
+      toast.success("Fonte global salva");
+      setFonteEditing(false);
+      await refreshConfig();
+      window.dispatchEvent(new Event("configuracoes-updated"));
+    }
   };
 
   const handleLogoFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -456,7 +465,8 @@ export default function SistemaConfiguracoesPage() {
     setConfirmPassword("");
   };
 
-  const resetTwoFaSetup = () => {
+  const resetTwoFaSetup = (opts?: { unenrollPendingId?: string | null }) => {
+    const pendingId = opts?.unenrollPendingId ?? mfaFactorId;
     setMfaFactorId(null);
     setMfaQrCode("");
     setMfaSecret("");
@@ -464,6 +474,14 @@ export default function SistemaConfiguracoesPage() {
     setEnrollingMfa(false);
     setEnablingMfa(false);
     setMfaSetupError("");
+
+    // Se o utilizador fechou o dialog sem concluir, o factor fica 'unverified'
+    // no servidor — limpa-o para que o próximo enroll não colida (422).
+    if (pendingId) {
+      void supabase.auth.mfa.unenroll({ factorId: pendingId }).catch(() => {
+        /* best-effort; se falhar, startEnrollTwoFa faz a limpeza via listFactors. */
+      });
+    }
   };
 
   const startEnrollTwoFa = async () => {
@@ -472,10 +490,38 @@ export default function SistemaConfiguracoesPage() {
     setMfaSetupError("");
 
     try {
+      // 1) Verifica factores existentes.
+      //    Supabase devolve 422 em /auth/v1/factors se já existir um TOTP
+      //    (verificado OU sobra de um enroll anterior não concluído).
+      const list = await supabase.auth.mfa.listFactors();
+      if (list.error) throw list.error;
+
+      const totpFactors = list.data?.totp ?? [];
+      const verified = totpFactors.find((f) => f.status === "verified");
+      if (verified) {
+        throw new Error(
+          "Este utilizador já tem 2FA ativo. Desative o factor atual antes de reconfigurar.",
+        );
+      }
+
+      // 2) Remove factores TOTP ainda 'unverified' (sobras). Isto elimina o 422.
+      const pendentes = totpFactors.filter((f) => f.status !== "verified");
+      for (const f of pendentes) {
+        const un = await supabase.auth.mfa.unenroll({ factorId: f.id });
+        if (un.error) {
+          // Se não der para remover, seguimos: o enroll abaixo vai reportar o problema real.
+          // eslint-disable-next-line no-console
+          console.warn("[2FA] Não foi possível remover factor antigo:", un.error.message);
+        }
+      }
+
+      // 3) Enroll novo, com friendlyName único (evita colisão em reconfig).
+      const friendlyName = `E-Transporte TOTP · ${Date.now().toString(36)}`;
       const { data, error } = await supabase.auth.mfa.enroll({
         factorType: "totp",
+        issuer: "E-Transporte",
+        friendlyName,
       });
-
       if (error) throw error;
 
       setMfaFactorId(data.id);
@@ -512,7 +558,8 @@ export default function SistemaConfiguracoesPage() {
 
       toast.success("2FA ativado com sucesso.");
       setTwoFaDialogOpen(false);
-      resetTwoFaSetup();
+      // Factor acabou de ficar 'verified' — não o remover.
+      resetTwoFaSetup({ unenrollPendingId: null });
 
       // Garante que o JWT seja atualizado para aal2.
       await supabase.auth.refreshSession();
@@ -781,13 +828,17 @@ export default function SistemaConfiguracoesPage() {
           <Select value={fonteGlobal} onValueChange={setFonteGlobal} disabled={!fonteEditing}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
-              {FONT_OPTIONS.map(f => (
+              {FONTES_GLOBAIS.map(f => (
                 <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>
               ))}
             </SelectContent>
           </Select>
-          <p className="text-sm text-muted-foreground mt-2" style={{ fontFamily: FONT_OPTIONS.find(f => f.value === fonteGlobal)?.label }}>
-            Exemplo de texto com a fonte <strong>{FONT_OPTIONS.find(f => f.value === fonteGlobal)?.label}</strong>
+          <p
+            className="text-sm text-muted-foreground mt-2"
+            style={{ fontFamily: resolveFonteCss(fonteGlobal) }}
+          >
+            Exemplo de texto com a fonte{" "}
+            <strong>{FONTES_GLOBAIS.find(f => f.value === fonteGlobal)?.label ?? "—"}</strong>
           </p>
         </div>
         {fonteEditing && (
@@ -919,10 +970,10 @@ export default function SistemaConfiguracoesPage() {
           if (!open) resetTwoFaSetup();
         }}
       >
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md" aria-describedby="configurar-2fa-desc">
           <DialogHeader>
             <DialogTitle>Configurar Autenticação em 2 Fatores</DialogTitle>
-            <DialogDescription>
+            <DialogDescription id="configurar-2fa-desc">
               Use seu app autenticador (TOTP) para habilitar a camada extra de segurança.
             </DialogDescription>
           </DialogHeader>
@@ -1002,53 +1053,85 @@ export default function SistemaConfiguracoesPage() {
           if (!open) resetPasswordForm();
         }}
       >
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md" aria-describedby="alterar-senha-desc">
           <DialogHeader>
             <DialogTitle>Alterar senha</DialogTitle>
-            <DialogDescription>
+            <DialogDescription id="alterar-senha-desc">
               Informe sua senha atual e a nova senha. A alteração é feita no Supabase Auth (conta segura).
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-2">
+          <form
+            id="alterar-senha-form"
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (!savingPassword) void handleChangePassword();
+            }}
+            className="space-y-4 py-2"
+            autoComplete="on"
+          >
+            {/* Campo oculto de identificação — ajuda gerenciadores de senha a associar a conta. */}
+            <input
+              type="text"
+              name="username"
+              autoComplete="username"
+              value={currentAccountEmail}
+              readOnly
+              hidden
+              aria-hidden="true"
+              tabIndex={-1}
+            />
             <div className="space-y-2">
               <Label htmlFor="current-password">Senha atual</Label>
               <Input
                 id="current-password"
+                name="current-password"
                 type="password"
                 autoComplete="current-password"
                 value={currentPassword}
                 onChange={(e) => setCurrentPassword(e.target.value)}
                 disabled={savingPassword}
+                required
               />
             </div>
             <div className="space-y-2">
               <Label htmlFor="new-password">Nova senha</Label>
               <Input
                 id="new-password"
+                name="new-password"
                 type="password"
                 autoComplete="new-password"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 disabled={savingPassword}
+                minLength={6}
+                required
               />
             </div>
             <div className="space-y-2">
               <Label htmlFor="confirm-password">Confirmar nova senha</Label>
               <Input
                 id="confirm-password"
+                name="confirm-password"
                 type="password"
                 autoComplete="new-password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 disabled={savingPassword}
+                minLength={6}
+                required
               />
             </div>
-          </div>
+          </form>
           <DialogFooter>
-            <Button variant="outline" type="button" disabled={savingPassword} onClick={() => setPasswordDialogOpen(false)}>
+            <Button
+              variant="outline"
+              type="button"
+              disabled={savingPassword}
+              onClick={() => setPasswordDialogOpen(false)}
+            >
               Cancelar
             </Button>
-            <Button type="button" disabled={savingPassword} onClick={handleChangePassword}>
+            <Button type="submit" form="alterar-senha-form" disabled={savingPassword}>
               {savingPassword ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Salvando...

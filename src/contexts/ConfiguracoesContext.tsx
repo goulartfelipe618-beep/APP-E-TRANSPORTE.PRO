@@ -8,6 +8,7 @@ import {
 } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { getPersistedSupabaseUserId } from "@/lib/supabaseSessionUser";
+import { FONTE_GLOBAL_PADRAO, resolveFonteCss } from "@/lib/fontesGlobais";
 
 interface Configuracoes {
   nome_projeto: string;
@@ -25,7 +26,7 @@ const defaultConfig: Configuracoes = {
   nome_projeto: "E-Transporte.pro",
   nome_completo: "",
   logo_url: "",
-  fonte_global: "montserrat",
+  fonte_global: FONTE_GLOBAL_PADRAO,
 };
 
 const CACHE_KEY = "etp_configuracoes_v1";
@@ -38,15 +39,6 @@ const ConfiguracoesContext = createContext<ConfiguracoesContextType>({
 });
 
 export const useConfiguracoes = () => useContext(ConfiguracoesContext);
-
-const FONT_MAP: Record<string, string> = {
-  montserrat: "'Montserrat', sans-serif",
-  inter: "'Inter', sans-serif",
-  roboto: "'Roboto', sans-serif",
-  opensans: "'Open Sans', sans-serif",
-  lato: "'Lato', sans-serif",
-  poppins: "'Poppins', sans-serif",
-};
 
 function readConfigCache(): Configuracoes | null {
   if (typeof window === "undefined") return null;
@@ -142,8 +134,7 @@ export function ConfiguracoesProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useLayoutEffect(() => {
-    const fontFamily = FONT_MAP[config.fonte_global] || FONT_MAP.montserrat;
-    document.documentElement.style.fontFamily = fontFamily;
+    document.documentElement.style.fontFamily = resolveFonteCss(config.fonte_global);
   }, [config.fonte_global]);
 
   return (

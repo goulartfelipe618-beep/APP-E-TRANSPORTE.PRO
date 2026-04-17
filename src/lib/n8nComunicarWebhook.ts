@@ -83,7 +83,52 @@ export function buildComunicadorSnapshot(
 }
 
 /**
+ * Mensagens amigáveis por tipo quando o webhook não está configurado.
+ * Alinhado às colunas em `sistema_webhooks_comunicacao`.
+ */
+const TIPO_LABEL: Record<WebhookComunicacaoTipo, string> = {
+  transfer_solicitacao: "Transfer — solicitação",
+  transfer_reserva: "Transfer — reserva",
+  grupo_solicitacao: "Grupo — solicitação",
+  grupo_reserva: "Grupo — reserva",
+  motorista_intake: "Cadastro de motorista",
+  motoristas_cadastrados: "Motoristas cadastrados",
+  geolocalizacao: "Geolocalização (link de rastreio)",
+};
+
+/**
+ * `supabase-js` embrulha respostas não-2xx como FunctionsHttpError e omite o corpo
+ * ("Edge Function returned a non-2xx status code"). Esta função extrai o `error`
+ * JSON que a nossa Edge Function devolve para darmos ao utilizador uma mensagem útil.
+ */
+async function extractEdgeFunctionError(err: unknown): Promise<string | null> {
+  if (!err || typeof err !== "object") return null;
+  const ctx = (err as { context?: unknown }).context;
+  if (!ctx) return null;
+
+  // O supabase-js v2 coloca o Response original em err.context.
+  if (typeof (ctx as Response).clone === "function") {
+    try {
+      const cloned = (ctx as Response).clone();
+      const text = await cloned.text();
+      if (!text) return null;
+      try {
+        const parsed = JSON.parse(text) as { error?: unknown; message?: unknown };
+        if (typeof parsed.error === "string") return parsed.error;
+        if (typeof parsed.message === "string") return parsed.message;
+      } catch {
+        return text;
+      }
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+/**
  * Envia o payload ao webhook configurado pelo Admin Master (URL no banco, nunca no cliente).
+ * Em caso de webhook não configurado devolve uma mensagem específica e acionável.
  */
 export async function dispatchComunicarWebhook(
   tipo: WebhookComunicacaoTipo,
@@ -92,15 +137,19 @@ export async function dispatchComunicarWebhook(
   const { data, error } = await supabase.functions.invoke("comunicar-webhook-dispatch", {
     body: { tipo, payload },
   });
+
   if (error) {
-    throw new Error(
-      error.message ||
-        "Configure os webhooks em Admin → Comunicador e faça deploy da função comunicar-webhook-dispatch.",
-    );
+    const bodyMsg = await extractEdgeFunctionError(error);
+    const fallback =
+      `Webhook "${TIPO_LABEL[tipo]}" ainda não está configurado. ` +
+      "Peça ao administrador master para preencher a URL em Admin → Comunicador (Webhooks).";
+    throw new Error(bodyMsg || error.message || fallback);
   }
+
   if (data && typeof data === "object" && "error" in data) {
     throw new Error(String((data as { error: string }).error));
   }
+
   const pack = data as { ok?: boolean; status?: number };
   if (!pack?.ok) {
     throw new Error(`Webhook retornou status ${pack?.status ?? "?"}`);

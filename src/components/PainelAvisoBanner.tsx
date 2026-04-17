@@ -6,12 +6,10 @@ import { type PainelTipo } from "@/lib/painelAvisosPages";
 import { avisoFonteClassName } from "@/lib/painelAvisoEstilo";
 import { renderAvisoTextoComMarcacao } from "@/lib/painelAvisoTexto";
 import {
-  applyFirstDismiss,
-  applySecondDismiss,
   getAvisoDisplayMode,
-  loadUserAvisoMap,
   type StoredAvisoState,
 } from "@/lib/painelAvisoStorage";
+import { loadUserAvisoMapWithSync, persistAvisoDismiss } from "@/lib/painelAvisoSync";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
@@ -85,7 +83,14 @@ export default function PainelAvisoBanner({ painel, activePage }: Props) {
       setStateMap({});
       return;
     }
-    setStateMap(loadUserAvisoMap(userId));
+    let cancelled = false;
+    void (async () => {
+      const next = await loadUserAvisoMapWithSync(userId);
+      if (!cancelled) setStateMap(next);
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [userId]);
 
   useEffect(() => {
@@ -137,16 +142,23 @@ export default function PainelAvisoBanner({ painel, activePage }: Props) {
       if (!userId) return;
       const t = Date.now();
       setNow(t);
-      const marcarNuncaMais = neverAgain[avisoId] === true;
-      setStateMap((prev) => {
-        const mode = getAvisoDisplayMode(avisoId, prev, t);
-        if (mode === "first") return applyFirstDismiss(userId, avisoId, prev, t);
-        if (mode === "second") return applySecondDismiss(userId, avisoId, marcarNuncaMais, prev, t);
-        return prev;
+      const mode = getAvisoDisplayMode(avisoId, stateMap, t);
+      // Checkbox "Não mostrar novamente" só é apresentada no modo "second";
+      // ignoramos o valor no modo "first" para evitar dismiss permanente acidental.
+      const marcarNuncaMais = mode === "second" && neverAgain[avisoId] === true;
+
+      // Atualização otimista + gravação sincronizada (DB + cache local).
+      void persistAvisoDismiss(userId, avisoId, {
+        neverAgain: marcarNuncaMais,
+        now: t,
+        prev: stateMap,
+      }).then((next) => {
+        setStateMap(next);
       });
+
       setNeverAgain((prev) => ({ ...prev, [avisoId]: false }));
     },
-    [userId, neverAgain],
+    [userId, neverAgain, stateMap],
   );
 
   if (!authReady || visíveis.length === 0) return null;
