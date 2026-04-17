@@ -16,6 +16,7 @@ const DashboardLayout = lazy(() => import("./components/DashboardLayout"));
 const TaxiDashboardLayout = lazy(() => import("./components/TaxiDashboardLayout"));
 const AdminLayout = lazy(() => import("./components/AdminLayout"));
 const MfaChallengePage = lazy(() => import("./pages/MfaChallenge"));
+const RastreioPublico = lazy(() => import("./pages/RastreioPublico"));
 
 function RouteFallback() {
   return (
@@ -40,6 +41,7 @@ const App = () => (
             <Route path="/" element={<Navigate to="/login" replace />} />
             <Route path="/login" element={<Login />} />
             <Route path="/mfa" element={<MfaChallengePage />} />
+            <Route path="/rastreio/:token" element={<RastreioPublico />} />
             <Route path="/dashboard" element={<ProtectedRoute><DashboardLayout /></ProtectedRoute>} />
             <Route path="/taxi" element={<ProtectedTaxiRoute><TaxiDashboardLayout /></ProtectedTaxiRoute>} />
             <Route path="/admin" element={<ProtectedAdminRoute><AdminLayout /></ProtectedAdminRoute>} />
