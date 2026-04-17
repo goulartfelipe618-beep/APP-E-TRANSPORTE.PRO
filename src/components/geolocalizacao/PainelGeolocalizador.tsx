@@ -2,7 +2,10 @@ import { useEffect } from "react";
 import LiveTrackingMap from "./LiveTrackingMap";
 import BotaoEncerrarViagem from "./BotaoEncerrarViagem";
 import { useRastreioAoVivo } from "@/hooks/useRastreioAoVivo";
-import { useMotoristaGPSBroadcast } from "@/hooks/useMotoristaGPSBroadcast";
+import {
+  useMotoristaGPSBroadcast,
+  type MotoristaGPSBroadcastState,
+} from "@/hooks/useMotoristaGPSBroadcast";
 import { cn } from "@/lib/utils";
 
 export type PainelGeolocalizadorProps = {
@@ -29,6 +32,13 @@ export type PainelGeolocalizadorProps = {
   fullscreenOnMobile?: boolean;
   /** Altura do mapa em desktop quando não estiver em modo fullscreen. Default 520. */
   heightPx?: number;
+  /**
+   * Callback opcional recebendo o estado do hook de GPS do motorista.
+   * Permite ao componente pai (ex.: AcompanharRastreioDialog) mostrar um
+   * painel de diagnóstico com último envio, erros e botão "forçar envio".
+   * Só é chamado quando papel==='motorista'.
+   */
+  onGpsState?: (state: MotoristaGPSBroadcastState) => void;
 };
 
 /**
@@ -44,16 +54,21 @@ export default function PainelGeolocalizador({
   className,
   fullscreenOnMobile = true,
   heightPx = 520,
+  onGpsState,
 }: PainelGeolocalizadorProps) {
   const { data: rastreio } = useRastreioAoVivo(rastreioId);
 
   const corridaConcluida = rastreio?.status === "concluida";
 
-  useMotoristaGPSBroadcast({
+  const gpsState = useMotoristaGPSBroadcast({
     rastreioId,
     enabled: papel === "motorista" && !corridaConcluida,
     intervaloMs: intervaloGpsMs,
   });
+
+  useEffect(() => {
+    if (papel === "motorista") onGpsState?.(gpsState);
+  }, [papel, gpsState, onGpsState]);
 
   const mostraBotao = papel !== "cliente" && !corridaConcluida;
 

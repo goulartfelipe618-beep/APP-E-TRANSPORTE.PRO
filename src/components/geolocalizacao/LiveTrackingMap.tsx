@@ -19,6 +19,9 @@ const CARTO_SUBDOMAINS = "abcd";
 
 // Considera-se "sinal perdido" após este tempo sem updates Realtime (ms).
 const SINAL_PERDIDO_MS = 30_000;
+// Janela em que consideramos o polling ainda "a fornecer dados" (ms).
+// Tem de ser > intervalo de polling (8s) + alguma margem.
+const POLL_GRACE_MS = 15_000;
 
 function isDocumentDark(): boolean {
   if (typeof document === "undefined") return false;
@@ -132,7 +135,12 @@ export default function LiveTrackingMap({
   fullscreenOnMobile = false,
   overlay,
 }: LiveTrackingMapProps) {
-  const { data: rastreio, status: subStatus, lastRealtimeAt } = useRastreioAoVivo(rastreioId);
+  const {
+    data: rastreio,
+    status: subStatus,
+    lastRealtimeAt,
+    lastPollAt,
+  } = useRastreioAoVivo(rastreioId);
   const [isDark, setIsDark] = useState<boolean>(() => isDocumentDark());
   const [now, setNow] = useState<number>(() => Date.now());
 
@@ -175,9 +183,17 @@ export default function LiveTrackingMap({
   // ----------------------------------------------
   // Estado do sinal (para cor do marker + HUD)
   // ----------------------------------------------
-  const ultimaBatida =
-    lastRealtimeAt?.getTime() ??
-    (rastreio?.ultima_atualizacao ? new Date(rastreio.ultima_atualizacao).getTime() : null);
+  // "ultimaBatida" é o instante mais recente em que recebemos dados — seja via
+  // Realtime, seja via polling de fallback, seja a própria coluna
+  // ultima_atualizacao gravada pelo motorista. Usar o MAIS RECENTE dos três
+  // evita "sinal perdido" falso quando o Realtime erra mas o polling continua.
+  const tsRealtime = lastRealtimeAt?.getTime() ?? 0;
+  const tsPoll = lastPollAt?.getTime() ?? 0;
+  const tsColumn = rastreio?.ultima_atualizacao
+    ? new Date(rastreio.ultima_atualizacao).getTime()
+    : 0;
+  const tsMaisRecente = Math.max(tsRealtime, tsPoll, tsColumn);
+  const ultimaBatida = tsMaisRecente > 0 ? tsMaisRecente : null;
   const tempoSemUpdate = ultimaBatida ? now - ultimaBatida : null;
   const sinalPerdido =
     !!position && tempoSemUpdate !== null && tempoSemUpdate > SINAL_PERDIDO_MS;
@@ -196,15 +212,27 @@ export default function LiveTrackingMap({
       : "ativo";
   const markerIcon = useMemo(() => makeVehicleIcon(markerVariant), [markerVariant]);
 
+  // HUD:
+  //  • Se o canal Realtime está SUBSCRIBED → "Ao vivo"
+  //  • Se o canal errou MAS o polling trouxe dados recentes → "Ao vivo (polling)"
+  //  • Se não há dados recentes e o canal errou → "Sem ligação"
+  //  • Sinal perdido tem precedência de alerta visual
+  const pollingRecente = tsPoll > 0 && now - tsPoll < POLL_GRACE_MS;
   const hud = (() => {
-    if (subStatus === "error")
-      return { label: "Sem ligação Realtime", tone: "error" as const, Icon: WifiOff };
-    if (subStatus !== "live")
-      return { label: "A ligar ao Realtime...", tone: "loading" as const, Icon: Loader2 };
-    if (sinalPerdido)
+    if (sinalPerdido && subStatus !== "loading")
       return { label: "Sinal Perdido", tone: "error" as const, Icon: AlertTriangle };
-    if (position) return { label: "Ao vivo", tone: "live" as const, Icon: Radio };
-    return { label: "À espera de posição...", tone: "idle" as const, Icon: Radio };
+    if (subStatus === "live") {
+      if (position) return { label: "Ao vivo", tone: "live" as const, Icon: Radio };
+      return { label: "À espera de posição...", tone: "idle" as const, Icon: Radio };
+    }
+    if (subStatus === "error") {
+      if (pollingRecente && position)
+        return { label: "Ao vivo (polling)", tone: "live" as const, Icon: Radio };
+      return { label: "Sem ligação", tone: "error" as const, Icon: WifiOff };
+    }
+    if (position && pollingRecente)
+      return { label: "Ao vivo (polling)", tone: "live" as const, Icon: Radio };
+    return { label: "A ligar...", tone: "loading" as const, Icon: Loader2 };
   })();
   const HudIcon = hud.Icon;
 

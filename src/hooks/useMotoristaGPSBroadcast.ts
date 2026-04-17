@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
 export type MotoristaGPSBroadcastOptions = {
@@ -19,11 +19,20 @@ export type MotoristaGPSBroadcastOptions = {
 };
 
 export type MotoristaGPSBroadcastState = {
+  /** Se o hook está a fazer watch/heartbeat. */
   ativo: boolean;
+  /** Se o browser suporta Geolocation API. */
   suportado: boolean;
+  /** Data/hora do último envio bem-sucedido. */
   ultimoEnvioEm: Date | null;
+  /** Última posição enviada com sucesso (para UI de diagnóstico). */
+  ultimaPosicao: { lat: number; lng: number; accuracy: number | null } | null;
+  /** Última mensagem de erro (geolocation ou supabase). */
   ultimoErro: string | null;
+  /** Nº de envios em curso. */
   tentativasPendentes: number;
+  /** Força um novo getCurrentPosition + envio imediato (ignora throttle). */
+  forcarEnvio: () => Promise<void>;
 };
 
 const MIN_INTERVAL = 5000;
@@ -35,6 +44,12 @@ const DEFAULT_INTERVAL = 7000;
  * `public.rastreios_ao_vivo` respeitando um intervalo mínimo de 5–10s
  * (economia de bateria) e opcionalmente grava breadcrumbs em
  * `public.rastreios_ao_vivo_pontos`.
+ *
+ * Usa DUAS fontes:
+ *  1. `navigator.geolocation.watchPosition` — dispara quando há movimento real
+ *     (eficiente em bateria).
+ *  2. Heartbeat com `getCurrentPosition` a cada `intervalo` — garante um ping
+ *     mesmo quando o veículo está parado (cliente não vê "sinal perdido" falso).
  *
  * Requer que o utilizador autenticado seja o dono do rastreio (RLS).
  */
@@ -56,28 +71,36 @@ export function useMotoristaGPSBroadcast(
     Math.min(MAX_INTERVAL, intervaloMs ?? DEFAULT_INTERVAL),
   );
 
-  const suportado = typeof navigator !== "undefined" && "geolocation" in navigator;
+  const suportado =
+    typeof navigator !== "undefined" &&
+    typeof navigator.geolocation !== "undefined" &&
+    "geolocation" in navigator;
 
   const [ativo, setAtivo] = useState(false);
   const [ultimoEnvioEm, setUltimoEnvioEm] = useState<Date | null>(null);
+  const [ultimaPosicao, setUltimaPosicao] = useState<
+    { lat: number; lng: number; accuracy: number | null } | null
+  >(null);
   const [ultimoErro, setUltimoErro] = useState<string | null>(null);
   const [tentativasPendentes, setTentativasPendentes] = useState(0);
 
   const ultimoEnvioRef = useRef<number>(0);
   const enviandoRef = useRef<boolean>(false);
+  const rastreioIdRef = useRef<string | null | undefined>(rastreioId);
+  const enabledRef = useRef<boolean>(enabled);
 
-  useEffect(() => {
-    if (!enabled || !rastreioId || !suportado) {
-      setAtivo(false);
-      return;
-    }
+  useEffect(() => { rastreioIdRef.current = rastreioId; }, [rastreioId]);
+  useEffect(() => { enabledRef.current = enabled; }, [enabled]);
 
-    let watchId: number | null = null;
-    let cancelled = false;
-
-    const enviar = async (pos: GeolocationPosition) => {
+  // --------------------------------------------------
+  // Envia uma posição para o Supabase (respeita throttle)
+  // --------------------------------------------------
+  const enviarPosicao = useCallback(
+    async (pos: GeolocationPosition, ignorarThrottle = false) => {
+      const rid = rastreioIdRef.current;
+      if (!rid) return;
       const agora = Date.now();
-      if (agora - ultimoEnvioRef.current < intervalo) return; // throttle
+      if (!ignorarThrottle && agora - ultimoEnvioRef.current < intervalo) return;
       if (enviandoRef.current) return;
 
       enviandoRef.current = true;
@@ -99,7 +122,7 @@ export function useMotoristaGPSBroadcast(
             speed_kmh,
             accuracy_m: accuracy,
           })
-          .eq("id", rastreioId);
+          .eq("id", rid);
 
         if (updErr) throw updErr;
 
@@ -107,7 +130,7 @@ export function useMotoristaGPSBroadcast(
           const { error: insErr } = await supabase
             .from("rastreios_ao_vivo_pontos")
             .insert({
-              rastreio_id: rastreioId,
+              rastreio_id: rid,
               latitude,
               longitude,
               heading,
@@ -118,59 +141,132 @@ export function useMotoristaGPSBroadcast(
         }
 
         ultimoEnvioRef.current = agora;
-        if (!cancelled) {
-          setUltimoEnvioEm(new Date());
-          setUltimoErro(null);
-          onEnviado?.({
-            lat: latitude,
-            lng: longitude,
-            accuracy: accuracy ?? undefined,
-            speed: speed_kmh ?? undefined,
-          });
-        }
+        setUltimoEnvioEm(new Date());
+        setUltimaPosicao({ lat: latitude, lng: longitude, accuracy });
+        setUltimoErro(null);
+        onEnviado?.({
+          lat: latitude,
+          lng: longitude,
+          accuracy: accuracy ?? undefined,
+          speed: speed_kmh ?? undefined,
+        });
       } catch (err) {
         const msg = err instanceof Error ? err.message : "Erro ao enviar posição.";
-        if (!cancelled) {
-          setUltimoErro(msg);
-          onErro?.(msg);
-        }
+        setUltimoErro(msg);
+        onErro?.(msg);
       } finally {
         enviandoRef.current = false;
-        if (!cancelled) setTentativasPendentes((n) => Math.max(0, n - 1));
+        setTentativasPendentes((n) => Math.max(0, n - 1));
       }
-    };
+    },
+    [intervalo, gravarBreadcrumbs, onEnviado, onErro],
+  );
 
-    const onError = (err: GeolocationPositionError) => {
+  // --------------------------------------------------
+  // Handler de erro da Geolocation API
+  // --------------------------------------------------
+  const tratarErroGeolocation = useCallback(
+    (err: GeolocationPositionError) => {
       const msg =
         err.code === err.PERMISSION_DENIED
-          ? "Permissão de localização negada."
+          ? "Permissão de localização negada no browser."
           : err.code === err.POSITION_UNAVAILABLE
-            ? "Localização indisponível."
+            ? "Localização indisponível neste dispositivo (sem GPS/Wi-Fi conhecido?)."
             : err.code === err.TIMEOUT
               ? "Tempo esgotado ao obter localização."
               : err.message;
-      if (!cancelled) {
-        setUltimoErro(msg);
-        onErro?.(msg);
-      }
-    };
+      setUltimoErro(msg);
+      onErro?.(msg);
+    },
+    [onErro],
+  );
 
-    // watchPosition é mais eficiente que setInterval(getCurrentPosition):
-    // o browser só dispara callbacks quando há movimento significativo.
-    // O throttling (intervalo) fica no handler enviar(), poupando rede/bateria.
-    watchId = navigator.geolocation.watchPosition(enviar, onError, {
-      enableHighAccuracy,
-      maximumAge: Math.floor(intervalo / 2),
-      timeout: 15_000,
+  // --------------------------------------------------
+  // Expor função forcarEnvio() à UI
+  // --------------------------------------------------
+  const forcarEnvio = useCallback(async () => {
+    if (!suportado) {
+      const msg = "Este navegador não suporta geolocalização.";
+      setUltimoErro(msg);
+      onErro?.(msg);
+      return;
+    }
+    return new Promise<void>((resolve) => {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          void enviarPosicao(pos, /* ignorarThrottle */ true).finally(() => resolve());
+        },
+        (err) => {
+          tratarErroGeolocation(err);
+          resolve();
+        },
+        {
+          enableHighAccuracy,
+          maximumAge: 0,
+          timeout: 15_000,
+        },
+      );
     });
+  }, [suportado, enableHighAccuracy, enviarPosicao, tratarErroGeolocation, onErro]);
+
+  // --------------------------------------------------
+  // Efeito principal: watchPosition + heartbeat interval
+  // --------------------------------------------------
+  useEffect(() => {
+    if (!enabled || !rastreioId || !suportado) {
+      setAtivo(false);
+      return;
+    }
+
+    let watchId: number | null = null;
+    let heartbeatTimer: number | null = null;
+
+    // 1) watchPosition — eficiente, só dispara quando há movimento significativo
+    watchId = navigator.geolocation.watchPosition(
+      (pos) => { void enviarPosicao(pos); },
+      tratarErroGeolocation,
+      {
+        enableHighAccuracy,
+        maximumAge: Math.floor(intervalo / 2),
+        timeout: 15_000,
+      },
+    );
+
+    // 2) Heartbeat — força um ping a cada `intervalo` mesmo parado
+    heartbeatTimer = window.setInterval(() => {
+      if (!enabledRef.current) return;
+      navigator.geolocation.getCurrentPosition(
+        (pos) => { void enviarPosicao(pos); },
+        tratarErroGeolocation,
+        {
+          enableHighAccuracy,
+          maximumAge: intervalo, // aceita cache recente para poupar bateria
+          timeout: 15_000,
+        },
+      );
+    }, intervalo);
+
     setAtivo(true);
 
     return () => {
-      cancelled = true;
       if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+      if (heartbeatTimer !== null) window.clearInterval(heartbeatTimer);
       setAtivo(false);
     };
-  }, [rastreioId, intervalo, enabled, suportado, gravarBreadcrumbs, enableHighAccuracy, onEnviado, onErro]);
+  }, [rastreioId, intervalo, enabled, suportado, enableHighAccuracy, enviarPosicao, tratarErroGeolocation]);
 
-  return { ativo, suportado, ultimoEnvioEm, ultimoErro, tentativasPendentes };
+  // Memoizar o objeto de retorno evita re-render-loops em componentes que
+  // passam este estado via prop/callback (ex.: PainelGeolocalizador.onGpsState).
+  return useMemo<MotoristaGPSBroadcastState>(
+    () => ({
+      ativo,
+      suportado,
+      ultimoEnvioEm,
+      ultimaPosicao,
+      ultimoErro,
+      tentativasPendentes,
+      forcarEnvio,
+    }),
+    [ativo, suportado, ultimoEnvioEm, ultimaPosicao, ultimoErro, tentativasPendentes, forcarEnvio],
+  );
 }
