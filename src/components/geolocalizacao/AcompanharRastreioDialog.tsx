@@ -126,7 +126,8 @@ export default function AcompanharRastreioDialog({
               rastreioId={rastreio.id}
               papel={papel}
               intervaloGpsMs={7000}
-              className="h-[60vh] min-h-[420px]"
+              fullscreenOnMobile={false}
+              heightPx={520}
             />
           )}
         </div>

@@ -289,9 +289,9 @@ export default function RastreioPublico() {
   const HudIcon = hud.Icon;
 
   return (
-    <div className="min-h-[100dvh] bg-background flex flex-col">
+    <div className="h-[100dvh] w-full bg-background flex flex-col overflow-hidden">
       {/* Header mínimo do cliente */}
-      <div className="px-4 py-3 border-b border-border bg-card/80 backdrop-blur flex items-center justify-between">
+      <div className="shrink-0 px-4 py-3 border-b border-border bg-card/80 backdrop-blur flex items-center justify-between">
         <div className="flex items-center gap-2 min-w-0">
           <MapPin className="h-4 w-4 text-[#FF6600] shrink-0" />
           <div className="min-w-0">
@@ -314,7 +314,7 @@ export default function RastreioPublico() {
       </div>
 
       {/* Mapa */}
-      <div className="relative flex-1">
+      <div className="relative flex-1 min-h-0">
         <MapContainer
           center={[initialCenter.lat, initialCenter.lng]}
           zoom={15}

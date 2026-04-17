@@ -21,6 +21,14 @@ export type PainelGeolocalizadorProps = {
   intervaloGpsMs?: number;
   /** Classe extra no container. */
   className?: string;
+  /**
+   * Se `true` (default), o mapa ocupa o viewport todo em mobile e usa
+   * `heightPx` em desktop. Dentro de um Dialog/Modal deve ser `false`
+   * para o mapa respeitar a caixa do diálogo.
+   */
+  fullscreenOnMobile?: boolean;
+  /** Altura do mapa em desktop quando não estiver em modo fullscreen. Default 520. */
+  heightPx?: number;
 };
 
 /**
@@ -34,6 +42,8 @@ export default function PainelGeolocalizador({
   papel,
   intervaloGpsMs = 7000,
   className,
+  fullscreenOnMobile = true,
+  heightPx = 520,
 }: PainelGeolocalizadorProps) {
   const { data: rastreio } = useRastreioAoVivo(rastreioId);
 
@@ -50,7 +60,7 @@ export default function PainelGeolocalizador({
   // No mobile fullscreen precisamos de bloquear scroll do body para o mapa não
   // competir com o scroll da página.
   useEffect(() => {
-    if (!mostraBotao || corridaConcluida) return;
+    if (!fullscreenOnMobile || !mostraBotao || corridaConcluida) return;
     if (typeof document === "undefined") return;
     if (window.matchMedia("(max-width: 767px)").matches) {
       const prev = document.body.style.overflow;
@@ -59,14 +69,14 @@ export default function PainelGeolocalizador({
         document.body.style.overflow = prev;
       };
     }
-  }, [mostraBotao, corridaConcluida]);
+  }, [mostraBotao, corridaConcluida, fullscreenOnMobile]);
 
   return (
     <LiveTrackingMap
       rastreioId={rastreioId}
       className={cn(className)}
-      fullscreenOnMobile={!corridaConcluida}
-      heightPx={520}
+      fullscreenOnMobile={fullscreenOnMobile && !corridaConcluida}
+      heightPx={heightPx}
       overlay={
         mostraBotao ? (
           <BotaoEncerrarViagem
