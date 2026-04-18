@@ -429,6 +429,15 @@ export default function TransferGeolocalizacaoPage() {
                           Ainda não comunicado
                         </span>
                       )}
+                      {r.iniciado_em_dispositivo ? (
+                        <span className="text-[11px] text-emerald-600 dark:text-emerald-400">
+                          · Cliente iniciou {new Date(r.iniciado_em_dispositivo).toLocaleTimeString("pt-BR")}
+                        </span>
+                      ) : st.tone === "on" ? (
+                        <span className="text-[11px] text-amber-600 dark:text-amber-400">
+                          · Aguardando cliente iniciar
+                        </span>
+                      ) : null}
                     </div>
                     <div className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
                       <MapPin className="h-3 w-3 shrink-0" />

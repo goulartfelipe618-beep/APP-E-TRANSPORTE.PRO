@@ -4,13 +4,20 @@ import { MapContainer, Marker, TileLayer, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import {
-  AlertTriangle, Car, Loader2, MapPin, Radio, WifiOff,
+  AlertTriangle, Car, CheckCircle2, Loader2, MapPin, Play, Radio,
+  ShieldAlert, WifiOff,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
+import {
+  apagarDeviceSecret,
+  gerarDeviceSecret,
+  guardarDeviceSecret,
+  lerDeviceSecret,
+} from "@/lib/rastreioDeviceSecret";
 
 // --------------------------------------------------------------------
-// Tipagem do retorno da RPC get_rastreio_publico (row alias)
+// Tipagem do retorno de get_rastreio_publico (linha do RPC)
 // --------------------------------------------------------------------
 type RastreioPublico = {
   id: string;
@@ -25,6 +32,7 @@ type RastreioPublico = {
   speed_kmh: number | null;
   ultima_atualizacao: string | null;
   iniciado_em: string | null;
+  iniciado_em_dispositivo: string | null;
   finalizado_em: string | null;
   expira_em: string | null;
   origem_endereco: string | null;
@@ -35,7 +43,7 @@ type RastreioPublico = {
 };
 
 // --------------------------------------------------------------------
-// Tiles (CartoDB — aceite na CSP do projeto via *.basemaps.cartocdn.com)
+// Tiles (CartoDB — aceite na CSP via *.basemaps.cartocdn.com)
 // --------------------------------------------------------------------
 const CARTO_LIGHT_URL = "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png";
 const CARTO_DARK_URL = "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
@@ -44,7 +52,11 @@ const CARTO_ATTRIBUTION =
   '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>';
 
 const DEFAULT_CENTER = { lat: -23.55052, lng: -46.633308 };
+/** Polling a cada 5s para descobrir quando o dono encerra a viagem (status). */
 const POLL_MS = 5000;
+/** Intervalo de envio de GPS (heartbeat mesmo parado). */
+const GPS_INTERVAL_MS = 7000;
+/** Tempo sem posição local antes de marcar "sinal perdido" na HUD. */
 const SINAL_PERDIDO_MS = 30_000;
 
 function isDocumentDark() {
@@ -101,6 +113,9 @@ function MapController({
   return null;
 }
 
+// --------------------------------------------------------------------
+// Resumo da viagem (mostrado quando status = concluida/finalizado)
+// --------------------------------------------------------------------
 function Resumo({ data }: { data: RastreioPublico }) {
   const distancia = data.distancia_total_km != null ? Number(data.distancia_total_km) : null;
   const dur = data.duracao_segundos;
@@ -155,16 +170,158 @@ function Resumo({ data }: { data: RastreioPublico }) {
   );
 }
 
+// --------------------------------------------------------------------
+// Tela "Iniciar viagem" — mostrada antes de o cliente autorizar o GPS
+// --------------------------------------------------------------------
+function PreStartScreen({
+  clienteNome,
+  motoristaNome,
+  veiculo,
+  onIniciar,
+  iniciando,
+  erroIniciar,
+}: {
+  clienteNome: string | null;
+  motoristaNome: string | null;
+  veiculo: string | null;
+  onIniciar: () => void;
+  iniciando: boolean;
+  erroIniciar: string | null;
+}) {
+  return (
+    <div className="min-h-[100dvh] w-full bg-background flex items-center justify-center p-4">
+      <div className="w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-xl space-y-5">
+        <div className="flex items-center gap-3">
+          <div className="h-11 w-11 rounded-full bg-[#FF6600]/10 flex items-center justify-center">
+            <MapPin className="h-5 w-5 text-[#FF6600]" />
+          </div>
+          <div>
+            <h1 className="text-lg font-bold text-foreground">
+              {clienteNome ? `Olá, ${clienteNome}` : "Bem-vindo"}
+            </h1>
+            <p className="text-xs text-muted-foreground">E-Transporte.pro · Rastreio ao vivo</p>
+          </div>
+        </div>
+
+        {(motoristaNome || veiculo) && (
+          <div className="rounded-lg border border-border bg-muted/40 p-3 text-sm space-y-1">
+            {motoristaNome && (
+              <div>
+                <span className="text-muted-foreground">Motorista: </span>
+                <span className="font-medium text-foreground">{motoristaNome}</span>
+              </div>
+            )}
+            {veiculo && (
+              <div>
+                <span className="text-muted-foreground">Veículo: </span>
+                <span className="font-medium text-foreground">{veiculo}</span>
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="space-y-2 text-sm text-muted-foreground">
+          <p>
+            Para iniciar a viagem, clique no botão abaixo e{" "}
+            <strong className="text-foreground">autorize o acesso à sua localização</strong>{" "}
+            quando o navegador perguntar.
+          </p>
+          <p className="text-xs">
+            A sua posição só será transmitida durante a viagem. Ao concluir,
+            o rastreio será encerrado automaticamente.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={onIniciar}
+          disabled={iniciando}
+          className={cn(
+            "w-full h-12 rounded-xl font-semibold text-white",
+            "bg-[#FF6600] hover:bg-[#FF6600]/90 disabled:bg-[#FF6600]/60",
+            "shadow-md transition-colors flex items-center justify-center gap-2",
+          )}
+        >
+          {iniciando ? (
+            <>
+              <Loader2 className="h-5 w-5 animate-spin" />
+              A iniciar…
+            </>
+          ) : (
+            <>
+              <Play className="h-5 w-5" />
+              Iniciar viagem
+            </>
+          )}
+        </button>
+
+        {erroIniciar && (
+          <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-xs text-destructive flex items-start gap-2">
+            <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+            <span>{erroIniciar}</span>
+          </div>
+        )}
+
+        <p className="text-[11px] text-muted-foreground text-center">
+          Problemas? Entre em contato com quem lhe enviou este link.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// --------------------------------------------------------------------
+// Tela "Link já utilizado" — quando outro device já iniciou a viagem
+// --------------------------------------------------------------------
+function LockedScreen({ motivo }: { motivo: string }) {
+  return (
+    <div className="min-h-[100dvh] w-full bg-background flex items-center justify-center p-4">
+      <div className="w-full max-w-md text-center space-y-4">
+        <ShieldAlert className="h-12 w-12 text-destructive mx-auto" />
+        <h1 className="text-xl font-bold text-foreground">Link indisponível</h1>
+        <p className="text-sm text-muted-foreground">{motivo}</p>
+        <p className="text-xs text-muted-foreground">
+          Se foi você quem iniciou, volte ao dispositivo onde clicou em
+          "Iniciar viagem" pela primeira vez.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// --------------------------------------------------------------------
+// Componente principal
+// --------------------------------------------------------------------
+type Modo =
+  | "loading"            // a consultar get_rastreio_publico pela primeira vez
+  | "pre-start"          // ainda não iniciado — mostra botão
+  | "locked-outro-device"// iniciado por outro browser
+  | "iniciando"          // clicou iniciar, a aguardar geolocation + RPC
+  | "tracking"           // em andamento a transmitir posição
+  | "concluida"          // corrida encerrada pelo dono
+  | "erro-fatal";        // link inválido / expirado
+
 export default function RastreioPublico() {
   const { token } = useParams<{ token: string }>();
+
+  const [modo, setModo] = useState<Modo>("loading");
   const [rastreio, setRastreio] = useState<RastreioPublico | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [erroFatal, setErroFatal] = useState<string | null>(null);
+  const [erroIniciar, setErroIniciar] = useState<string | null>(null);
+  const [erroGps, setErroGps] = useState<string | null>(null);
+
   const [isDark, setIsDark] = useState<boolean>(() => isDocumentDark());
-  const [lastPollOk, setLastPollOk] = useState<Date | null>(null);
+  const [lastGpsSentAt, setLastGpsSentAt] = useState<Date | null>(null);
   const [now, setNow] = useState<number>(() => Date.now());
 
-  // Observa troca de tema (class="dark" no <html>)
+  // Refs para workers em background sem re-renders
+  const deviceSecretRef = useRef<string | null>(null);
+  const watchIdRef = useRef<number | null>(null);
+  const heartbeatTimerRef = useRef<number | null>(null);
+  const sendInFlightRef = useRef<boolean>(false);
+  const lastSendTsRef = useRef<number>(0);
+
+  // Observa troca de tema
   useEffect(() => {
     if (typeof document === "undefined" || typeof MutationObserver === "undefined") return;
     const html = document.documentElement;
@@ -173,58 +330,266 @@ export default function RastreioPublico() {
     return () => observer.disconnect();
   }, []);
 
-  // tick a cada 5s para reavaliar "sinal perdido"
+  // tick a cada 2s para reavaliar "sinal perdido"
   useEffect(() => {
-    const t = window.setInterval(() => setNow(Date.now()), 5000);
+    const t = window.setInterval(() => setNow(Date.now()), 2000);
     return () => window.clearInterval(t);
   }, []);
 
+  // ----------------------------------------------------------------
+  // Snapshot inicial + polling de status (só para saber se o dono
+  // encerrou — a posição atualizada vem do nosso próprio GPS local).
+  // ----------------------------------------------------------------
   const fetchSnapshot = useCallback(async () => {
     if (!token) return;
-    try {
-      const { data, error: rpcErr } = await supabase
-        .rpc("get_rastreio_publico", { p_token: token });
-      if (rpcErr) throw rpcErr;
-      const row = Array.isArray(data) && data.length > 0 ? (data[0] as RastreioPublico) : null;
-      if (!row) {
-        setError("Link inválido ou expirado.");
-        setRastreio(null);
-      } else {
-        setError(null);
-        setRastreio(row);
-        setLastPollOk(new Date());
-      }
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : "Falha ao consultar o rastreio.";
-      setError(msg);
-    } finally {
-      setLoading(false);
+    const { data, error: rpcErr } = await supabase
+      .rpc("get_rastreio_publico", { p_token: token });
+    if (rpcErr) {
+      setErroFatal("Falha ao consultar o link. Verifique sua ligação e tente novamente.");
+      return;
     }
-  }, [token]);
+    const row = Array.isArray(data) && data.length > 0 ? (data[0] as RastreioPublico) : null;
+    if (!row) {
+      setModo("erro-fatal");
+      setErroFatal("Link inválido ou expirado.");
+      return;
+    }
+    setRastreio(row);
 
-  // Primeiro fetch + polling
+    // Decidir o modo com base no estado actual + secret local
+    const secretLocal = lerDeviceSecret(token);
+
+    if (row.status === "concluida" || row.status === "finalizado") {
+      setModo("concluida");
+      if (secretLocal) apagarDeviceSecret(token);
+      // Parar transmissão local se estivesse a correr
+      if (watchIdRef.current !== null) {
+        navigator.geolocation.clearWatch(watchIdRef.current);
+        watchIdRef.current = null;
+      }
+      if (heartbeatTimerRef.current !== null) {
+        window.clearInterval(heartbeatTimerRef.current);
+        heartbeatTimerRef.current = null;
+      }
+      return;
+    }
+
+    // Já iniciado por algum device
+    if (row.iniciado_em_dispositivo) {
+      if (secretLocal) {
+        // Presumo que é o mesmo device — confirma-se ao chamar iniciar_rastreio_publico
+        // na primeira vez; aqui, se já estamos em modo tracking, não mexo.
+        deviceSecretRef.current = secretLocal;
+        if (modo === "loading" || modo === "pre-start") {
+          // Tentar retomar silenciosamente
+          void resumirRastreio(secretLocal);
+        }
+      } else {
+        // Ninguém no localStorage → outro device já fez o lock
+        setModo("locked-outro-device");
+      }
+      return;
+    }
+
+    // Ainda não iniciado por ninguém → mostrar botão
+    if (modo === "loading") setModo("pre-start");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, modo]);
+
   useEffect(() => {
-    if (!token) return;
     void fetchSnapshot();
     const interval = window.setInterval(() => { void fetchSnapshot(); }, POLL_MS);
     return () => window.clearInterval(interval);
-  }, [token, fetchSnapshot]);
+  }, [fetchSnapshot]);
 
-  const position = useMemo<{ lat: number; lng: number } | null>(() => {
-    if (!rastreio?.latitude || !rastreio?.longitude) return null;
-    const lat = Number(rastreio.latitude);
-    const lng = Number(rastreio.longitude);
-    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
-    return { lat, lng };
-  }, [rastreio?.latitude, rastreio?.longitude]);
-
-  const initialCenter = useMemo(
-    () => position ?? DEFAULT_CENTER,
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [],
+  // ----------------------------------------------------------------
+  // Função de envio de posição via RPC enviar_posicao_publico
+  // ----------------------------------------------------------------
+  const enviarPosicao = useCallback(
+    async (pos: GeolocationPosition, ignorarThrottle = false) => {
+      if (!token || !deviceSecretRef.current) return;
+      const agora = Date.now();
+      if (!ignorarThrottle && agora - lastSendTsRef.current < GPS_INTERVAL_MS - 500) return;
+      if (sendInFlightRef.current) return;
+      sendInFlightRef.current = true;
+      try {
+        const speedMs = pos.coords.speed ?? null;
+        const speed_kmh = speedMs !== null && Number.isFinite(speedMs) ? speedMs * 3.6 : null;
+        const { error: rpcErr } = await supabase.rpc("enviar_posicao_publico", {
+          p_token: token,
+          p_device_secret: deviceSecretRef.current,
+          p_lat: pos.coords.latitude,
+          p_lng: pos.coords.longitude,
+          p_heading: pos.coords.heading ?? null,
+          p_speed_kmh: speed_kmh,
+          p_accuracy: pos.coords.accuracy ?? null,
+          p_gravar_breadcrumb: true,
+        });
+        if (rpcErr) {
+          setErroGps(rpcErr.message);
+          return;
+        }
+        lastSendTsRef.current = agora;
+        setLastGpsSentAt(new Date());
+        setErroGps(null);
+      } catch (e) {
+        setErroGps(e instanceof Error ? e.message : "Falha ao enviar posição.");
+      } finally {
+        sendInFlightRef.current = false;
+      }
+    },
+    [token],
   );
 
-  // Loading / erro / concluída
+  // ----------------------------------------------------------------
+  // Inicia a captura de GPS + heartbeat (chamado após lock OK)
+  // ----------------------------------------------------------------
+  const ligarGPS = useCallback(() => {
+    if (typeof navigator === "undefined" || !("geolocation" in navigator)) {
+      setErroGps("Este navegador não suporta geolocalização.");
+      return;
+    }
+
+    if (watchIdRef.current !== null) return; // já ligado
+
+    const onErroGeo = (err: GeolocationPositionError) => {
+      const msg =
+        err.code === err.PERMISSION_DENIED
+          ? "Permissão de localização negada. Ative-a nas definições do navegador."
+          : err.code === err.POSITION_UNAVAILABLE
+            ? "Localização indisponível neste dispositivo (sem GPS/Wi-Fi?)."
+            : err.code === err.TIMEOUT
+              ? "Tempo esgotado a obter localização."
+              : err.message;
+      setErroGps(msg);
+    };
+
+    // 1) watchPosition — dispara com movimento
+    watchIdRef.current = navigator.geolocation.watchPosition(
+      (pos) => { void enviarPosicao(pos); },
+      onErroGeo,
+      {
+        enableHighAccuracy: true,
+        maximumAge: Math.floor(GPS_INTERVAL_MS / 2),
+        timeout: 15_000,
+      },
+    );
+
+    // 2) Heartbeat — força ping parado
+    heartbeatTimerRef.current = window.setInterval(() => {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => { void enviarPosicao(pos); },
+        onErroGeo,
+        {
+          enableHighAccuracy: true,
+          maximumAge: GPS_INTERVAL_MS,
+          timeout: 15_000,
+        },
+      );
+    }, GPS_INTERVAL_MS);
+
+    setModo("tracking");
+  }, [enviarPosicao]);
+
+  // Limpeza de GPS ao desmontar
+  useEffect(() => {
+    return () => {
+      if (watchIdRef.current !== null) navigator.geolocation.clearWatch(watchIdRef.current);
+      if (heartbeatTimerRef.current !== null) window.clearInterval(heartbeatTimerRef.current);
+    };
+  }, []);
+
+  // ----------------------------------------------------------------
+  // Handler do botão "Iniciar viagem"
+  // ----------------------------------------------------------------
+  const handleIniciar = useCallback(async () => {
+    if (!token) return;
+    setErroIniciar(null);
+    setModo("iniciando");
+
+    // 1) Gerar secret (ou reutilizar se já existir por algum motivo)
+    const secret = lerDeviceSecret(token) ?? gerarDeviceSecret();
+    guardarDeviceSecret(token, secret);
+    deviceSecretRef.current = secret;
+
+    // 2) Chamar RPC para fazer o lock no servidor
+    const { data, error: rpcErr } = await supabase.rpc("iniciar_rastreio_publico", {
+      p_token: token,
+      p_device_secret: secret,
+      p_user_agent: typeof navigator !== "undefined" ? navigator.userAgent : null,
+    });
+
+    if (rpcErr) {
+      const msg = rpcErr.message || "";
+      if (msg.includes("RASTREIO_JA_INICIADO_NOUTRO_DEVICE")) {
+        apagarDeviceSecret(token);
+        deviceSecretRef.current = null;
+        setModo("locked-outro-device");
+        return;
+      }
+      if (msg.includes("RASTREIO_NAO_ENCONTRADO")) {
+        setModo("erro-fatal");
+        setErroFatal("Link inválido ou expirado.");
+        return;
+      }
+      if (msg.includes("RASTREIO_NAO_ATIVO")) {
+        setModo("erro-fatal");
+        setErroFatal("Este rastreio não está ativo no momento.");
+        return;
+      }
+      setModo("pre-start");
+      setErroIniciar(`Falha ao iniciar: ${msg}`);
+      return;
+    }
+
+    // 3) Guardar meta-dados da RPC (row zero)
+    const row = Array.isArray(data) && data.length > 0 ? data[0] as {
+      rastreio_id: string;
+      status: string;
+      motorista_nome: string | null;
+      veiculo_descricao: string | null;
+      cliente_nome: string | null;
+      categoria_rastreamento: string | null;
+      iniciado_em_dispositivo: string;
+      ja_iniciado_neste_device: boolean;
+    } : null;
+    if (row) {
+      setRastreio((prev) => prev ? { ...prev, iniciado_em_dispositivo: row.iniciado_em_dispositivo } : prev);
+    }
+
+    // 4) Ligar GPS (pede permissão ao browser agora)
+    ligarGPS();
+  }, [token, ligarGPS]);
+
+  // ----------------------------------------------------------------
+  // Retomar rastreio silenciosamente (mesmo device, ao refrescar página)
+  // ----------------------------------------------------------------
+  const resumirRastreio = useCallback(
+    async (secret: string) => {
+      if (!token) return;
+      const { error: rpcErr } = await supabase.rpc("iniciar_rastreio_publico", {
+        p_token: token,
+        p_device_secret: secret,
+        p_user_agent: typeof navigator !== "undefined" ? navigator.userAgent : null,
+      });
+      if (rpcErr) {
+        if ((rpcErr.message || "").includes("RASTREIO_JA_INICIADO_NOUTRO_DEVICE")) {
+          apagarDeviceSecret(token);
+          setModo("locked-outro-device");
+          return;
+        }
+        setModo("pre-start");
+        return;
+      }
+      deviceSecretRef.current = secret;
+      ligarGPS();
+    },
+    [token, ligarGPS],
+  );
+
+  // ----------------------------------------------------------------
+  // Render por modo
+  // ----------------------------------------------------------------
   if (!token) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background text-sm text-muted-foreground">
@@ -233,24 +598,22 @@ export default function RastreioPublico() {
     );
   }
 
-  if (loading && !rastreio) {
+  if (modo === "loading") {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background text-sm text-muted-foreground">
         <Loader2 className="h-5 w-5 animate-spin mr-2" />
-        A localizar o veículo…
+        A carregar…
       </div>
     );
   }
 
-  if (error && !rastreio) {
+  if (modo === "erro-fatal") {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-6">
         <div className="max-w-md text-center space-y-3">
           <AlertTriangle className="h-10 w-10 text-destructive mx-auto" />
           <h1 className="text-xl font-bold text-foreground">Link indisponível</h1>
-          <p className="text-sm text-muted-foreground">
-            {error}
-          </p>
+          <p className="text-sm text-muted-foreground">{erroFatal ?? "Link inválido."}</p>
           <p className="text-xs text-muted-foreground">
             Entre em contato com quem lhe enviou o link.
           </p>
@@ -259,14 +622,41 @@ export default function RastreioPublico() {
     );
   }
 
-  if (rastreio && (rastreio.status === "concluida" || rastreio.status === "finalizado")) {
+  if (modo === "locked-outro-device") {
+    return (
+      <LockedScreen motivo="Esta viagem já foi iniciada noutro dispositivo. Um mesmo link só pode ser usado por um aparelho." />
+    );
+  }
+
+  if (modo === "pre-start" || modo === "iniciando") {
+    return (
+      <PreStartScreen
+        clienteNome={rastreio?.cliente_nome ?? null}
+        motoristaNome={rastreio?.motorista_nome ?? null}
+        veiculo={rastreio?.veiculo_descricao ?? null}
+        onIniciar={() => { void handleIniciar(); }}
+        iniciando={modo === "iniciando"}
+        erroIniciar={erroIniciar}
+      />
+    );
+  }
+
+  if (modo === "concluida" && rastreio) {
     return <Resumo data={rastreio} />;
   }
 
-  const ultimaBatida = rastreio?.ultima_atualizacao
+  // --- modo === "tracking" --------------------------------------------------
+  const position =
+    rastreio?.latitude != null && rastreio?.longitude != null
+      ? { lat: Number(rastreio.latitude), lng: Number(rastreio.longitude) }
+      : null;
+
+  const tsSend = lastGpsSentAt?.getTime() ?? 0;
+  const tsColumn = rastreio?.ultima_atualizacao
     ? new Date(rastreio.ultima_atualizacao).getTime()
-    : null;
-  const tempoSemUpdate = ultimaBatida ? now - ultimaBatida : null;
+    : 0;
+  const ultimaBatida = Math.max(tsSend, tsColumn);
+  const tempoSemUpdate = ultimaBatida > 0 ? now - ultimaBatida : null;
   const sinalPerdido =
     !!position && tempoSemUpdate !== null && tempoSemUpdate > SINAL_PERDIDO_MS;
 
@@ -281,22 +671,23 @@ export default function RastreioPublico() {
   const markerIcon = makeVehicleIcon(markerVariant);
 
   const hud = (() => {
-    if (error) return { label: "A reconectar…", tone: "error" as const, Icon: WifiOff };
+    if (erroGps) return { label: erroGps, tone: "error" as const, Icon: WifiOff };
     if (!position) return { label: "À espera de posição…", tone: "idle" as const, Icon: Radio };
-    if (sinalPerdido) return { label: "Sinal perdido", tone: "error" as const, Icon: AlertTriangle };
-    return { label: "Ao vivo", tone: "live" as const, Icon: Radio };
+    if (sinalPerdido) return { label: "Sinal instável", tone: "error" as const, Icon: AlertTriangle };
+    return { label: "Viagem em curso", tone: "live" as const, Icon: CheckCircle2 };
   })();
   const HudIcon = hud.Icon;
 
+  const centerForMap = position ?? DEFAULT_CENTER;
+
   return (
     <div className="h-[100dvh] w-full bg-background flex flex-col overflow-hidden">
-      {/* Header mínimo do cliente */}
       <div className="shrink-0 px-4 py-3 border-b border-border bg-card/80 backdrop-blur flex items-center justify-between">
         <div className="flex items-center gap-2 min-w-0">
           <MapPin className="h-4 w-4 text-[#FF6600] shrink-0" />
           <div className="min-w-0">
             <div className="text-sm font-semibold text-foreground truncate">
-              {rastreio?.cliente_nome ? `Olá, ${rastreio.cliente_nome}` : "Acompanhe seu transfer"}
+              {rastreio?.cliente_nome ? `Olá, ${rastreio.cliente_nome}` : "Acompanhe sua viagem"}
             </div>
             {rastreio?.motorista_nome && (
               <div className="text-[11px] text-muted-foreground truncate">
@@ -306,17 +697,16 @@ export default function RastreioPublico() {
             )}
           </div>
         </div>
-        {lastPollOk && (
-          <div className="text-[11px] text-muted-foreground">
-            Sync: {lastPollOk.toLocaleTimeString()}
+        {lastGpsSentAt && (
+          <div className="text-[11px] text-muted-foreground text-right">
+            GPS: {lastGpsSentAt.toLocaleTimeString()}
           </div>
         )}
       </div>
 
-      {/* Mapa */}
       <div className="relative flex-1 min-h-0">
         <MapContainer
-          center={[initialCenter.lat, initialCenter.lng]}
+          center={[centerForMap.lat, centerForMap.lng]}
           zoom={15}
           scrollWheelZoom
           worldCopyJump
@@ -335,7 +725,7 @@ export default function RastreioPublico() {
           />
           <Marker
             position={
-              position ? [position.lat, position.lng] : [initialCenter.lat, initialCenter.lng]
+              position ? [position.lat, position.lng] : [centerForMap.lat, centerForMap.lng]
             }
             icon={markerIcon}
             title={rastreio?.veiculo_descricao ?? "Veículo"}
@@ -347,17 +737,19 @@ export default function RastreioPublico() {
         {/* HUD */}
         <div
           className={cn(
-            "pointer-events-none absolute left-3 top-3 z-[500] flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-medium shadow-sm backdrop-blur",
+            "pointer-events-none absolute left-3 top-3 z-[500] flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-medium shadow-sm backdrop-blur max-w-[90%]",
             hud.tone === "error"
               ? "border-destructive/40 bg-destructive/10 text-destructive"
-              : "border-border bg-background/90",
+              : hud.tone === "live"
+                ? "border-[#FF6600]/40 bg-[#FF6600]/10 text-foreground"
+                : "border-border bg-background/90",
           )}
           role="status"
           aria-live="polite"
         >
           <HudIcon
             className={cn(
-              "h-3.5 w-3.5",
+              "h-3.5 w-3.5 shrink-0",
               hud.tone === "live" && "text-[#FF6600]",
               hud.tone === "error" && "text-destructive",
               hud.tone === "idle" && "text-muted-foreground",
