@@ -44,6 +44,7 @@ import DisparadorPage from "@/pages/dashboard/DisparadorPage";
 import MentoriaPage from "@/pages/dashboard/MentoriaPage";
 import EmptyLegsPage from "@/pages/dashboard/EmptyLegsPage";
 import AtualizacoesPage from "@/pages/dashboard/AtualizacoesPage";
+import CatalogoPage from "@/pages/dashboard/Catalogo";
 import CommunityPage from "@/pages/dashboard/CommunityPage";
 import PainelAvisoBanner from "@/components/PainelAvisoBanner";
 import FullscreenBannerOverlay from "@/components/FullscreenBannerOverlay";
@@ -82,6 +83,7 @@ const PAGE_MAP: Record<string, React.ComponentType> = {
   disparador: DisparadorPage,
   mentoria: MentoriaPage,
   "empty-legs": EmptyLegsPage,
+  catalogo: CatalogoPage,
 };
 
 function readNetworkSpotlightActive() {

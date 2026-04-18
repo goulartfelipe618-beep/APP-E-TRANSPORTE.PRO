@@ -125,6 +125,7 @@ const getMenuStructure = (showNetwork: boolean, exibirComunicadorMotorista: bool
     items: [
       { title: "Geolocalização", page: "transfer/geolocalizacao", icon: Map },
       { title: "Disparador", page: "disparador", icon: Megaphone },
+      { title: "Catálogo", page: "catalogo", icon: BookOpen },
     ],
   },
   {
