@@ -218,8 +218,20 @@ export default function TransferGeolocalizacaoPage() {
       try { await navigator.clipboard?.writeText(url); } catch { /* noop */ }
 
       toast.success("Link criado! URL copiada para a área de transferência.");
+      // Reset os Selects ANTES de fechar o Dialog para libertar os portais Radix
+      // (evita "Failed to execute removeChild on Node" quando o parent re-renderiza
+      // durante a animação de fecho do DialogContent).
+      setReservaKey("");
+      setCategoria("cliente");
+      setNomeOpcional("");
+      setTelefoneOpcional("");
+      setObservacoes("");
       setOpen(false);
-      void loadRastreios();
+      // Adia o reload para depois do Dialog terminar a animação de saída,
+      // evitando re-renderizar enquanto o Radix está a desmontar portais.
+      window.setTimeout(() => {
+        void loadRastreios();
+      }, 250);
     } catch (e) {
       console.error(e);
       toast.error(e instanceof Error ? e.message : "Falha ao criar o rastreio.");
@@ -313,7 +325,10 @@ export default function TransferGeolocalizacaoPage() {
       if (error) throw error;
       toast.success("Rastreio encerrado.");
       setRastreioEncerrando(null);
-      void loadRastreios();
+      // Adia o reload para depois do AlertDialog fechar (evita removeChild do Radix).
+      window.setTimeout(() => {
+        void loadRastreios();
+      }, 250);
     } catch (e) {
       console.error(e);
       toast.error(e instanceof Error ? e.message : "Falha ao encerrar o rastreio.");
