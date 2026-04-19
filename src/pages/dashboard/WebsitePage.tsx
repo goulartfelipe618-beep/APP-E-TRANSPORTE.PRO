@@ -405,6 +405,10 @@ export default function WebsitePage() {
       toast.error("Selecione um modelo primeiro.");
       return;
     }
+    if (plano === "free") {
+      setUpgradeOpen(true);
+      return;
+    }
     setDomainPickSelect("");
     setPurchasedDomainId(null);
     setDomain("");

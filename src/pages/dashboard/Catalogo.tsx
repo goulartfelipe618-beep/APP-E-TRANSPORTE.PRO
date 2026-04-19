@@ -34,6 +34,8 @@ import {
   gerarCatalogoPdf,
   type CatalogoDadosSistema,
 } from "@/lib/catalogoPdfGenerator";
+import { useUserPlan } from "@/hooks/useUserPlan";
+import UpgradePlanDialog from "@/components/planos/UpgradePlanDialog";
 
 const TEMAS: Array<{ id: CatalogoTema; label: string; preview: string }> = [
   { id: "dark", label: "Dark Classic", preview: "#0B0B0C" },
@@ -62,6 +64,8 @@ type ChecklistItem = {
 };
 
 export default function CatalogoPage() {
+  const { plano, refetch: refetchPlano } = useUserPlan();
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
   const { config, setConfig, save, loading, saving, marcarGeracao } = useCatalogoConfig();
   const [sistema, setSistema] = useState<CatalogoDadosSistema | null>(null);
   const [carregandoSistema, setCarregandoSistema] = useState(true);
@@ -265,6 +269,10 @@ export default function CatalogoPage() {
 
   const handleGerar = async () => {
     if (!sistema) return;
+    if (plano === "free") {
+      setUpgradeOpen(true);
+      return;
+    }
     if (!podeGerar) {
       toast.error("Complete o checklist para liberar o download.");
       return;
@@ -347,7 +355,7 @@ export default function CatalogoPage() {
             <Button
               size="lg"
               onClick={handleGerar}
-              disabled={!podeGerar || gerando}
+              disabled={gerando || (plano !== "free" && !podeGerar)}
               className="bg-orange-500 text-white hover:bg-orange-600 disabled:opacity-40"
             >
               {gerando ? (
@@ -819,7 +827,7 @@ export default function CatalogoPage() {
             </Button>
             <Button
               onClick={handleGerar}
-              disabled={!podeGerar || gerando}
+              disabled={gerando || (plano !== "free" && !podeGerar)}
               size="sm"
               className="bg-orange-500 hover:bg-orange-600"
             >
@@ -833,6 +841,13 @@ export default function CatalogoPage() {
           </div>
         </div>
       </div>
+
+      <UpgradePlanDialog
+        open={upgradeOpen}
+        onOpenChange={setUpgradeOpen}
+        selfServiceUpgrade={plano === "free"}
+        onUpgradeSuccess={() => void refetchPlano()}
+      />
     </div>
   );
 }

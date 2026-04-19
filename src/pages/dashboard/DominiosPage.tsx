@@ -40,6 +40,7 @@ import {
 } from "@/components/ui/table";
 import type { Tables } from "@/integrations/supabase/types";
 import { useUserPlan } from "@/hooks/useUserPlan";
+import UpgradePlanDialog from "@/components/planos/UpgradePlanDialog";
 
 type DominioRow = Tables<"dominios_usuario">;
 type DominioRowView = DominioRow & { motorista_nome?: string };
@@ -284,8 +285,9 @@ async function checkDomainAvailability(fqdn: string): Promise<{
 }
 
 export default function DominiosPage() {
-  const { plano } = useUserPlan();
+  const { plano, refetch: refetchPlano } = useUserPlan();
   const freePlanReadOnly = plano === "free";
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
   const [rows, setRows] = useState<DominioRowView[]>([]);
   const [loading, setLoading] = useState(true);
   const [adminMasterView, setAdminMasterView] = useState<boolean | null>(null);
@@ -446,7 +448,7 @@ export default function DominiosPage() {
 
   const openDialog = () => {
     if (freePlanReadOnly) {
-      toast.error("No plano FREE você pode visualizar os domínios, mas o cadastro/registro é exclusivo do plano PRÓ.");
+      setUpgradeOpen(true);
       return;
     }
     resetDialogFields();
@@ -676,9 +678,9 @@ export default function DominiosPage() {
           </p>
         </div>
         {roleResolved && !isAdminMaster && (
-          <Button type="button" onClick={openDialog} className="shrink-0 gap-2" disabled={freePlanReadOnly}>
+          <Button type="button" onClick={openDialog} className="shrink-0 gap-2">
             <Plus className="h-4 w-4" />
-            {freePlanReadOnly ? "Cadastro de domínio (PRÓ)" : "Registrar um novo domínio"}
+            {freePlanReadOnly ? "Cadastro de domínio" : "Registrar um novo domínio"}
           </Button>
         )}
       </div>
@@ -1023,6 +1025,13 @@ export default function DominiosPage() {
       </AlertDialog>
       </>
       )}
+
+      <UpgradePlanDialog
+        open={upgradeOpen}
+        onOpenChange={setUpgradeOpen}
+        selfServiceUpgrade={plano === "free"}
+        onUpgradeSuccess={() => void refetchPlano()}
+      />
     </div>
   );
 }

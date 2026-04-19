@@ -1495,12 +1495,12 @@ export default function GooglePage() {
             disabled={ferramentasLoading}
             onClick={() => {
               if (ferramentasLoading) return;
-              if (!googleConsumoLiberado) {
-                toast.error("Esta ferramenta ainda não está disponível para uso. Aguarde a liberação da plataforma.");
-                return;
-              }
               if (!hasPlan("pro")) {
                 setUpgradeOpen(true);
+                return;
+              }
+              if (!googleConsumoLiberado) {
+                toast.error("Esta ferramenta ainda não está disponível para uso. Aguarde a liberação da plataforma.");
                 return;
               }
               setCreateOpen(true);
@@ -1527,12 +1527,12 @@ export default function GooglePage() {
             disabled={ferramentasLoading}
             onClick={() => {
               if (ferramentasLoading) return;
-              if (!googleConsumoLiberado) {
-                toast.error("Esta ferramenta ainda não está disponível para uso. Aguarde a liberação da plataforma.");
-                return;
-              }
               if (!hasPlan("pro")) {
                 setUpgradeOpen(true);
+                return;
+              }
+              if (!googleConsumoLiberado) {
+                toast.error("Esta ferramenta ainda não está disponível para uso. Aguarde a liberação da plataforma.");
                 return;
               }
               setCreateOpen(true);
