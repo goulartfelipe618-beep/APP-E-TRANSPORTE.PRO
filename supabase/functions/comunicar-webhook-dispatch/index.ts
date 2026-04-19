@@ -32,6 +32,20 @@ const COL: Record<string, string> = {
   geolocalizacao: "geolocalizacao_url",
 };
 
+/**
+ * IMPORTANTE: para o `supabase-js` no front conseguir ler o body de erro,
+ * a Edge Function deve responder 200 sempre que conseguir processar a
+ * requisição (mesmo que o webhook destino devolva 4xx/5xx). Caso contrário
+ * o `supabase.functions.invoke` apresenta apenas
+ * "Edge Function returned a non-2xx status code" sem o motivo real.
+ */
+function jsonOk<T>(body: T, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
 function assertSafeHttps(url: string): string {
   let u: URL;
   try {
@@ -56,25 +70,25 @@ function assertSafeHttps(url: string): string {
   return u.toString();
 }
 
+/** Body do n8n truncado para não estourar a resposta da função. */
+function truncate(s: string, max = 1500): string {
+  if (s.length <= max) return s;
+  return s.slice(0, max) + `\n…(truncado, ${s.length - max} chars omitidos)`;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: corsHeaders });
   }
 
   if (req.method !== "POST") {
-    return new Response(JSON.stringify({ error: "Method not allowed" }), {
-      status: 405,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return jsonOk({ ok: false, error: "Method not allowed" }, 405);
   }
 
   try {
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
-      return new Response(JSON.stringify({ error: "Não autorizado" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return jsonOk({ ok: false, error: "Não autorizado" }, 401);
     }
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -87,27 +101,18 @@ Deno.serve(async (req) => {
 
     const { data: { user }, error: userErr } = await supabaseUser.auth.getUser();
     if (userErr || !user) {
-      return new Response(JSON.stringify({ error: "Sessão inválida" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return jsonOk({ ok: false, error: "Sessão inválida" }, 401);
     }
 
     const body = (await req.json()) as { tipo?: string; payload?: unknown };
     const tipo = String(body.tipo || "").trim();
     if (!TIPOS_VALIDOS.has(tipo)) {
-      return new Response(JSON.stringify({ error: "tipo de webhook inválido" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return jsonOk({ ok: false, error: "tipo de webhook inválido" }, 400);
     }
 
     const col = COL[tipo];
     if (!col) {
-      return new Response(JSON.stringify({ error: "tipo não mapeado" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return jsonOk({ ok: false, error: "tipo não mapeado" }, 400);
     }
 
     const supabaseAdmin = createClient(supabaseUrl, serviceKey);
@@ -118,54 +123,106 @@ Deno.serve(async (req) => {
       .maybeSingle();
 
     if (rowErr) {
-      console.error(rowErr);
-      return new Response(JSON.stringify({ error: "Erro ao ler configuração de webhooks" }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      console.error("[comunicar-webhook] read error", rowErr);
+      // 200 para o cliente conseguir ler o body via supabase-js.
+      return jsonOk({ ok: false, error: "Erro ao ler configuração de webhooks" });
     }
 
     if (!row) {
-      return new Response(JSON.stringify({ error: "Configuração de webhooks não encontrada" }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      return jsonOk({
+        ok: false,
+        error:
+          "Configuração de webhooks não encontrada. Aplique a migração " +
+          "20260410120000_sistema_webhooks_comunicacao.sql.",
       });
     }
 
     const rawUrl = (row as Record<string, unknown>)[col] as string | null | undefined;
     if (!rawUrl?.trim()) {
-      return new Response(
-        JSON.stringify({
-          error:
-            "Webhook não configurado para este tipo. O administrador master deve preencher em Admin → Comunicador.",
-        }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        },
-      );
+      return jsonOk({
+        ok: false,
+        error:
+          "Webhook não configurado para este tipo. O administrador master deve preencher em Admin → Comunicador.",
+      });
     }
 
-    const targetUrl = assertSafeHttps(rawUrl);
+    let targetUrl: string;
+    try {
+      targetUrl = assertSafeHttps(rawUrl);
+    } catch (e) {
+      return jsonOk({
+        ok: false,
+        error: `URL do webhook inválida: ${e instanceof Error ? e.message : String(e)}`,
+      });
+    }
 
-    const n8nRes = await fetch(targetUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body.payload ?? {}),
-    });
+    // Timeout para evitar Edge Function "stuck" se o n8n estiver pendurado.
+    const ctrl = new AbortController();
+    const timeoutMs = 15_000;
+    const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+
+    let n8nRes: Response;
+    try {
+      n8nRes = await fetch(targetUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          // Header opcional para o admin distinguir origens no n8n.
+          "X-E-Transporte-Tipo": tipo,
+        },
+        body: JSON.stringify(body.payload ?? {}),
+        signal: ctrl.signal,
+      });
+    } catch (fetchErr) {
+      clearTimeout(timer);
+      const msg =
+        fetchErr instanceof Error
+          ? fetchErr.name === "AbortError"
+            ? `O webhook n8n não respondeu em ${Math.round(timeoutMs / 1000)}s.`
+            : fetchErr.message
+          : String(fetchErr);
+      console.error("[comunicar-webhook] fetch n8n falhou", msg);
+      return jsonOk({
+        ok: false,
+        status: 0,
+        error: `Falha ao chamar o webhook n8n: ${msg}`,
+      });
+    }
+    clearTimeout(timer);
+
+    const status = n8nRes.status;
+    let respText = "";
+    try {
+      respText = await n8nRes.text();
+    } catch { /* noop */ }
 
     const ok = n8nRes.ok;
-    const status = n8nRes.status;
 
-    return new Response(JSON.stringify({ ok, status }), {
-      status: ok ? 200 : 502,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    // Mensagem amigável para os erros mais comuns do n8n.
+    let friendly: string | undefined;
+    if (!ok) {
+      if (status === 404) {
+        friendly =
+          "O n8n devolveu 404. O workflow pode não estar Active (no n8n: clique no toggle " +
+          "'Active') ou a URL é a de TEST e não a de PRODUCTION. Use a URL Production do nó Webhook.";
+      } else if (status === 401 || status === 403) {
+        friendly =
+          "O n8n recusou a chamada (auth). Verifique se o nó Webhook não exige Header Auth " +
+          "que o sistema não envia.";
+      } else if (status >= 500) {
+        friendly = `O n8n devolveu ${status}. Verifique a execução do workflow no painel do n8n.`;
+      }
+    }
+
+    return jsonOk({
+      ok,
+      status,
+      error: ok ? undefined : friendly || `Webhook destino retornou status ${status}.`,
+      n8n_response: truncate(respText),
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    return new Response(JSON.stringify({ error: msg }), {
-      status: 400,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    console.error("[comunicar-webhook] exception", msg);
+    return jsonOk({ ok: false, error: msg });
   }
 });

@@ -129,6 +129,12 @@ async function extractEdgeFunctionError(err: unknown): Promise<string | null> {
 /**
  * Envia o payload ao webhook configurado pelo Admin Master (URL no banco, nunca no cliente).
  * Em caso de webhook não configurado devolve uma mensagem específica e acionável.
+ *
+ * A Edge Function devolve sempre HTTP 200 com `{ ok, status, error?, n8n_response? }`
+ * para que o `supabase-js` não engula o body. Por isso:
+ *   - `error` (do supabase-js) só aparece em falhas reais de transporte/auth.
+ *   - Falhas do destino (n8n 404, 500, timeout, …) chegam em `data.ok === false`
+ *     com `data.error` amigável e `data.status` real.
  */
 export async function dispatchComunicarWebhook(
   tipo: WebhookComunicacaoTipo,
@@ -141,17 +147,35 @@ export async function dispatchComunicarWebhook(
   if (error) {
     const bodyMsg = await extractEdgeFunctionError(error);
     const fallback =
-      `Webhook "${TIPO_LABEL[tipo]}" ainda não está configurado. ` +
-      "Peça ao administrador master para preencher a URL em Admin → Comunicador (Webhooks).";
+      `Não consegui contactar a Edge Function "comunicar-webhook-dispatch" para "${TIPO_LABEL[tipo]}". ` +
+      "Verifique a sua ligação e tente de novo.";
     throw new Error(bodyMsg || error.message || fallback);
   }
 
-  if (data && typeof data === "object" && "error" in data) {
-    throw new Error(String((data as { error: string }).error));
+  const pack = data as
+    | { ok?: boolean; status?: number; error?: string; n8n_response?: string }
+    | null
+    | undefined;
+
+  if (!pack) {
+    throw new Error("Resposta vazia da Edge Function de webhooks.");
   }
 
-  const pack = data as { ok?: boolean; status?: number };
-  if (!pack?.ok) {
-    throw new Error(`Webhook retornou status ${pack?.status ?? "?"}`);
+  if (pack.ok === false) {
+    const detalhe =
+      pack.error ||
+      (typeof pack.status === "number"
+        ? `Webhook retornou status ${pack.status}.`
+        : "O webhook destino devolveu um erro.");
+    // Loga o body do n8n para debug no DevTools sem poluir o toast do utilizador.
+    if (pack.n8n_response) {
+      // eslint-disable-next-line no-console
+      console.warn(`[${tipo}] resposta do webhook n8n:`, pack.n8n_response);
+    }
+    throw new Error(detalhe);
+  }
+
+  if (pack.ok !== true) {
+    throw new Error(`Resposta inesperada da Edge Function (${JSON.stringify(pack).slice(0, 200)}).`);
   }
 }
