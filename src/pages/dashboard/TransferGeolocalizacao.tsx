@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Plus, RefreshCw, Copy, Send, MapPin, Check,
-  StopCircle, ExternalLink, Loader2,
+  StopCircle, ExternalLink, Loader2, User, Car,
 } from "lucide-react";
 import SlideCarousel from "@/components/SlideCarousel";
 import { Button } from "@/components/ui/button";
@@ -645,13 +645,66 @@ export default function TransferGeolocalizacaoPage() {
 
             <div>
               <Label>Quem é rastreado *</Label>
-              <Select value={categoria} onValueChange={(v) => setCategoria(v as "cliente" | "motorista")}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="cliente">Cliente (celular do passageiro)</SelectItem>
-                  <SelectItem value="motorista">Motorista (celular do condutor)</SelectItem>
-                </SelectContent>
-              </Select>
+              {/*
+                Substituímos o <Select> por dois cartões radio para evitar
+                o bug "removeChild" do Radix UI: um <Select> dentro de um
+                <Dialog> abre um portal aninhado que entra em condição de
+                race com o focus-scope do Dialog ao montar. Como aqui só
+                há 2 opções fixas, dois botões resolvem definitivamente
+                o problema e melhoram a UX.
+              */}
+              <div
+                role="radiogroup"
+                aria-label="Quem é rastreado"
+                className="grid grid-cols-2 gap-2 mt-1"
+              >
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={categoria === "cliente"}
+                  onClick={() => setCategoria("cliente")}
+                  className={`flex items-start gap-2 rounded-md border p-3 text-left transition-colors ${
+                    categoria === "cliente"
+                      ? "border-orange-500 bg-orange-500/10 text-foreground"
+                      : "border-border bg-background hover:border-orange-500/50 hover:bg-accent text-muted-foreground"
+                  }`}
+                >
+                  <User
+                    className={`h-4 w-4 mt-0.5 shrink-0 ${
+                      categoria === "cliente" ? "text-orange-500" : ""
+                    }`}
+                  />
+                  <span className="flex flex-col">
+                    <span className="text-sm font-medium text-foreground">Cliente</span>
+                    <span className="text-[11px] text-muted-foreground">
+                      Celular do passageiro
+                    </span>
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={categoria === "motorista"}
+                  onClick={() => setCategoria("motorista")}
+                  className={`flex items-start gap-2 rounded-md border p-3 text-left transition-colors ${
+                    categoria === "motorista"
+                      ? "border-orange-500 bg-orange-500/10 text-foreground"
+                      : "border-border bg-background hover:border-orange-500/50 hover:bg-accent text-muted-foreground"
+                  }`}
+                >
+                  <Car
+                    className={`h-4 w-4 mt-0.5 shrink-0 ${
+                      categoria === "motorista" ? "text-orange-500" : ""
+                    }`}
+                  />
+                  <span className="flex flex-col">
+                    <span className="text-sm font-medium text-foreground">Motorista</span>
+                    <span className="text-[11px] text-muted-foreground">
+                      Celular do condutor
+                    </span>
+                  </span>
+                </button>
+              </div>
               <p className="text-[11px] text-muted-foreground mt-1">
                 O <strong>motorista</strong> transmite GPS enquanto a tela estiver aberta em “Acompanhar”. Em modo <strong>cliente</strong> o GPS vem do próprio passageiro (futuro).
               </p>
