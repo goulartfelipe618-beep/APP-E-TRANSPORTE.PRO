@@ -26,6 +26,35 @@
   <!-- Preferir .ico por conter transparência em todos os navegadores -->
   <link rel="icon" type="image/x-icon" href="/favicon.ico" />
   <link rel="apple-touch-icon" href="/favicon.ico" />
+  <style>
+    html.dark { background-color: #0a0a0a; color-scheme: dark; }
+    html:not(.dark) { background-color: #ffffff; color-scheme: light; }
+    html, body { margin: 0; padding: 0; }
+  </style>
+  <script>
+    (function () {
+      try {
+        var path = window.location.pathname || "";
+        var isLoginRoute =
+          path === "/" ||
+          path === "/login" ||
+          path === "/mfa" ||
+          path.indexOf("/rastreio/") === 0;
+        if (isLoginRoute) {
+          document.documentElement.classList.remove("dark");
+          return;
+        }
+        var t = localStorage.getItem("etp_theme_last_applied");
+        if (t === "dark") {
+          document.documentElement.classList.add("dark");
+        } else {
+          document.documentElement.classList.remove("dark");
+        }
+      } catch (e) {
+        /* fallback claro silencioso */
+      }
+    })();
+  </script>
 </head>
 
   <body>

@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useLayoutEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { HelpCircle, Key, Lock, LogIn, Mail, RefreshCw } from "lucide-react";
+import { Key, Lock, LogIn, Mail, RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { getPostLoginPath } from "@/lib/sessionRole";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -14,7 +14,7 @@ import {
   type LoginPainelConfig,
 } from "@/lib/loginPainelConfig";
 import LoginAvisosBanner from "@/components/LoginAvisosBanner";
-import { applyDocumentClassDark } from "@/lib/panelTheme";
+import { applyDocumentClassDark, applyThemeForRoute } from "@/lib/panelTheme";
 import { clearAuthStartedAt, isAuthExpired, readAuthStartedAt, setAuthStartedAt } from "@/lib/authExpiry";
 
 /** Persistência opcional; não ler na montagem — evita exibir URL antiga da imagem antes do fetch. */
@@ -46,7 +46,6 @@ const Login = () => {
   const [captchaInput, setCaptchaInput] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [idioma, setIdioma] = useState("pt-BR");
   const [loginConfig, setLoginConfig] = useState<LoginPainelConfig | null>(null);
   const [lateralImageReady, setLateralImageReady] = useState(false);
 
@@ -74,6 +73,9 @@ const Login = () => {
         }
 
         const path = await getPostLoginPath(session.user.id);
+        // Aplica o tema correcto do painel destino ANTES da navegação para
+        // evitar flash branco→dark quando o DashboardLayout monta.
+        applyThemeForRoute(path, session.user.id);
         navigate(path, { replace: true });
         return;
       }
@@ -96,7 +98,6 @@ const Login = () => {
       const { data } = await supabase.from("login_painel_config").select("*").eq("id", 1).maybeSingle();
       const merged = mergeLoginPainelConfig(data as Partial<LoginPainelConfig>);
       setLoginConfig(merged);
-      setIdioma(merged.idioma_padrao || "pt-BR");
       writeLoginConfigCache(merged);
     })();
   }, []);
@@ -173,6 +174,9 @@ const Login = () => {
 
     const path = await getPostLoginPath(data.user.id);
     setAuthStartedAt(Date.now());
+    // Aplica o tema do utilizador para a rota de destino antes da navegação,
+    // garantindo que o DashboardLayout monta já com a classe correcta no <html>.
+    applyThemeForRoute(path, data.user.id);
     navigate(path, { replace: true });
   };
 
@@ -199,23 +203,6 @@ const Login = () => {
 
       <section className="h-full min-h-0 w-full shrink-0 overflow-hidden bg-white lg:w-1/2 lg:max-w-[50%]">
         <div className="flex h-full w-full max-w-xl flex-col px-4 py-3 sm:px-6 lg:pl-6 lg:pr-8">
-          <div className="mb-3 flex items-center justify-end gap-2">
-            <Button type="button" variant="outline" size="sm" className="gap-2" onClick={() => window.open("mailto:suporte@e-transporte.pro", "_blank")}>
-              <HelpCircle className="h-4 w-4" />
-              {loginConfig?.texto_botao_ajuda ?? "Ajuda"}
-            </Button>
-            <select
-              value={idioma}
-              onChange={(e) => setIdioma(e.target.value)}
-              className="h-9 rounded-md border border-input bg-background px-2 text-sm"
-              aria-label="Idioma"
-            >
-              <option value="pt-BR">PT-BR</option>
-              <option value="en-US">EN</option>
-              <option value="es-ES">ES</option>
-            </select>
-          </div>
-
           <div className="flex min-h-0 flex-1 flex-col justify-center gap-3">
             <LoginAvisosBanner />
 
