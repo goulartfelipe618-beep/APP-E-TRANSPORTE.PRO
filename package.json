@@ -13,7 +13,8 @@
     "test:watch": "vitest",
     "server": "node server/index.mjs",
     "security-check": "node scripts/security-check.mjs",
-    "scan-dead-src": "node scripts/scan-dead-src.mjs"
+    "scan-dead-src": "node scripts/scan-dead-src.mjs",
+    "verify:webhook-solicitacao": "node scripts/verify-webhook-solicitacao.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

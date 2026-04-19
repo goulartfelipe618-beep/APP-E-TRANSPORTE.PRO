@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { computeLeadPassword } from "../_shared/lead_password.ts";
 import { requireWebhookHmacIfConfigured } from "../_shared/webhook_hmac.ts";
 
 const corsHeaders = {
@@ -88,25 +89,6 @@ function resolveValue(obj: Record<string, any>, path: string): any {
     current = current[part];
   }
   return current;
-}
-
-function stripAccents(input: string): string {
-  // Normalize and remove diacritics (e.g. "João" => "Joao")
-  return input.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-}
-
-function onlyLettersUpper(input: string): string {
-  return stripAccents(input).replace(/[^a-zA-Z]/g, "").toUpperCase();
-}
-
-function computeLeadPassword(nome: string, telefone: string): string {
-  const letters = onlyLettersUpper(nome);
-  const first3 = (letters.slice(0, 3) || "").padEnd(3, "X");
-
-  const digits = (telefone || "").replace(/\D/g, "");
-  const last4 = (digits.slice(-4) || "").padStart(4, "0");
-
-  return `${first3}${last4}ETP`;
 }
 
 async function findUserIdByEmail(
@@ -245,6 +227,8 @@ Deno.serve(async (req) => {
       );
     }
     const tipo = automacao.tipo as string;
+    // Login Auth FREE (createUser + plano free): apenas `tipo === "motorista"`.
+    // transfer / grupo apenas inserem em solicitacoes_*; não criam utilizador Auth.
     const userId = automacao.user_id;
     const savedMappings = (automacao.mappings || {}) as Record<string, Record<string, string>>;
     const columnMap = labelToColumn[tipo] || {};

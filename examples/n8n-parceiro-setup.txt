@@ -1,0 +1,26 @@
+Exemplo: workflow n8n + webhook-solicitacao (login FREE motorista)
+================================================================
+
+1) Ficheiro de referência: n8n-parceiro-workflow.example.json
+   - Importar no n8n (Workflow → Import from File).
+   - O nó "Enviar para Supabase" usa automacao_id da automação tipo motorista
+     "DESEJO SER PARCEIRO" no project lsfwmbpvithxqerfdlhy. Se a tua base tiver
+     outro UUID, copia da tabela public.automacoes (tipo = motorista).
+
+2) Variáveis de ambiente no n8n (Settings → Variables ou env do container):
+   - SUPABASE_ANON_KEY = chave anon do mesmo projeto Supabase (Settings → API).
+   - UAZAPI_TOKEN = token da UazAPI (não commite em Git em claro).
+
+3) Senha no WhatsApp = senha no Auth:
+   - Use o código em n8n-lead-password-code.js no nó Code (igual à Edge Function).
+
+4) Verificar chamada à função:
+   - npm run verify:webhook-solicitacao
+   - Requer .env com VITE_SUPABASE_URL e VITE_SUPABASE_PUBLISHABLE_KEY (anon).
+
+5) HMAC opcional: se WEBHOOK_INBOUND_HMAC_SECRET estiver definido no Supabase,
+   o POST precisa do cabeçalho x-webhook-signature (ver README_SECURITY.md).
+
+6) Automações tipo transfer ou grupo: o webhook-solicitacao apenas grava
+   solicitacoes_transfer / solicitacoes_grupos; não cria utilizador Auth FREE.
+   Login automático só no ramo motorista.

@@ -1,0 +1,112 @@
+{
+  "name": "Parceiro webhook + WhatsApp (exemplo repo)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "eb54332d-b6ee-4922-99af-c4266c73b44c",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [2288, 2272],
+      "id": "0f667491-a00d-457a-b232-f799f32ca154",
+      "name": "Webhook1",
+      "webhookId": "eb54332d-b6ee-4922-99af-c4266c73b44c"
+    },
+    {
+      "parameters": {
+        "jsCode": "function stripAccents(input) {\n  return String(input || \"\").normalize(\"NFD\").replace(/[\\u0300-\\u036f]/g, \"\");\n}\nfunction onlyLettersUpper(input) {\n  return stripAccents(input).replace(/[^a-zA-Z]/g, \"\").toUpperCase();\n}\nfunction computeLeadPassword(nome, telefone) {\n  const letters = onlyLettersUpper(nome);\n  const first3 = (letters.slice(0, 3) || \"\").padEnd(3, \"X\");\n  const digits = String(telefone || \"\").replace(/\\D/g, \"\");\n  const last4 = (digits.slice(-4) || \"\").padStart(4, \"0\");\n  return `${first3}${last4}ETP`;\n}\n\nconst body = $input.first().json.body;\n\nconst telefoneRaw = (body.telefone || \"\").replace(/\\D/g, \"\");\nconst telefone = telefoneRaw.startsWith(\"55\") ? telefoneRaw : \"55\" + telefoneRaw;\n\nconst senha = computeLeadPassword(body.nome || \"\", body.telefone || \"\");\n\nconst texto =\n  `Olá, *${body.nome}*! 👋\\n\\n` +\n  `Seja bem-vindo(a) ao *E-Transporte.pro*!\\n\\n` +\n  `Seu acesso foi criado com sucesso. Para entrar na plataforma, use as credenciais abaixo:\\n\\n` +\n  `*ID:* ${body.email}\\n*Senha:* ${senha}\\n\\n` +\n  `⚠️ _Recomendamos alterar sua senha no primeiro acesso._`;\n\nconst payload = {\n  number: telefone,\n  type: \"button\",\n  text: texto,\n  imageButton: \"https://i.postimg.cc/k5CV8mtD/Chat-GPT-Image-25-03-2026-20-13-44.png\",\n  footerText: \"© E-Transporte.pro | Sua gestão em movimento\",\n  choices: [\"Acessar plataforma|https://app.e-transporte.pro\", \"Falar com suporte\"],\n};\n\nreturn [{ json: payload }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2576, 2272],
+      "id": "b0c21532-9080-40d1-ab11-f73dc4646bb8",
+      "name": "Montar Card WhatsApp"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://ipazua.uazapi.com/send/menu",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "token",
+              "value": "={{ $env.UAZAPI_TOKEN }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify($json) }}",
+        "options": { "timeout": 30000 }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3072, 2272],
+      "id": "858276b8-5466-4be7-806f-faefa1547e92",
+      "name": "Enviar via UazAPI"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{ \"status\": \"ok\", \"message\": \"Card WhatsApp enviado com sucesso!\" }",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [3312, 2272],
+      "id": "89f04fd0-3747-4e42-ae1d-2976be9dee0d",
+      "name": "Resposta OK"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://lsfwmbpvithxqerfdlhy.supabase.co/functions/v1/webhook-solicitacao?automacao_id=d583fbea-960d-4178-94c8-50d3941ef532",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "apikey", "value": "={{ $env.SUPABASE_ANON_KEY }}" },
+            { "name": "Authorization", "value": "=Bearer {{ $env.SUPABASE_ANON_KEY }}" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify($('Webhook1').first().json.body) }}",
+        "options": { "timeout": 30000 }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2832, 2400],
+      "id": "d7704566-a8f4-49c6-9964-cf15bea0a6bf",
+      "name": "Enviar para Supabase"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook1": {
+      "main": [[{ "node": "Montar Card WhatsApp", "type": "main", "index": 0 }]]
+    },
+    "Montar Card WhatsApp": {
+      "main": [
+        [
+          { "node": "Enviar para Supabase", "type": "main", "index": 0 },
+          { "node": "Enviar via UazAPI", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Enviar via UazAPI": {
+      "main": [[{ "node": "Resposta OK", "type": "main", "index": 0 }]]
+    },
+    "Enviar para Supabase": { "main": [[]] }
+  }
+}
