@@ -36,6 +36,16 @@ function ProBadge() {
   );
 }
 
+/** Páginas onde não exibimos o badge PRÓ ao lado do item (plano FREE). */
+const PAGINAS_SEM_BADGE_PRO = new Set<string>([
+  "transfer/geolocalizacao",
+  "disparador",
+  "sistema/comunicador",
+  "network",
+  "campanhas/ativos",
+  "campanhas/leads",
+]);
+
 function readNetworkSpotlightHighlight() {
   if (typeof window === "undefined") return false;
   const aceito = localStorage.getItem("network_nacional_aceito") === "sim";
@@ -101,6 +111,7 @@ const getMenuStructure = (showNetwork: boolean, exibirComunicadorMotorista: bool
   {
     label: "Ferramentas",
     items: [
+      { title: "Geolocalização", page: "transfer/geolocalizacao", icon: Map },
       {
         title: "Campanhas",
         icon: Megaphone,
@@ -120,12 +131,12 @@ const getMenuStructure = (showNetwork: boolean, exibirComunicadorMotorista: bool
     ],
   },
   {
-    label: "BETA",
+    label: "Beta",
     labelTone: "beta",
     items: [
-      { title: "Geolocalização", page: "transfer/geolocalizacao", icon: Map },
       { title: "Disparador", page: "disparador", icon: Megaphone },
       { title: "Catálogo", page: "catalogo", icon: BookOpen },
+      { title: "Google Maps", page: "google", icon: MapPin },
     ],
   },
   {
@@ -162,7 +173,10 @@ export function AppSidebar() {
   const { plano, loading: planLoading } = useUserPlan();
   const freeRestricted = !planLoading && plano === "free";
   const proOnly = (page: string) => !isFrotaFreePage(page);
-  const groupHasProOnlyChild = (children: { page: string }[]) => children.some((c) => proOnly(c.page));
+  const mostrarBadgePro = (page: string) =>
+    freeRestricted && proOnly(page) && !PAGINAS_SEM_BADGE_PRO.has(page);
+  const groupHasProOnlyChild = (children: { page: string }[]) =>
+    children.some((c) => proOnly(c.page) && !PAGINAS_SEM_BADGE_PRO.has(c.page));
 
   useEffect(() => {
     const handler = () => {
@@ -292,7 +306,7 @@ export function AppSidebar() {
                                       isActive(child.page) && "text-primary font-medium"
                                     )}
                                   >
-                                    {freeRestricted && proOnly(child.page) ? (
+                                    {mostrarBadgePro(child.page) ? (
                                       <span className="mr-1.5 shrink-0">
                                         <ProBadge />
                                       </span>
@@ -331,7 +345,7 @@ export function AppSidebar() {
                             "bg-sidebar text-foreground ring-2 ring-primary shadow-md rounded-md",
                         )}
                       >
-                        {freeRestricted && proOnly(page) ? (
+                        {mostrarBadgePro(page) ? (
                           <span className="mr-1.5 shrink-0">
                             <ProBadge />
                           </span>
