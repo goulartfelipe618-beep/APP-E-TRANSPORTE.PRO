@@ -412,7 +412,7 @@ export default function AdminUsuariosCadastrados() {
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground mt-1">
-                Pode alternar entre FREE (limitado) e PRÓ (painel completo) quando necessário.
+                Pode alternar entre FREE (limitado) e PRÓ (painel completo) quando necessário. Alterar o plano não apaga dados do utilizador — apenas restringe ou liberta o acesso às funções.
               </p>
             </div>
             <Button onClick={handleUpdatePlan} disabled={updatingPlan} className="w-full">

@@ -24,6 +24,19 @@ import { ConfirmDeleteDialog } from "@/components/ConfirmDeleteDialog";
 
 type Row = Tables<"admin_fullscreen_banners">;
 
+function todayLocalISODate(): string {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function isInFullscreenDateRange(inicio: string, fim: string): boolean {
+  const today = todayLocalISODate();
+  return today >= inicio && today <= fim;
+}
+
 const emptyForm = () => ({
   imagem_url: "",
   incluir_motorista: true,
@@ -215,7 +228,7 @@ export default function AdminFullscreenBannersSection() {
             Banners em tela cheia
           </h2>
           <p className="text-muted-foreground mt-1 text-sm max-w-2xl">
-            Área de exibição ~560×400 px (centralizada; imagens maiores são reduzidas). Defina páginas, público e período. Os utilizadores podem
+            Área de exibição ~560×400 px (centralizada; imagens maiores são reduzidas). Defina páginas, público e período — só aparece se a data de hoje estiver entre a inicial e a final (inclusive). Os utilizadores podem
             fechar com animação; a partir da 3.ª exibição surge a opção «Não mostrar novamente».
           </p>
         </div>
@@ -234,7 +247,9 @@ export default function AdminFullscreenBannersSection() {
         <Card className="p-6 text-center text-muted-foreground">Nenhum banner em tela cheia.</Card>
       ) : (
         <div className="space-y-3">
-          {rows.map((r) => (
+          {rows.map((r) => {
+            const inPeriod = isInFullscreenDateRange(r.data_inicio, r.data_fim);
+            return (
             <Card key={r.id} className="p-4 flex flex-wrap items-start gap-4">
               <div className="h-20 w-28 shrink-0 overflow-hidden rounded-md border bg-muted">
                 {r.imagem_url ? (
@@ -246,6 +261,11 @@ export default function AdminFullscreenBannersSection() {
                   <span className={cn("rounded px-2 py-0.5", r.ativo ? "bg-primary/15 text-primary" : "bg-muted")}>
                     {r.ativo ? "Ativo" : "Inativo"}
                   </span>
+                  {r.ativo && !inPeriod ? (
+                    <span className="rounded border border-amber-500/40 bg-amber-950/40 px-2 py-0.5 text-amber-200/95">
+                      Fora do período
+                    </span>
+                  ) : null}
                   {r.incluir_motorista && (
                     <span className="rounded border border-border px-2 py-0.5">Motorista</span>
                   )}
@@ -264,7 +284,8 @@ export default function AdminFullscreenBannersSection() {
                 </Button>
               </div>
             </Card>
-          ))}
+            );
+          })}
         </div>
       )}
 

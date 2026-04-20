@@ -69,6 +69,13 @@ Nunca commite `.env`. Segredos de webhooks e service role ficam no **Supabase Da
 - **Bundle:** `React.lazy` + `Suspense` nas rotas pesadas; `manualChunks` no Vite para `recharts`, `jspdf`/`html2canvas`, mapas e ícones.
 - **Erros React:** `AppErrorBoundary` em `src/main.tsx`.
 
+## Plano FREE e PRÓ (retenção de dados)
+
+**Regra de produto:** quando um utilizador deixa de estar no plano **PRÓ** (subscrição terminada ou alteração para **FREE**), **nenhum dado do painel é apagado, reposto a valores iniciais nem eliminado em cascata** por essa mudança de plano. O que muda é apenas o **acesso**: funcionalidades exclusivas do PRÓ ficam **bloqueadas ou só leitura** até o plano voltar a ser PRÓ. Assim, ao reativar o PRÓ, o cliente **recupera o uso completo** sem ter de reconfigurar tudo.
+
+- O estado do plano está em `public.user_plans` (`plano`: `free` | `pro`).
+- A remoção em massa de dados de um utilizador só ocorre em fluxos explícitos de **eliminação de conta** (RPC / admin), não na expiração ou downgrade de plano.
+
 ## Documentação extra
 
 - **`README_SECURITY.md`** — alinhado a boas práticas do projeto (CSP, webhooks HMAC, uploads, RLS).

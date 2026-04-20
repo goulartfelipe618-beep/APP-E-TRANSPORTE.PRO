@@ -45,10 +45,13 @@ function matchesPage(row: BannerRow, painel: PainelTipo, activePage: string): bo
   if (painel === "motorista") {
     if (!row.incluir_motorista) return false;
     const pages = row.paginas_motorista || [];
+    // Lista vazia = todas as páginas do painel (compatível com dados antigos / migrações)
+    if (pages.length === 0) return true;
     return pages.includes(activePage);
   }
   if (!row.incluir_taxi) return false;
   const pages = row.paginas_taxi || [];
+  if (pages.length === 0) return true;
   return pages.includes(activePage);
 }
 
@@ -108,7 +111,7 @@ export default function FullscreenBannerOverlay({ painel, activePage }: Props) {
 
   useEffect(() => {
     let cancelled = false;
-    void (async () => {
+    const load = async () => {
       const { data, error } = await supabase.from("admin_fullscreen_banners").select("*").eq("ativo", true);
       if (cancelled) return;
       if (error) {
@@ -116,11 +119,23 @@ export default function FullscreenBannerOverlay({ painel, activePage }: Props) {
         return;
       }
       setRows((data || []) as BannerRow[]);
-    })();
+    };
+    void load();
+    // Atualiza ao voltar ao separador / janela (banner criado pelo admin sem F5)
+    const onFocus = () => void load();
+    window.addEventListener("focus", onFocus);
+    const interval = window.setInterval(() => void load(), 90_000);
     return () => {
       cancelled = true;
+      window.removeEventListener("focus", onFocus);
+      window.clearInterval(interval);
     };
   }, []);
+
+  // Ao mudar de página, volta a avaliar com o mesmo cache; força novo tick se o dia virou (edge case)
+  useEffect(() => {
+    setTick((t) => t + 1);
+  }, [activePage]);
 
   const today = todayLocalISODate();
 

@@ -104,7 +104,6 @@ const getMenuStructure = (showNetwork: boolean, exibirComunicadorMotorista: bool
         ],
       },
       { title: "Veículos", page: "veiculos", icon: Car },
-      { title: "Empty Legs", page: "empty-legs", icon: Plane },
       { title: "Mentoria", page: "mentoria", icon: GraduationCap },
     ],
   },
@@ -127,7 +126,6 @@ const getMenuStructure = (showNetwork: boolean, exibirComunicadorMotorista: bool
       { title: "E-mail Business", page: "email-business", icon: Mail },
       { title: "Website", page: "website", icon: Monitor },
       { title: "Domínios", page: "dominios", icon: Link2 },
-      { title: "Google Maps", page: "google", icon: MapPin },
     ],
   },
   {
@@ -137,6 +135,7 @@ const getMenuStructure = (showNetwork: boolean, exibirComunicadorMotorista: bool
       { title: "Disparador", page: "disparador", icon: Megaphone },
       { title: "Catálogo", page: "catalogo", icon: BookOpen },
       { title: "Google Maps", page: "google", icon: MapPin },
+      { title: "Empty Legs", page: "empty-legs", icon: Plane },
     ],
   },
   {

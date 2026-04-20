@@ -1,6 +1,10 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
+/**
+ * Plano do utilizador (`user_plans.plano`). Alterar entre FREE e PRÓ não deve apagar dados —
+ * apenas UI e permissões de escrita em áreas PRÓ; ver README «Plano FREE e PRÓ (retenção de dados)».
+ */
 export type PlanType = "free" | "pro";
 
 export const PLAN_ORDER: PlanType[] = ["free", "pro"];

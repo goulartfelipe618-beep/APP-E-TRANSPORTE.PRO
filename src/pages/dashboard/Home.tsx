@@ -47,7 +47,13 @@ type ToolDef = { title: string; page: string; desc: string; icon: LucideIcon };
 
 type Subsection = { title: string; items: ToolDef[] };
 
-type MajorSection = { id: string; label: string; subsections: Subsection[] };
+type MajorSection = {
+  id: string;
+  label: string;
+  /** Destaque âmbar alinhado ao grupo Beta do menu lateral. */
+  labelTone?: "beta";
+  subsections: Subsection[];
+};
 
 function buildHomeSections(showNetwork: boolean, exibirComunicadorMotorista: boolean): MajorSection[] {
   const principal: Subsection[] = [
@@ -86,7 +92,6 @@ function buildHomeSections(showNetwork: boolean, exibirComunicadorMotorista: boo
       title: "Frota e oportunidades",
       items: [
         { title: "Veículos", page: "veiculos", desc: "Cadastro e gestão da frota.", icon: Car },
-        { title: "Empty Legs", page: "empty-legs", desc: "Trechos e oportunidades de retorno.", icon: Plane },
         { title: "Mentoria", page: "mentoria", desc: "Conteúdos e trilha de desenvolvimento.", icon: GraduationCap },
       ],
     },
@@ -104,8 +109,13 @@ function buildHomeSections(showNetwork: boolean, exibirComunicadorMotorista: boo
     { title: "Comunidade", page: "comunidade", desc: "Canal com a comunidade da plataforma.", icon: Users },
     { title: "E-mail Business", page: "email-business", desc: "E-mail profissional com domínio próprio.", icon: Mail },
     { title: "Website", page: "website", desc: "Site institucional integrado à operação.", icon: Monitor },
-    { title: "Google Maps", page: "google", desc: "Presença no Google Meu Negócio e buscas.", icon: Search },
+  ];
+
+  const betaItems: ToolDef[] = [
     { title: "Disparador", page: "disparador", desc: "Envio de mensagens em massa (WhatsApp dedicado).", icon: Megaphone },
+    { title: "Catálogo", page: "catalogo", desc: "Catálogo comercial em PDF e materiais para a sua operação.", icon: BookOpen },
+    { title: "Google Maps", page: "google", desc: "Presença no Google Meu Negócio e buscas.", icon: MapPin },
+    { title: "Empty Legs", page: "empty-legs", desc: "Trechos e oportunidades de retorno.", icon: Plane },
   ];
 
   const configuracao: Subsection[] = [
@@ -134,6 +144,12 @@ function buildHomeSections(showNetwork: boolean, exibirComunicadorMotorista: boo
       id: "ferramentas",
       label: "Ferramentas",
       subsections: [{ title: "Marketing e operação", items: ferramentasItems }],
+    },
+    {
+      id: "beta",
+      label: "Beta",
+      labelTone: "beta",
+      subsections: [{ title: "Recursos em testes", items: betaItems }],
     },
     { id: "config", label: "Configurações", subsections: configuracao },
   ];
@@ -482,7 +498,14 @@ export default function HomePage() {
         {sections.map((major) => (
           <section key={major.id} className="space-y-8" aria-labelledby={`section-${major.id}`}>
             <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-              <h2 id={`section-${major.id}`} className="text-xl font-bold text-foreground">
+              <h2
+                id={`section-${major.id}`}
+                className={cn(
+                  "text-xl font-bold text-foreground",
+                  major.labelTone === "beta" &&
+                    "uppercase tracking-wide text-amber-600 dark:text-amber-400",
+                )}
+              >
                 {major.label}
               </h2>
               <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Acesso rápido</span>

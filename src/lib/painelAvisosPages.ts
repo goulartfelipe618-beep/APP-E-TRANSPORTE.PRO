@@ -26,6 +26,8 @@ export const PAGINAS_MOTORISTA: { value: string; label: string }[] = [
   { value: "google", label: "Google Maps" },
   { value: "email-business", label: "E-mail Business" },
   { value: "website", label: "Website" },
+  { value: "dominios", label: "Domínios" },
+  { value: "catalogo", label: "Catálogo" },
   { value: "disparador", label: "Disparador" },
   { value: "anotacoes", label: "Anotações" },
   { value: "sistema/configuracoes", label: "Sistema — Configurações" },

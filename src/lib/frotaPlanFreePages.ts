@@ -1,6 +1,9 @@
 /**
  * Páginas do painel motorista (frota /dashboard) liberadas no plano FREE.
- * Demais rotas exigem plano PRÓ.
+ * Demais rotas exigem plano PRÓ para edição / uso completo (gating na UI).
+ *
+ * Importante: esta lista define **acesso**, não retenção — ao cair para FREE, dados PRÓ
+ * permanecem na base; o utilizador só deixa de poder usar essas áreas até voltar ao PRÓ.
  */
 export const FROTA_FREE_PAGE_IDS = new Set<string>([
   "home",
