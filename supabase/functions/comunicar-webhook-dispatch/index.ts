@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { assertHttpsFullUrl } from "../_shared/ssrfSafeHttps.ts";
 
 /**
  * Mesmo conjunto que `@supabase/supabase-js/cors` (inclui Allow-Methods).
@@ -44,30 +45,6 @@ function jsonOk<T>(body: T, status = 200) {
     status,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
-}
-
-function assertSafeHttps(url: string): string {
-  let u: URL;
-  try {
-    u = new URL(url.trim());
-  } catch {
-    throw new Error("URL inválida");
-  }
-  if (u.protocol !== "https:") {
-    throw new Error("Apenas HTTPS é permitido");
-  }
-  const h = u.hostname;
-  if (
-    h === "localhost" ||
-    h === "0.0.0.0" ||
-    h.startsWith("127.") ||
-    h.startsWith("10.") ||
-    h.startsWith("192.168.") ||
-    h.endsWith(".local")
-  ) {
-    throw new Error("Host não permitido");
-  }
-  return u.toString();
 }
 
 /** Body do n8n truncado para não estourar a resposta da função. */
@@ -148,7 +125,7 @@ Deno.serve(async (req) => {
 
     let targetUrl: string;
     try {
-      targetUrl = assertSafeHttps(rawUrl);
+      targetUrl = assertHttpsFullUrl(rawUrl);
     } catch (e) {
       return jsonOk({
         ok: false,

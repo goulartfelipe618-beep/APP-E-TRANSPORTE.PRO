@@ -1,33 +1,12 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { assertHttpsBaseUrl } from "../_shared/ssrfSafeHttps.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-function assertSafeHttpsBase(url: string): string {
-  let u: URL;
-  try {
-    u = new URL(url.trim());
-  } catch {
-    throw new Error("URL inválida");
-  }
-  if (u.protocol !== "https:") {
-    throw new Error("Apenas HTTPS é permitido");
-  }
-  const h = u.hostname;
-  if (
-    h === "localhost" ||
-    h === "0.0.0.0" ||
-    h.startsWith("127.") ||
-    h.startsWith("10.") ||
-    h.startsWith("192.168.") ||
-    h.endsWith(".local")
-  ) {
-    throw new Error("Host não permitido");
-  }
-  return `${u.protocol}//${u.host}`;
-}
+const MAX_UPSTREAM_TEXT = 400_000;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -73,7 +52,7 @@ Deno.serve(async (req) => {
       jsonBody?: unknown;
     };
 
-    const baseUrl = assertSafeHttpsBase(String(body.baseUrl || ""));
+    const baseUrl = assertHttpsBaseUrl(String(body.baseUrl || ""));
     const apiKey = String(body.apiKey || "").trim();
     const path = String(body.path || "").startsWith("/") ? String(body.path) : `/${body.path || ""}`;
     const method = (body.method || "GET").toUpperCase();
@@ -110,7 +89,11 @@ Deno.serve(async (req) => {
     }
 
     const evoRes = await fetch(target, init);
-    const bodyText = await evoRes.text();
+    const rawText = await evoRes.text();
+    const bodyText =
+      rawText.length > MAX_UPSTREAM_TEXT
+        ? `${rawText.slice(0, MAX_UPSTREAM_TEXT)}\n…(truncado, ${rawText.length - MAX_UPSTREAM_TEXT} chars omitidos)`
+        : rawText;
 
     return new Response(
       JSON.stringify({

@@ -34,12 +34,28 @@ export function createApp() {
     }),
   );
 
+  const allowedOriginsList =
+    process.env.ALLOWED_ORIGINS?.split(",").map((s) => s.trim()).filter(Boolean) ?? [];
+  const corsOrigin =
+    allowedOriginsList.length > 0
+      ? allowedOriginsList
+      : process.env.NODE_ENV === "production"
+        ? false
+        : true;
+
   app.use(
     cors({
-      origin: process.env.ALLOWED_ORIGINS?.split(",").map((s) => s.trim()).filter(Boolean) || true,
+      origin: corsOrigin,
       maxAge: 86400,
     }),
   );
+
+  if (process.env.NODE_ENV === "production" && allowedOriginsList.length === 0) {
+    logger.warn(
+      "ALLOWED_ORIGINS não definido: pedidos cross-origin ao browser serão recusados por CORS. " +
+        "Defina ALLOWED_ORIGINS com a origem do front (ex.: https://app.seudominio.com).",
+    );
+  }
 
   /**
    * Webhooks: limite próprio, mais alto que login (n8n pode enviar rajadas).

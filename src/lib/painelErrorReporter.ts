@@ -46,6 +46,18 @@ function truncate(s: string | undefined | null): string | null {
   return s.length > MAX_TEXT ? `${s.slice(0, MAX_TEXT)}…` : s;
 }
 
+/** Evita persistir tokens OAuth/PKCE ou outros segredos frequentes em query/hash. */
+function sanitizeHrefForLog(href: string): string | null {
+  try {
+    const u = new URL(href);
+    u.search = "";
+    u.hash = "";
+    return u.toString();
+  } catch {
+    return null;
+  }
+}
+
 async function resolveDisplayName(userId: string): Promise<string | null> {
   const now = Date.now();
   if (displayNameCache.value !== null && now - displayNameCache.at < DISPLAY_NAME_TTL_MS) {
@@ -184,7 +196,8 @@ export async function reportPainelError(payload: {
     user_agent: userAgent ? truncate(userAgent) : null,
     extra: {
       ...(payload.extra ?? {}),
-      href: typeof window !== "undefined" ? window.location.href : null,
+      href:
+        typeof window !== "undefined" ? sanitizeHrefForLog(window.location.href) : null,
     },
   };
 
