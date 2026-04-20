@@ -1,5 +1,6 @@
 import jsPDF from "jspdf";
 import { supabase } from "@/integrations/supabase/client";
+import { mergeCabecalhoComPerfilSeNecessario } from "@/lib/cabecalhoContratualResolve";
 
 // ─── Layout Constants ───────────────────────────────────────
 const PAGE_W = 210;
@@ -114,8 +115,15 @@ async function fetchCabecalho(ownerUserId?: string | null) {
     uid = user?.id ?? null;
   }
   if (!uid) return null;
-  const { data } = await supabase.from("cabecalho_contratual" as any).select("*").eq("user_id", uid).maybeSingle();
-  return data as any;
+  const [cabRes, cfgRes] = await Promise.all([
+    supabase.from("cabecalho_contratual" as any).select("*").eq("user_id", uid).maybeSingle(),
+    supabase
+      .from("configuracoes" as any)
+      .select("nome_completo, nome_empresa, telefone, email, endereco_completo")
+      .eq("user_id", uid)
+      .maybeSingle(),
+  ]);
+  return mergeCabecalhoComPerfilSeNecessario(cabRes.data as any, cfgRes.data as any) as any;
 }
 
 // ─── Logo (informações contratuais) ─────────────────────────
@@ -490,7 +498,9 @@ async function addContractPages(
   reservaId: string,
   clientName: string,
 ) {
-  if (!contrato || (!contrato.modelo_contrato && !contrato.politica_cancelamento && !contrato.clausulas_adicionais)) return;
+  if (!contrato) return;
+  if (contrato.incluir_no_pdf_confirmacao === false) return;
+  if (!contrato.modelo_contrato && !contrato.politica_cancelamento && !contrato.clausulas_adicionais) return;
 
   doc.addPage();
   let y = await addFullHeader(doc, cabecalho, "Contrato de Prestação de Serviço", numReserva, reservaId);
