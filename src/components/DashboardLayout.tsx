@@ -10,6 +10,7 @@ import FloatingSupportChat from "@/components/FloatingSupportChat";
 import { NetworkSpotlightProvider } from "@/contexts/NetworkSpotlightContext";
 import { hydrateNetworkNacionalFromDb, persistNetworkHighlightDismissed } from "@/lib/networkNacionalPrefs";
 import { usePainelMotoristaEvolutionAtivo } from "@/hooks/usePainelMotoristaEvolutionAtivo";
+import { useMotoristaOnboarding } from "@/hooks/useMotoristaOnboarding";
 
 // Import all page components
 import HomePage from "@/pages/dashboard/Home";
@@ -95,6 +96,7 @@ function readNetworkSpotlightActive() {
 
 function DashboardContent() {
   const { activePage, setActivePage } = useActivePage();
+  const onboarding = useMotoristaOnboarding();
   const { painelMotoristaEvolutionAtivo, ready: painelComunicadorReady } = usePainelMotoristaEvolutionAtivo();
   const mainRef = useRef<HTMLElement>(null);
   useSlowScrollContainer(mainRef, activePage === "website");
@@ -143,6 +145,23 @@ function DashboardContent() {
       setActivePage("sistema/configuracoes");
     }
   }, [painelComunicadorReady, activePage, painelMotoristaEvolutionAtivo, setActivePage]);
+
+  /** Primeiro acesso: obriga concluir Sistema > Configurações; depois escolher Network na Home. */
+  useEffect(() => {
+    if (onboarding.loading) return;
+    if (!onboarding.phase1Complete && activePage !== "sistema/configuracoes") {
+      setActivePage("sistema/configuracoes");
+      return;
+    }
+    if (
+      onboarding.phase1Complete &&
+      !onboarding.networkChosen &&
+      activePage !== "home" &&
+      activePage !== "sistema/configuracoes"
+    ) {
+      setActivePage("home");
+    }
+  }, [onboarding.loading, onboarding.phase1Complete, onboarding.networkChosen, activePage, setActivePage]);
 
   const dismissSpotlight = () => {
     setShowOverlay(false);

@@ -902,12 +902,7 @@ export default function SistemaAutomacoesPage() {
         loading={deleteBusy}
       />
 
-      <UpgradePlanDialog
-        open={upgradePlanOpen}
-        onOpenChange={setUpgradePlanOpen}
-        selfServiceUpgrade={plano === "free"}
-        onUpgradeSuccess={() => void refetchPlano()}
-      />
+      <UpgradePlanDialog open={upgradePlanOpen} onOpenChange={setUpgradePlanOpen} />
     </div>
   );
 }

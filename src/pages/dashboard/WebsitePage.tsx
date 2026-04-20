@@ -667,12 +667,7 @@ export default function WebsitePage() {
   if (step === "domain_pick" && selectedTemplate) {
     return (
       <>
-        <UpgradePlanDialog
-          open={upgradeOpen}
-          onOpenChange={setUpgradeOpen}
-          selfServiceUpgrade={plano === "free"}
-          onUpgradeSuccess={() => void refetchPlano()}
-        />
+        <UpgradePlanDialog open={upgradeOpen} onOpenChange={setUpgradeOpen} />
         <div className="space-y-8 max-w-lg">
           <PurchasedDomainSelectStep
             domains={purchasedDomains}
@@ -721,12 +716,7 @@ export default function WebsitePage() {
   if (step === "briefing") {
     return (
       <>
-        <UpgradePlanDialog
-          open={upgradeOpen}
-          onOpenChange={setUpgradeOpen}
-          selfServiceUpgrade={plano === "free"}
-          onUpgradeSuccess={() => void refetchPlano()}
-        />
+        <UpgradePlanDialog open={upgradeOpen} onOpenChange={setUpgradeOpen} />
         <div className="space-y-6">
           <div>
             <h1 className="text-2xl font-bold text-foreground">Website — Briefing Completo</h1>
@@ -1220,12 +1210,7 @@ export default function WebsitePage() {
       )}
 
       {dbTemplates.length === 0 && <div className="text-center py-12 text-muted-foreground">Nenhum template disponível no momento.</div>}
-      <UpgradePlanDialog
-        open={upgradeOpen}
-        onOpenChange={setUpgradeOpen}
-        selfServiceUpgrade={plano === "free"}
-        onUpgradeSuccess={() => void refetchPlano()}
-      />
+      <UpgradePlanDialog open={upgradeOpen} onOpenChange={setUpgradeOpen} />
     </div>
   );
 }

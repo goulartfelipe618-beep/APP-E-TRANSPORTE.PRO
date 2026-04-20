@@ -1548,12 +1548,7 @@ export default function GooglePage() {
         onOpenChange={setCreateOpen}
         onSuccess={() => void refreshServicoGoogle()}
       />
-      <UpgradePlanDialog
-        open={upgradeOpen}
-        onOpenChange={setUpgradeOpen}
-        selfServiceUpgrade={plano === "free"}
-        onUpgradeSuccess={() => void refetchPlano()}
-      />
+      <UpgradePlanDialog open={upgradeOpen} onOpenChange={setUpgradeOpen} />
     </div>
   );
 }

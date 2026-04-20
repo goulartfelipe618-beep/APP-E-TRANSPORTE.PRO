@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   Dialog,
   DialogContent,
@@ -155,6 +156,8 @@ export default function SistemaConfiguracoesPage() {
   // Informações Contratuais
   const [contratualEditing, setContratualEditing] = useState(true);
   const [contratualSaved, setContratualSaved] = useState(false);
+  const [possuiCnpj, setPossuiCnpj] = useState<"sim" | "nao">("sim");
+  const [senhaRedefinida, setSenhaRedefinida] = useState(false);
   const [razaoSocial, setRazaoSocial] = useState("");
   const [cnpj, setCnpj] = useState("");
   const [enderecoSede, setEnderecoSede] = useState("");
@@ -227,6 +230,7 @@ export default function SistemaConfiguracoesPage() {
       setTelefoneContratual(d.telefone || "");
       setWhatsappContratual(d.whatsapp || "");
       setEmailOficial(d.email_oficial || "");
+      setPossuiCnpj(d.possui_cnpj === "nao" ? "nao" : "sim");
       setContratualEditing(false);
       setContratualSaved(true);
     }
@@ -265,7 +269,8 @@ export default function SistemaConfiguracoesPage() {
       setNomeProjeto(d.nome_projeto || "E-Transporte.pro");
       setFonteGlobal(d.fonte_global || FONTE_GLOBAL_PADRAO);
       setLogoUrl(d.logo_url || "");
-      if (d.nome_completo && d.telefone && d.email && d.cidade && d.nome_empresa && d.cnpj) {
+      setSenhaRedefinida(Boolean(d.senha_redefinida_em));
+      if (d.nome_completo && d.telefone && d.email && d.cidade && d.estado && d.nome_empresa && d.endereco_completo) {
         setProfileEditing(false);
       }
     } else {
@@ -301,8 +306,16 @@ export default function SistemaConfiguracoesPage() {
   };
 
   const handleSaveProfile = async () => {
-    if (!nomeCompleto.trim() || !email.trim() || !telefone.trim() || !cidade.trim() || !nomeEmpresa.trim() || !cnpjPerfil.trim()) {
-      toast.error("Todos os campos do perfil são obrigatórios!");
+    if (
+      !nomeCompleto.trim() ||
+      !email.trim() ||
+      !telefone.trim() ||
+      !cidade.trim() ||
+      !estado.trim() ||
+      !nomeEmpresa.trim() ||
+      !enderecoCompleto.trim()
+    ) {
+      toast.error("Preencha todos os campos obrigatórios do perfil (CNPJ é opcional).");
       return;
     }
     const ok = await upsertField({
@@ -315,7 +328,9 @@ export default function SistemaConfiguracoesPage() {
       endereco_latitude: enderecoLat,
       endereco_longitude: enderecoLng,
       nome_empresa: nomeEmpresa,
-      cnpj: cnpjPerfil,
+      cnpj: cnpjPerfil.trim() || null,
+      nome_projeto: nomeProjeto.trim() || "E-Transporte.pro",
+      fonte_global: fonteGlobal,
     });
     if (ok) {
       toast.success("Perfil salvo");
@@ -395,12 +410,78 @@ export default function SistemaConfiguracoesPage() {
   };
 
   const handleSaveContratual = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) { toast.error("Não autenticado"); return; }
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      toast.error("Não autenticado");
+      return;
+    }
+
+    if (possuiCnpj === "nao") {
+      const { data: cfg } = await supabase
+        .from("configuracoes" as any)
+        .select("nome_completo, nome_empresa, telefone, email, endereco_completo")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      const cfgRow = cfg as Record<string, string | null> | null;
+      if (!cfgRow?.nome_empresa?.trim() || !cfgRow.telefone?.trim() || !cfgRow.email?.trim() || !cfgRow.endereco_completo?.trim()) {
+        toast.error("Complete e salve o Meu Perfil antes de gravar esta opção.");
+        return;
+      }
+      const payload = {
+        user_id: user.id,
+        nome: "Cabeçalho 1",
+        possui_cnpj: "nao",
+        razao_social: cfgRow.nome_empresa.trim(),
+        cnpj: "—",
+        endereco_sede: cfgRow.endereco_completo.trim(),
+        representante_legal: (cfgRow.nome_completo || "").trim(),
+        logo_contratual_url: logoContratualUrl || null,
+        telefone: cfgRow.telefone.trim(),
+        whatsapp: cfgRow.telefone.trim(),
+        email_oficial: cfgRow.email.trim(),
+        updated_at: new Date().toISOString(),
+      };
+      const { data: existing } = await supabase
+        .from("cabecalho_contratual" as any)
+        .select("id")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      let error;
+      if (existing) {
+        ({ error } = await supabase.from("cabecalho_contratual" as any).update(payload as any).eq("user_id", user.id));
+      } else {
+        ({ error } = await supabase.from("cabecalho_contratual" as any).insert(payload as any));
+      }
+      if (error) {
+        toast.error("Erro ao salvar informações contratuais");
+        return;
+      }
+      toast.success("Contratos usarão os dados do Meu Perfil.");
+      setContratualEditing(false);
+      setContratualSaved(true);
+      window.dispatchEvent(new Event("configuracoes-updated"));
+      return;
+    }
+
+    if (
+      !razaoSocial.trim() ||
+      !cnpj.trim() ||
+      !enderecoSede.trim() ||
+      !representanteLegal.trim() ||
+      !telefoneContratual.trim() ||
+      !whatsappContratual.trim() ||
+      !emailOficial.trim()
+    ) {
+      toast.error("Preencha todos os campos obrigatórios (exceto logotipo contratual).");
+      return;
+    }
 
     const payload = {
       user_id: user.id,
       nome: "Cabeçalho 1",
+      possui_cnpj: "sim",
       razao_social: razaoSocial,
       cnpj,
       endereco_sede: enderecoSede,
@@ -425,7 +506,10 @@ export default function SistemaConfiguracoesPage() {
       ({ error } = await supabase.from("cabecalho_contratual" as any).insert(payload as any));
     }
 
-    if (error) { toast.error("Erro ao salvar informações contratuais"); return; }
+    if (error) {
+      toast.error("Erro ao salvar informações contratuais");
+      return;
+    }
     toast.success("Cabeçalho 1 salvo com sucesso");
     setContratualEditing(false);
     setContratualSaved(true);
@@ -615,6 +699,11 @@ export default function SistemaConfiguracoesPage() {
       }
 
       toast.success("Senha alterada com sucesso.");
+      const okMeta = await upsertField({ senha_redefinida_em: new Date().toISOString() });
+      if (okMeta) {
+        setSenhaRedefinida(true);
+        window.dispatchEvent(new Event("configuracoes-updated"));
+      }
       resetPasswordForm();
       setPasswordDialogOpen(false);
     } finally {
@@ -684,7 +773,7 @@ export default function SistemaConfiguracoesPage() {
             </div>
           </div>
           <div>
-            <label className="text-sm font-medium text-foreground">CNPJ *</label>
+            <label className="text-sm font-medium text-foreground">CNPJ (opcional)</label>
             <Input placeholder="00.000.000/0000-00" className="mt-1" value={cnpjPerfil} onChange={e => setCnpjPerfil(e.target.value)} disabled={!profileEditing} />
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -693,12 +782,12 @@ export default function SistemaConfiguracoesPage() {
               <Input placeholder="Ex: São Paulo" className="mt-1" value={cidade} onChange={e => setCidade(e.target.value)} disabled={!profileEditing} />
             </div>
             <div>
-              <label className="text-sm font-medium text-foreground">Estado</label>
+              <label className="text-sm font-medium text-foreground">Estado (UF) *</label>
               <Input placeholder="Ex: SP" className="mt-1" value={estado} onChange={e => setEstado(e.target.value)} disabled={!profileEditing} />
             </div>
           </div>
           <div>
-            <label className="text-sm font-medium text-foreground">Endereço Completo</label>
+            <label className="text-sm font-medium text-foreground">Endereço completo *</label>
             <p className="text-xs text-muted-foreground mt-0.5 mb-2">
               {isMapboxConfigured()
                 ? "Selecione um endereço na lista para enviar sua localização ao mapa de Abrangência do administrador."
@@ -799,7 +888,10 @@ export default function SistemaConfiguracoesPage() {
             </Button>
           )}
         </div>
-        <p className="text-sm text-muted-foreground mb-4">Altera o nome exibido em todo o sistema (painel, contratos, etc.)</p>
+        <p className="text-sm text-muted-foreground mb-2">Altera o nome exibido em todo o sistema (painel, contratos, etc.)</p>
+        <p className="mb-4 rounded-md border border-amber-500/35 bg-amber-500/10 px-3 py-2 text-xs font-medium text-amber-800 dark:text-amber-200">
+          Observação: este campo é o <strong>NOME GLOBAL DO SISTEMA</strong> (marca visível em contratos, PDF e áreas do painel).
+        </p>
         <div className={`${!nomeProjetoEditing ? "opacity-70 pointer-events-none" : ""}`}>
           <Input value={nomeProjeto} onChange={e => setNomeProjeto(e.target.value)} className="mb-3" disabled={!nomeProjetoEditing} />
         </div>
@@ -864,64 +956,155 @@ export default function SistemaConfiguracoesPage() {
           )}
         </div>
         <p className="text-sm text-muted-foreground mb-2">
-          {contratualSaved ? "Cabeçalho 1" : "Preencha os dados de identificação do motorista/empresa para contratos"}
+          {contratualSaved ? "Cabeçalho dos contratos" : "Defina se possui CNPJ próprio ou se os contratos devem usar o Meu Perfil"}
         </p>
 
         <div className={`space-y-4 ${!contratualEditing ? "opacity-60 pointer-events-none" : ""}`}>
-          <div>
-            <label className="text-sm font-medium text-foreground">Nome Empresarial / Razão Social (igual ao CNPJ) *</label>
-            <Input className="mt-1" placeholder="Razão Social conforme CNPJ" value={razaoSocial} onChange={e => setRazaoSocial(e.target.value)} disabled={!contratualEditing} />
-          </div>
-          <div>
-            <label className="text-sm font-medium text-foreground">CNPJ *</label>
-            <Input className="mt-1" placeholder="00.000.000/0000-00" value={cnpj} onChange={e => setCnpj(e.target.value)} disabled={!contratualEditing} />
-          </div>
-          <div>
-            <label className="text-sm font-medium text-foreground">Endereço da Sede *</label>
-            <Input className="mt-1" placeholder="Rua, número, bairro, cidade - UF" value={enderecoSede} onChange={e => setEnderecoSede(e.target.value)} disabled={!contratualEditing} />
-          </div>
-          <div>
-            <label className="text-sm font-medium text-foreground">Representante Legal (se houver)</label>
-            <Input className="mt-1" placeholder="Nome do representante legal" value={representanteLegal} onChange={e => setRepresentanteLegal(e.target.value)} disabled={!contratualEditing} />
-          </div>
-
-          {/* Logotipo Contratual */}
-          <div>
-            <label className="text-sm font-medium text-foreground">Logotipo Contratual (fundo branco)</label>
-            <div className="bg-muted/30 rounded-lg p-6 flex items-center justify-center mt-1 mb-2 border border-dashed border-border">
-              {logoContratualUrl ? (
-                <img src={logoContratualUrl} alt="Logo Contratual" className="h-14 max-w-[180px] object-contain" />
-              ) : (
-                <FileText className="h-12 w-12 text-muted-foreground" />
-              )}
-            </div>
-            <input ref={logoContratualRef} type="file" accept="image/*" className="hidden" onChange={handleLogoContratualUpload} />
-            {contratualEditing && (
-              <Button variant="outline" size="sm" onClick={() => logoContratualRef.current?.click()} disabled={!!uploadingLogoContratual}>
-                <Upload className="h-4 w-4 mr-2" /> {uploadingLogoContratual ? "Enviando..." : "Enviar Logotipo"}
-              </Button>
+          <div className="space-y-3 rounded-lg border border-border bg-muted/20 p-4">
+            <Label className="text-sm font-medium text-foreground">Possui CNPJ da empresa?</Label>
+            <RadioGroup
+              value={possuiCnpj}
+              onValueChange={(v) => setPossuiCnpj(v as "sim" | "nao")}
+              disabled={!contratualEditing}
+              className="flex flex-wrap gap-6"
+            >
+              <div className="flex items-center gap-2">
+                <RadioGroupItem value="sim" id="contr-cnpj-sim" />
+                <Label htmlFor="contr-cnpj-sim" className="cursor-pointer font-normal">
+                  Sim
+                </Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <RadioGroupItem value="nao" id="contr-cnpj-nao" />
+                <Label htmlFor="contr-cnpj-nao" className="cursor-pointer font-normal">
+                  Não
+                </Label>
+              </div>
+            </RadioGroup>
+            {possuiCnpj === "nao" ? (
+              <p className="text-sm text-muted-foreground">
+                Os contratos passarão a usar automaticamente <strong className="text-foreground">nome da empresa</strong>,{" "}
+                <strong className="text-foreground">endereço completo</strong>, <strong className="text-foreground">telefone</strong> e{" "}
+                <strong className="text-foreground">e-mail</strong> do <strong className="text-foreground">Meu Perfil</strong> (e o seu nome como
+                representante). Guarde para confirmar.
+              </p>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Preencha os campos abaixo. Todos são obrigatórios, exceto o <strong className="text-foreground">logotipo contratual</strong>.
+              </p>
             )}
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {possuiCnpj === "sim" ? (
+            <>
+              <div>
+                <label className="text-sm font-medium text-foreground">Nome Empresarial / Razão Social (igual ao CNPJ) *</label>
+                <Input
+                  className="mt-1"
+                  placeholder="Razão Social conforme CNPJ"
+                  value={razaoSocial}
+                  onChange={(e) => setRazaoSocial(e.target.value)}
+                  disabled={!contratualEditing}
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-foreground">CNPJ *</label>
+                <Input className="mt-1" placeholder="00.000.000/0000-00" value={cnpj} onChange={(e) => setCnpj(e.target.value)} disabled={!contratualEditing} />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-foreground">Endereço da Sede *</label>
+                <Input
+                  className="mt-1"
+                  placeholder="Rua, número, bairro, cidade - UF"
+                  value={enderecoSede}
+                  onChange={(e) => setEnderecoSede(e.target.value)}
+                  disabled={!contratualEditing}
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-foreground">Representante Legal *</label>
+                <Input
+                  className="mt-1"
+                  placeholder="Nome do representante legal"
+                  value={representanteLegal}
+                  onChange={(e) => setRepresentanteLegal(e.target.value)}
+                  disabled={!contratualEditing}
+                />
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-foreground">Logotipo Contratual (opcional — fundo branco)</label>
+                <div className="bg-muted/30 rounded-lg p-6 flex items-center justify-center mt-1 mb-2 border border-dashed border-border">
+                  {logoContratualUrl ? (
+                    <img src={logoContratualUrl} alt="Logo Contratual" className="h-14 max-w-[180px] object-contain" />
+                  ) : (
+                    <FileText className="h-12 w-12 text-muted-foreground" />
+                  )}
+                </div>
+                <input ref={logoContratualRef} type="file" accept="image/*" className="hidden" onChange={handleLogoContratualUpload} />
+                {contratualEditing && (
+                  <Button variant="outline" size="sm" onClick={() => logoContratualRef.current?.click()} disabled={!!uploadingLogoContratual}>
+                    <Upload className="h-4 w-4 mr-2" /> {uploadingLogoContratual ? "Enviando..." : "Enviar Logotipo"}
+                  </Button>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium text-foreground">Telefone *</label>
+                  <Input
+                    className="mt-1"
+                    placeholder="(00) 0000-0000"
+                    value={telefoneContratual}
+                    onChange={(e) => setTelefoneContratual(e.target.value)}
+                    disabled={!contratualEditing}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-foreground">WhatsApp *</label>
+                  <Input
+                    className="mt-1"
+                    placeholder="(00) 00000-0000"
+                    value={whatsappContratual}
+                    onChange={(e) => setWhatsappContratual(e.target.value)}
+                    disabled={!contratualEditing}
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-foreground">E-mail Oficial *</label>
+                <Input
+                  className="mt-1"
+                  placeholder="contato@empresa.com"
+                  value={emailOficial}
+                  onChange={(e) => setEmailOficial(e.target.value)}
+                  disabled={!contratualEditing}
+                />
+              </div>
+            </>
+          ) : (
             <div>
-              <label className="text-sm font-medium text-foreground">Telefone *</label>
-              <Input className="mt-1" placeholder="(00) 0000-0000" value={telefoneContratual} onChange={e => setTelefoneContratual(e.target.value)} disabled={!contratualEditing} />
+              <label className="text-sm font-medium text-foreground">Logotipo nos contratos (opcional)</label>
+              <div className="bg-muted/30 rounded-lg p-6 flex items-center justify-center mt-1 mb-2 border border-dashed border-border">
+                {logoContratualUrl ? (
+                  <img src={logoContratualUrl} alt="Logo Contratual" className="h-14 max-w-[180px] object-contain" />
+                ) : (
+                  <FileText className="h-12 w-12 text-muted-foreground" />
+                )}
+              </div>
+              <input ref={logoContratualRef} type="file" accept="image/*" className="hidden" onChange={handleLogoContratualUpload} />
+              {contratualEditing && (
+                <Button variant="outline" size="sm" onClick={() => logoContratualRef.current?.click()} disabled={!!uploadingLogoContratual}>
+                  <Upload className="h-4 w-4 mr-2" /> {uploadingLogoContratual ? "Enviando..." : "Enviar Logotipo"}
+                </Button>
+              )}
             </div>
-            <div>
-              <label className="text-sm font-medium text-foreground">WhatsApp *</label>
-              <Input className="mt-1" placeholder="(00) 00000-0000" value={whatsappContratual} onChange={e => setWhatsappContratual(e.target.value)} disabled={!contratualEditing} />
-            </div>
-          </div>
-          <div>
-            <label className="text-sm font-medium text-foreground">E-mail Oficial *</label>
-            <Input className="mt-1" placeholder="contato@empresa.com" value={emailOficial} onChange={e => setEmailOficial(e.target.value)} disabled={!contratualEditing} />
-          </div>
+          )}
         </div>
 
         {contratualEditing && (
           <Button className="bg-primary text-primary-foreground mt-4" onClick={handleSaveContratual}>
-            <Save className="h-4 w-4 mr-2" /> Salvar Cabeçalho 1
+            <Save className="h-4 w-4 mr-2" /> {possuiCnpj === "nao" ? "Salvar (usar dados do perfil)" : "Salvar Cabeçalho 1"}
           </Button>
         )}
       </div>
@@ -933,6 +1116,11 @@ export default function SistemaConfiguracoesPage() {
           <h3 className="font-semibold text-foreground">Segurança</h3>
         </div>
         <p className="text-sm text-muted-foreground mb-4">Altere sua senha e configure autenticação em dois fatores</p>
+        {!senhaRedefinida ? (
+          <div className="mb-4 rounded-lg border border-amber-500/45 bg-amber-500/10 px-3 py-2 text-sm text-amber-950 dark:text-amber-100">
+            No <strong>primeiro acesso</strong> é <strong>obrigatório</strong> redefinir a sua senha abaixo («Alteração de Senha»). Depois de guardar, poderá continuar o restante das configurações.
+          </div>
+        ) : null}
         <div className="space-y-3">
           <div className="flex items-center justify-between p-3 rounded-lg border border-border">
             <div>
@@ -944,7 +1132,13 @@ export default function SistemaConfiguracoesPage() {
             </Button>
           </div>
           <div className="flex items-center justify-between p-3 rounded-lg border border-border">
-            <div>
+            <div className="space-y-1.5">
+              <Badge
+                variant="outline"
+                className="border-amber-500/60 bg-amber-500/15 text-[10px] font-bold uppercase tracking-wide text-amber-700 dark:text-amber-300"
+              >
+                Beta
+              </Badge>
               <p className="font-medium text-foreground">Autenticação em 2 Fatores (2FA)</p>
               <p className="text-sm text-muted-foreground">Camada extra de segurança via app autenticador (TOTP)</p>
             </div>
@@ -952,6 +1146,7 @@ export default function SistemaConfiguracoesPage() {
               variant="outline"
               size="sm"
               type="button"
+              className="shrink-0 self-center"
               onClick={() => {
                 setTwoFaDialogOpen(true);
                 startEnrollTwoFa();

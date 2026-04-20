@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { mergeCabecalhoComPerfilSeNecessario } from "@/lib/cabecalhoContratualResolve";
 
 interface CabRow {
   razao_social: string;
@@ -37,12 +38,16 @@ export default function ContratoComoPdfPreview({
     (async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
-      const { data } = await supabase
-        .from("cabecalho_contratual" as any)
-        .select("*")
-        .eq("user_id", user.id)
-        .maybeSingle();
-      if (data) setCab(data as CabRow);
+      const [cabRes, cfgRes] = await Promise.all([
+        supabase.from("cabecalho_contratual" as any).select("*").eq("user_id", user.id).maybeSingle(),
+        supabase
+          .from("configuracoes" as any)
+          .select("nome_completo, nome_empresa, telefone, email, endereco_completo")
+          .eq("user_id", user.id)
+          .maybeSingle(),
+      ]);
+      const merged = mergeCabecalhoComPerfilSeNecessario(cabRes.data as any, cfgRes.data as any);
+      if (merged) setCab(merged as CabRow);
     })();
   }, []);
 

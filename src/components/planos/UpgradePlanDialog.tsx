@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
-import { PLAN_LABELS } from "@/hooks/useUserPlan";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -10,62 +9,86 @@ import { cn } from "@/lib/utils";
 /** Arte oficial FREE vs PRÓ (ficheiro em `public/planos/plano-pro-comparacao.png`). */
 const PLANO_COMPARACAO_SRC = "/planos/plano-pro-comparacao.png";
 
+const MIGRAR_PLANO_PRO_WEBHOOK =
+  "https://n8n.e-transporte.pro/webhook/961260a3-709a-4aba-a810-dbd255875fb3";
+
 interface UpgradePlanDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** Utilizador em FREE: pode confirmar plano PRÓ no painel (remove da fila de solicitações do site, se aplicável). */
-  selfServiceUpgrade?: boolean;
-  onUpgradeSuccess?: () => void;
 }
 
-export default function UpgradePlanDialog({
-  open,
-  onOpenChange,
-  selfServiceUpgrade = false,
-  onUpgradeSuccess,
-}: UpgradePlanDialogProps) {
+export default function UpgradePlanDialog({ open, onOpenChange }: UpgradePlanDialogProps) {
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     if (!open) setSubmitting(false);
   }, [open]);
 
-  const runSelfUpgrade = async () => {
+  const handleMigrar = async () => {
     setSubmitting(true);
     try {
-      const { data, error } = await supabase.functions.invoke("self-upgrade-plan", {
-        body: { plano: "pro" },
+      const {
+        data: { user },
+        error: authErr,
+      } = await supabase.auth.getUser();
+      if (authErr || !user) {
+        toast.error("Sessão inválida. Inicie sessão novamente.");
+        return;
+      }
+
+      const { data: cfg, error: cfgErr } = await supabase
+        .from("configuracoes")
+        .select("nome_completo, email, telefone, nome_empresa, cnpj, endereco_completo")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (cfgErr) {
+        console.error(cfgErr);
+        toast.error("Não foi possível ler as suas configurações.");
+        return;
+      }
+
+      const payload = {
+        user_id: user.id,
+        nome_completo: cfg?.nome_completo ?? "",
+        email: cfg?.email ?? user.email ?? "",
+        telefone: cfg?.telefone ?? "",
+        nome_empresa: cfg?.nome_empresa ?? "",
+        cnpj: cfg?.cnpj ?? "",
+        endereco_completo: cfg?.endereco_completo ?? "",
+        origem: "upgrade_plan_dialog",
+        enviado_em: new Date().toISOString(),
+      };
+
+      const res = await fetch(MIGRAR_PLANO_PRO_WEBHOOK, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
       });
-      if (error) {
-        toast.error(error.message || "Erro ao atualizar plano");
+
+      if (!res.ok) {
+        const t = await res.text().catch(() => "");
+        toast.error(t ? `Erro ao enviar pedido (${res.status})` : `Erro ao enviar pedido (${res.status}).`);
         return;
       }
-      if (data && typeof data === "object" && "error" in data && data.error) {
-        toast.error(String(data.error));
-        return;
-      }
-      toast.success(`Plano atualizado para ${PLAN_LABELS.pro}`);
-      onUpgradeSuccess?.();
+
+      toast.success("Em breve um dos administradores entrará em contato para alterar o seu plano.");
       onOpenChange(false);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Erro ao atualizar plano");
+      console.error(e);
+      toast.error(e instanceof Error ? e.message : "Erro ao enviar o pedido.");
     } finally {
       setSubmitting(false);
     }
   };
 
-  const handleMigrar = () => {
-    toast.info("Em breve um dos administradores entrará em contato para alterar o seu plano.");
-    onOpenChange(false);
-  };
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
+        showCloseButton={false}
         className={cn(
           "max-h-[min(94vh,920px)] w-[min(100vw-1rem,min(92vw,560px))] max-w-[min(100vw-1rem,min(92vw,560px))] gap-0 overflow-hidden p-0 sm:rounded-xl",
           "border-neutral-800 bg-neutral-950",
-          "[&>button]:z-20 [&>button]:text-white [&>button]:opacity-90 [&>button]:hover:opacity-100",
         )}
       >
         <DialogHeader className="sr-only">
@@ -92,42 +115,28 @@ export default function UpgradePlanDialog({
           <div className="flex flex-col gap-2 sm:flex-row sm:justify-center sm:gap-3">
             <Button
               type="button"
-              className="w-full bg-[#FF6600] font-semibold text-white hover:bg-[#e65c00] sm:min-w-[220px] sm:flex-1"
-              onClick={handleMigrar}
+              className="w-full bg-[#FF6600] font-semibold uppercase tracking-wide text-white hover:bg-[#e65c00] sm:min-w-[220px] sm:flex-1"
+              disabled={submitting}
+              onClick={() => void handleMigrar()}
             >
-              Migrar para o plano PRÓ
+              {submitting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> A enviar…
+                </>
+              ) : (
+                "MIGRAR PARA PLANO PRÓ"
+              )}
             </Button>
             <Button
               type="button"
               variant="outline"
               className="w-full border-neutral-600 bg-transparent font-semibold uppercase tracking-wide text-white hover:bg-white/10 sm:min-w-[140px]"
+              disabled={submitting}
               onClick={() => onOpenChange(false)}
             >
               FECHAR
             </Button>
           </div>
-          {selfServiceUpgrade ? (
-            <div className="border-t border-neutral-800 pt-3">
-              <Button
-                type="button"
-                variant="secondary"
-                className="w-full"
-                disabled={submitting}
-                onClick={() => void runSelfUpgrade()}
-              >
-                {submitting ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Confirmando…
-                  </>
-                ) : (
-                  "Confirmar plano PRÓ no painel (pré-cadastro)"
-                )}
-              </Button>
-              <p className="mt-1 text-center text-[11px] text-neutral-500">
-                Passa a constar como cliente com plano PRÓ e sai da fila de pré-cadastro do site, se houver.
-              </p>
-            </div>
-          ) : null}
         </div>
       </DialogContent>
     </Dialog>

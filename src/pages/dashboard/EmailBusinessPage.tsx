@@ -438,12 +438,7 @@ export default function EmailBusinessPage() {
 
   return (
     <div className="space-y-8">
-      <UpgradePlanDialog
-        open={upgradeOpen}
-        onOpenChange={setUpgradeOpen}
-        selfServiceUpgrade={plano === "free"}
-        onUpgradeSuccess={() => void refetchPlano()}
-      />
+      <UpgradePlanDialog open={upgradeOpen} onOpenChange={setUpgradeOpen} />
       {isAdditionalWizard && (
         <div className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-3">
           <p className="text-sm text-foreground">

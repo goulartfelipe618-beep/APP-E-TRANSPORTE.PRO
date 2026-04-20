@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { mergeCabecalhoComPerfilSeNecessario } from "@/lib/cabecalhoContratualResolve";
 import { Building2, Phone, Mail, MapPin, User, FileText } from "lucide-react";
 
 interface CabecalhoData {
@@ -20,12 +21,16 @@ export default function CabecalhoContratual() {
     (async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
-      const { data: d } = await supabase
-        .from("cabecalho_contratual" as any)
-        .select("*")
-        .eq("user_id", user.id)
-        .maybeSingle();
-      if (d) setData(d as any);
+      const [cabRes, cfgRes] = await Promise.all([
+        supabase.from("cabecalho_contratual" as any).select("*").eq("user_id", user.id).maybeSingle(),
+        supabase
+          .from("configuracoes" as any)
+          .select("nome_completo, nome_empresa, telefone, email, endereco_completo")
+          .eq("user_id", user.id)
+          .maybeSingle(),
+      ]);
+      const merged = mergeCabecalhoComPerfilSeNecessario(cabRes.data as any, cfgRes.data as any);
+      if (merged) setData(merged as CabecalhoData);
     })();
   }, []);
 

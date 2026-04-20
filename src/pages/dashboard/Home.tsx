@@ -10,7 +10,6 @@ import {
   AlertTriangle,
   CheckCircle2,
   Settings,
-  CircleDot,
   Home as HomeIcon,
   Bell,
   Activity,
@@ -29,7 +28,7 @@ import {
 } from "lucide-react";
 import { useState, useEffect, useMemo, type LucideIcon } from "react";
 import luxuryCar from "@/assets/luxury-car.jpg";
-import { supabase } from "@/integrations/supabase/client";
+import { useMotoristaOnboarding } from "@/hooks/useMotoristaOnboarding";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import SlideCarousel from "@/components/SlideCarousel";
@@ -183,55 +182,17 @@ function ToolCard({ tool, onOpen }: { tool: ToolDef; onOpen: (page: string) => v
 
 export default function HomePage() {
   const { setActivePage } = useActivePage();
+  const onboarding = useMotoristaOnboarding();
   const { painelMotoristaEvolutionAtivo, ready: painelComunicadorReady } = usePainelMotoristaEvolutionAtivo();
   const exibirComunicadorMotorista = !painelComunicadorReady || painelMotoristaEvolutionAtivo;
   const [networkAceito, setNetworkAceito] = useState<boolean | null>(null);
   const [mostrarRegras, setMostrarRegras] = useState(false);
-  const [primeirosPassosConcluidos, setPrimeirosPassosConcluidos] = useState<boolean | null>(null);
   const [menuNetwork, setMenuNetwork] = useState(() => localStorage.getItem("network_nacional_aceito") === "sim");
-
-  const CAMPOS_PERFIL_OBRIGATORIOS = ["nome_completo", "nome_empresa", "cnpj", "telefone", "email", "cidade"];
-  const CAMPOS_CONTRATUAIS_OBRIGATORIOS = ["razao_social", "cnpj", "endereco_sede", "telefone", "whatsapp", "email_oficial"];
 
   const sections = useMemo(
     () => buildHomeSections(menuNetwork, exibirComunicadorMotorista),
     [menuNetwork, exibirComunicadorMotorista],
   );
-
-  const checkPrimeirosPassos = async () => {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) return;
-
-    const { data: perfilData } = await supabase.from("configuracoes" as any).select("*").eq("user_id", user.id).maybeSingle();
-
-    const { data: contratualData } = await supabase.from("cabecalho_contratual" as any).select("*").eq("user_id", user.id).maybeSingle();
-
-    const perfil = (perfilData || {}) as any;
-    const contratual = (contratualData || {}) as any;
-
-    const perfilCompleto = CAMPOS_PERFIL_OBRIGATORIOS.every((campo) => perfil[campo] && String(perfil[campo]).trim() !== "");
-    const contratualCompleto = CAMPOS_CONTRATUAIS_OBRIGATORIOS.every(
-      (campo) => contratual[campo] && String(contratual[campo]).trim() !== "",
-    );
-
-    setPrimeirosPassosConcluidos(perfilCompleto && contratualCompleto);
-  };
-
-  useEffect(() => {
-    checkPrimeirosPassos();
-
-    const handleConfigUpdate = () => {
-      checkPrimeirosPassos();
-    };
-
-    window.addEventListener("configuracoes-updated", handleConfigUpdate);
-
-    return () => {
-      window.removeEventListener("configuracoes-updated", handleConfigUpdate);
-    };
-  }, []);
 
   useEffect(() => {
     const syncMenuNetwork = () => {
@@ -260,7 +221,7 @@ export default function HomePage() {
     checkNetworkStatus();
     window.addEventListener("network-status-changed", syncMenuNetwork);
     return () => window.removeEventListener("network-status-changed", syncMenuNetwork);
-  }, []);
+  }, [onboarding.phase1Complete]);
 
   const handleAceitarNetwork = () => {
     setMostrarRegras(true);
@@ -277,6 +238,7 @@ export default function HomePage() {
     setMenuNetwork(true);
     setMostrarRegras(false);
     window.dispatchEvent(new Event("network-status-changed"));
+    window.dispatchEvent(new Event("configuracoes-updated"));
   };
 
   const handleRecusarNetwork = async () => {
@@ -288,74 +250,14 @@ export default function HomePage() {
     setNetworkAceito(false);
     setMenuNetwork(false);
     window.dispatchEvent(new Event("network-status-changed"));
+    window.dispatchEvent(new Event("configuracoes-updated"));
   };
 
   const go = (page: string) => setActivePage(page);
 
-  return (
-    <div className="space-y-10 pb-8">
-      <SlideCarousel
-        pagina="home"
-        fallbackSlides={[
-          {
-            titulo: "Impulsione seu Transporte Executivo",
-            subtitulo: "Gerencie sua frota, motoristas e corridas com tecnologia de ponta.",
-            imagem_url: luxuryCar,
-          },
-        ]}
-      />
-
-      {/* Intro estilo landing, alinhada ao layout do sistema */}
-      <div className="rounded-2xl border border-border/80 bg-gradient-to-b from-card to-card/40 px-6 py-8 shadow-sm sm:px-10">
-        <div className="mx-auto max-w-3xl text-center">
-          <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-border bg-muted/50 px-3 py-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-            <HomeIcon className="h-3.5 w-3.5 text-primary" aria-hidden />
-            Início
-          </div>
-          <h1 className="text-balance text-2xl font-bold tracking-tight text-foreground sm:text-3xl">Central da sua operação</h1>
-          <p className="mt-3 text-pretty text-muted-foreground sm:text-lg">
-            Acesse abaixo todas as áreas do painel — mesma estrutura do menu lateral — com atalhos diretos para cada ferramenta.
-          </p>
-        </div>
-      </div>
-
-      {primeirosPassosConcluidos === false && (
-        <div className="space-y-4 rounded-xl border-2 border-amber-500/50 bg-card p-6">
-          <div className="flex items-center gap-3">
-            <div className="rounded-xl bg-amber-500/10 p-3">
-              <Settings className="h-6 w-6 text-amber-500" />
-            </div>
-            <div>
-              <h3 className="text-lg font-bold text-foreground">Primeiros passos</h3>
-              <p className="text-sm text-muted-foreground">Complete as etapas abaixo para começar a usar a plataforma</p>
-            </div>
-          </div>
-          <div className="space-y-3">
-            <div
-              className="flex cursor-pointer items-center gap-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 transition-colors hover:bg-amber-500/10"
-              onClick={() => setActivePage("sistema/configuracoes")}
-              onKeyDown={(e) => e.key === "Enter" && setActivePage("sistema/configuracoes")}
-              role="button"
-              tabIndex={0}
-            >
-              <div className="rounded-full border-2 border-amber-500 p-1.5">
-                <CircleDot className="h-4 w-4 text-amber-500" />
-              </div>
-              <div className="flex-1">
-                <p className="text-sm font-semibold text-foreground">Preencha suas configurações</p>
-                <p className="text-xs text-muted-foreground">
-                  Acesse Sistema → Configurações e preencha todos os campos obrigatórios (nome, empresa, CNPJ, telefone, e-mail, endereço, cidade e estado).
-                </p>
-              </div>
-              <Badge variant="outline" className="border-amber-500/50 text-amber-500">
-                Pendente
-              </Badge>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {networkAceito === null && !mostrarRegras && (
+  const networkBloco = (
+    <>
+      {!onboarding.loading && onboarding.phase1Complete && networkAceito === null && !mostrarRegras && (
         <div className="space-y-4 rounded-xl border-2 border-primary/50 bg-card p-6">
           <div className="flex items-center gap-3">
             <div className="rounded-xl bg-primary/10 p-3">
@@ -369,7 +271,7 @@ export default function HomePage() {
           <p className="text-sm leading-relaxed text-muted-foreground">
             Deseja fazer parte do sistema de <strong className="text-foreground">Network Nacional</strong> da E-Transporte.pro? Ao participar, você poderá receber solicitações de atendimento corporativo de empresas parceiras em sua região.
           </p>
-          <div className="flex gap-3">
+          <div className="flex flex-wrap gap-3">
             <Button onClick={handleAceitarNetwork} className="bg-primary text-primary-foreground">
               <CheckCircle2 className="mr-2 h-4 w-4" /> Sim, quero participar
             </Button>
@@ -380,7 +282,7 @@ export default function HomePage() {
         </div>
       )}
 
-      {mostrarRegras && (
+      {!onboarding.loading && onboarding.phase1Complete && mostrarRegras && (
         <div className="space-y-5 rounded-xl border-2 border-destructive/50 bg-card p-6">
           <div className="flex items-center gap-3">
             <div className="rounded-xl bg-destructive/10 p-3">
@@ -433,7 +335,7 @@ export default function HomePage() {
             </div>
           </div>
 
-          <div className="flex gap-3 pt-2">
+          <div className="flex flex-wrap gap-3 pt-2">
             <Button onClick={handleConfirmarRegras} className="bg-primary text-primary-foreground">
               <CheckCircle2 className="mr-2 h-4 w-4" /> Li e aceito todos os termos
             </Button>
@@ -449,7 +351,7 @@ export default function HomePage() {
         </div>
       )}
 
-      {networkAceito === true && (
+      {!onboarding.loading && onboarding.phase1Complete && networkAceito === true && (
         <div className="flex items-center gap-3 rounded-xl border border-primary/30 bg-primary/5 p-4">
           <CheckCircle2 className="h-5 w-5 shrink-0 text-primary" />
           <div>
@@ -459,8 +361,8 @@ export default function HomePage() {
         </div>
       )}
 
-      {networkAceito === false && (
-        <div className="flex items-center justify-between rounded-xl border border-border bg-muted/30 p-4">
+      {!onboarding.loading && onboarding.phase1Complete && networkAceito === false && (
+        <div className="flex flex-col gap-3 rounded-xl border border-border bg-muted/30 p-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
             <Users className="h-5 w-5 text-muted-foreground" />
             <p className="text-sm text-muted-foreground">Você optou por não participar do Network Nacional.</p>
@@ -479,12 +381,78 @@ export default function HomePage() {
               setNetworkAceito(null);
               setMenuNetwork(false);
               window.dispatchEvent(new Event("network-status-changed"));
+              window.dispatchEvent(new Event("configuracoes-updated"));
             }}
           >
             Reconsiderar
           </Button>
         </div>
       )}
+    </>
+  );
+
+  return (
+    <div className="space-y-10 pb-8">
+      {!onboarding.loading && onboarding.phase1Complete && !onboarding.networkChosen ? (
+        <div className="space-y-3">
+          <h2 className="text-lg font-bold text-foreground">Passo seguinte: Network Nacional</h2>
+          <p className="text-sm text-muted-foreground">
+            Confirme abaixo se deseja integrar o programa. Esta escolha é necessária para liberar o restante do painel.
+          </p>
+          {networkBloco}
+        </div>
+      ) : null}
+
+      {!onboarding.loading && !onboarding.phase1Complete ? (
+        <div className="space-y-4 rounded-xl border-2 border-amber-500/50 bg-card p-6">
+          <div className="flex items-center gap-3">
+            <div className="rounded-xl bg-amber-500/10 p-3">
+              <Settings className="h-6 w-6 text-amber-500" />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-foreground">Configurações obrigatórias</h3>
+              <p className="text-sm text-muted-foreground">
+                Conclua <strong className="text-foreground">Sistema → Configurações</strong> (Meu Perfil, Nome do projeto, Contratual, Segurança com redefinição de senha) antes de utilizar o painel.
+              </p>
+            </div>
+          </div>
+          {onboarding.pendencias.length > 0 ? (
+            <ul className="list-inside list-disc space-y-1 text-sm text-muted-foreground">
+              {onboarding.pendencias.map((p) => (
+                <li key={p}>{p}</li>
+              ))}
+            </ul>
+          ) : null}
+          <Button className="bg-primary text-primary-foreground" onClick={() => setActivePage("sistema/configuracoes")}>
+            Ir para Configurações
+          </Button>
+        </div>
+      ) : null}
+
+      <SlideCarousel
+        pagina="home"
+        fallbackSlides={[
+          {
+            titulo: "Impulsione seu Transporte Executivo",
+            subtitulo: "Gerencie sua frota, motoristas e corridas com tecnologia de ponta.",
+            imagem_url: luxuryCar,
+          },
+        ]}
+      />
+
+      {/* Intro estilo landing, alinhada ao layout do sistema */}
+      <div className="rounded-2xl border border-border/80 bg-gradient-to-b from-card to-card/40 px-6 py-8 shadow-sm sm:px-10">
+        <div className="mx-auto max-w-3xl text-center">
+          <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-border bg-muted/50 px-3 py-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            <HomeIcon className="h-3.5 w-3.5 text-primary" aria-hidden />
+            Início
+          </div>
+          <h1 className="text-balance text-2xl font-bold tracking-tight text-foreground sm:text-3xl">Central da sua operação</h1>
+          <p className="mt-3 text-pretty text-muted-foreground sm:text-lg">
+            Acesse abaixo todas as áreas do painel — mesma estrutura do menu lateral — com atalhos diretos para cada ferramenta.
+          </p>
+        </div>
+      </div>
 
       {/* Mapa completo de ferramentas — espelha o menu lateral */}
       <div className="space-y-12">
