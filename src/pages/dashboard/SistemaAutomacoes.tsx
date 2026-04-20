@@ -17,8 +17,6 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import FerramentasDevDialog from "@/components/automacoes/FerramentasDevDialog";
 import { ConfirmDeleteDialog } from "@/components/ConfirmDeleteDialog";
-import { useUserPlan } from "@/hooks/useUserPlan";
-import UpgradePlanDialog from "@/components/planos/UpgradePlanDialog";
 
 type DeleteIntent =
   | { kind: "automacao"; id: string }
@@ -179,8 +177,6 @@ export default function SistemaAutomacoesPage() {
   const [newCampaignField, setNewCampaignField] = useState("");
   const [campaignFieldLocked, setCampaignFieldLocked] = useState(false);
   const [campaignMeta, setCampaignMeta] = useState<any>(null);
-  const { plano, refetch: refetchPlano } = useUserPlan();
-  const [upgradePlanOpen, setUpgradePlanOpen] = useState(false);
 
   const fetchAutomacoes = useCallback(async () => {
     const { data, error } = await supabase
@@ -727,15 +723,7 @@ export default function SistemaAutomacoesPage() {
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="icon" onClick={fetchAutomacoes}><RefreshCw className="h-4 w-4" /></Button>
-          <Button
-            onClick={() => {
-              if (plano === "free") {
-                setUpgradePlanOpen(true);
-                return;
-              }
-              setOpen(true);
-            }}
-          >
+          <Button onClick={() => setOpen(true)}>
             <Plus className="h-4 w-4 mr-2" /> Nova Automação
           </Button>
         </div>
@@ -902,7 +890,6 @@ export default function SistemaAutomacoesPage() {
         loading={deleteBusy}
       />
 
-      <UpgradePlanDialog open={upgradePlanOpen} onOpenChange={setUpgradePlanOpen} />
     </div>
   );
 }

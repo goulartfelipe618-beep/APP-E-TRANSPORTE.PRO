@@ -25,6 +25,7 @@ export const FROTA_FREE_PAGE_IDS = new Set<string>([
   "marketing/qrcode",
   "comunidade",
   "sistema/configuracoes",
+  "sistema/automacoes",
   "anotacoes",
   "tickets",
 ]);
