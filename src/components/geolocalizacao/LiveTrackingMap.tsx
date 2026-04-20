@@ -173,12 +173,7 @@ export default function LiveTrackingMap({
     [],
   );
 
-  // ----------------------------------------------
-  // Auto-swap: se a corrida está concluída → card
-  // ----------------------------------------------
-  if (rastreio?.status === "concluida") {
-    return <ResumoViagemCard rastreio={rastreio} className={className} />;
-  }
+  const corridaConcluida = rastreio?.status === "concluida";
 
   // ----------------------------------------------
   // Estado do sinal (para cor do marker + HUD)
@@ -210,6 +205,9 @@ export default function LiveTrackingMap({
     : sinalPerdido
       ? "perdido"
       : "ativo";
+  // Sempre executar este hook (mesmo quando vamos mostrar o resumo) — um return
+  // antecipado aqui violava as Rules of Hooks e podia corromper reconciliação
+  // (erros removeChild/insertBefore ao alternar mapa ↔ resumo ou com Leaflet).
   const markerIcon = useMemo(() => makeVehicleIcon(markerVariant), [markerVariant]);
 
   // HUD:
@@ -235,6 +233,10 @@ export default function LiveTrackingMap({
     return { label: "A ligar...", tone: "loading" as const, Icon: Loader2 };
   })();
   const HudIcon = hud.Icon;
+
+  if (corridaConcluida && rastreio) {
+    return <ResumoViagemCard rastreio={rastreio} className={className} />;
+  }
 
   return (
     <div

@@ -11,6 +11,7 @@ import { NetworkSpotlightProvider } from "@/contexts/NetworkSpotlightContext";
 import { hydrateNetworkNacionalFromDb, persistNetworkHighlightDismissed } from "@/lib/networkNacionalPrefs";
 import { usePainelMotoristaEvolutionAtivo } from "@/hooks/usePainelMotoristaEvolutionAtivo";
 import { useMotoristaOnboarding } from "@/hooks/useMotoristaOnboarding";
+import { usePainelErrorReporter } from "@/hooks/usePainelErrorReporter";
 
 // Import all page components
 import HomePage from "@/pages/dashboard/Home";
@@ -95,6 +96,7 @@ function readNetworkSpotlightActive() {
 }
 
 function DashboardContent() {
+  usePainelErrorReporter("motorista_executivo", "etp_nav_dashboard");
   const { activePage, setActivePage } = useActivePage();
   const onboarding = useMotoristaOnboarding();
   const { painelMotoristaEvolutionAtivo, ready: painelComunicadorReady } = usePainelMotoristaEvolutionAtivo();

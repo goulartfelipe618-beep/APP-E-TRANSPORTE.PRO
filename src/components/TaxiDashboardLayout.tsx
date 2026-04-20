@@ -20,6 +20,7 @@ import TicketsPage from "@/pages/dashboard/TicketsPage";
 import TaxiCommunityPage from "@/pages/taxi/TaxiCommunityPage";
 import PainelAvisoBanner from "@/components/PainelAvisoBanner";
 import FullscreenBannerOverlay from "@/components/FullscreenBannerOverlay";
+import { usePainelErrorReporter } from "@/hooks/usePainelErrorReporter";
 
 const PAGE_MAP: Record<string, React.ComponentType> = {
   home: TaxiHome,
@@ -36,6 +37,7 @@ const PAGE_MAP: Record<string, React.ComponentType> = {
 };
 
 function TaxiContent() {
+  usePainelErrorReporter("taxi", "etp_nav_taxi");
   const { activePage } = useActivePage();
   const PageComponent = PAGE_MAP[activePage] || TaxiHome;
 

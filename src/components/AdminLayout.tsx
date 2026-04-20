@@ -27,6 +27,8 @@ import AdminEmptyLegsPage from "@/pages/admin/AdminEmptyLegsPage";
 import AdminCommunityPage from "@/pages/admin/AdminCommunityPage";
 import DominiosPage from "@/pages/dashboard/DominiosPage";
 import AdminAvisosPage from "@/pages/admin/AdminAvisosPage";
+import AdminLogsPage from "@/pages/admin/AdminLogsPage";
+import { usePainelErrorReporter } from "@/hooks/usePainelErrorReporter";
 
 const PAGE_MAP: Record<string, React.ComponentType> = {
   metricas: AdminMetricasPage,
@@ -49,9 +51,11 @@ const PAGE_MAP: Record<string, React.ComponentType> = {
   mentoria: AdminMentoriaPage,
   "empty-legs": AdminEmptyLegsPage,
   dominios: DominiosPage,
+  logs: AdminLogsPage,
 };
 
 function AdminContent() {
+  usePainelErrorReporter("admin_master", "etp_nav_admin");
   const { activePage } = useActivePage();
   const { config } = useConfiguracoes();
   const mainRef = useRef<HTMLElement>(null);

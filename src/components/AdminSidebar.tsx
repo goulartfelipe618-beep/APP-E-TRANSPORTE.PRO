@@ -1,5 +1,5 @@
 import {
-  SlidersHorizontal, LogOut, Shield, BarChart3, MapPin, FileText, ChevronDown, Users, ClipboardList, Building2, LayoutTemplate, Bell, Moon, Sun, Settings, StickyNote, MessageSquare, Zap, GraduationCap, Plane, Megaphone, Link2,
+  SlidersHorizontal, LogOut, Shield, BarChart3, MapPin, FileText, ChevronDown, Users, ClipboardList, Building2, LayoutTemplate, Bell, Moon, Sun, Settings, StickyNote, MessageSquare, Zap, GraduationCap, Plane, Megaphone, Link2, ScrollText,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -38,6 +38,7 @@ const usuariosChildren = [
 ];
 
 const sistemaChildren = [
+  { title: "Logs do painel", page: "logs", icon: ScrollText },
   { title: "Configurações", page: "sistema/configuracoes", icon: Settings },
   { title: "Automações", page: "sistema/automacoes", icon: Zap },
   { title: "Comunicador", page: "sistema/comunicador", icon: MessageSquare },

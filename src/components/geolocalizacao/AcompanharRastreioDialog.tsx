@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Eye, Loader2, MapPin, Radio } from "lucide-react";
 import {
   Dialog,
@@ -38,7 +38,44 @@ export default function AcompanharRastreioDialog({
   onClose,
   onStatusChanged,
 }: AcompanharRastreioDialogProps) {
-  const open = !!rastreio;
+  /**
+   * `open` do Radix desligado logo ao fechar, enquanto o pai ainda tem `rastreio`
+   * até ao timeout — evita condição de corrida Leaflet↔portal (removeChild).
+   */
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [mapMounted, setMapMounted] = useState(true);
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useLayoutEffect(() => {
+    if (closeTimerRef.current) {
+      clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
+    }
+    if (!rastreio?.id) {
+      setDialogOpen(false);
+      setMapMounted(false);
+      return;
+    }
+    setDialogOpen(true);
+    setMapMounted(true);
+  }, [rastreio?.id]);
+
+  useEffect(
+    () => () => {
+      if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
+    },
+    [],
+  );
+
+  const scheduleParentClose = () => {
+    setDialogOpen(false);
+    setMapMounted(false);
+    if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
+    closeTimerRef.current = setTimeout(() => {
+      closeTimerRef.current = null;
+      onClose();
+    }, 200);
+  };
 
   // Subscrever para fechar automaticamente / notificar quando o dono encerra
   useEffect(() => {
@@ -69,7 +106,7 @@ export default function AcompanharRastreioDialog({
   const clienteIniciou = rastreio?.iniciado_em_dispositivo != null;
 
   return (
-    <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
+    <Dialog open={dialogOpen} onOpenChange={(o) => { if (!o) scheduleParentClose(); }}>
       <DialogContent className="max-w-4xl p-0 gap-0 overflow-hidden">
         <DialogHeader className="px-5 py-4 border-b border-border">
           <DialogTitle className="flex items-center gap-2 flex-wrap">
@@ -108,6 +145,10 @@ export default function AcompanharRastreioDialog({
               <Loader2 className="h-5 w-5 animate-spin mr-2" />
               A carregar…
             </div>
+          ) : !mapMounted ? (
+            <div className="flex items-center justify-center py-20 text-muted-foreground text-sm">
+              A fechar mapa…
+            </div>
           ) : (
             <PainelGeolocalizador
               rastreioId={rastreio.id}
@@ -119,7 +160,7 @@ export default function AcompanharRastreioDialog({
         </div>
 
         <div className="px-5 py-3 border-t border-border flex justify-end">
-          <Button variant="outline" onClick={onClose}>Fechar</Button>
+          <Button variant="outline" onClick={scheduleParentClose}>Fechar</Button>
         </div>
       </DialogContent>
     </Dialog>

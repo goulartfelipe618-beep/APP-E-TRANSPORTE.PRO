@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
+import { isPainelErrorReporterActive, reportPainelError } from "@/lib/painelErrorReporter";
 
 type Props = { children: ReactNode };
 type State = { hasError: boolean; message?: string };
@@ -13,6 +14,14 @@ export class AppErrorBoundary extends Component<Props, State> {
   public componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
     if (import.meta.env.DEV) {
       console.error("[AppErrorBoundary]", error, errorInfo.componentStack);
+    }
+    if (isPainelErrorReporterActive()) {
+      void reportPainelError({
+        kind: "react_boundary",
+        message: error.message || "React error boundary",
+        stack: error.stack ?? null,
+        componentStack: errorInfo.componentStack ?? null,
+      });
     }
   }
 
