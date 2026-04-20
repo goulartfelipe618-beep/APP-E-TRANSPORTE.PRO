@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
-import { Plus, RefreshCw, Trash2, Eye, MessageSquare, Download } from "lucide-react";
+import { Plus, RefreshCw, Trash2, Eye, MessageSquare, Download, Pencil } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import CriarReservaTransferDialog from "@/components/transfer/CriarReservaTransferDialog";
@@ -22,6 +22,7 @@ const tipoLabel: Record<string, string> = {
 
 export default function TransferReservasPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [reservaEdicao, setReservaEdicao] = useState<Reserva | null>(null);
   const [reservas, setReservas] = useState<Reserva[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Reserva | null>(null);
@@ -77,7 +78,13 @@ export default function TransferReservasPage() {
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="icon" onClick={fetchReservas}><RefreshCw className="h-4 w-4" /></Button>
-          <Button className="bg-primary text-primary-foreground" onClick={() => setDialogOpen(true)}>
+          <Button
+            className="bg-primary text-primary-foreground"
+            onClick={() => {
+              setReservaEdicao(null);
+              setDialogOpen(true);
+            }}
+          >
             <Plus className="h-4 w-4 mr-2" /> Criar Reserva
           </Button>
         </div>
@@ -100,7 +107,7 @@ export default function TransferReservasPage() {
                 <TableHead>Data</TableHead>
                 <TableHead>Valor</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead className="w-[140px]">Ações</TableHead>
+                <TableHead className="w-[180px]">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -121,6 +128,17 @@ export default function TransferReservasPage() {
                   <TableCell><Badge variant="outline">{r.status}</Badge></TableCell>
                   <TableCell>
                     <div className="flex gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => {
+                          setReservaEdicao(r);
+                          setDialogOpen(true);
+                        }}
+                        title="Editar"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
                       <Button variant="ghost" size="icon" onClick={() => { setSelected(r); setSheetOpen(true); }} title="Ver detalhes">
                         <Eye className="h-4 w-4" />
                       </Button>
@@ -142,7 +160,15 @@ export default function TransferReservasPage() {
         )}
       </div>
 
-      <CriarReservaTransferDialog open={dialogOpen} onOpenChange={setDialogOpen} onCreated={fetchReservas} />
+      <CriarReservaTransferDialog
+        open={dialogOpen}
+        onOpenChange={(o) => {
+          setDialogOpen(o);
+          if (!o) setReservaEdicao(null);
+        }}
+        onCreated={fetchReservas}
+        reservaEdicao={reservaEdicao}
+      />
 
       <DetalhesReservaTransferSheet
         reserva={selected}

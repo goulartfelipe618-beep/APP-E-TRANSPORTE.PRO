@@ -9,6 +9,24 @@ import { Separator } from "@/components/ui/separator";
 import { ArrowLeftRight, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import type { Tables } from "@/integrations/supabase/types";
+
+function toDateInput(v: string | null | undefined): string {
+  if (!v) return "";
+  const s = String(v).trim();
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+  const d = new Date(s);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toISOString().slice(0, 10);
+}
+
+function toTimeInput(v: string | null | undefined): string {
+  if (!v) return "";
+  const s = String(v).trim();
+  const m = s.match(/(\d{1,2}):(\d{2})/);
+  if (!m) return "";
+  return `${m[1].padStart(2, "0")}:${m[2]}`;
+}
 
 export interface TransferInitialData {
   nome_completo?: string;
@@ -47,12 +65,19 @@ interface CriarReservaTransferDialogProps {
   onOpenChange: (open: boolean) => void;
   onCreated?: () => void;
   initialData?: TransferInitialData | null;
+  reservaEdicao?: Tables<"reservas_transfer"> | null;
 }
 
 type TipoViagem = "somente_ida" | "ida_volta" | "por_hora";
 type QuemViaja = "motorista" | "eu_mesmo";
 
-export default function CriarReservaTransferDialog({ open, onOpenChange, onCreated, initialData }: CriarReservaTransferDialogProps) {
+export default function CriarReservaTransferDialog({
+  open,
+  onOpenChange,
+  onCreated,
+  initialData,
+  reservaEdicao = null,
+}: CriarReservaTransferDialogProps) {
   const [tipoViagem, setTipoViagem] = useState<TipoViagem>("somente_ida");
   const [quemViaja, setQuemViaja] = useState<QuemViaja>("motorista");
   const [valorBase, setValorBase] = useState("0");
@@ -97,9 +122,49 @@ export default function CriarReservaTransferDialog({ open, onOpenChange, onCreat
 
   const valorTotalFormatted = valorTotalNum.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
-  // Pre-fill from solicitação data
+  // Pre-fill from edição, solicitação ou reset
   useEffect(() => {
-    if (open && initialData) {
+    if (!open) return;
+
+    if (reservaEdicao) {
+      const row = reservaEdicao;
+      setNomeCompleto(row.nome_completo ?? "");
+      setCpfCnpj(row.cpf_cnpj ?? "");
+      setEmail(row.email ?? "");
+      setTelefone(row.telefone ?? "");
+      const tv = row.tipo_viagem;
+      setTipoViagem(tv === "ida_volta" || tv === "por_hora" ? tv : "somente_ida");
+      setQuemViaja(row.quem_viaja === "eu_mesmo" ? "eu_mesmo" : "motorista");
+      setIdaEmbarque(row.ida_embarque ?? "");
+      setIdaDesembarque(row.ida_desembarque ?? "");
+      setIdaData(toDateInput(row.ida_data));
+      setIdaHora(toTimeInput(row.ida_hora));
+      setIdaPassageiros(row.ida_passageiros != null ? String(row.ida_passageiros) : "");
+      setIdaCupom(row.ida_cupom ?? "");
+      setIdaMensagem(row.ida_mensagem ?? "");
+      setVoltaEmbarque(row.volta_embarque ?? "");
+      setVoltaDesembarque(row.volta_desembarque ?? "");
+      setVoltaData(toDateInput(row.volta_data));
+      setVoltaHora(toTimeInput(row.volta_hora));
+      setVoltaPassageiros(row.volta_passageiros != null ? String(row.volta_passageiros) : "");
+      setVoltaCupom(row.volta_cupom ?? "");
+      setVoltaMensagem(row.volta_mensagem ?? "");
+      setPorHoraEnderecoInicio(row.por_hora_endereco_inicio ?? "");
+      setPorHoraPontoEncerramento(row.por_hora_ponto_encerramento ?? "");
+      setPorHoraData(toDateInput(row.por_hora_data));
+      setPorHoraHora(toTimeInput(row.por_hora_hora));
+      setPorHoraPassageiros(row.por_hora_passageiros != null ? String(row.por_hora_passageiros) : "");
+      setPorHoraQtdHoras(row.por_hora_qtd_horas != null ? String(row.por_hora_qtd_horas) : "");
+      setPorHoraCupom(row.por_hora_cupom ?? "");
+      setPorHoraItinerario(row.por_hora_itinerario ?? "");
+      setValorBase(String(row.valor_base ?? 0));
+      setDesconto(String(row.desconto ?? 0));
+      setMetodoPagamento(row.metodo_pagamento ?? "");
+      setObservacoes(row.observacoes ?? "");
+      return;
+    }
+
+    if (initialData) {
       setNomeCompleto(initialData.nome_completo || "");
       setTelefone(initialData.contato || "");
       setEmail(initialData.email || "");
@@ -111,7 +176,6 @@ export default function CriarReservaTransferDialog({ open, onOpenChange, onCreat
       setIdaCupom(initialData.cupom || "");
       setIdaMensagem(initialData.mensagem || "");
       setObservacoes(initialData.mensagem || "");
-      // Volta
       setVoltaEmbarque(initialData.volta_embarque || "");
       setVoltaDesembarque(initialData.volta_desembarque || "");
       setVoltaData(initialData.volta_data || "");
@@ -119,7 +183,6 @@ export default function CriarReservaTransferDialog({ open, onOpenChange, onCreat
       setVoltaPassageiros(initialData.volta_passageiros?.toString() || "");
       setVoltaCupom(initialData.volta_cupom || "");
       setVoltaMensagem(initialData.volta_mensagem || "");
-      // Por hora
       setPorHoraEnderecoInicio(initialData.por_hora_endereco_inicio || "");
       setPorHoraPontoEncerramento(initialData.por_hora_ponto_encerramento || "");
       setPorHoraData(initialData.por_hora_data || "");
@@ -133,9 +196,11 @@ export default function CriarReservaTransferDialog({ open, onOpenChange, onCreat
         const tipoMap: Record<string, TipoViagem> = { ida: "somente_ida", somente_ida: "somente_ida", ida_volta: "ida_volta", por_hora: "por_hora" };
         setTipoViagem(tipoMap[initialData.tipo] || "somente_ida");
       }
+      return;
     }
-    if (open && !initialData) resetForm();
-  }, [open, initialData]);
+
+    resetForm();
+  }, [open, initialData, reservaEdicao]);
 
   const resetForm = () => {
     setNomeCompleto(""); setCpfCnpj(""); setEmail(""); setTelefone("");
@@ -157,8 +222,7 @@ export default function CriarReservaTransferDialog({ open, onOpenChange, onCreat
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { toast.error("Você precisa estar logado."); setSaving(false); return; }
 
-    const { error } = await supabase.from("reservas_transfer").insert({
-      user_id: user.id,
+    const rowPayload = {
       nome_completo: nomeCompleto,
       cpf_cnpj: cpfCnpj,
       email,
@@ -169,22 +233,22 @@ export default function CriarReservaTransferDialog({ open, onOpenChange, onCreat
       ida_desembarque: idaDesembarque || null,
       ida_data: idaData || null,
       ida_hora: idaHora || null,
-      ida_passageiros: idaPassageiros ? parseInt(idaPassageiros) : null,
+      ida_passageiros: idaPassageiros ? parseInt(idaPassageiros, 10) : null,
       ida_cupom: idaCupom || null,
       ida_mensagem: idaMensagem || null,
       volta_embarque: voltaEmbarque || null,
       volta_desembarque: voltaDesembarque || null,
       volta_data: voltaData || null,
       volta_hora: voltaHora || null,
-      volta_passageiros: voltaPassageiros ? parseInt(voltaPassageiros) : null,
+      volta_passageiros: voltaPassageiros ? parseInt(voltaPassageiros, 10) : null,
       volta_cupom: voltaCupom || null,
       volta_mensagem: voltaMensagem || null,
       por_hora_endereco_inicio: porHoraEnderecoInicio || null,
       por_hora_ponto_encerramento: porHoraPontoEncerramento || null,
       por_hora_data: porHoraData || null,
       por_hora_hora: porHoraHora || null,
-      por_hora_passageiros: porHoraPassageiros ? parseInt(porHoraPassageiros) : null,
-      por_hora_qtd_horas: porHoraQtdHoras ? parseInt(porHoraQtdHoras) : null,
+      por_hora_passageiros: porHoraPassageiros ? parseInt(porHoraPassageiros, 10) : null,
+      por_hora_qtd_horas: porHoraQtdHoras ? parseInt(porHoraQtdHoras, 10) : null,
       por_hora_cupom: porHoraCupom || null,
       por_hora_itinerario: porHoraItinerario || null,
       valor_base: parseFloat(valorBase) || 0,
@@ -192,13 +256,17 @@ export default function CriarReservaTransferDialog({ open, onOpenChange, onCreat
       valor_total: valorTotalNum,
       metodo_pagamento: metodoPagamento || null,
       observacoes: observacoes || null,
-    });
+    };
+
+    const { error } = reservaEdicao?.id
+      ? await supabase.from("reservas_transfer").update(rowPayload).eq("id", reservaEdicao.id)
+      : await supabase.from("reservas_transfer").insert({ user_id: user.id, ...rowPayload });
 
     setSaving(false);
     if (error) {
-      toast.error("Erro ao criar reserva: " + error.message);
+      toast.error(reservaEdicao?.id ? "Erro ao atualizar reserva: " + error.message : "Erro ao criar reserva: " + error.message);
     } else {
-      toast.success("Reserva criada com sucesso!");
+      toast.success(reservaEdicao?.id ? "Reserva atualizada com sucesso!" : "Reserva criada com sucesso!");
       resetForm();
       onOpenChange(false);
       onCreated?.();
@@ -209,8 +277,10 @@ export default function CriarReservaTransferDialog({ open, onOpenChange, onCreat
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Criar Nova Reserva</DialogTitle>
-          <p className="text-sm text-muted-foreground">Preencha os dados para criar uma nova reserva manual.</p>
+          <DialogTitle>{reservaEdicao ? "Editar reserva" : "Criar Nova Reserva"}</DialogTitle>
+          <p className="text-sm text-muted-foreground">
+            {reservaEdicao ? "Altere os campos e guarde as alterações." : "Preencha os dados para criar uma nova reserva manual."}
+          </p>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -365,7 +435,7 @@ export default function CriarReservaTransferDialog({ open, onOpenChange, onCreat
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
             <Button type="submit" className="bg-primary text-primary-foreground" disabled={saving}>
               {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <ArrowLeftRight className="h-4 w-4 mr-2" />}
-              Criar Reserva
+              {reservaEdicao ? "Guardar alterações" : "Criar Reserva"}
             </Button>
           </div>
         </form>

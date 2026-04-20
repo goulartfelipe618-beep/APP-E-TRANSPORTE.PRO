@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
-import { Plus, RefreshCw, Trash2, Eye, MessageSquare, Download } from "lucide-react";
+import { Plus, RefreshCw, Trash2, Eye, MessageSquare, Download, Pencil } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import CriarReservaGrupoDialog from "@/components/grupos/CriarReservaGrupoDialog";
@@ -22,6 +22,7 @@ const veiculoLabel: Record<string, string> = {
 
 export default function GruposReservasPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [reservaGrupoEdicao, setReservaGrupoEdicao] = useState<ReservaGrupo | null>(null);
   const [reservas, setReservas] = useState<ReservaGrupo[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<ReservaGrupo | null>(null);
@@ -77,7 +78,13 @@ export default function GruposReservasPage() {
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="icon" onClick={fetchReservas}><RefreshCw className="h-4 w-4" /></Button>
-          <Button className="bg-primary text-primary-foreground" onClick={() => setDialogOpen(true)}>
+          <Button
+            className="bg-primary text-primary-foreground"
+            onClick={() => {
+              setReservaGrupoEdicao(null);
+              setDialogOpen(true);
+            }}
+          >
             <Plus className="h-4 w-4 mr-2" /> Criar Reserva
           </Button>
         </div>
@@ -101,7 +108,7 @@ export default function GruposReservasPage() {
                 <TableHead>Data Ida</TableHead>
                 <TableHead>Valor</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead className="w-[140px]">Ações</TableHead>
+                <TableHead className="w-[180px]">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -123,6 +130,17 @@ export default function GruposReservasPage() {
                   <TableCell><Badge variant="outline">{r.status}</Badge></TableCell>
                   <TableCell>
                     <div className="flex gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => {
+                          setReservaGrupoEdicao(r);
+                          setDialogOpen(true);
+                        }}
+                        title="Editar"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
                       <Button variant="ghost" size="icon" onClick={() => { setSelected(r); setSheetOpen(true); }} title="Ver detalhes">
                         <Eye className="h-4 w-4" />
                       </Button>
@@ -144,7 +162,15 @@ export default function GruposReservasPage() {
         )}
       </div>
 
-      <CriarReservaGrupoDialog open={dialogOpen} onOpenChange={setDialogOpen} onCreated={fetchReservas} />
+      <CriarReservaGrupoDialog
+        open={dialogOpen}
+        onOpenChange={(o) => {
+          setDialogOpen(o);
+          if (!o) setReservaGrupoEdicao(null);
+        }}
+        onCreated={fetchReservas}
+        reservaGrupoEdicao={reservaGrupoEdicao}
+      />
 
       <DetalhesReservaGrupoSheet
         reserva={selected}

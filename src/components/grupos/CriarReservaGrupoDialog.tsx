@@ -9,6 +9,26 @@ import { Separator } from "@/components/ui/separator";
 import { ArrowLeftRight, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import type { Tables } from "@/integrations/supabase/types";
+
+const TIPOS_VEICULO = ["van", "micro_onibus", "onibus"] as const;
+
+function toDateInput(v: string | null | undefined): string {
+  if (!v) return "";
+  const s = String(v).trim();
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+  const d = new Date(s);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toISOString().slice(0, 10);
+}
+
+function toTimeInput(v: string | null | undefined): string {
+  if (!v) return "";
+  const s = String(v).trim();
+  const m = s.match(/(\d{1,2}):(\d{2})/);
+  if (!m) return "";
+  return `${m[1].padStart(2, "0")}:${m[2]}`;
+}
 
 export interface GrupoInitialData {
   nome_cliente?: string;
@@ -32,9 +52,16 @@ interface CriarReservaGrupoDialogProps {
   onOpenChange: (open: boolean) => void;
   onCreated?: () => void;
   initialData?: GrupoInitialData | null;
+  reservaGrupoEdicao?: Tables<"reservas_grupos"> | null;
 }
 
-export default function CriarReservaGrupoDialog({ open, onOpenChange, onCreated, initialData }: CriarReservaGrupoDialogProps) {
+export default function CriarReservaGrupoDialog({
+  open,
+  onOpenChange,
+  onCreated,
+  initialData,
+  reservaGrupoEdicao = null,
+}: CriarReservaGrupoDialogProps) {
   const [saving, setSaving] = useState(false);
   const [valorBase, setValorBase] = useState("0");
   const [desconto, setDesconto] = useState("0");
@@ -65,9 +92,36 @@ export default function CriarReservaGrupoDialog({ open, onOpenChange, onCreated,
 
   const valorTotalFormatted = valorTotalNum.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
-  // Pre-fill from solicitação data
+  // Pre-fill from edição, solicitação ou reset
   useEffect(() => {
-    if (open && initialData) {
+    if (!open) return;
+
+    if (reservaGrupoEdicao) {
+      const row = reservaGrupoEdicao;
+      setNomeCompleto(row.nome_completo ?? "");
+      setCpfCnpj(row.cpf_cnpj ?? "");
+      setEmail(row.email ?? "");
+      setWhatsapp(row.whatsapp ?? "");
+      const tv = row.tipo_veiculo;
+      setTipoVeiculo(TIPOS_VEICULO.includes(tv as (typeof TIPOS_VEICULO)[number]) ? (tv as string) : "");
+      setNumPassageiros(row.num_passageiros != null ? String(row.num_passageiros) : "");
+      setEmbarque(row.embarque ?? "");
+      setDestino(row.destino ?? "");
+      setDataIda(toDateInput(row.data_ida));
+      setHoraIda(toTimeInput(row.hora_ida));
+      setDataRetorno(toDateInput(row.data_retorno));
+      setHoraRetorno(toTimeInput(row.hora_retorno));
+      setCupom(row.cupom ?? "");
+      setObservacoesViagem(row.observacoes_viagem ?? "");
+      setNomeMotorista(row.nome_motorista ?? "");
+      setTelefoneMotorista(row.telefone_motorista ?? "");
+      setValorBase(String(row.valor_base ?? 0));
+      setDesconto(String(row.desconto ?? 0));
+      setMetodoPagamento(row.metodo_pagamento ?? "");
+      return;
+    }
+
+    if (initialData) {
       setNomeCompleto(initialData.nome_cliente || "");
       setWhatsapp(initialData.whatsapp || "");
       setEmail(initialData.email || "");
@@ -81,9 +135,11 @@ export default function CriarReservaGrupoDialog({ open, onOpenChange, onCreated,
       setNumPassageiros(initialData.num_passageiros?.toString() || "");
       setCupom(initialData.cupom || "");
       setObservacoesViagem(initialData.mensagem || "");
+      return;
     }
-    if (open && !initialData) resetForm();
-  }, [open, initialData]);
+
+    resetForm();
+  }, [open, initialData, reservaGrupoEdicao]);
 
   const resetForm = () => {
     setNomeCompleto(""); setCpfCnpj(""); setEmail(""); setWhatsapp("");
@@ -100,14 +156,13 @@ export default function CriarReservaGrupoDialog({ open, onOpenChange, onCreated,
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { toast.error("Você precisa estar logado."); setSaving(false); return; }
 
-    const { error } = await supabase.from("reservas_grupos").insert({
-      user_id: user.id,
+    const rowPayload = {
       nome_completo: nomeCompleto,
       cpf_cnpj: cpfCnpj,
       email,
       whatsapp,
       tipo_veiculo: tipoVeiculo || null,
-      num_passageiros: numPassageiros ? parseInt(numPassageiros) : null,
+      num_passageiros: numPassageiros ? parseInt(numPassageiros, 10) : null,
       embarque: embarque || null,
       destino: destino || null,
       data_ida: dataIda || null,
@@ -122,13 +177,17 @@ export default function CriarReservaGrupoDialog({ open, onOpenChange, onCreated,
       desconto: parseFloat(desconto) || 0,
       valor_total: valorTotalNum,
       metodo_pagamento: metodoPagamento || null,
-    });
+    };
+
+    const { error } = reservaGrupoEdicao?.id
+      ? await supabase.from("reservas_grupos").update(rowPayload).eq("id", reservaGrupoEdicao.id)
+      : await supabase.from("reservas_grupos").insert({ user_id: user.id, ...rowPayload });
 
     setSaving(false);
     if (error) {
-      toast.error("Erro ao criar reserva: " + error.message);
+      toast.error(reservaGrupoEdicao?.id ? "Erro ao atualizar reserva: " + error.message : "Erro ao criar reserva: " + error.message);
     } else {
-      toast.success("Reserva de grupo criada com sucesso!");
+      toast.success(reservaGrupoEdicao?.id ? "Reserva de grupo atualizada com sucesso!" : "Reserva de grupo criada com sucesso!");
       resetForm();
       onOpenChange(false);
       onCreated?.();
@@ -139,8 +198,10 @@ export default function CriarReservaGrupoDialog({ open, onOpenChange, onCreated,
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Criar Nova Reserva de Grupo</DialogTitle>
-          <p className="text-sm text-muted-foreground">Preencha os dados para criar uma nova reserva de grupo.</p>
+          <DialogTitle>{reservaGrupoEdicao ? "Editar reserva de grupo" : "Criar Nova Reserva de Grupo"}</DialogTitle>
+          <p className="text-sm text-muted-foreground">
+            {reservaGrupoEdicao ? "Altere os campos e guarde as alterações." : "Preencha os dados para criar uma nova reserva de grupo."}
+          </p>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -217,7 +278,7 @@ export default function CriarReservaGrupoDialog({ open, onOpenChange, onCreated,
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
             <Button type="submit" className="bg-primary text-primary-foreground" disabled={saving}>
               {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <ArrowLeftRight className="h-4 w-4 mr-2" />}
-              Criar Reserva
+              {reservaGrupoEdicao ? "Guardar alterações" : "Criar Reserva"}
             </Button>
           </div>
         </form>
