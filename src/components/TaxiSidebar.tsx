@@ -63,12 +63,17 @@ const menuStructure = [
 ];
 
 export function TaxiSidebar() {
-  const { state } = useSidebar();
+  const { state, isMobile, setOpenMobile } = useSidebar();
   const collapsed = state === "collapsed";
   const navigate = useNavigate();
   const { config } = useConfiguracoes();
   const { activePage, setActivePage } = useActivePage();
   const { darkMode, toggle: toggleTheme } = usePanelTheme("taxi");
+
+  const goPage = (page: string) => {
+    setActivePage(page);
+    if (isMobile) setOpenMobile(false);
+  };
 
   const isActive = (page: string) => activePage === page;
   const isGroupActive = (children: { page: string }[]) =>
@@ -125,7 +130,7 @@ export function TaxiSidebar() {
                               {item.children.map((child) => (
                                 <SidebarMenuSubItem key={child.page}>
                                   <SidebarMenuSubButton
-                                    onClick={() => setActivePage(child.page)}
+                                    onClick={() => goPage(child.page)}
                                     className={cn(
                                       "w-full min-w-0 cursor-pointer text-sm",
                                       isActive(child.page) && "text-primary font-medium",
@@ -147,7 +152,7 @@ export function TaxiSidebar() {
                   return (
                     <SidebarMenuItem key={item.title}>
                       <SidebarMenuButton
-                        onClick={() => setActivePage(page)}
+                        onClick={() => goPage(page)}
                         className={cn(
                           "cursor-pointer",
                           isActive(page) && "bg-muted text-primary font-medium"

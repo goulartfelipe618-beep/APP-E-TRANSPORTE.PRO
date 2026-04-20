@@ -60,5 +60,54 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    <!-- Chatwoot: só painéis autenticados (evita login / rastreio público) -->
+    <script>
+      (function () {
+        try {
+          var path = window.location.pathname || "";
+          var skip =
+            path === "/" ||
+            path === "/login" ||
+            path === "/mfa" ||
+            path.indexOf("/rastreio/") === 0;
+          if (skip) return;
+        } catch (e) {}
+        window.chatwootSettings = { position: "right", type: "standard", launcherTitle: "" };
+        (function (d, t) {
+          var BASE_URL = "https://chatwoot.e-transporte.pro";
+          var g = d.createElement(t),
+            s = d.getElementsByTagName(t)[0];
+          g.src = BASE_URL + "/packs/js/sdk.js";
+          g.async = true;
+          s.parentNode.insertBefore(g, s);
+          g.onload = function () {
+            window.chatwootSDK.run({
+              websiteToken: "dvGfRaS9f9KKx3XkVjQreZwU",
+              baseUrl: BASE_URL,
+            });
+          };
+        })(document, "script");
+      })();
+    </script>
+    <style>
+      /* Chatwoot acima do mapa Leaflet (~400–700), abaixo de modais do painel (z-1100) */
+      .woot-widget-holder,
+      .woot--bubble-holder,
+      .woot-elements--container {
+        z-index: 900 !important;
+      }
+      @media (max-width: 640px) {
+        .woot-widget-holder,
+        .woot-elements--container {
+          max-width: calc(100vw - 1rem) !important;
+          right: max(0.5rem, env(safe-area-inset-right)) !important;
+          bottom: max(0.5rem, env(safe-area-inset-bottom)) !important;
+        }
+        .woot-widget-bubble {
+          right: max(0.5rem, env(safe-area-inset-right)) !important;
+          bottom: max(0.5rem, env(safe-area-inset-bottom)) !important;
+        }
+      }
+    </style>
   </body>
 </html>

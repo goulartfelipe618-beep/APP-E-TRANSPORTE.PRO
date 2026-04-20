@@ -46,10 +46,15 @@ const sistemaChildren = [
 ];
 
 export function AdminSidebar() {
-  const { state } = useSidebar();
+  const { state, isMobile, setOpenMobile } = useSidebar();
   const collapsed = state === "collapsed";
   const navigate = useNavigate();
   const { activePage, setActivePage } = useActivePage();
+
+  const goPage = (page: string) => {
+    setActivePage(page);
+    if (isMobile) setOpenMobile(false);
+  };
   const { config } = useConfiguracoes();
   const { darkMode, toggle: toggleTheme } = usePanelTheme("admin");
 
@@ -82,7 +87,7 @@ export function AdminSidebar() {
             {children.map((child) => (
               <SidebarMenuSubItem key={child.page}>
                 <SidebarMenuSubButton
-                  onClick={() => setActivePage(child.page)}
+                  onClick={() => goPage(child.page)}
                   className={cn(
                     "w-full min-w-0 cursor-pointer text-sm",
                     isActive(child.page) && "text-primary font-medium",
@@ -125,7 +130,7 @@ export function AdminSidebar() {
               {simpleItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton
-                    onClick={() => setActivePage(item.page)}
+                    onClick={() => goPage(item.page)}
                     className={cn(
                       "cursor-pointer",
                       isActive(item.page) && "bg-muted text-primary font-medium"
@@ -141,7 +146,7 @@ export function AdminSidebar() {
 
               <SidebarMenuItem>
                 <SidebarMenuButton
-                  onClick={() => setActivePage("network")}
+                  onClick={() => goPage("network")}
                   className={cn("cursor-pointer", isActive("network") && "bg-muted text-primary font-medium")}
                 >
                   <Building2 className="mr-2 h-4 w-4 shrink-0" />
@@ -153,7 +158,7 @@ export function AdminSidebar() {
 
               <SidebarMenuItem>
                 <SidebarMenuButton
-                  onClick={() => setActivePage("templates")}
+                  onClick={() => goPage("templates")}
                   className={cn("cursor-pointer", isActive("templates") && "bg-muted text-primary font-medium")}
                 >
                   <LayoutTemplate className="mr-2 h-4 w-4 shrink-0" />
@@ -163,7 +168,7 @@ export function AdminSidebar() {
 
               <SidebarMenuItem>
                 <SidebarMenuButton
-                  onClick={() => setActivePage("solicitacoes-servicos")}
+                  onClick={() => goPage("solicitacoes-servicos")}
                   className={cn("cursor-pointer", isActive("solicitacoes-servicos") && "bg-muted text-primary font-medium")}
                 >
                   <ClipboardList className="mr-2 h-4 w-4 shrink-0" />
@@ -173,7 +178,7 @@ export function AdminSidebar() {
 
               <SidebarMenuItem>
                 <SidebarMenuButton
-                  onClick={() => setActivePage("tickets")}
+                  onClick={() => goPage("tickets")}
                   className={cn("cursor-pointer", isActive("tickets") && "bg-muted text-primary font-medium")}
                 >
                   <ClipboardList className="mr-2 h-4 w-4 shrink-0" />

@@ -225,7 +225,9 @@ export default function AdminAbrangencia() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 rounded-xl border border-border overflow-hidden" style={{ height: 500 }}>
+        <div
+          className="relative z-0 isolate lg:col-span-2 min-h-[260px] h-[min(70dvh,520px)] lg:h-[500px] rounded-xl border border-border overflow-hidden"
+        >
           <MapContainer center={center} zoom={zoom} style={{ height: "100%", width: "100%" }} scrollWheelZoom>
             <TileLayer
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
