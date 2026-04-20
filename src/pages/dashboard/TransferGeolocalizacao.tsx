@@ -17,11 +17,8 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import {
-  Select, SelectContent, SelectGroup, SelectItem, SelectLabel,
-  SelectTrigger, SelectValue,
-} from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
+import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { Tables } from "@/integrations/supabase/types";
 import {
@@ -597,50 +594,47 @@ export default function TransferGeolocalizacaoPage() {
                   <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
                 </Button>
               </div>
-              <Select
-                value={reservaKey}
-                onValueChange={setReservaKey}
-                disabled={loading}
+              {/*
+                Select Radix + Dialog = portal/focus-scope quebrava a lista (insertBefore/removeChild)
+                e impedia escolher a reserva. <select> nativo fica dentro do mesmo DOM do Dialog.
+              */}
+              <select
+                className={cn(
+                  "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground ring-offset-background",
+                  "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
+                  "disabled:cursor-not-allowed disabled:opacity-50 max-w-full",
+                )}
+                value={reservaKey || ""}
+                onChange={(e) => setReservaKey(e.target.value)}
+                disabled={loading || totalReservas === 0}
+                aria-label="Reserva (Transfer ou Grupo)"
               >
-                <SelectTrigger>
-                  <SelectValue
-                    placeholder={
-                      loading
-                        ? "Carregando reservas..."
-                        : totalReservas === 0
-                          ? "Nenhuma reserva disponível"
-                          : "Selecione uma reserva"
-                    }
-                  />
-                </SelectTrigger>
-                <SelectContent className="max-h-[min(320px,70vh)]">
-                  {!loading && totalReservas === 0 && (
-                    <SelectItem value="__empty__" disabled>
-                      Nenhuma reserva de transfer ou grupo — cadastre em Transfer / Grupos → Reservas
-                    </SelectItem>
-                  )}
-                  {reservasTransfer.length > 0 && (
-                    <SelectGroup>
-                      <SelectLabel>Transfer</SelectLabel>
-                      {reservasTransfer.map((r) => (
-                        <SelectItem key={`t-${r.id}`} value={`transfer:${r.id}`}>
-                          {labelTransfer(r)}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  )}
-                  {reservasGrupos.length > 0 && (
-                    <SelectGroup>
-                      <SelectLabel>Grupos</SelectLabel>
-                      {reservasGrupos.map((r) => (
-                        <SelectItem key={`g-${r.id}`} value={`grupo:${r.id}`}>
-                          {labelGrupo(r)}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  )}
-                </SelectContent>
-              </Select>
+                <option value="">
+                  {loading
+                    ? "Carregando reservas…"
+                    : totalReservas === 0
+                      ? "Nenhuma reserva — cadastre em Transfer / Grupos → Reservas"
+                      : "Selecione uma reserva"}
+                </option>
+                {reservasTransfer.length > 0 ? (
+                  <optgroup label="Transfer">
+                    {reservasTransfer.map((r) => (
+                      <option key={`t-${r.id}`} value={`transfer:${r.id}`}>
+                        {labelTransfer(r)}
+                      </option>
+                    ))}
+                  </optgroup>
+                ) : null}
+                {reservasGrupos.length > 0 ? (
+                  <optgroup label="Grupos">
+                    {reservasGrupos.map((r) => (
+                      <option key={`g-${r.id}`} value={`grupo:${r.id}`}>
+                        {labelGrupo(r)}
+                      </option>
+                    ))}
+                  </optgroup>
+                ) : null}
+              </select>
             </div>
 
             <div>
