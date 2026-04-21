@@ -10,6 +10,7 @@ import ProtectedTaxiRoute from "./components/ProtectedTaxiRoute";
 import ProtectedAdminRoute from "./components/ProtectedAdminRoute";
 import { ConfiguracoesProvider } from "./contexts/ConfiguracoesContext";
 import AuthExpiryGuard from "./components/AuthExpiryGuard";
+import ClientSessionRevocationGuard from "./components/ClientSessionRevocationGuard";
 
 const NotFound = lazy(() => import("./pages/NotFound"));
 const DashboardLayout = lazy(() => import("./components/DashboardLayout"));
@@ -36,6 +37,7 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AuthExpiryGuard />
+        <ClientSessionRevocationGuard />
         <Suspense fallback={<RouteFallback />}>
           <Routes>
             <Route path="/" element={<Navigate to="/login" replace />} />

@@ -84,7 +84,6 @@ function buildHomeSections(showNetwork: boolean, exibirComunicadorMotorista: boo
       title: "Motoristas",
       items: [
         { title: "Cadastros", page: "motoristas/cadastros", desc: "Motoristas parceiros e fichas completas.", icon: UserCheck },
-        { title: "Solicitações", page: "motoristas/solicitacoes", desc: "Novos contatos que querem dirigir na operação.", icon: ClipboardList },
       ],
     },
     {

@@ -6,12 +6,10 @@ import { Badge } from "@/components/ui/badge";
 import CadastrarMotoristaDialog from "@/components/motoristas/CadastrarMotoristaDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { MOTORISTA_FROM_SOLICITACAO_KEY, type MotoristaInitialData } from "@/lib/motoristaFromSolicitacao";
 
 export default function MotoristaCadastrosPage() {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [open, setOpen] = useState(false);
-  const [fromSolicitacao, setFromSolicitacao] = useState<MotoristaInitialData | null>(null);
   const [motoristas, setMotoristas] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -28,44 +26,12 @@ export default function MotoristaCadastrosPage() {
     setLoading(false);
   }, []);
 
-  const consumeSessionPayload = useCallback(() => {
-    try {
-      const raw = sessionStorage.getItem(MOTORISTA_FROM_SOLICITACAO_KEY);
-      if (!raw) return;
-      sessionStorage.removeItem(MOTORISTA_FROM_SOLICITACAO_KEY);
-      const parsed = JSON.parse(raw) as MotoristaInitialData;
-      if (parsed?.solicitacao_id) {
-        setFromSolicitacao(parsed);
-        setOpen(true);
-      }
-    } catch {
-      sessionStorage.removeItem(MOTORISTA_FROM_SOLICITACAO_KEY);
-      toast.error("Não foi possível carregar os dados da solicitação.");
-    }
-  }, []);
-
-  useEffect(() => {
-    consumeSessionPayload();
-  }, [consumeSessionPayload]);
-
   useEffect(() => {
     fetchMotoristas();
   }, [fetchMotoristas]);
 
-  const handleCreated = async () => {
-    const sid = fromSolicitacao?.solicitacao_id;
-    if (sid) {
-      const { error } = await supabase.from("solicitacoes_motoristas").update({ status: "cadastrado" }).eq("id", sid);
-      if (error) toast.error("Cadastro validado, mas não foi possível atualizar o status da solicitação.");
-      else toast.success("Solicitação marcada como cadastrada.");
-    }
-    setFromSolicitacao(null);
-    fetchMotoristas();
-  };
-
-  const handleOpenChange = (next: boolean) => {
-    setOpen(next);
-    if (!next) setFromSolicitacao(null);
+  const handleCreated = () => {
+    void fetchMotoristas();
   };
 
   const filtered = motoristas.filter((m) => {
@@ -82,11 +48,13 @@ export default function MotoristaCadastrosPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Cadastros de Motoristas</h1>
-          <p className="text-muted-foreground">Gerenciamento completo de motoristas</p>
+          <p className="text-muted-foreground">
+            Motoristas parceiros registados na sua frota. Pré-cadastros de interesse na plataforma (site / landing) são
+            tratados apenas no painel Admin Master.
+          </p>
         </div>
         <Button
           onClick={() => {
-            setFromSolicitacao(null);
             setOpen(true);
           }}
         >
@@ -162,12 +130,7 @@ export default function MotoristaCadastrosPage() {
         </div>
       )}
 
-      <CadastrarMotoristaDialog
-        open={open}
-        onOpenChange={handleOpenChange}
-        onCreated={handleCreated}
-        initialData={fromSolicitacao}
-      />
+      <CadastrarMotoristaDialog open={open} onOpenChange={setOpen} onCreated={handleCreated} initialData={null} />
     </div>
   );
 }

@@ -220,55 +220,31 @@ export default function CadastrarMotoristaDialog({ open, onOpenChange, onCreated
       observacoes_internas: observacoesInternas || null,
     };
 
-    if (initialData?.solicitacao_id) {
-      const { error } = await supabase
-        .from("solicitacoes_motoristas")
-        .update({
-          nome: nome.trim(),
-          cpf: cpf || null,
-          cnh: cnh || null,
-          telefone: telefone || null,
-          email: emailField || null,
-          cidade: cidade || null,
-          estado: estadoUf || null,
-          mensagem_observacoes: observacoesInternas || null,
-          dados_webhook: payloadWebhook as any,
-          status: "cadastrado",
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", initialData.solicitacao_id);
-      if (error) {
-        toast.error(`Erro ao salvar cadastro: ${error.message}`);
-        setSaving(false);
-        return;
-      }
-    } else {
-      const { data: authData } = await supabase.auth.getUser();
-      const user = authData.user;
-      if (!user) {
-        toast.error("Sessão inválida. Faça login novamente.");
-        setSaving(false);
-        return;
-      }
-      const { error } = await supabase.from("solicitacoes_motoristas").insert({
-        user_id: user.id,
-        nome: nome.trim(),
-        cpf: cpf || null,
-        cnh: cnh || null,
-        telefone: telefone || null,
-        email: emailField || null,
-        cidade: cidade || null,
-        estado: estadoUf || null,
-        mensagem: observacoesInternas || null,
-        mensagem_observacoes: observacoesInternas || null,
-        dados_webhook: payloadWebhook as any,
-        status: "cadastrado",
-      } as any);
-      if (error) {
-        toast.error(`Erro ao salvar cadastro: ${error.message}`);
-        setSaving(false);
-        return;
-      }
+    const { data: authData } = await supabase.auth.getUser();
+    const user = authData.user;
+    if (!user) {
+      toast.error("Sessão inválida. Faça login novamente.");
+      setSaving(false);
+      return;
+    }
+    const { error } = await supabase.from("solicitacoes_motoristas").insert({
+      user_id: user.id,
+      nome: nome.trim(),
+      cpf: cpf || null,
+      cnh: cnh || null,
+      telefone: telefone || null,
+      email: emailField || null,
+      cidade: cidade || null,
+      estado: estadoUf || null,
+      mensagem: observacoesInternas || null,
+      mensagem_observacoes: observacoesInternas || null,
+      dados_webhook: payloadWebhook as any,
+      status: "cadastrado",
+    } as any);
+    if (error) {
+      toast.error(`Erro ao salvar cadastro: ${error.message}`);
+      setSaving(false);
+      return;
     }
 
     toast.success("Motorista salvo e disponível na lista imediatamente.");

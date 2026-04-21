@@ -26,7 +26,6 @@ import GruposSolicitacoesPage from "@/pages/dashboard/GruposSolicitacoes";
 import GruposReservasPage from "@/pages/dashboard/GruposReservas";
 import GruposContratoPage from "@/pages/dashboard/GruposContrato";
 import MotoristaCadastrosPage from "@/pages/dashboard/MotoristaCadastros";
-import MotoristaSolicitacoesPage from "@/pages/dashboard/MotoristaSolicitacoes";
 import MotoristaAgendamentosPage from "@/pages/dashboard/MotoristaAgendamentos";
 import VeiculosPage from "@/pages/dashboard/Veiculos";
 import CampanhasAtivosPage from "@/pages/dashboard/CampanhasAtivos";
@@ -65,7 +64,6 @@ const PAGE_MAP: Record<string, React.ComponentType> = {
   "grupos/reservas": GruposReservasPage,
   "grupos/contrato": GruposContratoPage,
   "motoristas/cadastros": MotoristaCadastrosPage,
-  "motoristas/solicitacoes": MotoristaSolicitacoesPage,
   "motoristas/agendamentos": MotoristaAgendamentosPage,
   veiculos: VeiculosPage,
   "campanhas/ativos": CampanhasAtivosPage,

@@ -98,10 +98,7 @@ const getMenuStructure = (showNetwork: boolean, exibirComunicadorMotorista: bool
       {
         title: "Motoristas",
         icon: UserCheck,
-        children: [
-          { title: "Cadastros", page: "motoristas/cadastros", icon: UserCheck },
-          { title: "Solicitações", page: "motoristas/solicitacoes", icon: ClipboardList },
-        ],
+        children: [{ title: "Cadastros", page: "motoristas/cadastros", icon: UserCheck }],
       },
       { title: "Veículos", page: "veiculos", icon: Car },
       { title: "Mentoria", page: "mentoria", icon: GraduationCap },
