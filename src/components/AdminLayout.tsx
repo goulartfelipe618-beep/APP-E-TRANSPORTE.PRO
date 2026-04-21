@@ -28,6 +28,7 @@ import AdminCommunityPage from "@/pages/admin/AdminCommunityPage";
 import DominiosPage from "@/pages/dashboard/DominiosPage";
 import AdminAvisosPage from "@/pages/admin/AdminAvisosPage";
 import AdminLogsPage from "@/pages/admin/AdminLogsPage";
+import AdminVeiculosPage from "@/pages/admin/AdminVeiculosPage";
 import { usePainelErrorReporter } from "@/hooks/usePainelErrorReporter";
 
 const PAGE_MAP: Record<string, React.ComponentType> = {
@@ -52,6 +53,7 @@ const PAGE_MAP: Record<string, React.ComponentType> = {
   "empty-legs": AdminEmptyLegsPage,
   dominios: DominiosPage,
   logs: AdminLogsPage,
+  veiculos: AdminVeiculosPage,
 };
 
 function AdminContent() {
