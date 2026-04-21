@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { MessageSquare, Download } from "lucide-react";
 import { Tables } from "@/integrations/supabase/types";
+import { badgeToneReservaStatus, labelReservaStatus } from "@/lib/reservaStatus";
 
 type Reserva = Tables<"reservas_transfer">;
 
@@ -54,7 +55,10 @@ export default function DetalhesReservaTransferSheet({ reserva, open, onOpenChan
           <Section title="Detalhes da Viagem">
             <div className="grid grid-cols-2 gap-3">
               <Field label="Tipo de Viagem" value={tipoLabel[r.tipo_viagem] || r.tipo_viagem} />
-              <Field label="Status" value={<Badge variant="outline">{r.status}</Badge>} />
+              <Field
+                label="Status"
+                value={<Badge variant={badgeToneReservaStatus(r.status)}>{labelReservaStatus(r.status)}</Badge>}
+              />
             </div>
           </Section>
 
@@ -122,6 +126,14 @@ export default function DetalhesReservaTransferSheet({ reserva, open, onOpenChan
               <Field label="Desconto" value={`${Number(r.desconto)}%`} />
               <Field label="Método de Pagamento" value={r.metodo_pagamento} />
               <Field label="Valor Total" value={<span className="text-base font-bold text-primary">{formatCurrency(r.valor_total)}</span>} />
+              <Field
+                label="Repasse ao motorista"
+                value={
+                  r.repasse_motorista != null && Number(r.repasse_motorista) > 0
+                    ? formatCurrency(Number(r.repasse_motorista))
+                    : "—"
+                }
+              />
             </div>
           </Section>
 

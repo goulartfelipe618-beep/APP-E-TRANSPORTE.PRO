@@ -70,7 +70,7 @@ export default function FinanceiroDashboardPage() {
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-foreground">Financeiro</h1>
         <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-          Receitas ligadas às reservas, despesas manuais e estado de pagamento. Cada conta vê apenas os seus dados (RLS).
+          Receitas ligadas às reservas, despesas manuais e estado de pagamento. Cada conta vê apenas os seus dados (RLS). Ao concluir uma reserva com repasse ao motorista, gera-se uma despesa automática — o lucro projetado já reflete receita menos repasses e outras despesas do mês.
         </p>
       </div>
 
@@ -91,7 +91,8 @@ export default function FinanceiroDashboardPage() {
           {error} — confirme se as migrações{" "}
           <code className="rounded bg-muted px-1">20260522130000_financial_transactions_frota</code> e{" "}
           <code className="rounded bg-muted px-1">20260523120000_financial_transactions_evolution</code> e{" "}
-          <code className="rounded bg-muted px-1">20260524130000_multitenant_perf_financial_integrity</code> foram aplicadas no Supabase.
+          <code className="rounded bg-muted px-1">20260524130000_multitenant_perf_financial_integrity</code> e{" "}
+          <code className="rounded bg-muted px-1">20260526120000_reserva_repasse_status_financeiro</code> foram aplicadas no Supabase.
         </p>
       ) : null}
 
@@ -208,7 +209,7 @@ export default function FinanceiroDashboardPage() {
       </div>
 
       <p className="text-xs text-muted-foreground">
-        Reservas novas ou atualizadas geram ou ajustam lançamentos automaticamente. O estado financeiro (pago/pendente) é independente do estado da viagem.
+        Reservas novas ou atualizadas geram ou ajustam lançamentos automaticamente. O estado financeiro (pago/pendente) é independente do estado da viagem. Repasses de motorista entram como despesas quando a reserva passa a concluída com valor de repasse.
       </p>
     </div>
   );

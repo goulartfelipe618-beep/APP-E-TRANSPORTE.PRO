@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { MessageSquare, Download } from "lucide-react";
 import { Tables } from "@/integrations/supabase/types";
+import { badgeToneReservaStatus, labelReservaStatus } from "@/lib/reservaStatus";
 
 type ReservaGrupo = Tables<"reservas_grupos">;
 
@@ -60,7 +61,10 @@ export default function DetalhesReservaGrupoSheet({ reserva, open, onOpenChange,
               <Field label="Hora Ida" value={r.hora_ida} />
               <Field label="Data Retorno" value={formatDate(r.data_retorno)} />
               <Field label="Hora Retorno" value={r.hora_retorno} />
-              <Field label="Status" value={<Badge variant="outline">{r.status}</Badge>} />
+              <Field
+                label="Status"
+                value={<Badge variant={badgeToneReservaStatus(r.status)}>{labelReservaStatus(r.status)}</Badge>}
+              />
               <Field label="Cupom" value={r.cupom} />
             </div>
           </Section>
@@ -84,6 +88,14 @@ export default function DetalhesReservaGrupoSheet({ reserva, open, onOpenChange,
               <Field label="Desconto" value={`${Number(r.desconto)}%`} />
               <Field label="Método de Pagamento" value={r.metodo_pagamento} />
               <Field label="Valor Total" value={<span className="text-base font-bold text-primary">{formatCurrency(r.valor_total)}</span>} />
+              <Field
+                label="Repasse ao motorista"
+                value={
+                  r.repasse_motorista != null && Number(r.repasse_motorista) > 0
+                    ? formatCurrency(Number(r.repasse_motorista))
+                    : "—"
+                }
+              />
             </div>
           </Section>
 

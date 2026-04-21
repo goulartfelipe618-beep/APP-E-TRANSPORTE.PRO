@@ -10,6 +10,7 @@ import { ArrowLeftRight, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { Tables } from "@/integrations/supabase/types";
+import { RESERVA_STATUS_OPTIONS } from "@/lib/reservaStatus";
 
 const TIPOS_VEICULO = ["van", "micro_onibus", "onibus"] as const;
 
@@ -83,6 +84,8 @@ export default function CriarReservaGrupoDialog({
   const [nomeMotorista, setNomeMotorista] = useState("");
   const [telefoneMotorista, setTelefoneMotorista] = useState("");
   const [metodoPagamento, setMetodoPagamento] = useState("");
+  const [statusOperacional, setStatusOperacional] = useState("pendente");
+  const [repasseMotorista, setRepasseMotorista] = useState("");
 
   const valorTotalNum = useMemo(() => {
     const base = parseFloat(valorBase) || 0;
@@ -118,6 +121,11 @@ export default function CriarReservaGrupoDialog({
       setValorBase(String(row.valor_base ?? 0));
       setDesconto(String(row.desconto ?? 0));
       setMetodoPagamento(row.metodo_pagamento ?? "");
+      const st = (row.status ?? "pendente").trim();
+      setStatusOperacional(RESERVA_STATUS_OPTIONS.some((o) => o.value === st) ? st : "pendente");
+      setRepasseMotorista(
+        row.repasse_motorista != null && Number(row.repasse_motorista) > 0 ? String(row.repasse_motorista) : "",
+      );
       return;
     }
 
@@ -147,6 +155,7 @@ export default function CriarReservaGrupoDialog({
     setDataIda(""); setHoraIda(""); setDataRetorno(""); setHoraRetorno("");
     setCupom(""); setObservacoesViagem(""); setNomeMotorista(""); setTelefoneMotorista("");
     setValorBase("0"); setDesconto("0"); setMetodoPagamento("");
+    setStatusOperacional("pendente"); setRepasseMotorista("");
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -177,6 +186,11 @@ export default function CriarReservaGrupoDialog({
       desconto: parseFloat(desconto) || 0,
       valor_total: valorTotalNum,
       metodo_pagamento: metodoPagamento || null,
+      status: statusOperacional,
+      repasse_motorista: (() => {
+        const r = parseFloat(String(repasseMotorista).replace(",", "."));
+        return Number.isFinite(r) && r > 0 ? r : null;
+      })(),
     };
 
     const { error } = reservaGrupoEdicao?.id
@@ -269,8 +283,32 @@ export default function CriarReservaGrupoDialog({
               <div className="space-y-1.5"><Label>Método de Pagamento</Label><Input placeholder="Ex: Dinheiro, Cartão, PIX" value={metodoPagamento} onChange={(e) => setMetodoPagamento(e.target.value)} /></div>
             </div>
             <div className="mt-3 flex items-center justify-between rounded-lg bg-muted px-4 py-2">
-              <span className="text-sm font-medium text-primary">Valor Total</span>
+              <span className="text-sm font-medium text-primary">Valor Total (a receber do cliente)</span>
               <span className="text-lg font-bold text-foreground">{valorTotalFormatted}</span>
+            </div>
+            <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label>Status da reserva</Label>
+                <Select value={statusOperacional} onValueChange={setStatusOperacional}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {RESERVA_STATUS_OPTIONS.map((o) => (
+                      <SelectItem key={o.value} value={o.value}>
+                        {o.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Ao marcar <strong className="text-foreground">Concluída</strong> com repasse, cria despesa no Financeiro.
+                </p>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Repasse ao motorista (R$)</Label>
+                <Input inputMode="decimal" placeholder="0,00" value={repasseMotorista} onChange={(e) => setRepasseMotorista(e.target.value)} />
+              </div>
             </div>
           </div>
 

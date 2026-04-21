@@ -15,6 +15,8 @@ export const FINANCEIRO_ORIGIN_LABEL: Record<string, string> = {
   reserva_transfer: "Reserva transfer",
   reserva_grupo: "Reserva grupo",
   manual: "Manual",
+  repasse_reserva_transfer: "Repasse motorista (transfer)",
+  repasse_reserva_grupo: "Repasse motorista (grupo)",
 };
 
 export const FINANCEIRO_STATUS_LABEL: Record<string, string> = {

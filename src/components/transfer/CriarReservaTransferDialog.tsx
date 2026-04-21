@@ -10,6 +10,7 @@ import { ArrowLeftRight, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { Tables } from "@/integrations/supabase/types";
+import { RESERVA_STATUS_OPTIONS } from "@/lib/reservaStatus";
 
 function toDateInput(v: string | null | undefined): string {
   if (!v) return "";
@@ -113,6 +114,8 @@ export default function CriarReservaTransferDialog({
   const [porHoraItinerario, setPorHoraItinerario] = useState("");
   const [metodoPagamento, setMetodoPagamento] = useState("");
   const [observacoes, setObservacoes] = useState("");
+  const [statusOperacional, setStatusOperacional] = useState("pendente");
+  const [repasseMotorista, setRepasseMotorista] = useState("");
 
   const valorTotalNum = useMemo(() => {
     const base = parseFloat(valorBase) || 0;
@@ -161,6 +164,13 @@ export default function CriarReservaTransferDialog({
       setDesconto(String(row.desconto ?? 0));
       setMetodoPagamento(row.metodo_pagamento ?? "");
       setObservacoes(row.observacoes ?? "");
+      const st = (row.status ?? "pendente").trim();
+      setStatusOperacional(
+        RESERVA_STATUS_OPTIONS.some((o) => o.value === st) ? st : "pendente",
+      );
+      setRepasseMotorista(
+        row.repasse_motorista != null && Number(row.repasse_motorista) > 0 ? String(row.repasse_motorista) : "",
+      );
       return;
     }
 
@@ -213,6 +223,7 @@ export default function CriarReservaTransferDialog({
     setPorHoraHora(""); setPorHoraPassageiros(""); setPorHoraQtdHoras("");
     setPorHoraCupom(""); setPorHoraItinerario("");
     setValorBase("0"); setDesconto("0"); setMetodoPagamento(""); setObservacoes("");
+    setStatusOperacional("pendente"); setRepasseMotorista("");
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -256,6 +267,11 @@ export default function CriarReservaTransferDialog({
       valor_total: valorTotalNum,
       metodo_pagamento: metodoPagamento || null,
       observacoes: observacoes || null,
+      status: statusOperacional,
+      repasse_motorista: (() => {
+        const r = parseFloat(String(repasseMotorista).replace(",", "."));
+        return Number.isFinite(r) && r > 0 ? r : null;
+      })(),
     };
 
     const { error } = reservaEdicao?.id
@@ -419,8 +435,39 @@ export default function CriarReservaTransferDialog({
               <div className="space-y-1.5"><Label>Método de Pagamento</Label><Input placeholder="Ex: Dinheiro, Cartão, PIX" value={metodoPagamento} onChange={(e) => setMetodoPagamento(e.target.value)} /></div>
             </div>
             <div className="mt-3 flex items-center justify-between rounded-lg bg-muted px-4 py-2">
-              <span className="text-sm font-medium text-primary">Valor Total</span>
+              <span className="text-sm font-medium text-primary">Valor Total (a receber do cliente)</span>
               <span className="text-lg font-bold text-foreground">{valorTotalFormatted}</span>
+            </div>
+            <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label>Status da reserva</Label>
+                <Select value={statusOperacional} onValueChange={setStatusOperacional}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {RESERVA_STATUS_OPTIONS.map((o) => (
+                      <SelectItem key={o.value} value={o.value}>
+                        {o.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Em <strong className="text-foreground">Concluída</strong>, com repasse &gt; 0, gera automaticamente uma{" "}
+                  <strong className="text-foreground">despesa</strong> no Financeiro (contas a pagar ao motorista).
+                </p>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Repasse ao motorista (R$)</Label>
+                <Input
+                  inputMode="decimal"
+                  placeholder="0,00"
+                  value={repasseMotorista}
+                  onChange={(e) => setRepasseMotorista(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">Valor a pagar ao motorista após a viagem concluída (margem = total − repasse).</p>
+              </div>
             </div>
           </div>
 

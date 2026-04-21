@@ -11,6 +11,7 @@ import { generateGrupoPDF, getGrupoReservaPdfBase64 } from "@/lib/pdfGenerator";
 import ComunicarDialog from "@/components/comunicar/ComunicarDialog";
 import { Tables } from "@/integrations/supabase/types";
 import { ConfirmDeleteDialog } from "@/components/ConfirmDeleteDialog";
+import { badgeToneReservaStatus, labelReservaStatus } from "@/lib/reservaStatus";
 
 type ReservaGrupo = Tables<"reservas_grupos">;
 
@@ -127,7 +128,9 @@ export default function GruposReservasPage() {
                   </TableCell>
                   <TableCell className="text-sm">{r.data_ida ? new Date(r.data_ida).toLocaleDateString("pt-BR") : "—"}</TableCell>
                   <TableCell className="font-semibold">{Number(r.valor_total).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</TableCell>
-                  <TableCell><Badge variant="outline">{r.status}</Badge></TableCell>
+                  <TableCell>
+                    <Badge variant={badgeToneReservaStatus(r.status)}>{labelReservaStatus(r.status)}</Badge>
+                  </TableCell>
                   <TableCell>
                     <div className="flex gap-1">
                       <Button
