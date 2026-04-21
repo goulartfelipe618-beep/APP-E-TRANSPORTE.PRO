@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Wallet, List, Inbox, Outbox, FileBarChart, ChevronLeft, ChevronRight } from "lucide-react";
+import { Wallet, List, Inbox, Banknote, FileBarChart, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useActivePage } from "@/contexts/ActivePageContext";
@@ -193,7 +193,7 @@ export default function FinanceiroDashboardPage() {
             onClick={() => setActivePage("financeiro/pagar")}
             className="flex items-center gap-3 rounded-xl border border-border bg-card p-4 text-left transition-colors hover:border-primary/50 hover:bg-muted/40"
           >
-            <Outbox className="h-5 w-5 shrink-0 text-primary" />
+            <Banknote className="h-5 w-5 shrink-0 text-primary" />
             <span className="font-medium text-foreground">Contas a pagar</span>
           </button>
           <button

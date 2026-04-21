@@ -29,7 +29,7 @@ import {
   Wallet2,
   List,
   Inbox,
-  Outbox,
+  Banknote,
   FileBarChart,
 } from "lucide-react";
 import { useState, useEffect, useMemo, type LucideIcon } from "react";
@@ -106,7 +106,7 @@ function buildHomeSections(showNetwork: boolean, exibirComunicadorMotorista: boo
         { title: "Dashboard financeiro", page: "financeiro", desc: "Resumo do mês: faturado, recebido, pendente e lucro estimado.", icon: Wallet2 },
         { title: "Lançamentos", page: "financeiro/lancamentos", desc: "Todas as receitas e despesas; criar lançamentos manuais.", icon: List },
         { title: "Contas a receber", page: "financeiro/receber", desc: "Receitas geradas pelas reservas (transfer e grupos).", icon: Inbox },
-        { title: "Contas a pagar", page: "financeiro/pagar", desc: "Despesas operacionais registadas.", icon: Outbox },
+        { title: "Contas a pagar", page: "financeiro/pagar", desc: "Despesas operacionais registadas.", icon: Banknote },
         { title: "Relatórios", page: "financeiro/relatorios", desc: "Por período e viagens mais rentáveis.", icon: FileBarChart },
       ],
     },
