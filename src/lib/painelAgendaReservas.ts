@@ -1,4 +1,5 @@
 import type { Tables } from "@/integrations/supabase/types";
+import { primeiroSegmentoEndereco } from "@/lib/abrangenciaMapHelpers";
 
 /** Reserva atribuída ao motorista OU criada por ele sem outro motorista definido (alinhado a Abrangência). */
 export function transferVisivelMotoristaExecutivo(r: Tables<"reservas_transfer">, userId: string): boolean {
@@ -49,6 +50,54 @@ export function isReservaCanceladaAgenda(status: string | null | undefined): boo
   return s.includes("cancel");
 }
 
+/** Alinhado ao mapa de Abrangência: viagem já realizada / encerrada. */
+export function isReservaConcluidaAgenda(status: string | null | undefined): boolean {
+  const s = (status || "").toLowerCase().trim();
+  if (!s) return false;
+  const keys = ["concluí", "concluid", "realiz", "finaliz", "complet", "feito", "atend", "encerr"];
+  return keys.some((k) => s.includes(k));
+}
+
+/** Instantâneo local do slot (dia da célula + hora; meio-dia se hora ausente). */
+export function parseAgendaInstantMs(dayKey: string, horario: string): number {
+  const parts = dayKey.split("-").map(Number);
+  if (parts.length !== 3 || parts.some((n) => !Number.isFinite(n))) return Date.now();
+  const [y, mo, d] = parts as [number, number, number];
+  let hh = 12;
+  let mm = 0;
+  const t = (horario ?? "").trim();
+  if (t && t !== "—") {
+    const m = /^(\d{1,2}):(\d{2})/.exec(t);
+    if (m) {
+      hh = Math.min(23, Math.max(0, Number(m[1])));
+      mm = Math.min(59, Math.max(0, Number(m[2])));
+    }
+  }
+  return new Date(y, mo - 1, d, hh, mm, 0, 0).getTime();
+}
+
+function trajetoTransferLeg(r: Tables<"reservas_transfer">, leg: "ida" | "volta" | "por_hora"): string {
+  if (leg === "por_hora") {
+    const a = primeiroSegmentoEndereco(r.por_hora_endereco_inicio) || "—";
+    const b = (r.por_hora_ponto_encerramento || "").trim() || "—";
+    return `${a} → ${b}`;
+  }
+  if (leg === "ida") {
+    const a = primeiroSegmentoEndereco(r.ida_embarque) || "—";
+    const b = (r.ida_desembarque || "").trim() || "—";
+    return `${a} → ${b}`;
+  }
+  const a = primeiroSegmentoEndereco(r.volta_embarque) || "—";
+  const b = (r.volta_desembarque || "").trim() || "—";
+  return `${a} → ${b}`;
+}
+
+function trajetoGrupoResumo(g: Tables<"reservas_grupos">): string {
+  const a = primeiroSegmentoEndereco(g.embarque) || "—";
+  const b = (g.destino || "").trim() || "—";
+  return `${a} → ${b}`;
+}
+
 export type AgendaItem = {
   key: string;
   reservaId: string;
@@ -57,15 +106,25 @@ export type AgendaItem = {
   /** Ex.: Ida, Volta, Por hora */
   perna: string;
   horario: string;
+  trajetoResumo: string;
+  status: string | null;
+  instanteAgendaMs: number;
 };
+
+/** Vermelho no código: já passou o horário do slot ou reserva concluída. */
+export function agendaItemCodigoNoPassado(it: AgendaItem, nowMs: number = Date.now()): boolean {
+  if (isReservaConcluidaAgenda(it.status)) return true;
+  return it.instanteAgendaMs < nowMs;
+}
 
 function pushItem(
   map: Map<string, AgendaItem[]>,
   dayKey: string | null,
-  item: Omit<AgendaItem, "key"> & { key?: string },
+  item: Omit<AgendaItem, "key" | "instanteAgendaMs"> & { key?: string },
 ): void {
   if (!dayKey) return;
   const key = item.key ?? `${item.kind}:${item.reservaId}:${item.perna}:${dayKey}`;
+  const instanteAgendaMs = parseAgendaInstantMs(dayKey, item.horario);
   const list = map.get(dayKey) ?? [];
   list.push({
     key,
@@ -74,6 +133,9 @@ function pushItem(
     numeroLabel: item.numeroLabel,
     perna: item.perna,
     horario: item.horario,
+    trajetoResumo: item.trajetoResumo,
+    status: item.status,
+    instanteAgendaMs,
   });
   map.set(dayKey, list);
 }
@@ -99,6 +161,8 @@ export function buildAgendaItemsPorDia(
         numeroLabel: num,
         perna: "Por hora",
         horario: formatHoraReserva(r.por_hora_hora),
+        trajetoResumo: trajetoTransferLeg(r, "por_hora"),
+        status: r.status,
         key: `transfer:${r.id}:por_hora`,
       });
       continue;
@@ -111,6 +175,8 @@ export function buildAgendaItemsPorDia(
       numeroLabel: num,
       perna: "Ida",
       horario: formatHoraReserva(r.ida_hora),
+      trajetoResumo: trajetoTransferLeg(r, "ida"),
+      status: r.status,
       key: `transfer:${r.id}:ida`,
     });
 
@@ -122,6 +188,8 @@ export function buildAgendaItemsPorDia(
         numeroLabel: num,
         perna: "Volta",
         horario: formatHoraReserva(r.volta_hora),
+        trajetoResumo: trajetoTransferLeg(r, "volta"),
+        status: r.status,
         key: `transfer:${r.id}:volta`,
       });
     }
@@ -131,6 +199,7 @@ export function buildAgendaItemsPorDia(
     if (!grupoVisivelMotoristaExecutivo(g, userId)) continue;
     if (isReservaCanceladaAgenda(g.status)) continue;
     const num = formatNumeroReservaPad(g.numero_reserva);
+    const traj = trajetoGrupoResumo(g);
 
     const dkIda = toAgendaDayKey(g.data_ida);
     pushItem(map, dkIda, {
@@ -139,6 +208,8 @@ export function buildAgendaItemsPorDia(
       numeroLabel: num,
       perna: "Ida",
       horario: formatHoraReserva(g.hora_ida),
+      trajetoResumo: traj,
+      status: g.status,
       key: `grupo:${g.id}:ida`,
     });
 
@@ -150,6 +221,8 @@ export function buildAgendaItemsPorDia(
         numeroLabel: num,
         perna: "Volta",
         horario: formatHoraReserva(g.hora_retorno),
+        trajetoResumo: traj,
+        status: g.status,
         key: `grupo:${g.id}:volta`,
       });
     }

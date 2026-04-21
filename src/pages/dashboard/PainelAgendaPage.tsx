@@ -5,7 +5,15 @@ import { Tables } from "@/integrations/supabase/types";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { buildAgendaItemsPorDia, type AgendaItem } from "@/lib/painelAgendaReservas";
+import {
+  agendaItemCodigoNoPassado,
+  buildAgendaItemsPorDia,
+  type AgendaItem,
+} from "@/lib/painelAgendaReservas";
+import DetalhesReservaTransferSheet from "@/components/reservas/DetalhesReservaTransferSheet";
+import DetalhesReservaGrupoSheet from "@/components/reservas/DetalhesReservaGrupoSheet";
+import ComunicarDialog from "@/components/comunicar/ComunicarDialog";
+import { generateGrupoPDF, generateTransferPDF, getGrupoReservaPdfBase64, getTransferReservaPdfBase64 } from "@/lib/pdfGenerator";
 
 const WEEKDAYS_PT = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"] as const;
 
@@ -39,6 +47,12 @@ export default function PainelAgendaPage() {
   const [transfers, setTransfers] = useState<Tables<"reservas_transfer">[]>([]);
   const [grupos, setGrupos] = useState<Tables<"reservas_grupos">[]>([]);
   const [userId, setUserId] = useState<string | null>(null);
+  const [detailTransfer, setDetailTransfer] = useState<Tables<"reservas_transfer"> | null>(null);
+  const [detailGrupo, setDetailGrupo] = useState<Tables<"reservas_grupos"> | null>(null);
+  const [detailSheetOpen, setDetailSheetOpen] = useState(false);
+  const [comunicarOpen, setComunicarOpen] = useState(false);
+  const [comunicarTransfer, setComunicarTransfer] = useState<Tables<"reservas_transfer"> | null>(null);
+  const [comunicarGrupo, setComunicarGrupo] = useState<Tables<"reservas_grupos"> | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -56,11 +70,13 @@ export default function PainelAgendaPage() {
         supabase
           .from("reservas_transfer")
           .select(
-            "id, tipo_viagem, numero_reserva, status, user_id, motorista_id, ida_data, ida_hora, volta_data, volta_hora, por_hora_data, por_hora_hora",
+            "id, tipo_viagem, numero_reserva, status, user_id, motorista_id, ida_data, ida_hora, volta_data, volta_hora, por_hora_data, por_hora_hora, ida_embarque, ida_desembarque, volta_embarque, volta_desembarque, por_hora_endereco_inicio, por_hora_ponto_encerramento",
           ),
         supabase
           .from("reservas_grupos")
-          .select("id, numero_reserva, status, user_id, motorista_id, data_ida, hora_ida, data_retorno, hora_retorno"),
+          .select(
+            "id, numero_reserva, status, user_id, motorista_id, data_ida, hora_ida, data_retorno, hora_retorno, embarque, destino",
+          ),
       ]);
 
       if (tRes.error) {
@@ -115,6 +131,54 @@ export default function PainelAgendaPage() {
     const n = new Date();
     setCursor({ y: n.getFullYear(), m: n.getMonth() });
   };
+
+  const openAgendaDetail = useCallback(async (it: AgendaItem) => {
+    try {
+      if (it.kind === "transfer") {
+        const { data, error } = await supabase.from("reservas_transfer").select("*").eq("id", it.reservaId).maybeSingle();
+        if (error || !data) {
+          toast.error("Não foi possível abrir a reserva de transfer.");
+          return;
+        }
+        setDetailGrupo(null);
+        setDetailTransfer(data as Tables<"reservas_transfer">);
+        setDetailSheetOpen(true);
+        return;
+      }
+      const { data, error } = await supabase.from("reservas_grupos").select("*").eq("id", it.reservaId).maybeSingle();
+      if (error || !data) {
+        toast.error("Não foi possível abrir a reserva de grupo.");
+        return;
+      }
+      setDetailTransfer(null);
+      setDetailGrupo(data as Tables<"reservas_grupos">);
+      setDetailSheetOpen(true);
+    } catch {
+      toast.error("Erro ao carregar detalhes da reserva.");
+    }
+  }, []);
+
+  const handleComunicarTransfer = useCallback((r: Tables<"reservas_transfer">) => {
+    setComunicarTransfer(r);
+    setComunicarGrupo(null);
+    setComunicarOpen(true);
+  }, []);
+
+  const handleComunicarGrupo = useCallback((r: Tables<"reservas_grupos">) => {
+    setComunicarGrupo(r);
+    setComunicarTransfer(null);
+    setComunicarOpen(true);
+  }, []);
+
+  const handleDownloadTransfer = useCallback(async (r: Tables<"reservas_transfer">) => {
+    toast.info("Gerando PDF...");
+    await generateTransferPDF(r.id);
+  }, []);
+
+  const handleDownloadGrupo = useCallback(async (r: Tables<"reservas_grupos">) => {
+    toast.info("Gerando PDF...");
+    await generateGrupoPDF(r.id);
+  }, []);
 
   return (
     <div className="space-y-6">
@@ -196,18 +260,32 @@ export default function PainelAgendaPage() {
                   {dayNum}
                 </span>
                 <div className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto">
-                  {items.map((it) => (
-                    <div
-                      key={it.key}
-                      className="rounded border border-border/80 bg-muted/40 px-1.5 py-1 text-[10px] leading-tight text-foreground sm:text-xs"
-                      title={`${it.numeroLabel} ${it.perna} · ${it.horario}`}
-                    >
-                      <div className="font-mono font-semibold text-primary">{it.numeroLabel}</div>
-                      <div className="text-muted-foreground">
-                        {it.perna} · {it.horario}
-                      </div>
-                    </div>
-                  ))}
+                  {items.map((it) => {
+                    const noPassado = agendaItemCodigoNoPassado(it);
+                    const title = `${it.numeroLabel} · ${it.perna} · ${it.horario} — ${it.trajetoResumo}`;
+                    return (
+                      <button
+                        key={it.key}
+                        type="button"
+                        onClick={() => void openAgendaDetail(it)}
+                        className={cn(
+                          "flex w-full min-w-0 max-w-full items-center gap-1 rounded border border-border/80 bg-muted/40 px-1 py-0.5 text-left text-[10px] leading-tight text-foreground transition-colors hover:bg-muted/70 sm:text-xs",
+                        )}
+                        title={title}
+                      >
+                        <span
+                          className={cn(
+                            "shrink-0 font-mono font-semibold tabular-nums",
+                            noPassado ? "text-red-500" : "text-green-500",
+                          )}
+                        >
+                          {it.numeroLabel}
+                        </span>
+                        <span className="min-w-0 flex-1 truncate text-muted-foreground">{it.trajetoResumo}</span>
+                        <span className="shrink-0 whitespace-nowrap text-muted-foreground">· {it.horario}</span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             );
@@ -220,8 +298,64 @@ export default function PainelAgendaPage() {
       ) : (
         <p className="text-xs text-muted-foreground">
           Reservas com data/hora preenchidas aparecem no dia correspondente. Ida e volta geram entradas separadas (com
-          horários distintos quando informados).
+          horários distintos quando informados). Toque numa linha para ver detalhes. O código fica{" "}
+          <span className="text-green-500">verde</span> se o horário do dia ainda não passou e{" "}
+          <span className="text-red-500">vermelho</span> se já passou ou a reserva está concluída.
         </p>
+      )}
+
+      <DetalhesReservaTransferSheet
+        reserva={detailTransfer}
+        open={detailSheetOpen && detailTransfer != null}
+        onOpenChange={(open) => {
+          setDetailSheetOpen(open);
+          if (!open) setDetailTransfer(null);
+        }}
+        onComunicar={handleComunicarTransfer}
+        onDownload={handleDownloadTransfer}
+      />
+
+      <DetalhesReservaGrupoSheet
+        reserva={detailGrupo}
+        open={detailSheetOpen && detailGrupo != null}
+        onOpenChange={(open) => {
+          setDetailSheetOpen(open);
+          if (!open) setDetailGrupo(null);
+        }}
+        onComunicar={handleComunicarGrupo}
+        onDownload={handleDownloadGrupo}
+      />
+
+      {comunicarTransfer && (
+        <ComunicarDialog
+          open={comunicarOpen && comunicarTransfer != null}
+          onOpenChange={(o) => {
+            setComunicarOpen(o);
+            if (!o) setComunicarTransfer(null);
+          }}
+          dados={comunicarTransfer}
+          telefone={comunicarTransfer.telefone}
+          titulo="Comunicar — Reserva Transfer"
+          onGerarPDF={() => generateTransferPDF(comunicarTransfer.id)}
+          webhookTipo="transfer_reserva"
+          getConfirmacaoReservaPdfBase64={() => getTransferReservaPdfBase64(comunicarTransfer.id)}
+        />
+      )}
+
+      {comunicarGrupo && (
+        <ComunicarDialog
+          open={comunicarOpen && comunicarGrupo != null}
+          onOpenChange={(o) => {
+            setComunicarOpen(o);
+            if (!o) setComunicarGrupo(null);
+          }}
+          dados={comunicarGrupo}
+          telefone={comunicarGrupo.whatsapp}
+          titulo="Comunicar — Reserva de Grupo"
+          onGerarPDF={() => generateGrupoPDF(comunicarGrupo.id)}
+          webhookTipo="grupo_reserva"
+          getConfirmacaoReservaPdfBase64={() => getGrupoReservaPdfBase64(comunicarGrupo.id)}
+        />
       )}
     </div>
   );
