@@ -28,6 +28,11 @@ export const FROTA_FREE_PAGE_IDS = new Set<string>([
   "sistema/automacoes",
   "anotacoes",
   "tickets",
+  "financeiro",
+  "financeiro/lancamentos",
+  "financeiro/receber",
+  "financeiro/pagar",
+  "financeiro/relatorios",
 ]);
 
 export function isFrotaFreePage(pageId: string): boolean {

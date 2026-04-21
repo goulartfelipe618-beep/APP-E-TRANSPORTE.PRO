@@ -26,6 +26,11 @@ import {
   StickyNote,
   ChevronRight,
   Calendar,
+  Wallet2,
+  List,
+  Inbox,
+  Outbox,
+  FileBarChart,
 } from "lucide-react";
 import { useState, useEffect, useMemo, type LucideIcon } from "react";
 import luxuryCar from "@/assets/luxury-car.jpg";
@@ -93,6 +98,16 @@ function buildHomeSections(showNetwork: boolean, exibirComunicadorMotorista: boo
       items: [
         { title: "Veículos", page: "veiculos", desc: "Cadastro e gestão da frota.", icon: Car },
         { title: "Mentoria", page: "mentoria", desc: "Conteúdos e trilha de desenvolvimento.", icon: GraduationCap },
+      ],
+    },
+    {
+      title: "Financeiro",
+      items: [
+        { title: "Dashboard financeiro", page: "financeiro", desc: "Resumo do mês: faturado, recebido, pendente e lucro estimado.", icon: Wallet2 },
+        { title: "Lançamentos", page: "financeiro/lancamentos", desc: "Todas as receitas e despesas; criar lançamentos manuais.", icon: List },
+        { title: "Contas a receber", page: "financeiro/receber", desc: "Receitas geradas pelas reservas (transfer e grupos).", icon: Inbox },
+        { title: "Contas a pagar", page: "financeiro/pagar", desc: "Despesas operacionais registadas.", icon: Outbox },
+        { title: "Relatórios", page: "financeiro/relatorios", desc: "Por período e viagens mais rentáveis.", icon: FileBarChart },
       ],
     },
   ];
@@ -432,7 +447,6 @@ export default function HomePage() {
 
       <SlideCarousel
         pagina="home"
-        breakoutTop={false}
         fallbackSlides={[
           {
             titulo: "Impulsione seu Transporte Executivo",

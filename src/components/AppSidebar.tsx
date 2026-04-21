@@ -7,6 +7,7 @@ import {
   ClipboardList, Car, Megaphone, BarChart3,
   Globe, Search, Mail, Monitor, Settings, StickyNote, Link2,
   Bell, Moon, Sun, LogOut, GraduationCap, Plane, Calendar,
+  Wallet2, List, Inbox, Outbox,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -103,6 +104,16 @@ const getMenuStructure = (showNetwork: boolean, exibirComunicadorMotorista: bool
       },
       { title: "Veículos", page: "veiculos", icon: Car },
       { title: "Mentoria", page: "mentoria", icon: GraduationCap },
+    ],
+  },
+  {
+    label: "Financeiro",
+    items: [
+      { title: "Dashboard", page: "financeiro", icon: Wallet2 },
+      { title: "Lançamentos", page: "financeiro/lancamentos", icon: List },
+      { title: "Contas a receber", page: "financeiro/receber", icon: Inbox },
+      { title: "Contas a pagar", page: "financeiro/pagar", icon: Outbox },
+      { title: "Relatórios", page: "financeiro/relatorios", icon: BarChart3 },
     ],
   },
   {

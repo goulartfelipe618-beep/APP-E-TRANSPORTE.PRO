@@ -49,6 +49,11 @@ import AtualizacoesPage from "@/pages/dashboard/AtualizacoesPage";
 import PainelAgendaPage from "@/pages/dashboard/PainelAgendaPage";
 import CatalogoPage from "@/pages/dashboard/Catalogo";
 import CommunityPage from "@/pages/dashboard/CommunityPage";
+import FinanceiroDashboardPage from "@/pages/dashboard/financeiro/FinanceiroDashboardPage";
+import FinanceiroLancamentosPage from "@/pages/dashboard/financeiro/FinanceiroLancamentosPage";
+import FinanceiroReceberPage from "@/pages/dashboard/financeiro/FinanceiroReceberPage";
+import FinanceiroPagarPage from "@/pages/dashboard/financeiro/FinanceiroPagarPage";
+import FinanceiroRelatoriosPage from "@/pages/dashboard/financeiro/FinanceiroRelatoriosPage";
 import PainelAvisoBanner from "@/components/PainelAvisoBanner";
 import FullscreenBannerOverlay from "@/components/FullscreenBannerOverlay";
 
@@ -87,6 +92,11 @@ const PAGE_MAP: Record<string, React.ComponentType> = {
   mentoria: MentoriaPage,
   "empty-legs": EmptyLegsPage,
   catalogo: CatalogoPage,
+  financeiro: FinanceiroDashboardPage,
+  "financeiro/lancamentos": FinanceiroLancamentosPage,
+  "financeiro/receber": FinanceiroReceberPage,
+  "financeiro/pagar": FinanceiroPagarPage,
+  "financeiro/relatorios": FinanceiroRelatoriosPage,
 };
 
 function readNetworkSpotlightActive() {

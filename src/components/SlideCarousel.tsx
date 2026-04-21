@@ -131,36 +131,39 @@ export default function SlideCarousel({
       "sm:-ml-[var(--main-pad-x,1.5rem)] sm:-mr-[var(--main-pad-x,1.5rem)]",
     );
 
-  const frameClassName = cn(
-    "relative box-border min-w-0 shrink-0 overflow-hidden p-0",
+  /** Sombra por baixo do slide (o `overflow-hidden` do interior cortaria a sombra no mesmo nó). */
+  const outerBleedClass = cn(
+    "relative z-[1] min-w-0 shrink-0",
+    horizontalBleedClass,
+    fullBleed
+      ? "shadow-[0_10px_28px_-6px_rgba(0,0,0,0.45)] dark:shadow-[0_14px_40px_-8px_rgba(0,0,0,0.75)]"
+      : "shadow-md dark:shadow-lg",
+    className,
+  );
+
+  const innerFrameClassName = cn(
+    "relative box-border min-w-0 w-full overflow-hidden p-0",
     isBanner
       ? cn(
           /* Mobile: área mais alta + contain = imagem inteira; desktop: faixa wide original */
           "max-sm:aspect-[2/1] max-sm:min-h-[120px] sm:aspect-[1922/330] sm:min-h-0",
-          fullBleed
-            ? "rounded-none border-0 bg-muted/30 shadow-none"
-            : "rounded-none rounded-b-xl border-b border-border bg-muted/30",
+          fullBleed ? "rounded-none border-0 bg-muted/30" : "rounded-none rounded-b-xl border-b border-border bg-muted/30",
         )
       : cn(
           "max-sm:aspect-video max-sm:min-h-[160px] sm:aspect-[16/5] sm:min-h-[180px]",
-          fullBleed ? "rounded-none border-0 shadow-none" : "rounded-xl",
+          fullBleed ? "rounded-none border-0" : "rounded-xl",
         ),
-    horizontalBleedClass,
-    className,
   );
 
   if (!loading && displaySlides.length === 0) return null;
 
   if (loading) {
     return (
-      <div
-        style={bleedStyle}
-        className={frameClassName}
-        aria-busy="true"
-        aria-label="Carregando banner"
-      >
-        <div className="absolute inset-0 flex items-center justify-center bg-muted/50">
-          <Loader2 className="h-9 w-9 animate-spin text-muted-foreground" />
+      <div style={bleedStyle} className={outerBleedClass} aria-busy="true" aria-label="Carregando banner">
+        <div className={innerFrameClassName}>
+          <div className="absolute inset-0 flex items-center justify-center bg-muted/50">
+            <Loader2 className="h-9 w-9 animate-spin text-muted-foreground" />
+          </div>
         </div>
       </div>
     );
@@ -218,52 +221,54 @@ export default function SlideCarousel({
   };
 
   return (
-    <div style={bleedStyle} className={frameClassName}>
-      <div className="absolute inset-0 min-h-0">
-        {displaySlides.map((s, i) => renderSlide(s, i))}
-      </div>
-
-      {showText && (
-        <div className="absolute inset-0 flex items-center bg-gradient-to-r from-black/70 to-transparent px-6 transition-opacity duration-700 sm:px-12">
-          <div className="max-w-lg">
-            {currentSlideData.titulo && (
-              <h2 className="mb-2 text-3xl font-bold text-white">{currentSlideData.titulo}</h2>
-            )}
-            {currentSlideData.subtitulo && <p className="text-white/80">{currentSlideData.subtitulo}</p>}
-          </div>
+    <div style={bleedStyle} className={outerBleedClass}>
+      <div className={innerFrameClassName}>
+        <div className="absolute inset-0 min-h-0">
+          {displaySlides.map((s, i) => renderSlide(s, i))}
         </div>
-      )}
 
-      {displaySlides.length > 1 && (
-        <>
-          <button
-            type="button"
-            onClick={prevSlide}
-            className="absolute left-2 top-1/2 z-10 -translate-y-1/2 rounded-full bg-black/50 p-2 text-white transition-colors hover:bg-black/70 sm:left-4"
-          >
-            <ChevronLeft className="h-5 w-5" />
-          </button>
-          <button
-            type="button"
-            onClick={nextSlide}
-            className="absolute right-2 top-1/2 z-10 -translate-y-1/2 rounded-full bg-black/50 p-2 text-white transition-colors hover:bg-black/70 sm:right-4"
-          >
-            <ChevronRight className="h-5 w-5" />
-          </button>
-          <div className="absolute bottom-4 left-1/2 z-10 flex -translate-x-1/2 gap-2">
-            {displaySlides.map((_, i) => (
-              <button
-                key={i}
-                type="button"
-                onClick={() => setCurrentSlide(i)}
-                className={`h-2.5 w-2.5 rounded-full transition-all duration-500 ${
-                  i === currentSlide ? "scale-110 bg-white" : "bg-white/40"
-                }`}
-              />
-            ))}
+        {showText && (
+          <div className="absolute inset-0 flex items-center bg-gradient-to-r from-black/70 to-transparent px-6 transition-opacity duration-700 sm:px-12">
+            <div className="max-w-lg">
+              {currentSlideData.titulo && (
+                <h2 className="mb-2 text-3xl font-bold text-white">{currentSlideData.titulo}</h2>
+              )}
+              {currentSlideData.subtitulo && <p className="text-white/80">{currentSlideData.subtitulo}</p>}
+            </div>
           </div>
-        </>
-      )}
+        )}
+
+        {displaySlides.length > 1 && (
+          <>
+            <button
+              type="button"
+              onClick={prevSlide}
+              className="absolute left-2 top-1/2 z-10 -translate-y-1/2 rounded-full bg-black/50 p-2 text-white transition-colors hover:bg-black/70 sm:left-4"
+            >
+              <ChevronLeft className="h-5 w-5" />
+            </button>
+            <button
+              type="button"
+              onClick={nextSlide}
+              className="absolute right-2 top-1/2 z-10 -translate-y-1/2 rounded-full bg-black/50 p-2 text-white transition-colors hover:bg-black/70 sm:right-4"
+            >
+              <ChevronRight className="h-5 w-5" />
+            </button>
+            <div className="absolute bottom-4 left-1/2 z-10 flex -translate-x-1/2 gap-2">
+              {displaySlides.map((_, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => setCurrentSlide(i)}
+                  className={`h-2.5 w-2.5 rounded-full transition-all duration-500 ${
+                    i === currentSlide ? "scale-110 bg-white" : "bg-white/40"
+                  }`}
+                />
+              ))}
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }

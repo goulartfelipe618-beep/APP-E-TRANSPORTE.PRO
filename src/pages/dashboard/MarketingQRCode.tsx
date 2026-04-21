@@ -277,7 +277,7 @@ export default function MarketingQRCodePage() {
               <Plus className="h-4 w-4 mr-2" /> Novo QR Code
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto z-[200]">
+          <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Novo QR Code</DialogTitle>
             </DialogHeader>
@@ -324,7 +324,7 @@ export default function MarketingQRCodePage() {
       </div>
 
       <Dialog open={downloadOpen} onOpenChange={setDownloadOpen}>
-        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto z-[200]">
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Baixar QR Code em PNG</DialogTitle>
           </DialogHeader>
