@@ -8,6 +8,7 @@
 export const FROTA_FREE_PAGE_IDS = new Set<string>([
   "home",
   "abrangencia",
+  "agenda",
   "atualizacoes",
   "metricas",
   "transfer/solicitacoes",

@@ -6,28 +6,58 @@ import { Badge } from "@/components/ui/badge";
 import CadastrarMotoristaDialog from "@/components/motoristas/CadastrarMotoristaDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import type { Json } from "@/integrations/supabase/types";
+
+type MotoristaCadastroRow = {
+  id: string;
+  nome: string;
+  cpf: string | null;
+  telefone: string | null;
+  email: string | null;
+  cidade: string | null;
+  estado: string | null;
+  status: string;
+  created_at: string;
+  dados_webhook: Json | null;
+};
+
+function situacaoFrotaFromWebhook(dw: Json | null): "ativo" | "inativo" {
+  if (!dw || typeof dw !== "object" || Array.isArray(dw)) return "ativo";
+  const o = dw as Record<string, unknown>;
+  return o.situacao_frota === "inativo" ? "inativo" : "ativo";
+}
 
 export default function MotoristaCadastrosPage() {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [open, setOpen] = useState(false);
-  const [motoristas, setMotoristas] = useState<any[]>([]);
+  const [motoristas, setMotoristas] = useState<MotoristaCadastroRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
 
   const fetchMotoristas = useCallback(async () => {
     setLoading(true);
+    const { data: auth } = await supabase.auth.getUser();
+    const user = auth.user;
+    if (!user) {
+      setMotoristas([]);
+      setLoading(false);
+      return;
+    }
+
     const { data, error } = await supabase
       .from("solicitacoes_motoristas")
-      .select("id, nome, cpf, telefone, email, cidade, estado, status, created_at")
+      .select("id, nome, cpf, telefone, email, cidade, estado, status, created_at, dados_webhook")
+      .eq("user_id", user.id)
       .eq("status", "cadastrado")
       .order("created_at", { ascending: false });
+
     if (error) toast.error("Erro ao carregar cadastros de motoristas.");
-    else setMotoristas(data || []);
+    else setMotoristas((data as MotoristaCadastroRow[] | null) ?? []);
     setLoading(false);
   }, []);
 
   useEffect(() => {
-    fetchMotoristas();
+    void fetchMotoristas();
   }, [fetchMotoristas]);
 
   const handleCreated = () => {
@@ -47,10 +77,10 @@ export default function MotoristaCadastrosPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Cadastros de Motoristas</h1>
+          <h1 className="text-2xl font-bold text-foreground">Cadastros de motoristas</h1>
           <p className="text-muted-foreground">
-            Motoristas parceiros registados na sua frota. Pré-cadastros de interesse na plataforma (site / landing) são
-            tratados apenas no painel Admin Master.
+            Motoristas da <strong>sua frota</strong> (cada registo fica associado à sua conta; o painel Admin Master gere
+            pré-cadastros do site separadamente). A lista usa o mesmo critério de segurança na base de dados (RLS).
           </p>
         </div>
         <Button
@@ -83,48 +113,67 @@ export default function MotoristaCadastrosPage() {
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center py-20 text-muted-foreground">Carregando...</div>
+        <div className="flex items-center justify-center py-20 text-muted-foreground">A carregar…</div>
       ) : filtered.length === 0 ? (
         <div className="flex items-center justify-center py-20 text-muted-foreground">Nenhum motorista cadastrado.</div>
       ) : viewMode === "grid" ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {filtered.map((m) => (
-            <div key={m.id} className="rounded-xl border border-border bg-card p-4 space-y-2">
-              <div className="flex items-center justify-between gap-2">
-                <h3 className="font-semibold text-foreground">{m.nome}</h3>
-                <Badge variant="default">Cadastrado</Badge>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {filtered.map((m) => {
+            const situacao = situacaoFrotaFromWebhook(m.dados_webhook);
+            return (
+              <div key={m.id} className="space-y-2 rounded-xl border border-border bg-card p-4">
+                <div className="flex items-center justify-between gap-2">
+                  <h3 className="font-semibold text-foreground">{m.nome}</h3>
+                  <div className="flex shrink-0 flex-wrap justify-end gap-1">
+                    <Badge variant="outline">Cadastrado</Badge>
+                    <Badge variant={situacao === "ativo" ? "default" : "secondary"}>
+                      {situacao === "ativo" ? "Ativo" : "Inativo"}
+                    </Badge>
+                  </div>
+                </div>
+                <p className="text-sm text-muted-foreground">CPF: {m.cpf || "—"}</p>
+                <p className="text-sm text-muted-foreground">Telefone: {m.telefone || "—"}</p>
+                <p className="text-sm text-muted-foreground">
+                  Cidade/UF: {m.cidade || "—"} {m.estado ? `- ${m.estado}` : ""}
+                </p>
+                <p className="text-xs text-muted-foreground">Cadastrado em {new Date(m.created_at).toLocaleDateString("pt-BR")}</p>
               </div>
-              <p className="text-sm text-muted-foreground">CPF: {m.cpf || "—"}</p>
-              <p className="text-sm text-muted-foreground">Telefone: {m.telefone || "—"}</p>
-              <p className="text-sm text-muted-foreground">Cidade/UF: {(m.cidade || "—")} {(m.estado ? `- ${m.estado}` : "")}</p>
-              <p className="text-xs text-muted-foreground">
-                Cadastrado em {new Date(m.created_at).toLocaleDateString("pt-BR")}
-              </p>
-            </div>
-          ))}
+            );
+          })}
         </div>
       ) : (
-        <div className="rounded-xl border border-border bg-card overflow-hidden">
+        <div className="overflow-hidden rounded-xl border border-border bg-card">
           <table className="w-full text-sm">
             <thead className="bg-muted/40">
               <tr>
-                <th className="text-left p-3">Nome</th>
-                <th className="text-left p-3">CPF</th>
-                <th className="text-left p-3">Telefone</th>
-                <th className="text-left p-3">Cidade/UF</th>
-                <th className="text-left p-3">Data</th>
+                <th className="p-3 text-left">Nome</th>
+                <th className="p-3 text-left">CPF</th>
+                <th className="p-3 text-left">Telefone</th>
+                <th className="p-3 text-left">Cidade/UF</th>
+                <th className="p-3 text-left">Frota</th>
+                <th className="p-3 text-left">Data</th>
               </tr>
             </thead>
             <tbody>
-              {filtered.map((m) => (
-                <tr key={m.id} className="border-t border-border">
-                  <td className="p-3">{m.nome}</td>
-                  <td className="p-3">{m.cpf || "—"}</td>
-                  <td className="p-3">{m.telefone || "—"}</td>
-                  <td className="p-3">{(m.cidade || "—")} {(m.estado ? `- ${m.estado}` : "")}</td>
-                  <td className="p-3">{new Date(m.created_at).toLocaleDateString("pt-BR")}</td>
-                </tr>
-              ))}
+              {filtered.map((m) => {
+                const situacao = situacaoFrotaFromWebhook(m.dados_webhook);
+                return (
+                  <tr key={m.id} className="border-t border-border">
+                    <td className="p-3">{m.nome}</td>
+                    <td className="p-3">{m.cpf || "—"}</td>
+                    <td className="p-3">{m.telefone || "—"}</td>
+                    <td className="p-3">
+                      {m.cidade || "—"} {m.estado ? `- ${m.estado}` : ""}
+                    </td>
+                    <td className="p-3">
+                      <Badge variant={situacao === "ativo" ? "default" : "secondary"} className="text-xs">
+                        {situacao === "ativo" ? "Ativo" : "Inativo"}
+                      </Badge>
+                    </td>
+                    <td className="p-3">{new Date(m.created_at).toLocaleDateString("pt-BR")}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

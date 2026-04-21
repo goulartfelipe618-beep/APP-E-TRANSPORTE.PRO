@@ -25,6 +25,7 @@ import {
   Monitor,
   StickyNote,
   ChevronRight,
+  Calendar,
 } from "lucide-react";
 import { useState, useEffect, useMemo, type LucideIcon } from "react";
 import luxuryCar from "@/assets/luxury-car.jpg";
@@ -62,6 +63,7 @@ function buildHomeSections(showNetwork: boolean, exibirComunicadorMotorista: boo
         { title: "Atualizações", page: "atualizacoes", desc: "Novidades da plataforma e avisos importantes.", icon: Bell },
         { title: "Métricas", page: "metricas", desc: "Indicadores e desempenho da operação.", icon: Activity },
         { title: "Abrangência", page: "abrangencia", desc: "Mapa das suas reservas (um PIN por viagem, embarque da primeira partida).", icon: MapPin },
+        { title: "Agenda", page: "agenda", desc: "Calendário mensal das suas reservas (transfer e grupos).", icon: Calendar },
       ],
     },
     {
@@ -123,7 +125,7 @@ function buildHomeSections(showNetwork: boolean, exibirComunicadorMotorista: boo
         { title: "Configurações", page: "sistema/configuracoes", desc: "Dados da empresa, perfil e preferências.", icon: Settings },
         { title: "Automações", page: "sistema/automacoes", desc: "Webhooks e integrações automatizadas.", icon: Globe },
         ...(exibirComunicadorMotorista
-          ? [{ title: "Comunicador", page: "sistema/comunicador", desc: "Canais WhatsApp oficiais e próprios.", icon: Monitor } as ToolDef]
+          ? [{ title: "Comunicador", page: "sistema/comunicador", desc: "Canal WhatsApp oficial da plataforma.", icon: Monitor } as ToolDef]
           : []),
       ],
     },
@@ -430,6 +432,7 @@ export default function HomePage() {
 
       <SlideCarousel
         pagina="home"
+        breakoutTop={false}
         fallbackSlides={[
           {
             titulo: "Impulsione seu Transporte Executivo",

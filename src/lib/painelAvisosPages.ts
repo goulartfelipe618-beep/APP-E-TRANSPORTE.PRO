@@ -4,6 +4,7 @@ export const PAGINAS_MOTORISTA: { value: string; label: string }[] = [
   { value: "atualizacoes", label: "Atualizações" },
   { value: "metricas", label: "Métricas" },
   { value: "abrangencia", label: "Abrangência" },
+  { value: "agenda", label: "Agenda" },
   { value: "transfer/solicitacoes", label: "Transfer — Solicitações" },
   { value: "transfer/reservas", label: "Transfer — Reservas" },
   { value: "transfer/contrato", label: "Transfer — Contrato" },

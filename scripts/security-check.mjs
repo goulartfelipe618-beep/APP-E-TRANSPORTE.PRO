@@ -85,4 +85,24 @@ try {
   /* fora de repo git */
 }
 
+/** Alinhado a README_SECURITY.md — service role nunca no bundle do browser. */
+console.log("\n--- Verificação rápida `src/` (segredos) ---\n");
+const GREP_PATTERNS = ["service_role", "SUPABASE_SERVICE_ROLE_KEY"];
+try {
+  let found = false;
+  for (const pat of GREP_PATTERNS) {
+    try {
+      execSync(`git grep -l --no-color -i "${pat}" -- src`, { cwd: root, stdio: "pipe" });
+      found = true;
+      console.error(`ERRO: ocorrências de "${pat}" em src/ — não pode ir para o bundle.`);
+    } catch (e) {
+      if (e?.status !== 1) throw e;
+    }
+  }
+  if (found) exit = 1;
+  else console.log("Nenhuma correspondência service_role / SUPABASE_SERVICE_ROLE_KEY em src/.");
+} catch {
+  console.log("(Pulado: git grep em src não disponível.)");
+}
+
 process.exit(exit);

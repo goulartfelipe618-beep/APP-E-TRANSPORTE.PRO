@@ -235,7 +235,7 @@ export default function ComunicadorAdminMasterPage() {
         });
         if (error) throw error;
       }
-      toast.success("Credenciais da Evolution salvas. Os motoristas poderão gerar QR no comunicador próprio.");
+      toast.success("Credenciais da Evolution salvas. O painel dos motoristas usa apenas o comunicador oficial.");
       setEvoCredsExist(true);
       setEvoKey("");
       setEvoEditing(false);
@@ -359,8 +359,8 @@ export default function ComunicadorAdminMasterPage() {
           <CardTitle className="text-lg">Evolution API (WhatsApp)</CardTitle>
           <CardDescription>
             URL e chave do <strong className="text-foreground">mesmo servidor Evolution</strong> que você usa no painel. Com
-            isso, ao motorista clicar em &quot;Gerar QR Code&quot; no comunicador próprio, o sistema cria a instância nesse
-            servidor e exibe o QR — sem precisar de variáveis no front do motorista.
+            isso, a instância oficial da plataforma pode ser gerida neste painel. O envio pelos motoristas executivos usa
+            sempre esse canal (sem comunicador próprio no painel por enquanto).
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

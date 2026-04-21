@@ -6,7 +6,7 @@ import {
   FileText, BookOpen, Map, Users, UserCheck,
   ClipboardList, Car, Megaphone, BarChart3,
   Globe, Search, Mail, Monitor, Settings, StickyNote, Link2,
-  Bell, Moon, Sun, LogOut, GraduationCap, Plane,
+  Bell, Moon, Sun, LogOut, GraduationCap, Plane, Calendar,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -73,6 +73,7 @@ const getMenuStructure = (showNetwork: boolean, exibirComunicadorMotorista: bool
         children: [
           { title: "Home", page: "home", icon: Home },
           { title: "Abrangência", page: "abrangencia", icon: MapPin },
+          { title: "Agenda", page: "agenda", icon: Calendar },
           { title: "Atualizações", page: "atualizacoes", icon: Bell },
           { title: "Métricas", page: "metricas", icon: Activity },
         ],

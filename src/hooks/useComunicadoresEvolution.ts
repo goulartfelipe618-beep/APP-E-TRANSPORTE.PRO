@@ -16,7 +16,9 @@ export function qrSrc(qr: string | null): string | null {
   return `data:image/png;base64,${qr}`;
 }
 
-export function useComunicadoresEvolution() {
+export function useComunicadoresEvolution(opts?: { includeUsuarioComunicador?: boolean }) {
+  const includeUsuario = opts?.includeUsuarioComunicador !== false;
+
   const [sistema, setSistema] = useState<ComunicadorRow | null>(null);
   const [own, setOwn] = useState<ComunicadorRow | null>(null);
   const [loading, setLoading] = useState(true);
@@ -30,6 +32,14 @@ export function useComunicadoresEvolution() {
       return;
     }
 
+    if (!includeUsuario) {
+      const sysRes = await supabase.from("comunicadores_evolution").select("*").eq("escopo", "sistema").maybeSingle();
+      setSistema(sysRes.data ?? null);
+      setOwn(null);
+      setLoading(false);
+      return;
+    }
+
     const [sysRes, ownRes] = await Promise.all([
       supabase.from("comunicadores_evolution").select("*").eq("escopo", "sistema").maybeSingle(),
       supabase.from("comunicadores_evolution").select("*").eq("escopo", "usuario").eq("user_id", user.id).maybeSingle(),
@@ -38,7 +48,7 @@ export function useComunicadoresEvolution() {
     setSistema(sysRes.data ?? null);
     setOwn(ownRes.data ?? null);
     setLoading(false);
-  }, []);
+  }, [includeUsuario]);
 
   useEffect(() => {
     void load();

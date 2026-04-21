@@ -90,8 +90,6 @@ const labelMap: Record<string, string> = {
 
 const ignoredKeys = ["id", "user_id", "created_at", "updated_at", "veiculo_id", "motorista_id", "solicitacao_id"];
 
-type CanalEnvio = "oficial" | "proprio";
-
 function nomeClienteParaComunicar(dados: Record<string, unknown>): string {
   const d = dados as { nome_cliente?: string; nome_completo?: string; nome?: string };
   const raw =
@@ -114,23 +112,9 @@ export default function ComunicarDialog({
 
   const [enviando, setEnviando] = useState(false);
 
-  const { sistema, own } = useComunicadoresEvolution();
+  const { sistema } = useComunicadoresEvolution({ includeUsuarioComunicador: false });
   const sistemaRef = useRef<ComunicadorRow | null>(null);
-  const ownRef = useRef<ComunicadorRow | null>(null);
-  const canalRef = useRef<CanalEnvio>("oficial");
   sistemaRef.current = sistema;
-  ownRef.current = own;
-
-  const telOficial = sistema?.telefone_conectado?.trim() || null;
-  const telProprio = own?.telefone_conectado?.trim() || null;
-  const temOficial = Boolean(telOficial);
-  const temProprio = Boolean(telProprio);
-
-  useEffect(() => {
-    if (temProprio && temOficial) canalRef.current = "proprio";
-    else if (temProprio) canalRef.current = "proprio";
-    else if (temOficial) canalRef.current = "oficial";
-  }, [temProprio, temOficial]);
 
   const [msgAcima, setMsgAcima] = useState("");
   const [msgAbaixo, setMsgAbaixo] = useState("");
@@ -190,7 +174,7 @@ export default function ComunicarDialog({
             .filter(([k, v]) => !ignoredKeys.includes(k) && v != null && v !== "")
             .map(([k]) => k),
           motorista_painel: motorista,
-          comunicador: buildComunicadorSnapshot(canalRef.current, sistemaRef.current, ownRef.current),
+          comunicador: buildComunicadorSnapshot("oficial", sistemaRef.current, null),
         });
         abertoWebhookDoneRef.current = key;
       } catch (e) {
@@ -340,7 +324,7 @@ export default function ComunicarDialog({
             final: msgAbaixo,
           },
           motorista_painel: motorista,
-          comunicador: buildComunicadorSnapshot(canalRef.current, sistema, own),
+          comunicador: buildComunicadorSnapshot("oficial", sistema, null),
           confirmacao_reserva_pdf: confirmacaoPdf,
         });
       } catch (e) {

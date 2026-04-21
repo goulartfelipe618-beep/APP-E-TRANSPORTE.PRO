@@ -46,6 +46,7 @@ import DisparadorPage from "@/pages/dashboard/DisparadorPage";
 import MentoriaPage from "@/pages/dashboard/MentoriaPage";
 import EmptyLegsPage from "@/pages/dashboard/EmptyLegsPage";
 import AtualizacoesPage from "@/pages/dashboard/AtualizacoesPage";
+import PainelAgendaPage from "@/pages/dashboard/PainelAgendaPage";
 import CatalogoPage from "@/pages/dashboard/Catalogo";
 import CommunityPage from "@/pages/dashboard/CommunityPage";
 import PainelAvisoBanner from "@/components/PainelAvisoBanner";
@@ -56,6 +57,7 @@ const PAGE_MAP: Record<string, React.ComponentType> = {
   atualizacoes: AtualizacoesPage,
   metricas: MetricasPage,
   abrangencia: MotoristaAbrangenciaPage,
+  agenda: PainelAgendaPage,
   "transfer/solicitacoes": TransferSolicitacoesPage,
   "transfer/reservas": TransferReservasPage,
   "transfer/contrato": TransferContratoPage,
@@ -147,6 +149,30 @@ function DashboardContent() {
       setActivePage("sistema/configuracoes");
     }
   }, [painelComunicadorReady, activePage, painelMotoristaEvolutionAtivo, setActivePage]);
+
+  /**
+   * Quando as configurações obrigatórias passam a estar concluídas, força refresh completo
+   * e abre na Home (sessionStorage) para recarregar tema, RLS e estado do onboarding.
+   */
+  const phase1CompletePrevRef = useRef<boolean | null>(null);
+  useEffect(() => {
+    if (onboarding.loading) return;
+    if (phase1CompletePrevRef.current === null) {
+      phase1CompletePrevRef.current = onboarding.phase1Complete;
+      return;
+    }
+    if (phase1CompletePrevRef.current === false && onboarding.phase1Complete) {
+      try {
+        sessionStorage.setItem("etp_nav_dashboard", "home");
+      } catch {
+        /* sessionStorage indisponível */
+      }
+      phase1CompletePrevRef.current = true;
+      window.location.reload();
+      return;
+    }
+    phase1CompletePrevRef.current = onboarding.phase1Complete;
+  }, [onboarding.loading, onboarding.phase1Complete]);
 
   /** Primeiro acesso: obriga concluir Sistema > Configurações; depois escolher Network na Home. */
   useEffect(() => {

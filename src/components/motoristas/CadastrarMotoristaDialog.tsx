@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,14 +10,25 @@ import { toast } from "sonner";
 import type { MotoristaInitialData } from "@/lib/motoristaFromSolicitacao";
 import { parseDadosWebhook, pickStr } from "@/lib/motoristaFromSolicitacao";
 import { supabase } from "@/integrations/supabase/client";
+import type { Database, Json } from "@/integrations/supabase/types";
+import {
+  fetchIbgeEstados,
+  fetchIbgeMunicipiosPorEstadoId,
+  findEstadoIdPorSigla,
+  type IbgeEstado,
+  type IbgeMunicipio,
+} from "@/lib/ibgeLocalidades";
+import { fetchViaCep } from "@/lib/viaCep";
 
-const UFS = ["AC","AL","AP","AM","BA","CE","DF","ES","GO","MA","MT","MS","MG","PA","PB","PR","PE","PI","RJ","RN","RS","RO","RR","SC","SP","SE","TO"] as const;
+const CNH_CATEGORIAS = ["A", "ACC", "B", "C", "D", "E", "AB", "AD", "AE"] as const;
 
 const TABS = [
   { label: "Pessoal", icon: User },
   { label: "Documentos", icon: FileText },
   { label: "Pagamento", icon: CreditCard },
 ];
+
+type MotoristaInsert = Database["public"]["Tables"]["solicitacoes_motoristas"]["Insert"];
 
 function FileRow({
   label,
@@ -66,15 +77,25 @@ export default function CadastrarMotoristaDialog({ open, onOpenChange, onCreated
   const [dataNascimento, setDataNascimento] = useState("");
   const [telefone, setTelefone] = useState("");
   const [emailField, setEmailField] = useState("");
-  const [enderecoCompleto, setEnderecoCompleto] = useState("");
+  const [logradouro, setLogradouro] = useState("");
+  const [numero, setNumero] = useState("");
+  const [complemento, setComplemento] = useState("");
+  const [bairro, setBairro] = useState("");
   const [cidade, setCidade] = useState("");
   const [estadoUf, setEstadoUf] = useState("");
+  const [municipioIbgeId, setMunicipioIbgeId] = useState("");
   const [cep, setCep] = useState("");
   const [cnh, setCnh] = useState("");
   const [categoriaCnh, setCategoriaCnh] = useState("");
   const [validadeCnh, setValidadeCnh] = useState("");
-  const [statusMotorista, setStatusMotorista] = useState("ativo");
+  const [statusMotorista, setStatusMotorista] = useState<"ativo" | "inativo">("ativo");
   const [observacoesInternas, setObservacoesInternas] = useState("");
+
+  const [estadosIbge, setEstadosIbge] = useState<IbgeEstado[]>([]);
+  const [municipios, setMunicipios] = useState<IbgeMunicipio[]>([]);
+  const [cityFilter, setCityFilter] = useState("");
+  const [loadingEstados, setLoadingEstados] = useState(false);
+  const [loadingCidades, setLoadingCidades] = useState(false);
 
   const [arPerfil, setArPerfil] = useState<File | null>(null);
   const [arCnhF, setArCnhF] = useState<File | null>(null);
@@ -86,6 +107,22 @@ export default function CadastrarMotoristaDialog({ open, onOpenChange, onCreated
 
   const [saving, setSaving] = useState(false);
 
+  const estadoUfRef = useRef(estadoUf);
+  estadoUfRef.current = estadoUf;
+
+  const enderecoCompleto = useMemo(() => {
+    const parts = [logradouro.trim(), numero.trim(), complemento.trim(), bairro.trim()].filter(Boolean);
+    return parts.join(", ");
+  }, [logradouro, numero, complemento, bairro]);
+
+  const municipiosFiltrados = useMemo(() => {
+    const q = cityFilter.trim().toLowerCase();
+    if (q.length < 2) return [];
+    const hit = municipios.filter((m) => m.nome.toLowerCase().includes(q));
+    if (hit.length <= 250) return hit;
+    return hit.slice(0, 250);
+  }, [municipios, cityFilter]);
+
   const resetEmpty = useCallback(() => {
     setNome("");
     setCpf("");
@@ -93,15 +130,21 @@ export default function CadastrarMotoristaDialog({ open, onOpenChange, onCreated
     setDataNascimento("");
     setTelefone("");
     setEmailField("");
-    setEnderecoCompleto("");
+    setLogradouro("");
+    setNumero("");
+    setComplemento("");
+    setBairro("");
     setCidade("");
     setEstadoUf("");
+    setMunicipioIbgeId("");
     setCep("");
     setCnh("");
     setCategoriaCnh("");
     setValidadeCnh("");
     setStatusMotorista("ativo");
     setObservacoesInternas("");
+    setCityFilter("");
+    setMunicipios([]);
     setArPerfil(null);
     setArCnhF(null);
     setArCnhV(null);
@@ -113,6 +156,65 @@ export default function CadastrarMotoristaDialog({ open, onOpenChange, onCreated
 
   useEffect(() => {
     if (!open) return;
+    let cancelled = false;
+    void (async () => {
+      setLoadingEstados(true);
+      try {
+        const list = await fetchIbgeEstados();
+        if (!cancelled) setEstadosIbge(list);
+      } catch {
+        if (!cancelled) toast.error("Não foi possível carregar estados (IBGE). Verifique a rede.");
+      } finally {
+        if (!cancelled) setLoadingEstados(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open || !estadoUf || estadosIbge.length === 0) {
+      if (!estadoUf) setMunicipios([]);
+      return;
+    }
+    const estadoId = findEstadoIdPorSigla(estadosIbge, estadoUf);
+    if (estadoId == null) return;
+
+    let cancelled = false;
+    setLoadingCidades(true);
+    void (async () => {
+      try {
+        const list = await fetchIbgeMunicipiosPorEstadoId(estadoId);
+        if (!cancelled) setMunicipios(list);
+      } catch {
+        if (!cancelled) {
+          toast.error("Não foi possível carregar cidades (IBGE).");
+          setMunicipios([]);
+        }
+      } finally {
+        if (!cancelled) setLoadingCidades(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, estadoUf, estadosIbge]);
+
+  useEffect(() => {
+    if (!open || !initialData || municipios.length === 0 || municipioIbgeId) return;
+    const target = (initialData.cidade || "").trim().toLowerCase();
+    if (!target) return;
+    const exact = municipios.find((m) => m.nome.toLowerCase() === target);
+    const loose = exact ?? municipios.find((m) => m.nome.toLowerCase().includes(target));
+    if (loose) {
+      setMunicipioIbgeId(String(loose.id));
+      setCidade(loose.nome);
+    }
+  }, [open, initialData, municipios, municipioIbgeId]);
+
+  useEffect(() => {
+    if (!open) return;
     if (initialData) {
       const dw = parseDadosWebhook(initialData.dados_webhook);
       setNome(initialData.nome || "");
@@ -120,43 +222,51 @@ export default function CadastrarMotoristaDialog({ open, onOpenChange, onCreated
       setTelefone(initialData.telefone || "");
       setEmailField(initialData.email || "");
       setCnh(initialData.cnh || "");
-      setCidade(initialData.cidade || "");
       setEstadoUf((initialData.estado || "").toUpperCase().slice(0, 2));
       setObservacoesInternas(initialData.mensagem_observacoes || "");
       setRg(pickStr(dw, "rg"));
       setDataNascimento(pickStr(dw, "data_nascimento").slice(0, 10));
-      setEnderecoCompleto(pickStr(dw, "endereco", "_endereco"));
       setCep(pickStr(dw, "cep"));
       setCategoriaCnh(pickStr(dw, "categoria_cnh", "categoria"));
+      setLogradouro(pickStr(dw, "logradouro", "endereco", "_endereco"));
+      setNumero(pickStr(dw, "numero"));
+      setComplemento(pickStr(dw, "complemento"));
+      setBairro(pickStr(dw, "bairro"));
+      const sid = pickStr(dw, "ibge_municipio_id");
+      if (sid && /^\d+$/.test(sid)) setMunicipioIbgeId(sid);
+      const sit = pickStr(dw, "situacao_frota");
+      if (sit === "inativo") setStatusMotorista("inativo");
+      else if (sit === "ativo") setStatusMotorista("ativo");
       setTabIndex(0);
-      toast.message("Revise e complete todos os campos obrigatórios antes de salvar.", { duration: 5000 });
+      toast.message("Revise os dados (UF → cidade IBGE) e complete o cadastro antes de salvar.", { duration: 5000 });
     } else {
       resetEmpty();
     }
   }, [open, initialData, resetEmpty]);
 
-  const strict = !!initialData;
-
   const validateTab0 = (): string | null => {
     if (!nome.trim()) return "Informe o nome completo.";
     if (!cpf.trim()) return "Informe o CPF.";
     if (!telefone.trim()) return "Informe o telefone.";
-    if (!strict) return null;
     if (!emailField.trim()) return "Informe o e-mail.";
     if (!dataNascimento) return "Informe a data de nascimento.";
     if (!rg.trim()) return "Informe o RG.";
-    if (!enderecoCompleto.trim()) return "Informe o endereço completo.";
-    if (!cidade.trim()) return "Informe a cidade.";
-    if (!estadoUf) return "Selecione o estado (UF).";
-    if (!cep.trim()) return "Informe o CEP.";
+    if (!estadoUf) return "Selecione o estado (UF) na lista IBGE.";
+    if (!municipioIbgeId) return "Selecione a cidade (filtrar por nome, mín. 2 letras).";
+    if (!cidade.trim()) return "Cidade inválida — selecione novamente na lista.";
+    const cepDigits = cep.replace(/\D/g, "");
+    if (cepDigits.length !== 8) return "Informe um CEP válido (8 dígitos).";
+    if (!logradouro.trim()) return "Informe o logradouro (rua/avenida).";
+    if (!numero.trim()) return "Informe o número.";
+    if (!bairro.trim()) return "Informe o bairro.";
     if (!cnh.trim()) return "Informe o número da CNH.";
     if (!categoriaCnh) return "Selecione a categoria da CNH.";
     if (!validadeCnh) return "Informe a validade da CNH.";
+    if (!statusMotorista) return "Selecione o status (ativo ou inativo).";
     return null;
   };
 
   const validateTab1 = (): string | null => {
-    if (!strict) return null;
     if (!arPerfil || !arCnhF || !arCnhV || !arResid) {
       return "Anexe foto de perfil, CNH (frente e verso) e comprovante de residência.";
     }
@@ -164,14 +274,12 @@ export default function CadastrarMotoristaDialog({ open, onOpenChange, onCreated
   };
 
   const validateTab2 = (): string | null => {
-    if (!strict) return null;
     if (!tipoPagamento) return "Selecione o tipo de pagamento.";
     if (tipoPagamento === "pix" && !pixChave.trim()) return "Informe a chave PIX.";
     return null;
   };
 
-  const validateAll = (): string | null =>
-    validateTab0() ?? validateTab1() ?? validateTab2();
+  const validateAll = (): string | null => validateTab0() ?? validateTab1() ?? validateTab2();
 
   const goNext = () => {
     if (tabIndex === 0) {
@@ -198,6 +306,19 @@ export default function CadastrarMotoristaDialog({ open, onOpenChange, onCreated
     setTabIndex((t) => Math.min(t + 1, TABS.length - 1));
   };
 
+  const handleCepBlur = async () => {
+    const digits = cep.replace(/\D/g, "");
+    if (digits.length !== 8) return;
+    const j = await fetchViaCep(digits);
+    if (!j) return;
+    if (j.uf && estadoUfRef.current && j.uf !== estadoUfRef.current) {
+      toast.message("O CEP pertence a outro UF. Ajuste o estado ou o CEP.", { duration: 6000 });
+    }
+    if (j.logradouro) setLogradouro((prev) => (prev.trim() ? prev : j.logradouro ?? ""));
+    if (j.bairro) setBairro((prev) => (prev.trim() ? prev : j.bairro ?? ""));
+    if (j.complemento) setComplemento((prev) => (prev.trim() ? prev : j.complemento ?? ""));
+  };
+
   const handleSave = async () => {
     const err = validateAll();
     if (err) {
@@ -208,16 +329,24 @@ export default function CadastrarMotoristaDialog({ open, onOpenChange, onCreated
       return;
     }
     setSaving(true);
-    const payloadWebhook = {
+
+    const ibgeIdNum = Number(municipioIbgeId);
+    const dadosWebhookObj = {
       rg,
       data_nascimento: dataNascimento || null,
       endereco: enderecoCompleto || null,
-      cep: cep || null,
+      logradouro: logradouro.trim() || null,
+      numero: numero.trim() || null,
+      complemento: complemento.trim() || null,
+      bairro: bairro.trim() || null,
+      cep: cep.replace(/\D/g, "") || null,
       categoria_cnh: categoriaCnh || null,
       validade_cnh: validadeCnh || null,
       tipo_pagamento: tipoPagamento || null,
-      pix_chave: pixChave || null,
+      pix_chave: tipoPagamento === "pix" ? pixChave.trim() || null : null,
       observacoes_internas: observacoesInternas || null,
+      situacao_frota: statusMotorista,
+      ibge_municipio_id: Number.isFinite(ibgeIdNum) ? ibgeIdNum : null,
     };
 
     const { data: authData } = await supabase.auth.getUser();
@@ -227,27 +356,30 @@ export default function CadastrarMotoristaDialog({ open, onOpenChange, onCreated
       setSaving(false);
       return;
     }
-    const { error } = await supabase.from("solicitacoes_motoristas").insert({
+
+    const row: MotoristaInsert = {
       user_id: user.id,
       nome: nome.trim(),
-      cpf: cpf || null,
-      cnh: cnh || null,
-      telefone: telefone || null,
-      email: emailField || null,
-      cidade: cidade || null,
-      estado: estadoUf || null,
-      mensagem: observacoesInternas || null,
-      mensagem_observacoes: observacoesInternas || null,
-      dados_webhook: payloadWebhook as any,
+      cpf: cpf.replace(/\D/g, "") || null,
+      cnh: cnh.trim() || null,
+      telefone: telefone.trim() || null,
+      email: emailField.trim() || null,
+      cidade: cidade.trim(),
+      estado: estadoUf,
+      mensagem: observacoesInternas.trim() || null,
+      mensagem_observacoes: observacoesInternas.trim() || null,
+      dados_webhook: dadosWebhookObj as unknown as Json,
       status: "cadastrado",
-    } as any);
+    };
+
+    const { error } = await supabase.from("solicitacoes_motoristas").insert(row);
     if (error) {
       toast.error(`Erro ao salvar cadastro: ${error.message}`);
       setSaving(false);
       return;
     }
 
-    toast.success("Motorista salvo e disponível na lista imediatamente.");
+    toast.success("Motorista salvo e disponível na sua lista.");
     setSaving(false);
     onOpenChange(false);
     onCreated?.();
@@ -259,12 +391,12 @@ export default function CadastrarMotoristaDialog({ open, onOpenChange, onCreated
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] max-w-xl overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{initialData ? "Converter solicitação — cadastro completo" : "Cadastrar Motorista"}</DialogTitle>
+          <DialogTitle>{initialData ? "Completar cadastro a partir da solicitação" : "Cadastrar motorista"}</DialogTitle>
         </DialogHeader>
 
-        {strict && (
+        {initialData && (
           <p className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-900 dark:text-amber-100">
-            Preencha <strong>todos</strong> os dados obrigatórios do motorista. O cadastro de veículos fica no menu <strong>Veículos</strong>.
+            Confirme <strong>UF</strong> e <strong>cidade (IBGE)</strong> antes de gravar. O registo fica associado à sua conta e visível só para si.
           </p>
         )}
 
@@ -323,46 +455,123 @@ export default function CadastrarMotoristaDialog({ open, onOpenChange, onCreated
             </fieldset>
 
             <fieldset className="space-y-4">
-              <legend className="w-full border-b border-border pb-2 text-sm font-semibold text-foreground">Endereço</legend>
-              <div>
-                <Label>Endereço completo *</Label>
-                <Input
-                  className="mt-1"
-                  placeholder="Rua, número, complemento, bairro"
-                  value={enderecoCompleto}
-                  onChange={(e) => setEnderecoCompleto(e.target.value)}
-                />
-              </div>
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <Label>Cidade *</Label>
-                  <Input className="mt-1" value={cidade} onChange={(e) => setCidade(e.target.value)} />
-                </div>
-                <div>
+              <legend className="w-full border-b border-border pb-2 text-sm font-semibold text-foreground">
+                Endereço (IBGE + ViaCEP)
+              </legend>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="sm:col-span-2">
                   <Label>Estado (UF) *</Label>
-                  <Select value={estadoUf || undefined} onValueChange={setEstadoUf}>
+                  <Select
+                    value={estadoUf || undefined}
+                    disabled={loadingEstados || estadosIbge.length === 0}
+                    onValueChange={(uf) => {
+                      setEstadoUf(uf);
+                      setMunicipioIbgeId("");
+                      setCidade("");
+                      setCityFilter("");
+                    }}
+                  >
                     <SelectTrigger className="mt-1">
-                      <SelectValue placeholder="UF" />
+                      <SelectValue placeholder={loadingEstados ? "A carregar IBGE…" : "Selecione o estado"} />
                     </SelectTrigger>
-                    <SelectContent>
-                      {UFS.map((uf) => (
-                        <SelectItem key={uf} value={uf}>
-                          {uf}
+                    <SelectContent className="max-h-[min(280px,50vh)]">
+                      {estadosIbge.map((e) => (
+                        <SelectItem key={e.id} value={e.sigla}>
+                          {e.nome} ({e.sigla})
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
+                  <p className="mt-1 text-xs text-muted-foreground">Fonte: API de localidades do IBGE.</p>
                 </div>
+
+                <div className="sm:col-span-2">
+                  <Label>Filtrar cidade *</Label>
+                  <Input
+                    className="mt-1"
+                    placeholder="Digite ao menos 2 letras (ex.: cam)"
+                    value={cityFilter}
+                    disabled={!estadoUf || loadingCidades}
+                    onChange={(e) => {
+                      setCityFilter(e.target.value);
+                      setMunicipioIbgeId("");
+                      setCidade("");
+                    }}
+                  />
+                </div>
+
+                <div className="sm:col-span-2">
+                  <Label>Cidade (município IBGE) *</Label>
+                  <Select
+                    value={municipioIbgeId || undefined}
+                    disabled={!estadoUf || loadingCidades || municipiosFiltrados.length === 0}
+                    onValueChange={(id) => {
+                      setMunicipioIbgeId(id);
+                      const m = municipios.find((x) => String(x.id) === id);
+                      setCidade(m?.nome ?? "");
+                    }}
+                  >
+                    <SelectTrigger className="mt-1">
+                      <SelectValue
+                        placeholder={
+                          !estadoUf
+                            ? "Selecione primeiro o estado"
+                            : loadingCidades
+                              ? "A carregar municípios…"
+                              : cityFilter.trim().length < 2
+                                ? "Digite 2+ letras para listar cidades"
+                                : "Selecione a cidade"
+                        }
+                      />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-[min(280px,50vh)]">
+                      {municipiosFiltrados.map((m) => (
+                        <SelectItem key={m.id} value={String(m.id)}>
+                          {m.nome}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {cityFilter.trim().length >= 2 && municipiosFiltrados.length === 250 && (
+                    <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
+                      Lista limitada a 250 resultados — refine o filtro se não encontrar a cidade.
+                    </p>
+                  )}
+                </div>
+
                 <div>
                   <Label>CEP *</Label>
-                  <Input className="mt-1" placeholder="00000-000" value={cep} onChange={(e) => setCep(e.target.value)} />
+                  <Input
+                    className="mt-1"
+                    placeholder="00000-000"
+                    value={cep}
+                    onChange={(e) => setCep(e.target.value)}
+                    onBlur={() => void handleCepBlur()}
+                  />
+                  <p className="mt-1 text-xs text-muted-foreground">ViaCEP preenche rua e bairro quando possível.</p>
+                </div>
+                <div className="sm:col-span-2">
+                  <Label>Logradouro (rua/avenida) *</Label>
+                  <Input className="mt-1" value={logradouro} onChange={(e) => setLogradouro(e.target.value)} />
+                </div>
+                <div>
+                  <Label>Número *</Label>
+                  <Input className="mt-1" value={numero} onChange={(e) => setNumero(e.target.value)} />
+                </div>
+                <div>
+                  <Label>Complemento</Label>
+                  <Input className="mt-1" value={complemento} onChange={(e) => setComplemento(e.target.value)} />
+                </div>
+                <div className="sm:col-span-2">
+                  <Label>Bairro *</Label>
+                  <Input className="mt-1" value={bairro} onChange={(e) => setBairro(e.target.value)} />
                 </div>
               </div>
             </fieldset>
 
             <fieldset className="space-y-4">
               <legend className="w-full border-b border-border pb-2 text-sm font-semibold text-foreground">CNH</legend>
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                 <div>
                   <Label>Número da CNH *</Label>
                   <Input className="mt-1" value={cnh} onChange={(e) => setCnh(e.target.value)} />
@@ -371,10 +580,10 @@ export default function CadastrarMotoristaDialog({ open, onOpenChange, onCreated
                   <Label>Categoria *</Label>
                   <Select value={categoriaCnh || undefined} onValueChange={setCategoriaCnh}>
                     <SelectTrigger className="mt-1">
-                      <SelectValue placeholder="Cat." />
+                      <SelectValue placeholder="Selecione" />
                     </SelectTrigger>
                     <SelectContent>
-                      {(["A", "B", "C", "D", "E", "AB"] as const).map((c) => (
+                      {CNH_CATEGORIAS.map((c) => (
                         <SelectItem key={c} value={c}>
                           {c}
                         </SelectItem>
@@ -390,9 +599,9 @@ export default function CadastrarMotoristaDialog({ open, onOpenChange, onCreated
             </fieldset>
 
             <div>
-              <Label>Status</Label>
-              <Select value={statusMotorista} onValueChange={setStatusMotorista}>
-                <SelectTrigger className="mt-1 w-40">
+              <Label>Situação na frota *</Label>
+              <Select value={statusMotorista} onValueChange={(v) => setStatusMotorista(v as "ativo" | "inativo")}>
+                <SelectTrigger className="mt-1 w-full max-w-xs">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -400,10 +609,14 @@ export default function CadastrarMotoristaDialog({ open, onOpenChange, onCreated
                   <SelectItem value="inativo">Inativo</SelectItem>
                 </SelectContent>
               </Select>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Não confundir com o estado do pré-cadastro na plataforma: aqui é só controle da sua frota (guardado em dados
+                extra).
+              </p>
             </div>
 
             <div>
-              <Label>Observações (solicitação / internas)</Label>
+              <Label>Observações (internas / solicitação)</Label>
               <Textarea
                 className="mt-1"
                 placeholder="Observações vindas do lead ou anotações internas..."
@@ -417,14 +630,12 @@ export default function CadastrarMotoristaDialog({ open, onOpenChange, onCreated
         {tabIndex === 1 && (
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              {strict
-                ? "Envio obrigatório dos quatro arquivos abaixo para concluir a conversão."
-                : "Anexe documentos (opcional neste fluxo)."}
+              Envie os quatro ficheiros abaixo (obrigatório para concluir o cadastro).
             </p>
-            <FileRow label="Foto de perfil" required={strict} file={arPerfil} onFile={setArPerfil} />
-            <FileRow label="CNH — frente" required={strict} file={arCnhF} onFile={setArCnhF} />
-            <FileRow label="CNH — verso" required={strict} file={arCnhV} onFile={setArCnhV} />
-            <FileRow label="Comprovante de residência" required={strict} file={arResid} onFile={setArResid} />
+            <FileRow label="Foto de perfil" required file={arPerfil} onFile={setArPerfil} />
+            <FileRow label="CNH — frente" required file={arCnhF} onFile={setArCnhF} />
+            <FileRow label="CNH — verso" required file={arCnhV} onFile={setArCnhV} />
+            <FileRow label="Comprovante de residência" required file={arResid} onFile={setArResid} />
           </div>
         )}
 
@@ -447,7 +658,12 @@ export default function CadastrarMotoristaDialog({ open, onOpenChange, onCreated
             {tipoPagamento === "pix" && (
               <div>
                 <Label>Chave PIX *</Label>
-                <Input className="mt-1" value={pixChave} onChange={(e) => setPixChave(e.target.value)} placeholder="CPF, e-mail, telefone ou aleatória" />
+                <Input
+                  className="mt-1"
+                  value={pixChave}
+                  onChange={(e) => setPixChave(e.target.value)}
+                  placeholder="CPF, e-mail, telefone ou aleatória"
+                />
               </div>
             )}
           </div>
@@ -462,7 +678,7 @@ export default function CadastrarMotoristaDialog({ open, onOpenChange, onCreated
             <div />
           )}
           {isLast ? (
-            <Button type="button" onClick={handleSave} disabled={saving}>
+            <Button type="button" onClick={() => void handleSave()} disabled={saving}>
               {saving ? "Salvando..." : "Salvar motorista"}
             </Button>
           ) : (
