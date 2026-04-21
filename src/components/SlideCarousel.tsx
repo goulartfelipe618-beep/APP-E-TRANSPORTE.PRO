@@ -114,35 +114,38 @@ export default function SlideCarousel({
 
   const isBanner = variant === "banner";
 
-  /** Encosta nas bordas internas do `<main>` usando `--main-pad-x` / `--main-pad-y` definidos no layout. */
+  /** Margem superior negativa (padding do `<main>`). Lateral em mobile usa classes (viewport). */
   const bleedStyle: CSSProperties | undefined =
-    breakoutHorizontal || breakoutTop
+    breakoutTop
       ? {
-          ...(breakoutHorizontal && {
-            marginLeft: "calc(-1 * var(--main-pad-x, 1.5rem))",
-            marginRight: "calc(-1 * var(--main-pad-x, 1.5rem))",
-            width: "calc(100% + 2 * var(--main-pad-x, 1.5rem))",
-            maxWidth: "none",
-          }),
-          ...(breakoutTop && {
-            marginTop: "calc(-1 * var(--main-pad-y, 1.5rem))",
-          }),
+          marginTop: "calc(-1 * var(--main-pad-y, 1.5rem))",
         }
       : undefined;
+
+  /** Em telemóvel: largura total da viewport; a partir de sm: compensa só o padding do main. */
+  const horizontalBleedClass =
+    breakoutHorizontal &&
+    cn(
+      "relative left-1/2 w-screen max-w-[100vw] -translate-x-1/2",
+      "sm:left-0 sm:w-[calc(100%+2*var(--main-pad-x,1.5rem))] sm:max-w-none sm:translate-x-0",
+      "sm:-ml-[var(--main-pad-x,1.5rem)] sm:-mr-[var(--main-pad-x,1.5rem)]",
+    );
 
   const frameClassName = cn(
     "relative box-border min-w-0 shrink-0 overflow-hidden p-0",
     isBanner
       ? cn(
-          "aspect-[1922/330] min-h-[120px]",
+          /* Mobile: área mais alta + contain = imagem inteira; desktop: faixa wide original */
+          "max-sm:aspect-[2/1] max-sm:min-h-[120px] sm:aspect-[1922/330] sm:min-h-0",
           fullBleed
             ? "rounded-none border-0 bg-muted/30 shadow-none"
             : "rounded-none rounded-b-xl border-b border-border bg-muted/30",
         )
       : cn(
-          "aspect-[16/5] min-h-[140px] sm:min-h-[180px]",
+          "max-sm:aspect-video max-sm:min-h-[160px] sm:aspect-[16/5] sm:min-h-[180px]",
           fullBleed ? "rounded-none border-0 shadow-none" : "rounded-xl",
         ),
+    horizontalBleedClass,
     className,
   );
 
@@ -178,7 +181,7 @@ export default function SlideCarousel({
       <img
         src={slide.imagem_url}
         alt={slide.titulo || "Slide"}
-        className="h-full w-full min-h-0 object-cover object-center"
+        className="h-full w-full min-h-0 object-contain object-center sm:object-cover"
       />
     ) : (
       <div
@@ -221,7 +224,7 @@ export default function SlideCarousel({
       </div>
 
       {showText && (
-        <div className="absolute inset-0 flex items-center bg-gradient-to-r from-black/70 to-transparent px-12 transition-opacity duration-700">
+        <div className="absolute inset-0 flex items-center bg-gradient-to-r from-black/70 to-transparent px-6 transition-opacity duration-700 sm:px-12">
           <div className="max-w-lg">
             {currentSlideData.titulo && (
               <h2 className="mb-2 text-3xl font-bold text-white">{currentSlideData.titulo}</h2>
@@ -236,14 +239,14 @@ export default function SlideCarousel({
           <button
             type="button"
             onClick={prevSlide}
-            className="absolute left-4 top-1/2 z-10 -translate-y-1/2 rounded-full bg-black/50 p-2 text-white transition-colors hover:bg-black/70"
+            className="absolute left-2 top-1/2 z-10 -translate-y-1/2 rounded-full bg-black/50 p-2 text-white transition-colors hover:bg-black/70 sm:left-4"
           >
             <ChevronLeft className="h-5 w-5" />
           </button>
           <button
             type="button"
             onClick={nextSlide}
-            className="absolute right-4 top-1/2 z-10 -translate-y-1/2 rounded-full bg-black/50 p-2 text-white transition-colors hover:bg-black/70"
+            className="absolute right-2 top-1/2 z-10 -translate-y-1/2 rounded-full bg-black/50 p-2 text-white transition-colors hover:bg-black/70 sm:right-4"
           >
             <ChevronRight className="h-5 w-5" />
           </button>

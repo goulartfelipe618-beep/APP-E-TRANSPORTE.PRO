@@ -30,6 +30,7 @@ import AdminAvisosPage from "@/pages/admin/AdminAvisosPage";
 import AdminLogsPage from "@/pages/admin/AdminLogsPage";
 import AdminVeiculosPage from "@/pages/admin/AdminVeiculosPage";
 import { usePainelErrorReporter } from "@/hooks/usePainelErrorReporter";
+import { useScrollPanelToTop } from "@/hooks/useScrollPanelToTop";
 
 const PAGE_MAP: Record<string, React.ComponentType> = {
   metricas: AdminMetricasPage,
@@ -61,6 +62,7 @@ function AdminContent() {
   const { activePage } = useActivePage();
   const { config } = useConfiguracoes();
   const mainRef = useRef<HTMLElement>(null);
+  useScrollPanelToTop(activePage, mainRef);
   useSlowScrollContainer(mainRef, activePage === "templates");
   const PageComponent = PAGE_MAP[activePage] || AdminAbrangenciaPage;
 

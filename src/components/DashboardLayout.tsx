@@ -12,6 +12,7 @@ import { hydrateNetworkNacionalFromDb, persistNetworkHighlightDismissed } from "
 import { usePainelMotoristaEvolutionAtivo } from "@/hooks/usePainelMotoristaEvolutionAtivo";
 import { useMotoristaOnboarding } from "@/hooks/useMotoristaOnboarding";
 import { usePainelErrorReporter } from "@/hooks/usePainelErrorReporter";
+import { useScrollPanelToTop } from "@/hooks/useScrollPanelToTop";
 
 // Import all page components
 import HomePage from "@/pages/dashboard/Home";
@@ -101,6 +102,7 @@ function DashboardContent() {
   const onboarding = useMotoristaOnboarding();
   const { painelMotoristaEvolutionAtivo, ready: painelComunicadorReady } = usePainelMotoristaEvolutionAtivo();
   const mainRef = useRef<HTMLElement>(null);
+  useScrollPanelToTop(activePage, mainRef);
   useSlowScrollContainer(mainRef, activePage === "website");
   const [showOverlay, setShowOverlay] = useState(readNetworkSpotlightActive);
 

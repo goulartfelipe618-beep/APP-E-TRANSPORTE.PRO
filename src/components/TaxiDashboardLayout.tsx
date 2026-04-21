@@ -1,4 +1,4 @@
-import { useLayoutEffect } from "react";
+import { useLayoutEffect, useRef } from "react";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { syncPanelThemeForCurrentUser } from "@/lib/panelTheme";
 import PageLoader from "@/components/PageLoader";
@@ -21,6 +21,7 @@ import TaxiCommunityPage from "@/pages/taxi/TaxiCommunityPage";
 import PainelAvisoBanner from "@/components/PainelAvisoBanner";
 import FullscreenBannerOverlay from "@/components/FullscreenBannerOverlay";
 import { usePainelErrorReporter } from "@/hooks/usePainelErrorReporter";
+import { useScrollPanelToTop } from "@/hooks/useScrollPanelToTop";
 
 const PAGE_MAP: Record<string, React.ComponentType> = {
   home: TaxiHome,
@@ -39,6 +40,8 @@ const PAGE_MAP: Record<string, React.ComponentType> = {
 function TaxiContent() {
   usePainelErrorReporter("taxi", "etp_nav_taxi");
   const { activePage } = useActivePage();
+  const mainRef = useRef<HTMLElement>(null);
+  useScrollPanelToTop(activePage, mainRef);
   const PageComponent = PAGE_MAP[activePage] || TaxiHome;
 
   useLayoutEffect(() => {
@@ -57,7 +60,10 @@ function TaxiContent() {
           </div>
         </header>
         <PainelAvisoBanner painel="taxi" activePage={activePage} />
-        <main className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto bg-background [--main-pad-x:1rem] [--main-pad-y:1rem] px-[var(--main-pad-x)] py-[var(--main-pad-y)] sm:[--main-pad-x:1.5rem] sm:[--main-pad-y:1.5rem]">
+        <main
+          ref={mainRef}
+          className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto bg-background [--main-pad-x:1rem] [--main-pad-y:1rem] px-[var(--main-pad-x)] py-[var(--main-pad-y)] sm:[--main-pad-x:1.5rem] sm:[--main-pad-y:1.5rem]"
+        >
           <PageLoader>
             <PageComponent />
           </PageLoader>
