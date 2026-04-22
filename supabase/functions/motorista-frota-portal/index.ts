@@ -72,11 +72,17 @@ Deno.serve(async (req) => {
           });
         }
 
+        const syntheticEmail = `frota.${String(row.id).replace(/-/g, "")}@motorista-frota.local`;
+        const loginEmailResolved =
+          row.portal_auth_user_id != null
+            ? (row.portal_login_email?.trim() || syntheticEmail)
+            : null;
+
         return new Response(
           JSON.stringify({
             nome: row.nome,
             registered: row.portal_auth_user_id != null,
-            login_email: row.portal_login_email ?? null,
+            login_email: loginEmailResolved,
           }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } },
         );

@@ -104,6 +104,7 @@ export default function FrotaReservasPage() {
           ) : transfers.length === 0 ? (
             <p className="p-6 text-sm text-muted-foreground">Sem reservas de transfer atribuídas.</p>
           ) : (
+            <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -143,6 +144,7 @@ export default function FrotaReservasPage() {
                 ))}
               </TableBody>
             </Table>
+            </div>
           )}
         </div>
       </div>
@@ -155,6 +157,7 @@ export default function FrotaReservasPage() {
           ) : grupos.length === 0 ? (
             <p className="p-6 text-sm text-muted-foreground">Sem reservas de grupo atribuídas.</p>
           ) : (
+            <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -190,6 +193,7 @@ export default function FrotaReservasPage() {
                 ))}
               </TableBody>
             </Table>
+            </div>
           )}
         </div>
       </div>

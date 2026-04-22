@@ -19,6 +19,14 @@ function validatePortalPassword(password: string): string | null {
   return null;
 }
 
+function mapAuthError(message: string): string {
+  const m = message.toLowerCase();
+  if (m.includes("invalid login") || m.includes("invalid credentials") || m.includes("invalid_grant")) {
+    return "Senha incorreta. Verifique e tente novamente.";
+  }
+  return message;
+}
+
 export default function MotoristaFrotaAcessoPage() {
   const { token } = useParams<{ token: string }>();
   const navigate = useNavigate();
@@ -30,6 +38,17 @@ export default function MotoristaFrotaAcessoPage() {
   const [password2, setPassword2] = useState("");
   const [loginPass, setLoginPass] = useState("");
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    const meta = document.createElement("meta");
+    meta.setAttribute("name", "robots");
+    meta.setAttribute("content", "noindex, nofollow, noarchive");
+    meta.setAttribute("data-frota-acesso", "1");
+    document.head.appendChild(meta);
+    return () => {
+      document.querySelector('meta[data-frota-acesso="1"]')?.remove();
+    };
+  }, []);
 
   useEffect(() => {
     void (async () => {
@@ -85,7 +104,7 @@ export default function MotoristaFrotaAcessoPage() {
       }
       const { error: sErr } = await supabase.auth.signInWithPassword({ email, password });
       if (sErr) {
-        toast.error(sErr.message);
+        toast.error(mapAuthError(sErr.message));
         return;
       }
       const { data: s } = await supabase.auth.getSession();
@@ -98,15 +117,22 @@ export default function MotoristaFrotaAcessoPage() {
   };
 
   const handleLogin = async () => {
-    if (!loginEmail || !loginPass) {
-      toast.error("Email e senha são obrigatórios.");
+    if (!loginPass.trim()) {
+      toast.error("Introduza a sua senha.");
+      return;
+    }
+    if (!loginEmail?.trim()) {
+      toast.error("A preparar o acesso… Se persistir, recarregue a página.");
       return;
     }
     setBusy(true);
     try {
-      const { error } = await supabase.auth.signInWithPassword({ email: loginEmail, password: loginPass });
+      const { error } = await supabase.auth.signInWithPassword({
+        email: loginEmail.trim(),
+        password: loginPass,
+      });
       if (error) {
-        toast.error(error.message);
+        toast.error(mapAuthError(error.message));
         return;
       }
       const { data: s } = await supabase.auth.getSession();
@@ -119,7 +145,7 @@ export default function MotoristaFrotaAcessoPage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
+      <div className="flex min-h-screen min-h-[100dvh] items-center justify-center bg-background px-4">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
@@ -127,21 +153,21 @@ export default function MotoristaFrotaAcessoPage() {
 
   if (!token) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background p-4">
+      <div className="flex min-h-screen min-h-[100dvh] items-center justify-center bg-background p-4">
         <p className="text-sm text-muted-foreground">Link inválido.</p>
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-muted/30 p-4">
+    <div className="flex min-h-screen min-h-[100dvh] items-center justify-center bg-muted/30 p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
       <Card className="w-full max-w-md border-border shadow-lg">
-        <CardHeader>
+        <CardHeader className="space-y-1">
           <CardTitle className="text-xl">Portal do motorista</CardTitle>
           <p className="text-sm text-muted-foreground">
             {nome ? (
               <>
-                Olá, <strong className="text-foreground">{nome}</strong>. Este é o acesso à sua área na frota.
+                Olá, <strong className="text-foreground">{nome}</strong>. O acesso está associado a este link — só precisa da senha.
               </>
             ) : (
               "Acesso à área do motorista."
@@ -151,38 +177,62 @@ export default function MotoristaFrotaAcessoPage() {
         <CardContent className="space-y-4">
           {!registered ? (
             <>
-              <p className="text-sm text-muted-foreground">Defina uma senha para entrar no painel (Agenda e Reservas).</p>
+              <p className="text-sm text-muted-foreground">Defina uma senha forte para entrar no painel (Agenda e Reservas).</p>
               <div className="space-y-2">
                 <Label htmlFor="pw1">Senha</Label>
-                <Input id="pw1" type="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} />
+                <Input
+                  id="pw1"
+                  type="password"
+                  autoComplete="new-password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="min-h-11"
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="pw2">Confirmar senha</Label>
-                <Input id="pw2" type="password" autoComplete="new-password" value={password2} onChange={(e) => setPassword2(e.target.value)} />
+                <Input
+                  id="pw2"
+                  type="password"
+                  autoComplete="new-password"
+                  value={password2}
+                  onChange={(e) => setPassword2(e.target.value)}
+                  className="min-h-11"
+                />
               </div>
-              <Button type="button" className="w-full bg-primary text-primary-foreground" disabled={busy} onClick={() => void handleBootstrap()}>
+              <Button type="button" className="min-h-11 w-full bg-primary text-primary-foreground" disabled={busy} onClick={() => void handleBootstrap()}>
                 {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                 Criar acesso e entrar
               </Button>
             </>
           ) : (
-            <>
-              <p className="text-sm text-muted-foreground">Já definiu senha. Inicie sessão com a senha criada.</p>
+            <form
+              className="space-y-4"
+              onSubmit={(e) => {
+                e.preventDefault();
+                void handleLogin();
+              }}
+            >
+              <p className="text-sm text-muted-foreground">Introduza a senha que definiu para este acesso.</p>
               {loginEmail ? (
-                <div className="space-y-2">
-                  <Label>Email de acesso (guarde ou use o mesmo link)</Label>
-                  <Input readOnly value={loginEmail} className="font-mono text-xs" />
-                </div>
+                <input type="text" name="username" autoComplete="username" value={loginEmail} readOnly tabIndex={-1} aria-hidden className="sr-only" />
               ) : null}
               <div className="space-y-2">
                 <Label htmlFor="lp">Senha</Label>
-                <Input id="lp" type="password" autoComplete="current-password" value={loginPass} onChange={(e) => setLoginPass(e.target.value)} />
+                <Input
+                  id="lp"
+                  type="password"
+                  autoComplete="current-password"
+                  value={loginPass}
+                  onChange={(e) => setLoginPass(e.target.value)}
+                  className="min-h-11"
+                />
               </div>
-              <Button type="button" className="w-full bg-primary text-primary-foreground" disabled={busy} onClick={() => void handleLogin()}>
+              <Button type="submit" className="min-h-11 w-full bg-primary text-primary-foreground" disabled={busy || !loginEmail}>
                 {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                 Entrar
               </Button>
-            </>
+            </form>
           )}
         </CardContent>
       </Card>
