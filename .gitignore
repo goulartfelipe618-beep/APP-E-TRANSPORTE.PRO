@@ -13,7 +13,6 @@ dist-ssr
 *.local
 
 # Tooling / IDE
-.lovable/
 coverage
 .cache
 .turbo

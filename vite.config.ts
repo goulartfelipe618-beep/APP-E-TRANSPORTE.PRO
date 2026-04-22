@@ -1,7 +1,6 @@
 import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
-import { componentTagger } from "lovable-tagger";
 
 /** Lê env de arquivo (.env) e de process.env (Vercel injeta no build). Aceita nomes alternativos comuns. */
 function supabaseEnvFromProcess(fileEnv: Record<string, string>) {
@@ -34,7 +33,7 @@ export default defineConfig(({ mode }) => {
         overlay: false,
       },
     },
-    plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
+    plugins: [react()],
     resolve: {
       alias: {
         "@": path.resolve(__dirname, "./src"),
