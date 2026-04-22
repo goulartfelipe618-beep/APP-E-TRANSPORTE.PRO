@@ -8,6 +8,7 @@ import Login from "./pages/Login";
 import ProtectedRoute from "./components/ProtectedRoute";
 import ProtectedTaxiRoute from "./components/ProtectedTaxiRoute";
 import ProtectedAdminRoute from "./components/ProtectedAdminRoute";
+import ProtectedFrotaRoute from "./components/ProtectedFrotaRoute";
 import { ConfiguracoesProvider } from "./contexts/ConfiguracoesContext";
 import AuthExpiryGuard from "./components/AuthExpiryGuard";
 import ClientSessionRevocationGuard from "./components/ClientSessionRevocationGuard";
@@ -18,6 +19,8 @@ const TaxiDashboardLayout = lazy(() => import("./components/TaxiDashboardLayout"
 const AdminLayout = lazy(() => import("./components/AdminLayout"));
 const MfaChallengePage = lazy(() => import("./pages/MfaChallenge"));
 const RastreioPublico = lazy(() => import("./pages/RastreioPublico"));
+const MotoristaFrotaAcessoPage = lazy(() => import("./pages/frota/MotoristaFrotaAcessoPage"));
+const FrotaMotoristaLayout = lazy(() => import("./components/FrotaMotoristaLayout"));
 
 function RouteFallback() {
   return (
@@ -44,6 +47,8 @@ const App = () => (
             <Route path="/login" element={<Login />} />
             <Route path="/mfa" element={<MfaChallengePage />} />
             <Route path="/rastreio/:token" element={<RastreioPublico />} />
+            <Route path="/frota/acesso/:token" element={<MotoristaFrotaAcessoPage />} />
+            <Route path="/frota" element={<ProtectedFrotaRoute><FrotaMotoristaLayout /></ProtectedFrotaRoute>} />
             <Route path="/dashboard" element={<ProtectedRoute><DashboardLayout /></ProtectedRoute>} />
             <Route path="/taxi" element={<ProtectedTaxiRoute><TaxiDashboardLayout /></ProtectedTaxiRoute>} />
             <Route path="/admin" element={<ProtectedAdminRoute><AdminLayout /></ProtectedAdminRoute>} />

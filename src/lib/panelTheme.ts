@@ -79,7 +79,9 @@ export function applyThemeForRoute(path: string, userId: string | null) {
     ? "admin"
     : path.startsWith("/taxi")
       ? "taxi"
-      : "frota";
+      : path.startsWith("/frota")
+        ? "frota"
+        : "frota";
   applyPanelThemeFromStorage(panel, userId);
 }
 

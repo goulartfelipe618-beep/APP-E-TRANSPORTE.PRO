@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { clearAuthStartedAt, isAuthExpired, readAuthStartedAt, setAuthStartedAt } from "@/lib/authExpiry";
+import { isMotoristaFrotaUser } from "@/lib/motoristaFrotaRole";
 
 /**
  * Rotas autenticadas do painel (motorista executivo). O JWT é gerido pelo cliente Supabase
@@ -11,6 +12,7 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
   const [loading, setLoading] = useState(true);
   const [authenticated, setAuthenticated] = useState(false);
   const [needsMfa, setNeedsMfa] = useState(false);
+  const [redirectFrota, setRedirectFrota] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -41,6 +43,15 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
           }
           setAuthenticated(false);
           setNeedsMfa(false);
+          setLoading(false);
+          return;
+        }
+
+        const frota = await isMotoristaFrotaUser(session.user.id);
+        if (frota) {
+          setRedirectFrota(true);
+          setNeedsMfa(false);
+          setAuthenticated(false);
           setLoading(false);
           return;
         }
@@ -87,6 +98,7 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
     );
   }
 
+  if (redirectFrota) return <Navigate to="/frota" replace />;
   if (needsMfa) return <Navigate to="/mfa" replace />;
   if (!authenticated) return <Navigate to="/login" replace />;
   return <>{children}</>;

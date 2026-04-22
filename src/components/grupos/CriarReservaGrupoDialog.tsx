@@ -86,6 +86,8 @@ export default function CriarReservaGrupoDialog({
   const [metodoPagamento, setMetodoPagamento] = useState("");
   const [statusOperacional, setStatusOperacional] = useState("pendente");
   const [repasseMotorista, setRepasseMotorista] = useState("");
+  const [motoristasFrota, setMotoristasFrota] = useState<{ id: string; nome: string; portal_auth_user_id: string }[]>([]);
+  const [motoristaAtribUid, setMotoristaAtribUid] = useState<string>("");
 
   const valorTotalNum = useMemo(() => {
     const base = parseFloat(valorBase) || 0;
@@ -126,6 +128,8 @@ export default function CriarReservaGrupoDialog({
       setRepasseMotorista(
         row.repasse_motorista != null && Number(row.repasse_motorista) > 0 ? String(row.repasse_motorista) : "",
       );
+      if (row.motorista_id) setMotoristaAtribUid(row.motorista_id);
+      else setMotoristaAtribUid("");
       return;
     }
 
@@ -149,6 +153,31 @@ export default function CriarReservaGrupoDialog({
     resetForm();
   }, [open, initialData, reservaGrupoEdicao]);
 
+  useEffect(() => {
+    if (!open) return;
+    void (async () => {
+      const { data: auth } = await supabase.auth.getUser();
+      if (!auth.user) {
+        setMotoristasFrota([]);
+        return;
+      }
+      const { data } = await supabase
+        .from("solicitacoes_motoristas")
+        .select("id, nome, portal_auth_user_id")
+        .eq("user_id", auth.user.id)
+        .eq("status", "cadastrado")
+        .not("portal_auth_user_id", "is", null);
+      const rows = (data ?? []) as { id: string; nome: string; portal_auth_user_id: string | null }[];
+      setMotoristasFrota(
+        rows.filter((r) => r.portal_auth_user_id != null).map((r) => ({
+          id: r.id,
+          nome: r.nome,
+          portal_auth_user_id: r.portal_auth_user_id as string,
+        })),
+      );
+    })();
+  }, [open]);
+
   const resetForm = () => {
     setNomeCompleto(""); setCpfCnpj(""); setEmail(""); setWhatsapp("");
     setTipoVeiculo(""); setNumPassageiros(""); setEmbarque(""); setDestino("");
@@ -156,6 +185,7 @@ export default function CriarReservaGrupoDialog({
     setCupom(""); setObservacoesViagem(""); setNomeMotorista(""); setTelefoneMotorista("");
     setValorBase("0"); setDesconto("0"); setMetodoPagamento("");
     setStatusOperacional("pendente"); setRepasseMotorista("");
+    setMotoristaAtribUid("");
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -180,7 +210,6 @@ export default function CriarReservaGrupoDialog({
       hora_retorno: horaRetorno || null,
       cupom: cupom || null,
       observacoes_viagem: observacoesViagem || null,
-      nome_motorista: nomeMotorista || null,
       telefone_motorista: telefoneMotorista || null,
       valor_base: parseFloat(valorBase) || 0,
       desconto: parseFloat(desconto) || 0,
@@ -190,6 +219,12 @@ export default function CriarReservaGrupoDialog({
       repasse_motorista: (() => {
         const r = parseFloat(String(repasseMotorista).replace(",", "."));
         return Number.isFinite(r) && r > 0 ? r : null;
+      })(),
+      motorista_id: motoristaAtribUid.trim() !== "" ? motoristaAtribUid.trim() : null,
+      nome_motorista: (() => {
+        if (!motoristaAtribUid.trim()) return nomeMotorista || null;
+        const hit = motoristasFrota.find((m) => m.portal_auth_user_id === motoristaAtribUid.trim());
+        return (hit?.nome ?? nomeMotorista) || null;
       })(),
     };
 
@@ -261,14 +296,39 @@ export default function CriarReservaGrupoDialog({
 
           <div>
             <h3 className="font-semibold text-foreground mb-3">Veículo e Motorista</h3>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
               <div className="space-y-1.5">
                 <Label>Veículo</Label>
                 <Select><SelectTrigger><SelectValue placeholder="Selecione um veículo" /></SelectTrigger>
                   <SelectContent><SelectItem value="none" disabled>Nenhum veículo cadastrado</SelectItem></SelectContent>
                 </Select>
               </div>
-              <div className="space-y-1.5"><Label>Nome do Motorista</Label><Input value={nomeMotorista} onChange={(e) => setNomeMotorista(e.target.value)} /></div>
+              <div className="space-y-1.5 lg:col-span-2">
+                <Label>Motorista da frota (portal)</Label>
+                <Select
+                  value={motoristaAtribUid || "__none__"}
+                  onValueChange={(v) => {
+                    const uid = v === "__none__" ? "" : v;
+                    setMotoristaAtribUid(uid);
+                    const hit = motoristasFrota.find((m) => m.portal_auth_user_id === uid);
+                    if (hit) setNomeMotorista(hit.nome);
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Atribuir motorista com portal activo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">— Não atribuir —</SelectItem>
+                    {motoristasFrota.map((m) => (
+                      <SelectItem key={m.id} value={m.portal_auth_user_id}>
+                        {m.nome}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">O motorista vê a reserva no portal após atribuição e com conta activa.</p>
+              </div>
+              <div className="space-y-1.5"><Label>Nome (manual / extra)</Label><Input value={nomeMotorista} onChange={(e) => setNomeMotorista(e.target.value)} /></div>
               <div className="space-y-1.5"><Label>Telefone do Motorista</Label><Input value={telefoneMotorista} onChange={(e) => setTelefoneMotorista(e.target.value)} /></div>
             </div>
           </div>

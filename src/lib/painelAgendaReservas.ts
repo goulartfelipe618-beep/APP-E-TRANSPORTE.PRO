@@ -141,6 +141,115 @@ function pushItem(
 }
 
 /** Monta o mapa dia → linhas da agenda (só reservas, não solicitações). */
+/** Só reservas com motorista_id = utilizador (motorista da frota atribuído). */
+export function transferVisivelSomenteAtribuido(r: Tables<"reservas_transfer">, motoristaAuthId: string): boolean {
+  return (r.motorista_id ?? "").trim() === motoristaAuthId;
+}
+
+export function grupoVisivelSomenteAtribuido(g: Tables<"reservas_grupos">, motoristaAuthId: string): boolean {
+  return g.motorista_id != null && g.motorista_id === motoristaAuthId;
+}
+
+/** Agenda do submotorista: apenas serviços atribuídos a ele (auth uid). */
+export function buildAgendaItemsPorDiaAtribuidoSomente(
+  transfers: Tables<"reservas_transfer">[],
+  grupos: Tables<"reservas_grupos">[],
+  motoristaAuthId: string,
+): Map<string, AgendaItem[]> {
+  const map = new Map<string, AgendaItem[]>();
+
+  for (const r of transfers) {
+    if (!transferVisivelSomenteAtribuido(r, motoristaAuthId)) continue;
+    if (isReservaCanceladaAgenda(r.status)) continue;
+    const num = formatNumeroReservaPad(r.numero_reserva);
+
+    if (r.tipo_viagem === "por_hora") {
+      const dk = toAgendaDayKey(r.por_hora_data);
+      pushItem(map, dk, {
+        reservaId: r.id,
+        kind: "transfer",
+        numeroLabel: num,
+        perna: "Por hora",
+        horario: formatHoraReserva(r.por_hora_hora),
+        trajetoResumo: trajetoTransferLeg(r, "por_hora"),
+        status: r.status,
+        key: `transfer:${r.id}:por_hora`,
+      });
+      continue;
+    }
+
+    const dkIda = toAgendaDayKey(r.ida_data);
+    pushItem(map, dkIda, {
+      reservaId: r.id,
+      kind: "transfer",
+      numeroLabel: num,
+      perna: "Ida",
+      horario: formatHoraReserva(r.ida_hora),
+      trajetoResumo: trajetoTransferLeg(r, "ida"),
+      status: r.status,
+      key: `transfer:${r.id}:ida`,
+    });
+
+    if (r.tipo_viagem === "ida_volta") {
+      const dkVolta = toAgendaDayKey(r.volta_data);
+      pushItem(map, dkVolta, {
+        reservaId: r.id,
+        kind: "transfer",
+        numeroLabel: num,
+        perna: "Volta",
+        horario: formatHoraReserva(r.volta_hora),
+        trajetoResumo: trajetoTransferLeg(r, "volta"),
+        status: r.status,
+        key: `transfer:${r.id}:volta`,
+      });
+    }
+  }
+
+  for (const g of grupos) {
+    if (!grupoVisivelSomenteAtribuido(g, motoristaAuthId)) continue;
+    if (isReservaCanceladaAgenda(g.status)) continue;
+    const num = formatNumeroReservaPad(g.numero_reserva);
+    const traj = trajetoGrupoResumo(g);
+
+    const dkIda = toAgendaDayKey(g.data_ida);
+    pushItem(map, dkIda, {
+      reservaId: g.id,
+      kind: "grupo",
+      numeroLabel: num,
+      perna: "Ida",
+      horario: formatHoraReserva(g.hora_ida),
+      trajetoResumo: traj,
+      status: g.status,
+      key: `grupo:${g.id}:ida`,
+    });
+
+    const dkVolta = toAgendaDayKey(g.data_retorno);
+    if (dkVolta) {
+      pushItem(map, dkVolta, {
+        reservaId: g.id,
+        kind: "grupo",
+        numeroLabel: num,
+        perna: "Volta",
+        horario: formatHoraReserva(g.hora_retorno),
+        trajetoResumo: traj,
+        status: g.status,
+        key: `grupo:${g.id}:volta`,
+      });
+    }
+  }
+
+  for (const [, arr] of map) {
+    arr.sort((a, b) => {
+      const ta = a.horario === "—" ? "99:99" : a.horario;
+      const tb = b.horario === "—" ? "99:99" : b.horario;
+      if (ta !== tb) return ta.localeCompare(tb);
+      return a.numeroLabel.localeCompare(b.numeroLabel);
+    });
+  }
+
+  return map;
+}
+
 export function buildAgendaItemsPorDia(
   transfers: Tables<"reservas_transfer">[],
   grupos: Tables<"reservas_grupos">[],

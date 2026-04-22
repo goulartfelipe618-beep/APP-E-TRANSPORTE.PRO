@@ -116,6 +116,8 @@ export default function CriarReservaTransferDialog({
   const [observacoes, setObservacoes] = useState("");
   const [statusOperacional, setStatusOperacional] = useState("pendente");
   const [repasseMotorista, setRepasseMotorista] = useState("");
+  const [motoristasFrota, setMotoristasFrota] = useState<{ id: string; nome: string; portal_auth_user_id: string }[]>([]);
+  const [motoristaAtribUid, setMotoristaAtribUid] = useState<string>("");
 
   const valorTotalNum = useMemo(() => {
     const base = parseFloat(valorBase) || 0;
@@ -171,6 +173,8 @@ export default function CriarReservaTransferDialog({
       setRepasseMotorista(
         row.repasse_motorista != null && Number(row.repasse_motorista) > 0 ? String(row.repasse_motorista) : "",
       );
+      const mid = (row.motorista_id ?? "").trim();
+      setMotoristaAtribUid(mid);
       return;
     }
 
@@ -212,6 +216,31 @@ export default function CriarReservaTransferDialog({
     resetForm();
   }, [open, initialData, reservaEdicao]);
 
+  useEffect(() => {
+    if (!open) return;
+    void (async () => {
+      const { data: auth } = await supabase.auth.getUser();
+      if (!auth.user) {
+        setMotoristasFrota([]);
+        return;
+      }
+      const { data } = await supabase
+        .from("solicitacoes_motoristas")
+        .select("id, nome, portal_auth_user_id")
+        .eq("user_id", auth.user.id)
+        .eq("status", "cadastrado")
+        .not("portal_auth_user_id", "is", null);
+      const rows = (data ?? []) as { id: string; nome: string; portal_auth_user_id: string | null }[];
+      setMotoristasFrota(
+        rows.filter((r) => r.portal_auth_user_id != null).map((r) => ({
+          id: r.id,
+          nome: r.nome,
+          portal_auth_user_id: r.portal_auth_user_id as string,
+        })),
+      );
+    })();
+  }, [open]);
+
   const resetForm = () => {
     setNomeCompleto(""); setCpfCnpj(""); setEmail(""); setTelefone("");
     setTipoViagem("somente_ida"); setQuemViaja("motorista");
@@ -224,6 +253,7 @@ export default function CriarReservaTransferDialog({
     setPorHoraCupom(""); setPorHoraItinerario("");
     setValorBase("0"); setDesconto("0"); setMetodoPagamento(""); setObservacoes("");
     setStatusOperacional("pendente"); setRepasseMotorista("");
+    setMotoristaAtribUid("");
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -272,6 +302,8 @@ export default function CriarReservaTransferDialog({
         const r = parseFloat(String(repasseMotorista).replace(",", "."));
         return Number.isFinite(r) && r > 0 ? r : null;
       })(),
+      motorista_id:
+        quemViaja === "motorista" && motoristaAtribUid.trim() !== "" ? motoristaAtribUid.trim() : null,
     };
 
     const { error } = reservaEdicao?.id
@@ -406,18 +438,28 @@ export default function CriarReservaTransferDialog({
                 </Select>
               </div>
               {quemViaja === "motorista" && (
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <Label>Motorista *</Label>
-                    <Select><SelectTrigger><SelectValue placeholder="Selecione um motorista" /></SelectTrigger>
-                      <SelectContent><SelectItem value="none" disabled>Nenhum motorista cadastrado</SelectItem></SelectContent>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div className="space-y-1.5 sm:col-span-2">
+                    <Label>Motorista da frota *</Label>
+                    <Select
+                      value={motoristaAtribUid || "__none__"}
+                      onValueChange={(v) => setMotoristaAtribUid(v === "__none__" ? "" : v)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione quem executa a viagem" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">— Não atribuir ainda —</SelectItem>
+                        {motoristasFrota.map((m) => (
+                          <SelectItem key={m.id} value={m.portal_auth_user_id}>
+                            {m.nome}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
                     </Select>
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label>Veículo</Label>
-                    <Select disabled><SelectTrigger><SelectValue placeholder="Selecione um motorista primeiro" /></SelectTrigger>
-                      <SelectContent><SelectItem value="none" disabled>—</SelectItem></SelectContent>
-                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      Só aparecem motoristas com <strong className="text-foreground">portal activo</strong> (definiram senha pelo link). Atribua a reserva para ela surgir na agenda dele.
+                    </p>
                   </div>
                 </div>
               )}

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, LayoutGrid, List } from "lucide-react";
+import { Plus, Search, LayoutGrid, List, Link2, Copy } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import CadastrarMotoristaDialog from "@/components/motoristas/CadastrarMotoristaDialog";
 import { supabase } from "@/integrations/supabase/client";
@@ -19,6 +19,8 @@ type MotoristaCadastroRow = {
   status: string;
   created_at: string;
   dados_webhook: Json | null;
+  portal_token: string;
+  portal_auth_user_id: string | null;
 };
 
 function situacaoFrotaFromWebhook(dw: Json | null): "ativo" | "inativo" {
@@ -46,7 +48,7 @@ export default function MotoristaCadastrosPage() {
 
     const { data, error } = await supabase
       .from("solicitacoes_motoristas")
-      .select("id, nome, cpf, telefone, email, cidade, estado, status, created_at, dados_webhook")
+      .select("id, nome, cpf, telefone, email, cidade, estado, status, created_at, dados_webhook, portal_token, portal_auth_user_id")
       .eq("user_id", user.id)
       .eq("status", "cadastrado")
       .order("created_at", { ascending: false });
@@ -62,6 +64,15 @@ export default function MotoristaCadastrosPage() {
 
   const handleCreated = () => {
     void fetchMotoristas();
+  };
+
+  const portalUrl = (token: string) =>
+    typeof window !== "undefined" ? `${window.location.origin}/frota/acesso/${token}` : "";
+
+  const copyPortalLink = (token: string) => {
+    const u = portalUrl(token);
+    if (!u) return;
+    void navigator.clipboard.writeText(u).then(() => toast.success("Link copiado."));
   };
 
   const filtered = motoristas.filter((m) => {
@@ -137,6 +148,16 @@ export default function MotoristaCadastrosPage() {
                   Cidade/UF: {m.cidade || "—"} {m.estado ? `- ${m.estado}` : ""}
                 </p>
                 <p className="text-xs text-muted-foreground">Cadastrado em {new Date(m.created_at).toLocaleDateString("pt-BR")}</p>
+                <div className="flex flex-wrap items-center gap-2 border-t border-border pt-2">
+                  <Link2 className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span className="text-xs text-muted-foreground">
+                    Portal: {m.portal_auth_user_id ? "senha definida" : "enviar link para definir senha"}
+                  </span>
+                  <Button type="button" variant="outline" size="sm" className="h-7 text-xs" onClick={() => copyPortalLink(m.portal_token)}>
+                    <Copy className="mr-1 h-3 w-3" />
+                    Copiar link
+                  </Button>
+                </div>
               </div>
             );
           })}

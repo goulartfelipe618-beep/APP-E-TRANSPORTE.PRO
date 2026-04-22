@@ -372,14 +372,24 @@ export default function CadastrarMotoristaDialog({ open, onOpenChange, onCreated
       status: "cadastrado",
     };
 
-    const { error } = await supabase.from("solicitacoes_motoristas").insert(row);
+    const { data: inserted, error } = await supabase.from("solicitacoes_motoristas").insert(row).select("id, portal_token").single();
     if (error) {
       toast.error(`Erro ao salvar cadastro: ${error.message}`);
       setSaving(false);
       return;
     }
 
-    toast.success("Motorista salvo e disponível na sua lista.");
+    const portalToken = inserted?.portal_token as string | undefined;
+    const link =
+      typeof window !== "undefined" && portalToken
+        ? `${window.location.origin}/frota/acesso/${portalToken}`
+        : null;
+    toast.success(
+      link
+        ? `Motorista guardado. Link do portal: ${link}`
+        : "Motorista salvo e disponível na sua lista.",
+      { duration: 12_000 },
+    );
     setSaving(false);
     onOpenChange(false);
     onCreated?.();

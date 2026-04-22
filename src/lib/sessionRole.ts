@@ -1,7 +1,14 @@
 import { supabase } from "@/integrations/supabase/client";
 
 /** Rota após login/MFA. Usa RPC security definer para não depender de RLS em user_roles. */
-export async function getPostLoginPath(userId: string): Promise<"/admin" | "/taxi" | "/dashboard"> {
+export async function getPostLoginPath(userId: string): Promise<"/admin" | "/taxi" | "/dashboard" | "/frota"> {
+  const { data: frotaRow } = await supabase
+    .from("solicitacoes_motoristas")
+    .select("id")
+    .eq("portal_auth_user_id", userId)
+    .maybeSingle();
+  if (frotaRow) return "/frota";
+
   const { data: primary, error } = await supabase.rpc("get_session_primary_role");
 
   if (!error && primary) {
