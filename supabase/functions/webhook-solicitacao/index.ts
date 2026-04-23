@@ -438,12 +438,11 @@ Deno.serve(async (req) => {
         );
       }
 
-      const computedPassword = computeLeadPassword(leadNome, String(leadTelefone));
-
       // 3) Upsert auth user (login) by email
       let authUserId = existingUserId;
 
       if (!authUserId) {
+        const computedPassword = computeLeadPassword(leadNome, String(leadTelefone));
         const { data: newUser, error: createErr } = await supabase.auth.admin.createUser({
           email: leadEmail,
           password: computedPassword,
@@ -458,13 +457,15 @@ Deno.serve(async (req) => {
         }
         authUserId = newUser.user.id;
       } else {
+        // Conta já existia: não redefinir a palavra-passe para a derivada do lead.
+        // Isso invalidava logins de motoristas que já tinham alterado a senha em Configurações
+        // (nova submissão do formulário / webhook repetido voltava a impôr a senha previsível).
         const { error: pwErr } = await supabase.auth.admin.updateUserById(authUserId, {
-          password: computedPassword,
           email_confirm: true,
         });
         if (pwErr) {
           return new Response(
-            JSON.stringify({ error: "Erro ao atualizar senha do usuário", details: pwErr.message }),
+            JSON.stringify({ error: "Erro ao atualizar utilizador existente", details: pwErr.message }),
             { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }

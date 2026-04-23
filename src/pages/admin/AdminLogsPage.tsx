@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   RefreshCw,
@@ -8,6 +9,7 @@ import {
   User,
   MapPin,
   AlertTriangle,
+  Loader2,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import type { Tables } from "@/integrations/supabase/types";
@@ -54,13 +56,42 @@ function formatWhen(iso: string) {
 }
 
 export default function AdminLogsPage() {
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const [masterAccess, setMasterAccess] = useState<"pending" | "yes" | "no">("pending");
   const [painelFilter, setPainelFilter] = useState<string>("all");
   const [nomeFilter, setNomeFilter] = useState("");
   const [purging, setPurging] = useState(false);
 
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (cancelled) return;
+      if (!user?.id) {
+        setMasterAccess("no");
+        navigate("/", { replace: true });
+        return;
+      }
+      const { data, error } = await supabase.rpc("is_admin_master", { _user_id: user.id });
+      if (cancelled) return;
+      if (error || !Boolean(data)) {
+        setMasterAccess("no");
+        navigate("/", { replace: true });
+        return;
+      }
+      setMasterAccess("yes");
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [navigate]);
+
   const query = useQuery({
     queryKey: [...QUERY_KEY, painelFilter],
+    enabled: masterAccess === "yes",
     queryFn: async () => {
       let q = supabase
         .from("painel_client_error_logs")
@@ -92,6 +123,7 @@ export default function AdminLogsPage() {
   }, [queryClient]);
 
   useEffect(() => {
+    if (masterAccess !== "yes") return;
     const channel = supabase
       .channel("admin-painel-error-logs")
       .on(
@@ -105,7 +137,7 @@ export default function AdminLogsPage() {
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [invalidate]);
+  }, [invalidate, masterAccess]);
 
   const handlePurgeOld = async () => {
     const cutoff = new Date();
@@ -124,15 +156,27 @@ export default function AdminLogsPage() {
     }
   };
 
+  if (masterAccess === "pending") {
+    return (
+      <div className="flex min-h-[40vh] items-center justify-center gap-2 text-sm text-muted-foreground">
+        <Loader2 className="h-5 w-5 animate-spin shrink-0" aria-hidden />
+        A verificar permissões…
+      </div>
+    );
+  }
+
+  if (masterAccess === "no") {
+    return null;
+  }
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-foreground">Logs do painel</h1>
         <p className="mt-1 text-sm text-muted-foreground max-w-3xl">
-          Erros e rejeições capturados nos browsers dos utilizadores (motorista executivo, táxi e este
-          Admin Master), com o menu em que estavam e o máximo de detalhe possível. Aplicação da migration
-          Supabase <code className="text-xs">painel_client_error_logs</code> é obrigatória para gravar
-          novos eventos.
+          Erros e rejeições capturados nos browsers (motorista executivo, táxi e Admin Master). Consulta
+          exclusiva do administrador master; a tabela <code className="text-xs">painel_client_error_logs</code>{" "}
+          aplica RLS no Supabase.
         </p>
       </div>
 

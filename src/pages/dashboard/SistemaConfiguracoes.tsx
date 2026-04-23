@@ -673,7 +673,8 @@ export default function SistemaConfiguracoesPage() {
     const {
       data: { user },
     } = await supabase.auth.getUser();
-    if (!user?.email) {
+    const emailNorm = user?.email?.trim().toLowerCase();
+    if (!emailNorm) {
       toast.error("Não foi possível obter o e-mail da conta.");
       return;
     }
@@ -681,7 +682,7 @@ export default function SistemaConfiguracoesPage() {
     setSavingPassword(true);
     try {
       const { error: signInErr } = await supabase.auth.signInWithPassword({
-        email: user.email,
+        email: emailNorm,
         password: currentPassword,
       });
       if (signInErr) {
@@ -696,6 +697,11 @@ export default function SistemaConfiguracoesPage() {
       if (updateErr) {
         toast.error(updateErr.message || "Não foi possível atualizar a senha.");
         return;
+      }
+
+      const { error: refreshErr } = await supabase.auth.refreshSession();
+      if (refreshErr && import.meta.env.DEV) {
+        console.warn("[senha] refreshSession após troca:", refreshErr.message);
       }
 
       toast.success("Senha alterada com sucesso.");

@@ -1,6 +1,14 @@
 import { lazy, Suspense } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes, Navigate } from "react-router-dom";
+
+/** Preserva `?code=` (PKCE) e `#...` ao ir da raiz para `/login` — necessário para links de recuperação de senha. */
+function RootToLoginRedirect() {
+  const search = typeof window !== "undefined" ? window.location.search : "";
+  const hash = typeof window !== "undefined" ? window.location.hash : "";
+  const to = `/login${search}${hash}`;
+  return <Navigate to={to} replace />;
+}
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -43,7 +51,7 @@ const App = () => (
         <ClientSessionRevocationGuard />
         <Suspense fallback={<RouteFallback />}>
           <Routes>
-            <Route path="/" element={<Navigate to="/login" replace />} />
+            <Route path="/" element={<RootToLoginRedirect />} />
             <Route path="/login" element={<Login />} />
             <Route path="/mfa" element={<MfaChallengePage />} />
             <Route path="/rastreio/:token" element={<RastreioPublico />} />
