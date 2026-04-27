@@ -42,11 +42,19 @@ export default function VeiculosPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
+    const { data: auth } = await supabase.auth.getUser();
+    const uid = auth.user?.id;
+    if (!uid) {
+      setVeiculos([]);
+      setLoading(false);
+      return;
+    }
     const { data, error } = await supabase
       .from("veiculos_frota")
       .select(
         "id, marca, modelo, placa, tipo_veiculo, status, valor_km, valor_hora, tarifa_base, valor_minimo_corrida, imagem_capa_url",
       )
+      .eq("user_id", uid)
       .order("created_at", { ascending: false });
     if (error) toast.error("Não foi possível carregar os veículos.");
     else setVeiculos((data || []) as VeiculoRow[]);

@@ -2,6 +2,7 @@ import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
 import { AppErrorBoundary } from "./components/AppErrorBoundary";
+import { installBrowserZoomLock } from "./lib/installBrowserZoomLock";
 
 // --------------------------------------------------------------------------
 // Silenciar AbortError benigno vindo do Web Locks / supabase-auth.
@@ -41,6 +42,8 @@ if (typeof window !== "undefined") {
       ev.preventDefault();
     }
   });
+
+  installBrowserZoomLock();
 }
 
 createRoot(document.getElementById("root")!).render(

@@ -89,6 +89,7 @@ const labelMap: Record<string, string> = {
 };
 
 const ignoredKeys = ["id", "user_id", "created_at", "updated_at", "veiculo_id", "motorista_id", "solicitacao_id"];
+const CONNECTED_STATUS = new Set(["open", "conectado", "connected", "online"]);
 
 function nomeClienteParaComunicar(dados: Record<string, unknown>): string {
   const d = dados as { nome_cliente?: string; nome_completo?: string; nome?: string };
@@ -112,9 +113,11 @@ export default function ComunicarDialog({
 
   const [enviando, setEnviando] = useState(false);
 
-  const { sistema } = useComunicadoresEvolution({ includeUsuarioComunicador: false });
+  const { sistema, own } = useComunicadoresEvolution();
   const sistemaRef = useRef<ComunicadorRow | null>(null);
+  const ownRef = useRef<ComunicadorRow | null>(null);
   sistemaRef.current = sistema;
+  ownRef.current = own;
 
   const [msgAcima, setMsgAcima] = useState("");
   const [msgAbaixo, setMsgAbaixo] = useState("");
@@ -174,7 +177,11 @@ export default function ComunicarDialog({
             .filter(([k, v]) => !ignoredKeys.includes(k) && v != null && v !== "")
             .map(([k]) => k),
           motorista_painel: motorista,
-          comunicador: buildComunicadorSnapshot("oficial", sistemaRef.current, null),
+          comunicador: buildComunicadorSnapshot(
+            resolveCanalComunicador(ownRef.current),
+            sistemaRef.current,
+            ownRef.current,
+          ),
         });
         abertoWebhookDoneRef.current = key;
       } catch (e) {
@@ -242,6 +249,11 @@ export default function ComunicarDialog({
   const isReservaN8n = webhookTipo === "transfer_reserva" || webhookTipo === "grupo_reserva";
 
   const hasTextoPrePreenchido = isSolicitacaoN8n || isReservaN8n;
+
+  const resolveCanalComunicador = (row: ComunicadorRow | null): "oficial" | "proprio" => {
+    const status = (row?.connection_status || "").trim().toLowerCase();
+    return row?.instance_name && CONNECTED_STATUS.has(status) ? "proprio" : "oficial";
+  };
 
   const toggleVar = (key: string) => {
     setSelectedVars((prev) => {
@@ -324,7 +336,7 @@ export default function ComunicarDialog({
             final: msgAbaixo,
           },
           motorista_painel: motorista,
-          comunicador: buildComunicadorSnapshot("oficial", sistema, null),
+          comunicador: buildComunicadorSnapshot(resolveCanalComunicador(own), sistema, own),
           confirmacao_reserva_pdf: confirmacaoPdf,
         });
       } catch (e) {

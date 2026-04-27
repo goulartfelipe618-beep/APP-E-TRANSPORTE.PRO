@@ -107,7 +107,14 @@
     @apply border-border;
   }
 
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    touch-action: manipulation;
+  }
+
   body {
     @apply bg-background text-foreground;
+    touch-action: manipulation;
   }
 }
