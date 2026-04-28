@@ -58,6 +58,18 @@ export function buildComunicadorSnapshot(
 ): Record<string, unknown> {
   const telOf = sistema?.telefone_conectado?.trim() || null;
   const telOwn = own?.telefone_conectado?.trim() || null;
+  const ownInstance = own?.instance_name?.trim() || null;
+  const linhaPropria =
+    own && (telOwn || ownInstance)
+      ? {
+          telefone_e164: telOwn || null,
+          nome_dispositivo: own.nome_dispositivo ?? null,
+          instance_name: ownInstance,
+          connection_status: own.connection_status ?? null,
+          rotulo: own.rotulo ?? null,
+          comunicador_id: own.id ?? null,
+        }
+      : null;
   return {
     canal_escolhido: canal,
     linha_oficial: telOf
@@ -69,16 +81,7 @@ export function buildComunicadorSnapshot(
           comunicador_id: sistema?.id ?? null,
         }
       : null,
-    linha_propria_motorista: telOwn
-      ? {
-          telefone_e164: telOwn,
-          nome_dispositivo: own?.nome_dispositivo ?? null,
-          instance_name: own?.instance_name ?? null,
-          connection_status: own?.connection_status ?? null,
-          rotulo: own?.rotulo ?? null,
-          comunicador_id: own?.id ?? null,
-        }
-      : null,
+    linha_propria_motorista: linhaPropria,
   };
 }
 

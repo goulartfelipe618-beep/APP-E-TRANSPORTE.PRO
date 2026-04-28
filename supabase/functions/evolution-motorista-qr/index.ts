@@ -89,13 +89,13 @@ Deno.serve(async (req) => {
       });
     }
 
-    const allowed = (roleRows || []).some(
-      (r: { role: string }) => r.role === "admin_transfer" || r.role === "admin_master",
+    const allowed = (roleRows || []).some((r: { role: string }) =>
+      ["admin_transfer", "admin_master", "motorista_executivo", "admin_taxi"].includes(r.role),
     );
     if (!allowed) {
       return new Response(
         JSON.stringify({
-          error: "Apenas contas de motorista executivo (ou administrador) podem gerar este QR.",
+          error: "Apenas motorista executivo, táxi (painel próprio) ou administrador pode gerar este QR.",
         }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
