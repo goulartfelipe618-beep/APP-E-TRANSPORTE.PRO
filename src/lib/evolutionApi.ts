@@ -193,7 +193,21 @@ export async function fetchEvolutionMotoristaQrFromServer(): Promise<{
   }>("evolution-motorista-qr", { body: {} });
 
   if (error) {
-    return { base64: null, detail: error.message };
+    let detail = error.message;
+    try {
+      const ctx = (error as { context?: Response }).context;
+      if (ctx && typeof ctx.json === "function") {
+        const body = (await ctx.json()) as { error?: string; detail?: string };
+        if (typeof body.detail === "string" && body.detail.trim()) {
+          detail = body.detail.trim();
+        } else if (typeof body.error === "string" && body.error.trim()) {
+          detail = body.detail ? `${body.error}: ${body.detail}` : body.error.trim();
+        }
+      }
+    } catch {
+      /* corpo não-JSON ou vazio */
+    }
+    return { base64: null, detail };
   }
   if (data && typeof data === "object" && "error" in data && data.error) {
     return { base64: null, detail: (data.detail as string) || String(data.error) };
@@ -302,9 +316,10 @@ export async function fetchEvolutionQrCode(
 
     const data = JSON.parse(connectPack.bodyText) as Record<string, unknown>;
     const b64 =
-      (typeof data.base64 === "string" && data.base64) ||
+      (typeof data.base64 === "string" && data.base64.length > 40 && data.base64) ||
       (typeof (data as { qrcode?: { base64?: string } }).qrcode?.base64 === "string" &&
         (data as { qrcode: { base64: string } }).qrcode.base64) ||
+      (typeof data.qrOrCode === "string" && data.qrOrCode.startsWith("data:image") ? data.qrOrCode : null) ||
       null;
 
     return { base64: b64 };

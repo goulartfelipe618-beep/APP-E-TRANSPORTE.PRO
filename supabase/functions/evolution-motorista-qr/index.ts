@@ -38,6 +38,76 @@ function instanceNameForUser(userId: string): string {
   return `etp-u-${userId.replace(/-/g, "").slice(0, 16)}`;
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+/** Respostas da Evolution variam por versão: base64, qrcode.base64, qrOrCode (data URL), instance aninhado. */
+function extractQrBase64FromEvolutionJson(data: unknown): string | null {
+  if (!data || typeof data !== "object") return null;
+  const o = data as Record<string, unknown>;
+
+  const fromQrcode = (q: unknown): string | null => {
+    if (!q || typeof q !== "object") return null;
+    const b = (q as { base64?: string }).base64;
+    return typeof b === "string" && b.length > 40 ? b : null;
+  };
+
+  if (typeof o.base64 === "string" && o.base64.length > 40) {
+    return o.base64;
+  }
+
+  const nested = fromQrcode(o.qrcode);
+  if (nested) return nested;
+
+  const qrOrCode = o.qrOrCode;
+  if (typeof qrOrCode === "string" && qrOrCode.startsWith("data:image") && qrOrCode.length > 80) {
+    return qrOrCode;
+  }
+
+  const inst = o.instance;
+  if (inst && typeof inst === "object") {
+    const io = inst as Record<string, unknown>;
+    if (typeof io.base64 === "string" && io.base64.length > 40) return io.base64;
+    const iq = fromQrcode(io.qrcode);
+    if (iq) return iq;
+  }
+
+  if (Array.isArray(data)) {
+    for (const item of data) {
+      const inner = extractQrBase64FromEvolutionJson(item);
+      if (inner) return inner;
+    }
+  }
+
+  return null;
+}
+
+function evolutionAlreadyConnectedPayload(data: unknown): boolean {
+  if (!data || typeof data !== "object") return false;
+  const o = data as Record<string, unknown>;
+  let st = "";
+  if (typeof o.state === "string") st = o.state;
+  else if (o.instance && typeof o.instance === "object") {
+    const s = (o.instance as Record<string, unknown>).state;
+    if (typeof s === "string") st = s;
+  }
+  const s = st.toLowerCase();
+  return s === "open" || s.includes("connected");
+}
+
+/** Erros “de negócio” da Evolution: HTTP 200 + JSON para o supabase.functions.invoke repassar `detail` ao cliente. */
+function evolutionFailureResponse(message: string, detail: string, code?: string) {
+  return new Response(
+    JSON.stringify({
+      error: message,
+      detail: detail.slice(0, 800),
+      ...(code ? { code } : {}),
+    }),
+    { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+  );
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -143,7 +213,8 @@ Deno.serve(async (req) => {
     const baseUrl = assertSafeHttpsBase(rawUrl);
     const instanceName = instanceNameForUser(user.id);
 
-    const createTarget = `${baseUrl.replace(/\/+$/, "")}/instance/create`;
+    const root = baseUrl.replace(/\/+$/, "");
+    const createTarget = `${root}/instance/create`;
     const createRes = await fetch(createTarget, {
       method: "POST",
       headers: {
@@ -158,56 +229,79 @@ Deno.serve(async (req) => {
     });
     const createText = await createRes.text();
     if (![200, 201, 409].includes(createRes.status)) {
-      return new Response(
-        JSON.stringify({
-          error: `Evolution recusou criar a instância (${createRes.status}).`,
-          detail: createText.slice(0, 400),
-        }),
-        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      return evolutionFailureResponse(
+        `Evolution recusou criar a instância (${createRes.status}).`,
+        createText,
+        "evolution_create",
       );
     }
 
-    const connectTarget =
-      `${baseUrl.replace(/\/+$/, "")}/instance/connect/${encodeURIComponent(instanceName)}`;
-    const connectRes = await fetch(connectTarget, {
-      method: "GET",
-      headers: { apikey: rawKey },
-    });
-    const connectText = await connectRes.text();
-
-    if (connectRes.status < 200 || connectRes.status >= 300) {
-      return new Response(
-        JSON.stringify({
-          error: "Evolution não retornou o QR (connect).",
-          detail: connectText.slice(0, 400),
-        }),
-        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
-    }
-
-    let data: Record<string, unknown>;
+    let b64: string | null = null;
     try {
-      data = JSON.parse(connectText) as Record<string, unknown>;
+      const createJson = JSON.parse(createText) as unknown;
+      b64 = extractQrBase64FromEvolutionJson(createJson);
     } catch {
-      return new Response(JSON.stringify({ error: "Resposta inválida da Evolution (JSON)." }), {
-        status: 502,
+      /* create pode vir vazio ou não-JSON em alguns proxies */
+    }
+
+    if (b64) {
+      return new Response(JSON.stringify({ base64: b64, instanceName }), {
+        status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const b64 =
-      (typeof data.base64 === "string" && data.base64) ||
-      (typeof (data as { qrcode?: { base64?: string } }).qrcode?.base64 === "string" &&
-        (data as { qrcode: { base64: string } }).qrcode.base64) ||
-      null;
+    const connectTarget = `${root}/instance/connect/${encodeURIComponent(instanceName)}`;
+    const delaysMs = [0, 900, 1600];
+    let lastConnectText = "";
+    let lastConnectStatus = 0;
+
+    for (const wait of delaysMs) {
+      if (wait > 0) await sleep(wait);
+
+      const connectRes = await fetch(connectTarget, {
+        method: "GET",
+        headers: { apikey: rawKey },
+      });
+      lastConnectText = await connectRes.text();
+      lastConnectStatus = connectRes.status;
+
+      if (connectRes.status < 200 || connectRes.status >= 300) {
+        continue;
+      }
+
+      let data: unknown;
+      try {
+        data = JSON.parse(lastConnectText) as unknown;
+      } catch {
+        continue;
+      }
+
+      if (evolutionAlreadyConnectedPayload(data)) {
+        return evolutionFailureResponse(
+          "Esta instância já está conectada ao WhatsApp.",
+          "Desligue o aparelho em Aparelhos ligados ou remova a instância antes de gerar um novo QR.",
+          "already_connected",
+        );
+      }
+
+      b64 = extractQrBase64FromEvolutionJson(data);
+      if (b64) break;
+    }
+
+    if (!b64 && (lastConnectStatus < 200 || lastConnectStatus >= 300)) {
+      return evolutionFailureResponse(
+        "Evolution não retornou o QR (connect).",
+        `${lastConnectStatus}: ${lastConnectText.slice(0, 500)}`,
+        "evolution_connect_http",
+      );
+    }
 
     if (!b64) {
-      return new Response(
-        JSON.stringify({
-          error: "QR Code não veio na resposta da Evolution.",
-          detail: connectText.slice(0, 500),
-        }),
-        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      return evolutionFailureResponse(
+        "QR Code não veio na resposta da Evolution.",
+        `Última resposta connect (${lastConnectStatus}): ${lastConnectText.slice(0, 700)}`,
+        "evolution_no_qr",
       );
     }
 
