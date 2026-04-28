@@ -89,9 +89,18 @@ export default function TransferGeolocalizacaoPage() {
 
   const loadReservas = useCallback(async () => {
     setLoading(true);
+    const { data: auth } = await supabase.auth.getUser();
+    const uid = auth.user?.id;
+    if (!uid) {
+      setReservasTransfer([]);
+      setReservasGrupos([]);
+      setLoading(false);
+      return;
+    }
+    const filtroDonoOuMotorista = `user_id.eq.${uid},motorista_id.eq.${uid}`;
     const [t, g] = await Promise.all([
-      supabase.from("reservas_transfer").select("*").order("created_at", { ascending: false }),
-      supabase.from("reservas_grupos").select("*").order("created_at", { ascending: false }),
+      supabase.from("reservas_transfer").select("*").or(filtroDonoOuMotorista).order("created_at", { ascending: false }),
+      supabase.from("reservas_grupos").select("*").or(filtroDonoOuMotorista).order("created_at", { ascending: false }),
     ]);
     if (t.error) {
       toast.error("Erro ao carregar reservas de transfer");
@@ -108,9 +117,17 @@ export default function TransferGeolocalizacaoPage() {
 
   const loadRastreios = useCallback(async () => {
     setLoadingRastreios(true);
+    const { data: auth } = await supabase.auth.getUser();
+    const uid = auth.user?.id;
+    if (!uid) {
+      setRastreios([]);
+      setLoadingRastreios(false);
+      return;
+    }
     const { data, error } = await supabase
       .from("rastreios_ao_vivo")
       .select("*")
+      .eq("user_id", uid)
       .order("created_at", { ascending: false })
       .limit(50);
     if (error) {
