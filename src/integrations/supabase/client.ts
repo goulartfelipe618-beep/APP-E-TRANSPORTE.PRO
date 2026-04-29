@@ -47,5 +47,7 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     autoRefreshToken: Boolean(browserSessionStorage),
     detectSessionInUrl: true,
     lock: processLock,
+    /** Evita falhas raras de `Acquiring process lock … timed out` em picos de getSession/onAuthStateChange. */
+    lockAcquireTimeout: 30_000,
   },
 });

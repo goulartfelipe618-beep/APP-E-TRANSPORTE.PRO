@@ -140,6 +140,8 @@ export default function CampanhasAtivosPage() {
     } as any);
 
     if (automacaoError) {
+      // O DELETE pode falhar enquanto a campanha está "ativa" no período (trigger). Pausar antes remove o bloqueio.
+      await supabase.from("campanhas" as any).update({ status: "pausada" }).eq("id", campanha.id);
       await supabase.from("campanhas" as any).delete().eq("id", campanha.id);
       toast.error(`Erro ao criar webhook automático: ${automacaoError.message}`);
       setSaving(false);
