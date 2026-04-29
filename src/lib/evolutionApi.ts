@@ -183,6 +183,7 @@ export async function fetchEvolutionMotoristaQrFromServer(): Promise<{
   base64: string | null;
   instanceName?: string;
   detail?: string;
+  code?: string;
 }> {
   const { data, error } = await supabase.functions.invoke<{
     base64?: string;
@@ -210,7 +211,11 @@ export async function fetchEvolutionMotoristaQrFromServer(): Promise<{
     return { base64: null, detail };
   }
   if (data && typeof data === "object" && "error" in data && data.error) {
-    return { base64: null, detail: (data.detail as string) || String(data.error) };
+    return {
+      base64: null,
+      detail: (data.detail as string) || String(data.error),
+      code: typeof data.code === "string" ? data.code : undefined,
+    };
   }
   if (!data?.base64) {
     return { base64: null, detail: "Resposta sem QR Code." };

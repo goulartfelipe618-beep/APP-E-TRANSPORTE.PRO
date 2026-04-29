@@ -228,7 +228,9 @@ Deno.serve(async (req) => {
       }),
     });
     const createText = await createRes.text();
-    if (![200, 201, 409].includes(createRes.status)) {
+    const createTextLower = createText.toLowerCase();
+    const createAlreadyInUse = createRes.status === 403 && createTextLower.includes("already in use");
+    if (![200, 201, 409].includes(createRes.status) && !createAlreadyInUse) {
       return evolutionFailureResponse(
         `Evolution recusou criar a instância (${createRes.status}).`,
         createText,

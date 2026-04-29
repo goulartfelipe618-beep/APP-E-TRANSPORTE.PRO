@@ -47,6 +47,7 @@ export default function ComunicadorMotoristaExecutivoPage() {
 
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const autoQrTriedRef = useRef(false);
   const trySyncRef = useRef<() => Promise<void>>(async () => {});
   const endQrSessionRef = useRef<(opts?: { connected: boolean }) => Promise<void>>(async () => {});
   const expiryNotifiedRef = useRef(false);
@@ -177,6 +178,15 @@ export default function ComunicadorMotoristaExecutivoPage() {
     try {
       const pack = await fetchEvolutionMotoristaQrFromServer();
       if (!pack.base64) {
+        const detail = (pack.detail || "").toLowerCase();
+        // Evita spam quando a instância já existe/conectou fora deste fluxo.
+        if (pack.code === "already_connected" || detail.includes("already in use")) {
+          await trySync();
+          if (!isOwnWhatsAppConnected(own)) {
+            toast.message("Instância já existe. Desconecte para criar um novo vínculo.");
+          }
+          return;
+        }
         toast.error(pack.detail || "Não foi possível gerar o QR Code.");
         return;
       }
@@ -194,7 +204,7 @@ export default function ComunicadorMotoristaExecutivoPage() {
     } finally {
       setBusyQr(false);
     }
-  }, [persistOwnPatch, trySync]);
+  }, [persistOwnPatch, trySync, own]);
 
   const handleRemoverOwn = useCallback(async () => {
     setBusyDelete(true);
@@ -225,17 +235,10 @@ export default function ComunicadorMotoristaExecutivoPage() {
     if (!painelComunicadorReady || !painelMotoristaEvolutionAtivo) return;
     if (loading || busyQr || busyDelete) return;
     if (ownConnected || qrSession) return;
+    if (autoQrTriedRef.current) return;
+    autoQrTriedRef.current = true;
     void handleConectarAgora();
-  }, [
-    painelComunicadorReady,
-    painelMotoristaEvolutionAtivo,
-    loading,
-    busyQr,
-    busyDelete,
-    ownConnected,
-    qrSession,
-    handleConectarAgora,
-  ]);
+  }, [painelComunicadorReady, painelMotoristaEvolutionAtivo, loading, busyQr, busyDelete, ownConnected, qrSession, handleConectarAgora]);
 
   if (painelComunicadorReady && !painelMotoristaEvolutionAtivo) {
     return (
