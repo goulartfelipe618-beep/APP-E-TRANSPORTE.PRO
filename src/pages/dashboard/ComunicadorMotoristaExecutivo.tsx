@@ -127,9 +127,9 @@ export default function ComunicadorMotoristaExecutivoPage() {
     if (sync.detail && !sync.connected) {
       return;
     }
-    if (sync.connected && sync.phone) {
+    if (sync.connected) {
       await persistOwnPatch({
-        telefone_conectado: sync.phone,
+        telefone_conectado: sync.phone ?? own?.telefone_conectado ?? null,
         connection_status: "conectado",
         nome_dispositivo: sync.profileName?.trim() || own?.nome_dispositivo || null,
         foto_perfil_url: sync.profilePicUrl ?? own?.foto_perfil_url ?? null,
