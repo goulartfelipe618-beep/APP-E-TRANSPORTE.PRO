@@ -27,6 +27,13 @@ function isOwnWhatsAppConnected(row: ComunicadorRow | null): boolean {
   return CONNECTED_STATUS.has(s);
 }
 
+function isConfirmedSyncConnected(sync: { connected: boolean; phone: string | null; state: string | null }): boolean {
+  if (!sync.connected) return false;
+  if (Boolean(sync.phone?.trim())) return true;
+  const normalized = (sync.state || "").trim().toLowerCase();
+  return CONNECTED_STATUS.has(normalized);
+}
+
 function formatMmSs(ms: number): string {
   const sec = Math.max(0, Math.ceil(ms / 1000));
   const m = Math.floor(sec / 60);
@@ -127,7 +134,7 @@ export default function ComunicadorMotoristaExecutivoPage() {
     if (sync.detail && !sync.connected) {
       return;
     }
-    if (sync.connected) {
+    if (isConfirmedSyncConnected(sync)) {
       await persistOwnPatch({
         telefone_conectado: sync.phone ?? own?.telefone_conectado ?? null,
         connection_status: "conectado",

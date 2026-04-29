@@ -95,10 +95,13 @@ Deno.serve(async (req) => {
       }
     }
 
+    const normalizedState = typeof state === "string" ? state.toLowerCase() : "";
     const connected =
       Boolean(phone) ||
-      state === "open" ||
-      (typeof state === "string" && state.toLowerCase().includes("connect"));
+      normalizedState === "open" ||
+      normalizedState === "connected" ||
+      normalizedState === "conectado" ||
+      normalizedState === "online";
 
     return new Response(
       JSON.stringify({
