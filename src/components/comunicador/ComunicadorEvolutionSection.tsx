@@ -121,7 +121,7 @@ export function ComunicadorEvolutionSection({
                     onClick={() => setRemoveOpen(true)}
                   >
                     <Trash2 className="mr-2 h-4 w-4" />
-                    Excluir comunicador
+                    Desconectar
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -202,10 +202,10 @@ export function ComunicadorEvolutionSection({
         <AlertDialog open={removeOpen} onOpenChange={setRemoveOpen}>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Excluir comunicador?</AlertDialogTitle>
+              <AlertDialogTitle>Desconectar WhatsApp?</AlertDialogTitle>
               <AlertDialogDescription>
-                Isso remove a instância na Evolution e desvincula seu WhatsApp desta conta. Você poderá conectar de novo
-                depois gerando um novo QR Code.
+                Isso remove a instância na Evolution automaticamente e desvincula seu WhatsApp desta conta. Você poderá
+                conectar de novo ao gerar um novo QR Code.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
@@ -217,7 +217,7 @@ export function ComunicadorEvolutionSection({
                   void onRemover();
                 }}
               >
-                Excluir
+                Desconectar
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

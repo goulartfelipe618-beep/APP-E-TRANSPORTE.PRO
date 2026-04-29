@@ -221,6 +221,22 @@ export default function ComunicadorMotoristaExecutivoPage() {
     }
   }, [reload, setOwn]);
 
+  useEffect(() => {
+    if (!painelComunicadorReady || !painelMotoristaEvolutionAtivo) return;
+    if (loading || busyQr || busyDelete) return;
+    if (ownConnected || qrSession) return;
+    void handleConectarAgora();
+  }, [
+    painelComunicadorReady,
+    painelMotoristaEvolutionAtivo,
+    loading,
+    busyQr,
+    busyDelete,
+    ownConnected,
+    qrSession,
+    handleConectarAgora,
+  ]);
+
   if (painelComunicadorReady && !painelMotoristaEvolutionAtivo) {
     return (
       <div className="max-w-2xl space-y-6">
@@ -336,6 +352,17 @@ export default function ComunicadorMotoristaExecutivoPage() {
                 Se o tempo acabar sem leitura, voltará a aparecer o botão para gerar um novo QR (válido por 10
                 minutos).
               </p>
+              <div className="pt-2">
+                <Button
+                  type="button"
+                  variant="destructive"
+                  onClick={() => void handleRemoverOwn()}
+                  disabled={busyDelete}
+                >
+                  {busyDelete ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                  DESCONECTAR
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -344,23 +371,15 @@ export default function ComunicadorMotoristaExecutivoPage() {
           <CardHeader>
             <CardTitle className="text-lg">WhatsApp próprio</CardTitle>
             <CardDescription>
-              Deseja conectar o seu próprio WhatsApp para enviar mensagens aos clientes pelo painel (Comunicar)?
+              Gerando QR Code automaticamente para conectar seu WhatsApp.
             </CardDescription>
           </CardHeader>
-          <CardContent className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <CardContent className="flex items-center gap-3">
+            {busyQr ? <Loader2 className="h-4 w-4 animate-spin text-primary" /> : <Smartphone className="h-4 w-4 text-primary" />}
             <p className="text-sm text-muted-foreground">
-              A ligação é feita na Evolution da plataforma. O QR fica disponível por{" "}
-              <strong className="text-foreground">10 minutos</strong>. Depois disso, pode gerar outro.
+              Aguarde alguns segundos. O QR será exibido nesta tela e ficará válido por{" "}
+              <strong className="text-foreground">10 minutos</strong>.
             </p>
-            <Button
-              type="button"
-              className="shrink-0 bg-[#FF6600] text-white hover:bg-[#FF6600]/90"
-              onClick={() => void handleConectarAgora()}
-              disabled={busyQr || loading}
-            >
-              {busyQr ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Smartphone className="mr-2 h-4 w-4" />}
-              CONECTAR AGORA
-            </Button>
           </CardContent>
         </Card>
       )}

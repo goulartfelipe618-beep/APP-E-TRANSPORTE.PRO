@@ -45,7 +45,8 @@
           return;
         }
         var t = localStorage.getItem("etp_theme_last_applied");
-        if (t === "dark") {
+        // Primeiro acesso sem histórico: inicia em dark.
+        if (t === "dark" || t === null) {
           document.documentElement.classList.add("dark");
         } else {
           document.documentElement.classList.remove("dark");
