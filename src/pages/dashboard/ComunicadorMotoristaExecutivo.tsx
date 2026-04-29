@@ -47,7 +47,6 @@ export default function ComunicadorMotoristaExecutivoPage() {
 
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const autoQrTriedRef = useRef(false);
   const trySyncRef = useRef<() => Promise<void>>(async () => {});
   const endQrSessionRef = useRef<(opts?: { connected: boolean }) => Promise<void>>(async () => {});
   const expiryNotifiedRef = useRef(false);
@@ -231,15 +230,6 @@ export default function ComunicadorMotoristaExecutivoPage() {
     }
   }, [reload, setOwn]);
 
-  useEffect(() => {
-    if (!painelComunicadorReady || !painelMotoristaEvolutionAtivo) return;
-    if (loading || busyQr || busyDelete) return;
-    if (ownConnected || qrSession) return;
-    if (autoQrTriedRef.current) return;
-    autoQrTriedRef.current = true;
-    void handleConectarAgora();
-  }, [painelComunicadorReady, painelMotoristaEvolutionAtivo, loading, busyQr, busyDelete, ownConnected, qrSession, handleConectarAgora]);
-
   if (painelComunicadorReady && !painelMotoristaEvolutionAtivo) {
     return (
       <div className="max-w-2xl space-y-6">
@@ -318,21 +308,29 @@ export default function ComunicadorMotoristaExecutivoPage() {
       />
 
       {ownConnected ? (
-        <ComunicadorEvolutionSection
-          title="Seu WhatsApp (linha própria)"
-          description="Conectado. Os envios em Comunicar usam este número enquanto a conexão estiver ativa."
-          row={own}
-          readOnly={false}
-          loading={loading}
-          busy={busyDelete}
-          onRefresh={() => void reload()}
-          onGerarQr={() => {}}
-          evolutionCreds={undefined}
-          hideQr
-          motoristaOwn
-          showRemover
-          onRemover={handleRemoverOwn}
-        />
+        <div className="space-y-3">
+          <ComunicadorEvolutionSection
+            title="Seu WhatsApp (linha própria)"
+            description="Conectado. Os envios em Comunicar usam este número enquanto a conexão estiver ativa."
+            row={own}
+            readOnly={false}
+            loading={loading}
+            busy={busyDelete}
+            onRefresh={() => void reload()}
+            onGerarQr={() => {}}
+            evolutionCreds={undefined}
+            hideQr
+            motoristaOwn
+            showRemover
+            onRemover={handleRemoverOwn}
+          />
+          <div className="flex justify-end">
+            <Button type="button" variant="destructive" onClick={() => void handleRemoverOwn()} disabled={busyDelete}>
+              {busyDelete ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              DESCONECTAR
+            </Button>
+          </div>
+        </div>
       ) : qrSession && qrImg ? (
         <Card className="border-border">
           <CardHeader>
@@ -374,15 +372,23 @@ export default function ComunicadorMotoristaExecutivoPage() {
           <CardHeader>
             <CardTitle className="text-lg">WhatsApp próprio</CardTitle>
             <CardDescription>
-              Gerando QR Code automaticamente para conectar seu WhatsApp.
+              Clique no botão abaixo para abrir o QR Code e conectar seu WhatsApp.
             </CardDescription>
           </CardHeader>
-          <CardContent className="flex items-center gap-3">
-            {busyQr ? <Loader2 className="h-4 w-4 animate-spin text-primary" /> : <Smartphone className="h-4 w-4 text-primary" />}
+          <CardContent className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm text-muted-foreground">
-              Aguarde alguns segundos. O QR será exibido nesta tela e ficará válido por{" "}
+              O QR será exibido nesta tela e ficará válido por{" "}
               <strong className="text-foreground">10 minutos</strong>.
             </p>
+            <Button
+              type="button"
+              className="shrink-0 bg-[#FF6600] text-white hover:bg-[#FF6600]/90"
+              onClick={() => void handleConectarAgora()}
+              disabled={busyQr || loading}
+            >
+              {busyQr ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Smartphone className="mr-2 h-4 w-4" />}
+              CONECTAR O QR CODE
+            </Button>
           </CardContent>
         </Card>
       )}
