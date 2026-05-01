@@ -7,7 +7,6 @@ import { Badge } from "@/components/ui/badge";
 import { FileDown, Loader2, MessageSquare, Send } from "lucide-react";
 import { toast } from "sonner";
 import { useComunicadoresEvolution } from "@/hooks/useComunicadoresEvolution";
-import type { ComunicadorRow } from "@/hooks/useComunicadoresEvolution";
 import {
   buildComunicadorSnapshot,
   dispatchComunicarWebhook,
@@ -113,10 +112,6 @@ export default function ComunicarDialog({
   const [enviando, setEnviando] = useState(false);
 
   const { sistema, own } = useComunicadoresEvolution();
-  const sistemaRef = useRef<ComunicadorRow | null>(null);
-  const ownRef = useRef<ComunicadorRow | null>(null);
-  sistemaRef.current = sistema;
-  ownRef.current = own;
 
   const [msgAcima, setMsgAcima] = useState("");
   const [msgAbaixo, setMsgAbaixo] = useState("");
@@ -139,56 +134,6 @@ export default function ComunicarDialog({
     if (rowId != null && rowId !== "") return `id:${rowId}`;
     return availableVars.map((v) => `${v.key}=${v.value}`).join("\u0001");
   }, [dados, availableVars]);
-
-  const abertoWebhookDoneRef = useRef<string | null>(null);
-  const abertoWebhookScheduledRef = useRef<string | null>(null);
-  useEffect(() => {
-    if (!open) {
-      abertoWebhookDoneRef.current = null;
-      abertoWebhookScheduledRef.current = null;
-      return;
-    }
-    if (!webhookTipo) return;
-    if (webhookTipo === "transfer_reserva" || webhookTipo === "grupo_reserva") {
-      return;
-    }
-
-    const key = `${webhookTipo}:${dadosFingerprint}`;
-    if (abertoWebhookDoneRef.current === key || abertoWebhookScheduledRef.current === key) return;
-    abertoWebhookScheduledRef.current = key;
-
-    let cancelled = false;
-    const t = window.setTimeout(async () => {
-      if (cancelled || !webhookTipo) return;
-      try {
-        const motorista = await fetchMotoristaPainelSnapshot();
-        await dispatchComunicarWebhook(webhookTipo, {
-          evento: "comunicar_dialogo_aberto",
-          webhook_tipo: webhookTipo,
-          origem: webhookTipo,
-          momento: new Date().toISOString(),
-          titulo_modal: titulo,
-          telefone_cliente: telefone?.replace(/\D/g, "") || null,
-          dados_registro: dadosRegistroComunicarParaWebhook(
-            jsonSafeRecord(dadosRef.current as Record<string, unknown>) as Record<string, unknown>,
-          ),
-          variaveis_disponiveis: Object.entries(dadosRef.current)
-            .filter(([k, v]) => !ignoredKeys.includes(k) && v != null && v !== "")
-            .map(([k]) => k),
-          motorista_painel: motorista,
-          comunicador: buildComunicadorSnapshot(sistemaRef.current, ownRef.current),
-        });
-        abertoWebhookDoneRef.current = key;
-      } catch (e) {
-        console.error(e);
-        abertoWebhookScheduledRef.current = null;
-      }
-    }, 450);
-    return () => {
-      cancelled = true;
-      clearTimeout(t);
-    };
-  }, [open, webhookTipo, dadosFingerprint, titulo, telefone]);
 
   useEffect(() => {
     if (!open) return;
