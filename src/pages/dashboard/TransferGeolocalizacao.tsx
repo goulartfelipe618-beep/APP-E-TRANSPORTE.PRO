@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Plus, RefreshCw, Copy, Send, MapPin, Check,
-  StopCircle, ExternalLink, Loader2, User, Car,
+  StopCircle, ExternalLink, Loader2, User, Car, Eye,
 } from "lucide-react";
 import SlideCarousel from "@/components/SlideCarousel";
 import { Button } from "@/components/ui/button";
@@ -27,6 +27,7 @@ import {
   jsonSafeRecord,
 } from "@/lib/n8nComunicarWebhook";
 import AcompanharRastreioDialog from "@/components/geolocalizacao/AcompanharRastreioDialog";
+import DetalhesViagemRastreioSheet from "@/components/geolocalizacao/DetalhesViagemRastreioSheet";
 
 type ReservaTransfer = Tables<"reservas_transfer">;
 type ReservaGrupo = Tables<"reservas_grupos">;
@@ -86,6 +87,7 @@ export default function TransferGeolocalizacaoPage() {
   const [comunicandoId, setComunicandoId] = useState<string | null>(null);
   const [encerrandoId, setEncerrandoId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [detalheRastreio, setDetalheRastreio] = useState<RastreioRow | null>(null);
 
   const loadReservas = useCallback(async () => {
     setLoading(true);
@@ -335,6 +337,11 @@ export default function TransferGeolocalizacaoPage() {
     try {
       const { error } = await supabase.rpc("encerrar_rastreio", {
         p_rastreio_id: rastreioEncerrando.id,
+        p_origem: null,
+        p_destino: null,
+        p_valor_total: null,
+        p_distancia_km: null,
+        p_duracao_segundos: null,
       });
       if (error) throw error;
       toast.success("Rastreio encerrado.");
@@ -537,10 +544,21 @@ export default function TransferGeolocalizacaoPage() {
                       type="button"
                       size="sm"
                       variant="outline"
+                      onClick={() => setDetalheRastreio(r)}
+                      title="Ver distância, tempo e coordenadas (só os seus links)"
+                    >
+                      <Eye className="h-4 w-4 mr-1" />
+                      Detalhes
+                    </Button>
+
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
                       className="text-destructive hover:text-destructive"
                       onClick={() => setRastreioEncerrando(r)}
                       disabled={encerrandoAtual}
-                      title="Encerrar e apagar rastro GPS"
+                      title="Encerrar viagem e compactar GPS"
                     >
                       <StopCircle className="h-4 w-4 mr-1" />
                       Encerrar
@@ -563,8 +581,8 @@ export default function TransferGeolocalizacaoPage() {
             {rastreiosHistorico.map((r) => {
               const dt = r.data_hora_fim || r.finalizado_em || r.updated_at;
               return (
-                <div key={r.id} className="py-2 flex items-center justify-between gap-3">
-                  <div className="min-w-0">
+                <div key={r.id} className="py-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0 flex-1">
                     <div className="text-sm text-foreground truncate">
                       {r.cliente_nome?.trim() || "—"}
                       {r.distancia_total_km != null && (
@@ -578,7 +596,19 @@ export default function TransferGeolocalizacaoPage() {
                       {dt ? new Date(dt).toLocaleString("pt-BR") : "—"}
                     </div>
                   </div>
-                  <Badge variant="secondary">Concluído</Badge>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="h-8"
+                      onClick={() => setDetalheRastreio(r)}
+                    >
+                      <Eye className="h-3.5 w-3.5 mr-1" />
+                      Detalhes
+                    </Button>
+                    <Badge variant="secondary">Concluído</Badge>
+                  </div>
                 </div>
               );
             })}
@@ -784,6 +814,14 @@ export default function TransferGeolocalizacaoPage() {
         }}
       />
 
+      <DetalhesViagemRastreioSheet
+        rastreio={detalheRastreio}
+        open={detalheRastreio !== null}
+        onOpenChange={(o) => {
+          if (!o) setDetalheRastreio(null);
+        }}
+      />
+
       {/* ======================================================= */}
       {/* Dialog: Confirmar Encerramento                           */}
       {/* ======================================================= */}
@@ -795,7 +833,9 @@ export default function TransferGeolocalizacaoPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Encerrar rastreio?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta ação marca o rastreio como <strong>concluído</strong>, remove os pontos GPS históricos e desativa o link público. O resumo da viagem (distância, duração) será preservado.
+              Confirma o encerramento? O rastreio fica <strong>concluído</strong>. São guardadas as coordenadas de
+              início e fim, distância e tempo; os pontos GPS intermédios são removidos. Só a sua conta vê os detalhes
+              deste link.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

@@ -94,17 +94,7 @@ export default function PainelGeolocalizador({
       heightPx={heightPx}
       overlay={
         mostraBotao ? (
-          <BotaoEncerrarViagem
-            rastreioId={rastreioId}
-            origemInicial={rastreio?.origem_endereco ?? ""}
-            destinoInicial={rastreio?.destino_endereco ?? ""}
-            valorInicial={
-              rastreio?.valor_total !== undefined && rastreio?.valor_total !== null
-                ? Number(rastreio.valor_total)
-                : null
-            }
-            className="w-full shadow-lg"
-          />
+          <BotaoEncerrarViagem rastreioId={rastreioId} className="w-full shadow-lg" />
         ) : null
       }
     />

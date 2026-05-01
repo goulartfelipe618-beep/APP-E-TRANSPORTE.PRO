@@ -17,6 +17,10 @@ export type ResumoViagemCardProps = {
     | "motorista_nome"
     | "veiculo_descricao"
     | "status"
+    | "inicio_latitude"
+    | "inicio_longitude"
+    | "fim_latitude"
+    | "fim_longitude"
   >;
   className?: string;
 };
@@ -44,6 +48,14 @@ function formatMoeda(valor: number | string | null | undefined): string {
   return n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
+function formatCoordPair(
+  lat: number | null | undefined,
+  lng: number | null | undefined,
+): string | null {
+  if (lat == null || lng == null || !Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  return `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+}
+
 function formatDataHora(iso: string | null | undefined): string {
   if (!iso) return "—";
   try {
@@ -61,6 +73,16 @@ function formatDataHora(iso: string | null | undefined): string {
 
 export default function ResumoViagemCard({ rastreio, className }: ResumoViagemCardProps) {
   const concluida = rastreio.status === "concluida";
+
+  const origemText =
+    rastreio.origem_endereco?.trim() ||
+    formatCoordPair(rastreio.inicio_latitude, rastreio.inicio_longitude) ||
+    "—";
+
+  const destinoText =
+    rastreio.destino_endereco?.trim() ||
+    formatCoordPair(rastreio.fim_latitude, rastreio.fim_longitude) ||
+    "—";
 
   return (
     <section
@@ -85,7 +107,7 @@ export default function ResumoViagemCard({ rastreio, className }: ResumoViagemCa
           </h3>
           <p className="truncate text-xs text-muted-foreground">
             {concluida
-              ? "Viagem encerrada. Dados de GPS foram removidos; apenas o resultado foi mantido."
+              ? "Viagem encerrada. Mantêm-se início/fim (coordenadas), distância e tempo; trajeto detalhado foi compactado."
               : "Viagem ainda em andamento."}
           </p>
         </div>
@@ -99,13 +121,13 @@ export default function ResumoViagemCard({ rastreio, className }: ResumoViagemCa
       <div className="grid grid-cols-1 gap-4 p-5 sm:grid-cols-2">
         <InfoItem
           icon={<MapPin className="h-4 w-4 text-[#FF6600]" />}
-          label="Origem"
-          value={rastreio.origem_endereco ?? "—"}
+          label="Início do trajeto"
+          value={origemText}
         />
         <InfoItem
           icon={<Navigation className="h-4 w-4 text-[#FF6600]" />}
-          label="Destino"
-          value={rastreio.destino_endereco ?? "—"}
+          label="Fim do trajeto"
+          value={destinoText}
         />
         <InfoItem
           icon={<Route className="h-4 w-4 text-[#FF6600]" />}

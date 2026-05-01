@@ -1,9 +1,6 @@
 import { useState } from "react";
 import { CheckCircle2, Loader2, Square } from "lucide-react";
-import { z } from "zod";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -22,24 +19,8 @@ import type { Tables } from "@/integrations/supabase/types";
 
 type Rastreio = Tables<"rastreios_ao_vivo">;
 
-const encerrarSchema = z.object({
-  origem: z.string().trim().min(3, "Informe a origem.").max(200).optional().or(z.literal("")),
-  destino: z.string().trim().min(3, "Informe o destino.").max(200).optional().or(z.literal("")),
-  valorTotal: z
-    .string()
-    .optional()
-    .refine(
-      (v) => !v || /^\d+([.,]\d{1,2})?$/.test(v.trim()),
-      "Valor inválido. Use formato 123,45 ou 123.45.",
-    ),
-});
-
 export type BotaoEncerrarViagemProps = {
   rastreioId: string;
-  /** Valores pré-preenchidos opcionais. */
-  origemInicial?: string;
-  destinoInicial?: string;
-  valorInicial?: number | null;
   /** Callback após encerrar com sucesso — recebe a linha atualizada já com o resumo. */
   onEncerrada?: (rastreio: Rastreio) => void;
   /** Desabilita o botão (ex.: já está 'concluida'). */
@@ -49,18 +30,8 @@ export type BotaoEncerrarViagemProps = {
   variant?: "destructive" | "default";
 };
 
-function parseValor(raw: string): number | null {
-  const v = raw.trim().replace(",", ".");
-  if (!v) return null;
-  const n = Number(v);
-  return Number.isFinite(n) ? Number(n.toFixed(2)) : null;
-}
-
 export default function BotaoEncerrarViagem({
   rastreioId,
-  origemInicial = "",
-  destinoInicial = "",
-  valorInicial = null,
   onEncerrada,
   disabled,
   className,
@@ -68,44 +39,24 @@ export default function BotaoEncerrarViagem({
 }: BotaoEncerrarViagemProps) {
   const [open, setOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [origem, setOrigem] = useState(origemInicial);
-  const [destino, setDestino] = useState(destinoInicial);
-  const [valorTotal, setValorTotal] = useState(
-    valorInicial !== null && valorInicial !== undefined
-      ? String(valorInicial).replace(".", ",")
-      : "",
-  );
-  const [errors, setErrors] = useState<Record<string, string>>({});
 
   const handleConfirm = async (event: React.MouseEvent) => {
     event.preventDefault();
 
-    const parsed = encerrarSchema.safeParse({ origem, destino, valorTotal });
-    if (!parsed.success) {
-      const fieldErrors: Record<string, string> = {};
-      parsed.error.issues.forEach((iss) => {
-        if (iss.path[0]) fieldErrors[String(iss.path[0])] = iss.message;
-      });
-      setErrors(fieldErrors);
-      return;
-    }
-    setErrors({});
-
     setSubmitting(true);
     try {
-      const valorNumero = parseValor(valorTotal);
       const { data, error } = await supabase.rpc("encerrar_rastreio", {
         p_rastreio_id: rastreioId,
-        p_origem: origem.trim() || null,
-        p_destino: destino.trim() || null,
-        p_valor_total: valorNumero,
+        p_origem: null,
+        p_destino: null,
+        p_valor_total: null,
         p_distancia_km: null,
         p_duracao_segundos: null,
       });
 
       if (error) throw error;
 
-      toast.success("Viagem encerrada. Resumo salvo e GPS removido.");
+      toast.success("Viagem encerrada. Início e fim do trajeto foram registados.");
       setOpen(false);
       if (data && onEncerrada) onEncerrada(data as Rastreio);
     } catch (err) {
@@ -130,60 +81,24 @@ export default function BotaoEncerrarViagem({
         </Button>
       </AlertDialogTrigger>
 
-      <AlertDialogContent className="max-w-lg">
+      <AlertDialogContent className="max-w-md">
         <AlertDialogHeader>
           <AlertDialogTitle className="flex items-center gap-2">
             <CheckCircle2 className="h-5 w-5 text-[#FF6600]" aria-hidden />
-            Encerrar viagem e salvar resumo
+            Encerrar viagem?
           </AlertDialogTitle>
-          <AlertDialogDescription>
-            Ao confirmar, a viagem é marcada como <strong>concluída</strong>. A distância e o tempo
-            serão calculados automaticamente a partir do trajeto, e{" "}
-            <strong>todos os pontos de GPS serão apagados</strong> — ficando apenas este resumo no
-            banco.
+          <AlertDialogDescription className="text-left space-y-2">
+            <span className="block">
+              Confirma que deseja terminar esta viagem? Ela será marcada como{" "}
+              <strong>concluída</strong>.
+            </span>
+            <span className="block text-muted-foreground">
+              O sistema regista as coordenadas de <strong>início</strong> e <strong>fim</strong> do trajeto,
+              calcula distância e tempo a partir do percorrido e remove os pontos GPS intermédios. Pode
+              consultar o resumo na lista de links desta conta.
+            </span>
           </AlertDialogDescription>
         </AlertDialogHeader>
-
-        <div className="grid gap-3 py-2">
-          <div className="grid gap-1.5">
-            <Label htmlFor="rastreio-origem">Origem</Label>
-            <Input
-              id="rastreio-origem"
-              value={origem}
-              onChange={(e) => setOrigem(e.target.value)}
-              placeholder="Ex.: Aeroporto de Congonhas"
-              maxLength={200}
-              autoComplete="off"
-            />
-            {errors.origem && <p className="text-xs text-destructive">{errors.origem}</p>}
-          </div>
-
-          <div className="grid gap-1.5">
-            <Label htmlFor="rastreio-destino">Destino</Label>
-            <Input
-              id="rastreio-destino"
-              value={destino}
-              onChange={(e) => setDestino(e.target.value)}
-              placeholder="Ex.: Hotel Renaissance, Jardins"
-              maxLength={200}
-              autoComplete="off"
-            />
-            {errors.destino && <p className="text-xs text-destructive">{errors.destino}</p>}
-          </div>
-
-          <div className="grid gap-1.5">
-            <Label htmlFor="rastreio-valor">Valor cobrado (R$) — opcional</Label>
-            <Input
-              id="rastreio-valor"
-              value={valorTotal}
-              onChange={(e) => setValorTotal(e.target.value)}
-              placeholder="Ex.: 180,00"
-              inputMode="decimal"
-              autoComplete="off"
-            />
-            {errors.valorTotal && <p className="text-xs text-destructive">{errors.valorTotal}</p>}
-          </div>
-        </div>
 
         <AlertDialogFooter>
           <AlertDialogCancel disabled={submitting}>Cancelar</AlertDialogCancel>
@@ -197,7 +112,7 @@ export default function BotaoEncerrarViagem({
             ) : (
               <CheckCircle2 className="h-4 w-4" aria-hidden />
             )}
-            Confirmar encerramento
+            Sim, encerrar
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
