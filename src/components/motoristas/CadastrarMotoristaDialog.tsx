@@ -29,6 +29,7 @@ const TABS = [
 ];
 
 type MotoristaInsert = Database["public"]["Tables"]["solicitacoes_motoristas"]["Insert"];
+type MotoristaUpdate = Database["public"]["Tables"]["solicitacoes_motoristas"]["Update"];
 
 function FileRow({
   label,
@@ -69,6 +70,7 @@ interface Props {
 }
 
 export default function CadastrarMotoristaDialog({ open, onOpenChange, onCreated, initialData }: Props) {
+  const isEditExisting = Boolean(initialData?.cadastro_row_id);
   const [tabIndex, setTabIndex] = useState(0);
 
   const [nome, setNome] = useState("");
@@ -222,12 +224,17 @@ export default function CadastrarMotoristaDialog({ open, onOpenChange, onCreated
       setTelefone(initialData.telefone || "");
       setEmailField(initialData.email || "");
       setCnh(initialData.cnh || "");
+      setCidade((initialData.cidade || "").trim());
       setEstadoUf((initialData.estado || "").toUpperCase().slice(0, 2));
       setObservacoesInternas(initialData.mensagem_observacoes || "");
       setRg(pickStr(dw, "rg"));
       setDataNascimento(pickStr(dw, "data_nascimento").slice(0, 10));
       setCep(pickStr(dw, "cep"));
       setCategoriaCnh(pickStr(dw, "categoria_cnh", "categoria"));
+      const vCnh = pickStr(dw, "validade_cnh");
+      setValidadeCnh(vCnh ? vCnh.slice(0, 10) : "");
+      setTipoPagamento(pickStr(dw, "tipo_pagamento"));
+      setPixChave(pickStr(dw, "pix_chave"));
       setLogradouro(pickStr(dw, "logradouro", "endereco", "_endereco"));
       setNumero(pickStr(dw, "numero"));
       setComplemento(pickStr(dw, "complemento"));
@@ -238,7 +245,9 @@ export default function CadastrarMotoristaDialog({ open, onOpenChange, onCreated
       if (sit === "inativo") setStatusMotorista("inativo");
       else if (sit === "ativo") setStatusMotorista("ativo");
       setTabIndex(0);
-      toast.message("Revise os dados (UF → cidade IBGE) e complete o cadastro antes de salvar.", { duration: 5000 });
+      if (!initialData.cadastro_row_id) {
+        toast.message("Revise os dados (UF → cidade IBGE) e complete o cadastro antes de salvar.", { duration: 5000 });
+      }
     } else {
       resetEmpty();
     }
@@ -267,6 +276,7 @@ export default function CadastrarMotoristaDialog({ open, onOpenChange, onCreated
   };
 
   const validateTab1 = (): string | null => {
+    if (isEditExisting) return null;
     if (!arPerfil || !arCnhF || !arCnhV || !arResid) {
       return "Anexe foto de perfil, CNH (frente e verso) e comprovante de residência.";
     }
@@ -331,7 +341,9 @@ export default function CadastrarMotoristaDialog({ open, onOpenChange, onCreated
     setSaving(true);
 
     const ibgeIdNum = Number(municipioIbgeId);
+    const baseDw = parseDadosWebhook(initialData?.dados_webhook);
     const dadosWebhookObj = {
+      ...baseDw,
       rg,
       data_nascimento: dataNascimento || null,
       endereco: enderecoCompleto || null,
@@ -354,6 +366,36 @@ export default function CadastrarMotoristaDialog({ open, onOpenChange, onCreated
     if (!user) {
       toast.error("Sessão inválida. Faça login novamente.");
       setSaving(false);
+      return;
+    }
+
+    if (isEditExisting && initialData?.cadastro_row_id) {
+      const updatePayload: MotoristaUpdate = {
+        nome: nome.trim(),
+        cpf: cpf.replace(/\D/g, "") || null,
+        cnh: cnh.trim() || null,
+        telefone: telefone.trim() || null,
+        email: emailField.trim() || null,
+        cidade: cidade.trim(),
+        estado: estadoUf,
+        mensagem: observacoesInternas.trim() || null,
+        mensagem_observacoes: observacoesInternas.trim() || null,
+        dados_webhook: dadosWebhookObj as unknown as Json,
+      };
+      const { error: updErr } = await supabase
+        .from("solicitacoes_motoristas")
+        .update(updatePayload)
+        .eq("id", initialData.cadastro_row_id)
+        .eq("user_id", user.id);
+      if (updErr) {
+        toast.error(`Erro ao atualizar: ${updErr.message}`);
+        setSaving(false);
+        return;
+      }
+      toast.success("Motorista atualizado.");
+      setSaving(false);
+      onOpenChange(false);
+      onCreated?.();
       return;
     }
 
@@ -401,12 +443,23 @@ export default function CadastrarMotoristaDialog({ open, onOpenChange, onCreated
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] max-w-xl overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{initialData ? "Completar cadastro a partir da solicitação" : "Cadastrar motorista"}</DialogTitle>
+          <DialogTitle>
+            {isEditExisting
+              ? "Editar motorista"
+              : initialData
+                ? "Completar cadastro a partir da solicitação"
+                : "Cadastrar motorista"}
+          </DialogTitle>
         </DialogHeader>
 
-        {initialData && (
+        {initialData && !isEditExisting && (
           <p className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-900 dark:text-amber-100">
             Confirme <strong>UF</strong> e <strong>cidade (IBGE)</strong> antes de gravar. O registo fica associado à sua conta e visível só para si.
+          </p>
+        )}
+        {isEditExisting && (
+          <p className="rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+            Alterações aplicam-se apenas a este motorista na <strong className="text-foreground">sua frota</strong>. A base de dados impede editar cadastros de outras contas.
           </p>
         )}
 
@@ -640,12 +693,14 @@ export default function CadastrarMotoristaDialog({ open, onOpenChange, onCreated
         {tabIndex === 1 && (
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              Envie os quatro ficheiros abaixo (obrigatório para concluir o cadastro).
+              {isEditExisting
+                ? "Na edição, os anexos são opcionais. Quando o envio ao servidor estiver ativo, poderá substituir documentos aqui; por agora pode avançar sem novos ficheiros."
+                : "Envie os quatro ficheiros abaixo (obrigatório para concluir o cadastro)."}
             </p>
-            <FileRow label="Foto de perfil" required file={arPerfil} onFile={setArPerfil} />
-            <FileRow label="CNH — frente" required file={arCnhF} onFile={setArCnhF} />
-            <FileRow label="CNH — verso" required file={arCnhV} onFile={setArCnhV} />
-            <FileRow label="Comprovante de residência" required file={arResid} onFile={setArResid} />
+            <FileRow label="Foto de perfil" required={!isEditExisting} file={arPerfil} onFile={setArPerfil} />
+            <FileRow label="CNH — frente" required={!isEditExisting} file={arCnhF} onFile={setArCnhF} />
+            <FileRow label="CNH — verso" required={!isEditExisting} file={arCnhV} onFile={setArCnhV} />
+            <FileRow label="Comprovante de residência" required={!isEditExisting} file={arResid} onFile={setArResid} />
           </div>
         )}
 
@@ -689,7 +744,7 @@ export default function CadastrarMotoristaDialog({ open, onOpenChange, onCreated
           )}
           {isLast ? (
             <Button type="button" onClick={() => void handleSave()} disabled={saving}>
-              {saving ? "Salvando..." : "Salvar motorista"}
+              {saving ? "Salvando..." : isEditExisting ? "Guardar alterações" : "Salvar motorista"}
             </Button>
           ) : (
             <Button type="button" onClick={goNext}>

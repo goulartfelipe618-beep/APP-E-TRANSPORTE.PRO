@@ -1,9 +1,11 @@
 import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, LayoutGrid, List, Link2, Copy } from "lucide-react";
+import { Plus, Search, LayoutGrid, List, Link2, Copy, Eye, Pencil } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import CadastrarMotoristaDialog from "@/components/motoristas/CadastrarMotoristaDialog";
+import DetalhesMotoristaFrotaSheet from "@/components/motoristas/DetalhesMotoristaFrotaSheet";
+import type { MotoristaInitialData } from "@/lib/motoristaFromSolicitacao";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { Json } from "@/integrations/supabase/types";
@@ -16,12 +18,32 @@ type MotoristaCadastroRow = {
   email: string | null;
   cidade: string | null;
   estado: string | null;
+  cnh: string | null;
+  mensagem: string | null;
+  mensagem_observacoes: string | null;
   status: string;
   created_at: string;
   dados_webhook: Json | null;
   portal_token: string;
   portal_auth_user_id: string | null;
 };
+
+function rowToInitialData(m: MotoristaCadastroRow): MotoristaInitialData {
+  const dw = m.dados_webhook;
+  return {
+    solicitacao_id: m.id,
+    cadastro_row_id: m.id,
+    nome: m.nome,
+    email: m.email ?? undefined,
+    telefone: m.telefone ?? undefined,
+    cpf: m.cpf ?? undefined,
+    cnh: m.cnh ?? undefined,
+    cidade: m.cidade ?? undefined,
+    estado: m.estado ?? undefined,
+    mensagem_observacoes: m.mensagem_observacoes ?? m.mensagem ?? undefined,
+    dados_webhook: dw && typeof dw === "object" && !Array.isArray(dw) ? (dw as Record<string, unknown>) : null,
+  };
+}
 
 function situacaoFrotaFromWebhook(dw: Json | null): "ativo" | "inativo" {
   if (!dw || typeof dw !== "object" || Array.isArray(dw)) return "ativo";
@@ -31,7 +53,9 @@ function situacaoFrotaFromWebhook(dw: Json | null): "ativo" | "inativo" {
 
 export default function MotoristaCadastrosPage() {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
-  const [open, setOpen] = useState(false);
+  const [cadastroDialogOpen, setCadastroDialogOpen] = useState(false);
+  const [cadastroInitial, setCadastroInitial] = useState<MotoristaInitialData | null>(null);
+  const [detalheMotorista, setDetalheMotorista] = useState<MotoristaCadastroRow | null>(null);
   const [motoristas, setMotoristas] = useState<MotoristaCadastroRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -48,7 +72,9 @@ export default function MotoristaCadastrosPage() {
 
     const { data, error } = await supabase
       .from("solicitacoes_motoristas")
-      .select("id, nome, cpf, telefone, email, cidade, estado, status, created_at, dados_webhook, portal_token, portal_auth_user_id")
+      .select(
+        "id, nome, cpf, telefone, email, cidade, estado, cnh, mensagem, mensagem_observacoes, status, created_at, dados_webhook, portal_token, portal_auth_user_id",
+      )
       .eq("user_id", user.id)
       .eq("status", "cadastrado")
       .order("created_at", { ascending: false });
@@ -96,7 +122,8 @@ export default function MotoristaCadastrosPage() {
         </div>
         <Button
           onClick={() => {
-            setOpen(true);
+            setCadastroInitial(null);
+            setCadastroDialogOpen(true);
           }}
         >
           <Plus className="mr-2 h-4 w-4" /> Novo motorista
@@ -148,6 +175,25 @@ export default function MotoristaCadastrosPage() {
                   Cidade/UF: {m.cidade || "—"} {m.estado ? `- ${m.estado}` : ""}
                 </p>
                 <p className="text-xs text-muted-foreground">Cadastrado em {new Date(m.created_at).toLocaleDateString("pt-BR")}</p>
+                <div className="flex flex-wrap gap-2 border-t border-border pt-2">
+                  <Button type="button" variant="outline" size="sm" className="h-8 text-xs" onClick={() => setDetalheMotorista(m)}>
+                    <Eye className="mr-1 h-3.5 w-3.5" />
+                    Ver detalhes
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-8 border-[#FF6600]/40 text-xs text-[#FF6600] hover:bg-[#FF6600]/10"
+                    onClick={() => {
+                      setCadastroInitial(rowToInitialData(m));
+                      setCadastroDialogOpen(true);
+                    }}
+                  >
+                    <Pencil className="mr-1 h-3.5 w-3.5" />
+                    Editar
+                  </Button>
+                </div>
                 <div className="flex flex-wrap items-center gap-2 border-t border-border pt-2">
                   <Link2 className="h-3.5 w-3.5 text-muted-foreground" />
                   <span className="text-xs text-muted-foreground">
@@ -173,6 +219,7 @@ export default function MotoristaCadastrosPage() {
                 <th className="p-3 text-left">Cidade/UF</th>
                 <th className="p-3 text-left">Frota</th>
                 <th className="p-3 text-left">Data</th>
+                <th className="p-3 text-right">Ações</th>
               </tr>
             </thead>
             <tbody>
@@ -192,6 +239,27 @@ export default function MotoristaCadastrosPage() {
                       </Badge>
                     </td>
                     <td className="p-3">{new Date(m.created_at).toLocaleDateString("pt-BR")}</td>
+                    <td className="p-3 text-right">
+                      <div className="flex justify-end gap-1">
+                        <Button type="button" variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={() => setDetalheMotorista(m)}>
+                          <Eye className="mr-1 h-3.5 w-3.5" />
+                          Detalhes
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 px-2 text-xs text-[#FF6600]"
+                          onClick={() => {
+                            setCadastroInitial(rowToInitialData(m));
+                            setCadastroDialogOpen(true);
+                          }}
+                        >
+                          <Pencil className="mr-1 h-3.5 w-3.5" />
+                          Editar
+                        </Button>
+                      </div>
+                    </td>
                   </tr>
                 );
               })}
@@ -200,7 +268,23 @@ export default function MotoristaCadastrosPage() {
         </div>
       )}
 
-      <CadastrarMotoristaDialog open={open} onOpenChange={setOpen} onCreated={handleCreated} initialData={null} />
+      <CadastrarMotoristaDialog
+        open={cadastroDialogOpen}
+        onOpenChange={(v) => {
+          setCadastroDialogOpen(v);
+          if (!v) setCadastroInitial(null);
+        }}
+        onCreated={handleCreated}
+        initialData={cadastroInitial}
+      />
+
+      <DetalhesMotoristaFrotaSheet
+        motorista={detalheMotorista}
+        open={detalheMotorista !== null}
+        onOpenChange={(o) => {
+          if (!o) setDetalheMotorista(null);
+        }}
+      />
     </div>
   );
 }

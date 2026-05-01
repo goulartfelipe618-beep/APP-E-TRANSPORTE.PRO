@@ -2,7 +2,13 @@
 export const MOTORISTA_FROM_SOLICITACAO_KEY = "etp_motorista_from_solicitacao_v1";
 
 export interface MotoristaInitialData {
+  /** ID da linha em `solicitacoes_motoristas` (solicitação no site ou cadastro de frota). */
   solicitacao_id: string;
+  /**
+   * Se definido, o diálogo grava com **update** nesse id (edição de motorista já cadastrado na frota).
+   * RLS exige `user_id = auth.uid()`.
+   */
+  cadastro_row_id?: string;
   nome?: string;
   email?: string;
   telefone?: string;
