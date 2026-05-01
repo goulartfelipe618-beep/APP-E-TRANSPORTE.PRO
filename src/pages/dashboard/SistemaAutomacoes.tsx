@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, Plus, Link2, Copy, ArrowLeft, Sparkles, Save, Code2, Trash2, FlaskConical, Eye, X, Pencil, ChevronDown, ChevronRight, Check } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { RefreshCw, Plus, Link2, Copy, ArrowLeft, Sparkles, Save, Code2, Trash2, FlaskConical, Eye, X, Pencil, ChevronDown, ChevronRight, Check, Megaphone, CalendarClock } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -23,6 +24,14 @@ type DeleteIntent =
   | { kind: "teste"; id: string }
   | { kind: "testes_all"; automacaoId: string };
 
+interface CampanhaEmbed {
+  id: string;
+  nome: string;
+  data_inicio: string;
+  data_fim: string;
+  status: string;
+}
+
 interface Automacao {
   id: string;
   user_id: string;
@@ -33,6 +42,19 @@ interface Automacao {
   campanha_id?: string | null;
   is_campaign_webhook?: boolean;
   created_at: string;
+  /** Preenchido via join ao carregar a lista (webhooks de campanha). */
+  campanhas?: CampanhaEmbed | CampanhaEmbed[] | null;
+}
+
+/** Webhook criado automaticamente em Campanhas — não pode ser apagado manualmente. */
+function isWebhookCampanhaAutomacao(a: Automacao): boolean {
+  return Boolean(a.campanha_id && (a.is_campaign_webhook === true || a.tipo === "campanha"));
+}
+
+function campanhaEmbedRow(a: Automacao): CampanhaEmbed | null {
+  const c = a.campanhas;
+  if (!c) return null;
+  return Array.isArray(c) ? c[0] ?? null : c;
 }
 
 interface WebhookTeste {
@@ -181,17 +203,29 @@ export default function SistemaAutomacoesPage() {
   const fetchAutomacoes = useCallback(async () => {
     const { data, error } = await supabase
       .from("automacoes")
-      .select("*")
+      .select("*, campanhas ( id, nome, data_inicio, data_fim, status )")
       .order("created_at", { ascending: false });
     if (error) toast.error("Erro ao carregar automações");
-    else setAutomacoes((data || []).map((a: any) => ({
-      ...a,
-      mappings: typeof a.mappings === "object" ? a.mappings : {},
-    })));
+    else
+      setAutomacoes(
+        (data || []).map((a: any) => ({
+          ...a,
+          mappings: typeof a.mappings === "object" ? a.mappings : {},
+        })),
+      );
     setLoading(false);
   }, []);
 
   useEffect(() => { fetchAutomacoes(); }, [fetchAutomacoes]);
+
+  const automacoesPlataforma = useMemo(
+    () => automacoes.filter((a) => !isWebhookCampanhaAutomacao(a)),
+    [automacoes],
+  );
+  const automacoesCampanha = useMemo(
+    () => automacoes.filter((a) => isWebhookCampanhaAutomacao(a)),
+    [automacoes],
+  );
 
   const slugify = (value: string) =>
     value
@@ -210,11 +244,67 @@ export default function SistemaAutomacoesPage() {
     if (!error) setTestes((data || []) as WebhookTeste[]);
   }, []);
 
+  const openAutomacaoForConfig = useCallback(
+    (a: Automacao) => {
+      const m: Record<string, Record<string, string>> =
+        a.mappings && typeof a.mappings === "object" ? { ...a.mappings } : {};
+      if (a.tipo !== "transfer" && !m["default"]) m["default"] = {};
+      if (a.tipo === "transfer") {
+        if (!m["somente_ida"]) m["somente_ida"] = {};
+        if (!m["ida_volta"]) m["ida_volta"] = {};
+        if (!m["por_hora"]) m["por_hora"] = {};
+      }
+      setSelected(a);
+      setMappings(m);
+      fetchTestes(a.id);
+      if (a.tipo === "campanha") {
+        const placeholders = Object.keys(m.default || {});
+        setCampaignFields(placeholders);
+        setCampaignFieldLocked(placeholders.length > 0);
+        setNewCampaignField("");
+        const embed = campanhaEmbedRow(a);
+        if (embed) {
+          setCampaignMeta({ data_inicio: embed.data_inicio, data_fim: embed.data_fim });
+        } else if (a.campanha_id) {
+          supabase
+            .from("campanhas" as any)
+            .select("data_inicio, data_fim")
+            .eq("id", a.campanha_id)
+            .maybeSingle()
+            .then(({ data }) => setCampaignMeta(data || null));
+        } else {
+          setCampaignMeta(null);
+        }
+      } else {
+        setCampaignMeta(null);
+        setCampaignFields([]);
+        setCampaignFieldLocked(false);
+        setNewCampaignField("");
+      }
+      if (a.tipo === "transfer") {
+        setCollapsedContainers({ somente_ida: true, ida_volta: true, por_hora: true });
+      } else if (a.tipo === "campanha") {
+        setCollapsedContainers({ default: false });
+      } else {
+        setCollapsedContainers({ default: true });
+      }
+    },
+    [fetchTestes],
+  );
+
   const executeDeleteIntent = async () => {
     if (!deleteIntent) return;
     setDeleteBusy(true);
     try {
       if (deleteIntent.kind === "automacao") {
+        const alvo = automacoes.find((x) => x.id === deleteIntent.id);
+        if (alvo && isWebhookCampanhaAutomacao(alvo)) {
+          toast.error(
+            "Webhooks de campanha não podem ser eliminados manualmente. São removidos automaticamente quando a campanha encerra.",
+          );
+          setDeleteIntent(null);
+          return;
+        }
         const { error } = await supabase.from("automacoes").delete().eq("id", deleteIntent.id);
         if (error) toast.error("Erro ao excluir");
         else {
@@ -386,9 +476,34 @@ export default function SistemaAutomacoesPage() {
             </Button>
           )}
         </div>
-        {isCampaign && campaignMeta && (
-          <div className="rounded-lg border border-border bg-muted/30 p-4 text-sm">
-            <p><strong>Período da campanha:</strong> {new Date(`${campaignMeta.data_inicio}T00:00:00`).toLocaleDateString("pt-BR")} - {new Date(`${campaignMeta.data_fim}T00:00:00`).toLocaleDateString("pt-BR")}</p>
+        {isCampaign && (
+          <div className="space-y-3">
+            <Alert className="border-primary/30 bg-primary/5">
+              <Megaphone className="h-4 w-4" />
+              <AlertTitle>Webhook de campanha</AlertTitle>
+              <AlertDescription className="text-sm">
+                Este registo foi criado automaticamente ao criar a campanha.{" "}
+                <strong className="text-foreground">Não pode ser apagado manualmente</strong> — é removido logo que a
+                campanha fique <strong className="text-foreground">encerrada</strong> (após a data de término).
+              </AlertDescription>
+            </Alert>
+            {(campaignMeta || campanhaEmbedRow(selected)) && (
+              <div className="rounded-lg border border-border bg-muted/30 p-4 text-sm space-y-1">
+                <p>
+                  <strong>Período da campanha:</strong>{" "}
+                  {new Date(`${(campaignMeta || campanhaEmbedRow(selected))!.data_inicio}T00:00:00`).toLocaleDateString("pt-BR")}{" "}
+                  — {new Date(`${(campaignMeta || campanhaEmbedRow(selected))!.data_fim}T00:00:00`).toLocaleDateString("pt-BR")}
+                </p>
+                <p className="flex items-center gap-2">
+                  <CalendarClock className="h-4 w-4 shrink-0 text-primary" />
+                  <span>
+                    <strong>Data de término do webhook:</strong>{" "}
+                    {new Date(`${(campaignMeta || campanhaEmbedRow(selected))!.data_fim}T00:00:00`).toLocaleDateString("pt-BR")}{" "}
+                    <span className="text-muted-foreground">(último dia em que o URL desta campanha permanece válido)</span>
+                  </span>
+                </p>
+              </div>
+            )}
           </div>
         )}
 
@@ -719,7 +834,10 @@ export default function SistemaAutomacoesPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Automações</h1>
-          <p className="text-muted-foreground">Gerencie seus webhooks e mapeamentos de campos ({automacoes.length})</p>
+          <p className="text-muted-foreground">
+            Gerencie webhooks e mapeamentos — {automacoesPlataforma.length} da plataforma
+            {automacoesCampanha.length > 0 ? ` · ${automacoesCampanha.length} de campanha` : ""}
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="icon" onClick={fetchAutomacoes}><RefreshCw className="h-4 w-4" /></Button>
@@ -729,108 +847,155 @@ export default function SistemaAutomacoesPage() {
         </div>
       </div>
 
-      <div className="rounded-xl border border-border bg-card overflow-hidden">
-        {loading ? (
-          <p className="text-sm text-muted-foreground p-6">Carregando...</p>
-        ) : automacoes.length === 0 ? (
-          <p className="text-sm text-muted-foreground p-6">Nenhuma automação cadastrada. Clique em "Nova Automação" para começar.</p>
-        ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Nome</TableHead>
-                <TableHead>Tipo</TableHead>
-                <TableHead>Webhook URL</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Ativar/Desativar</TableHead>
-                <TableHead className="w-[100px]">Ações</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {automacoes.map((a) => (
-                <TableRow key={a.id}>
-                  <TableCell className="font-medium">{a.nome}</TableCell>
-                  <TableCell><Badge variant="secondary">{tipoLabels[a.tipo] || a.tipo}</Badge></TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2 max-w-[280px]">
-                      <span className="text-xs font-mono text-muted-foreground truncate">{getWebhookUrl(a)}</span>
-                      <Button variant="ghost" size="icon" className="shrink-0 h-7 w-7" onClick={() => copyUrl(a)} title="Copiar URL">
-                        <Copy className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={a.ativo ? "default" : "outline"}>
-                      {a.ativo ? "Ativo" : "Inativo"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Switch checked={a.ativo} onCheckedChange={() => toggleWebhook(a)} />
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex gap-1">
-                      <Button variant="ghost" size="sm" onClick={() => {
-                        const m = (a.mappings && typeof a.mappings === "object") ? a.mappings : {};
-                        // Ensure default tab exists for grupo/motorista
-                        if (a.tipo !== "transfer" && !m["default"]) {
-                          m["default"] = {};
-                        }
-                        // Ensure transfer tabs exist
-                        if (a.tipo === "transfer") {
-                          if (!m["somente_ida"]) m["somente_ida"] = {};
-                          if (!m["ida_volta"]) m["ida_volta"] = {};
-                          if (!m["por_hora"]) m["por_hora"] = {};
-                        }
-                        setSelected(a);
-                        setMappings(m);
-                        fetchTestes(a.id);
-                        if (a.tipo === "campanha") {
-                          const placeholders = Object.keys(m.default || {});
-                          setCampaignFields(placeholders);
-                          setCampaignFieldLocked(placeholders.length > 0);
-                          setNewCampaignField("");
-                          if (a.campanha_id) {
-                            supabase
-                              .from("campanhas" as any)
-                              .select("data_inicio, data_fim")
-                              .eq("id", a.campanha_id)
-                              .maybeSingle()
-                              .then(({ data }) => setCampaignMeta(data || null));
-                          } else {
-                            setCampaignMeta(null);
-                          }
-                        } else {
-                          setCampaignMeta(null);
-                          setCampaignFields([]);
-                          setCampaignFieldLocked(false);
-                          setNewCampaignField("");
-                        }
-                        // Sempre abrir com mapeamento recolhido; o motorista expande com "Editar"
-                        if (a.tipo === "transfer") {
-                          setCollapsedContainers({
-                            somente_ida: true,
-                            ida_volta: true,
-                            por_hora: true,
-                          });
-                        } else if (a.tipo === "campanha") {
-                          setCollapsedContainers({ default: false });
-                        } else {
-                          setCollapsedContainers({ default: true });
-                        }
-                      }}>
-                        Configurar
-                      </Button>
-                      <Button variant="ghost" size="icon" onClick={() => setDeleteIntent({ kind: "automacao", id: a.id })}>
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        )}
-      </div>
+      {loading ? (
+        <div className="rounded-xl border border-border bg-card p-6">
+          <p className="text-sm text-muted-foreground">Carregando...</p>
+        </div>
+      ) : automacoes.length === 0 ? (
+        <div className="rounded-xl border border-border bg-card p-6">
+          <p className="text-sm text-muted-foreground">
+            Nenhuma automação cadastrada. Clique em &quot;Nova Automação&quot; para começar.
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-8">
+          <section className="space-y-3">
+            <div>
+              <h2 className="text-lg font-semibold text-foreground">Automações da plataforma</h2>
+              <p className="text-sm text-muted-foreground">
+                Webhooks que cria manualmente (transfer, motorista, grupo). Pode configurar e excluir.
+              </p>
+            </div>
+            <div className="rounded-xl border border-border bg-card overflow-hidden">
+              {automacoesPlataforma.length === 0 ? (
+                <p className="text-sm text-muted-foreground p-6">Nenhuma automação da plataforma nesta conta.</p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Nome</TableHead>
+                      <TableHead>Tipo</TableHead>
+                      <TableHead>Webhook URL</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Ativar/Desativar</TableHead>
+                      <TableHead className="w-[120px]">Ações</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {automacoesPlataforma.map((a) => (
+                      <TableRow key={a.id}>
+                        <TableCell className="font-medium">{a.nome}</TableCell>
+                        <TableCell>
+                          <Badge variant="secondary">{tipoLabels[a.tipo] || a.tipo}</Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2 max-w-[280px]">
+                            <span className="text-xs font-mono text-muted-foreground truncate">{getWebhookUrl(a)}</span>
+                            <Button variant="ghost" size="icon" className="shrink-0 h-7 w-7" onClick={() => copyUrl(a)} title="Copiar URL">
+                              <Copy className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={a.ativo ? "default" : "outline"}>{a.ativo ? "Ativo" : "Inativo"}</Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Switch checked={a.ativo} onCheckedChange={() => toggleWebhook(a)} />
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex gap-1">
+                            <Button variant="ghost" size="sm" onClick={() => openAutomacaoForConfig(a)}>
+                              Configurar
+                            </Button>
+                            <Button variant="ghost" size="icon" onClick={() => setDeleteIntent({ kind: "automacao", id: a.id })}>
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </div>
+          </section>
+
+          <section className="space-y-3">
+            <div>
+              <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
+                <Megaphone className="h-5 w-5 text-primary shrink-0" />
+                Webhooks de campanha
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                Criados automaticamente ao criar uma campanha. Não podem ser apagados aqui — são removidos quando a
+                campanha encerra.
+              </p>
+            </div>
+            <div className="rounded-xl border border-border bg-card overflow-hidden">
+              {automacoesCampanha.length === 0 ? (
+                <p className="text-sm text-muted-foreground p-6">Nenhum webhook de campanha ativo.</p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Nome</TableHead>
+                      <TableHead>Campanha</TableHead>
+                      <TableHead>Término do webhook</TableHead>
+                      <TableHead>Webhook URL</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Ativar/Desativar</TableHead>
+                      <TableHead className="w-[100px]">Ações</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {automacoesCampanha.map((a) => {
+                      const camp = campanhaEmbedRow(a);
+                      const fim = camp?.data_fim;
+                      return (
+                        <TableRow key={a.id}>
+                          <TableCell className="font-medium">{a.nome}</TableCell>
+                          <TableCell className="text-sm max-w-[160px] truncate" title={camp?.nome}>
+                            {camp?.nome ?? "—"}
+                          </TableCell>
+                          <TableCell>
+                            {fim ? (
+                              <span className="inline-flex items-center gap-1.5 text-sm">
+                                <CalendarClock className="h-3.5 w-3.5 text-primary shrink-0" />
+                                {new Date(`${fim}T00:00:00`).toLocaleDateString("pt-BR")}
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground text-sm">—</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2 max-w-[220px]">
+                              <span className="text-xs font-mono text-muted-foreground truncate">{getWebhookUrl(a)}</span>
+                              <Button variant="ghost" size="icon" className="shrink-0 h-7 w-7" onClick={() => copyUrl(a)} title="Copiar URL">
+                                <Copy className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={a.ativo ? "default" : "outline"}>{a.ativo ? "Ativo" : "Inativo"}</Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Switch checked={a.ativo} onCheckedChange={() => toggleWebhook(a)} />
+                          </TableCell>
+                          <TableCell>
+                            <Button variant="ghost" size="sm" onClick={() => openAutomacaoForConfig(a)}>
+                              Configurar
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              )}
+            </div>
+          </section>
+        </div>
+      )}
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-lg">

@@ -1,0 +1,303 @@
+{
+  "name": "E-Transporte — Webhook e-transporte (v4)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "e-transporte",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "node-webhook",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 400],
+      "webhookId": "e-transporte-webhook-v3"
+    },
+
+    {
+      "parameters": {
+        "jsCode": "const j = $input.first().json;\nconst body = j.body;\nif (body && typeof body === 'object') {\n  return [{ json: body }];\n}\nreturn [{ json: j }];"
+      },
+      "id": "node-flatten-body",
+      "name": "Normalizar body",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [110, 400]
+    },
+
+    {
+      "parameters": {
+        "mode": "expression",
+        "numberOutputs": 8,
+        "output": "={{ (() => { const h = $('Webhook').first().json.headers ?? {}; const t = (h['x-e-transporte-tipo'] ?? h['X-E-Transporte-Tipo'] ?? '').toLowerCase().trim(); const map = { transfer_solicitacao: 0, transfer_reserva: 1, grupo_solicitacao: 2, grupo_reserva: 3, motorista_intake: 4, motoristas_cadastrados: 5, geolocalizacao: 6 }; return map[t] !== undefined ? map[t] : 7; })() }}"
+      },
+      "id": "node-switch",
+      "name": "Switch por Tipo",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [220, 400]
+    },
+
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            { "id": "a1",  "name": "tipo",                   "value": "={{ (() => { const h = $('Webhook').first().json.headers ?? {}; return (h['x-e-transporte-tipo'] ?? h['X-E-Transporte-Tipo'] ?? '').toLowerCase().trim(); })() }}", "type": "string" },
+            { "id": "a2",  "name": "reserva_id",             "value": "={{ $json.reserva_id ?? $json.id ?? null }}", "type": "string" },
+            { "id": "a3",  "name": "cliente",                "value": "={{ $json.cliente ?? $json.nome ?? null }}", "type": "string" },
+            { "id": "a4",  "name": "origem",                 "value": "={{ $json.origem ?? null }}", "type": "string" },
+            { "id": "a5",  "name": "destino",                "value": "={{ $json.destino ?? null }}", "type": "string" },
+            { "id": "a6",  "name": "data_hora",              "value": "={{ $json.data_hora ?? $json.datetime ?? null }}", "type": "string" },
+            { "id": "a7",  "name": "canal_whatsapp",         "value": "={{ $json.comunicador?.canal_escolhido ?? 'oficial' }}", "type": "string" },
+            { "id": "a8",  "name": "whatsapp_destino_e164",  "value": "={{ $json.comunicador?.canal_escolhido === 'proprio' ? ($json.comunicador?.linha_propria_motorista?.telefone_e164 ?? $json.comunicador?.linha_oficial?.telefone_e164 ?? null) : ($json.comunicador?.linha_oficial?.telefone_e164 ?? null) }}", "type": "string" },
+            { "id": "a9",  "name": "whatsapp_instance",      "value": "={{ $json.comunicador?.canal_escolhido === 'proprio' ? ($json.comunicador?.linha_propria_motorista?.instance_name ?? $json.comunicador?.linha_oficial?.instance_name ?? null) : ($json.comunicador?.linha_oficial?.instance_name ?? null) }}", "type": "string" },
+            { "id": "a10", "name": "comunicador",            "value": "={{ $json.comunicador ?? null }}", "type": "object" },
+            { "id": "a11", "name": "payload_resumo",         "value": "={{ JSON.stringify($json).substring(0, 500) }}", "type": "string" },
+            { "id": "a12", "name": "recebido_em",            "value": "={{ new Date().toISOString() }}", "type": "string" }
+          ]
+        }
+      },
+      "id": "node-set-transfer-sol",
+      "name": "Log transfer_solicitacao",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [460, -280]
+    },
+
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            { "id": "a1",  "name": "tipo",                   "value": "={{ (() => { const h = $('Webhook').first().json.headers ?? {}; return (h['x-e-transporte-tipo'] ?? h['X-E-Transporte-Tipo'] ?? '').toLowerCase().trim(); })() }}", "type": "string" },
+            { "id": "a2",  "name": "reserva_id",             "value": "={{ $json.reserva_id ?? $json.id ?? null }}", "type": "string" },
+            { "id": "a3",  "name": "cliente",                "value": "={{ $json.cliente ?? $json.nome ?? null }}", "type": "string" },
+            { "id": "a4",  "name": "status",                 "value": "={{ $json.status ?? null }}", "type": "string" },
+            { "id": "a5",  "name": "valor",                  "value": "={{ $json.valor ?? null }}", "type": "string" },
+            { "id": "a6",  "name": "canal_whatsapp",         "value": "={{ $json.comunicador?.canal_escolhido ?? 'oficial' }}", "type": "string" },
+            { "id": "a7",  "name": "whatsapp_destino_e164",  "value": "={{ $json.comunicador?.canal_escolhido === 'proprio' ? ($json.comunicador?.linha_propria_motorista?.telefone_e164 ?? $json.comunicador?.linha_oficial?.telefone_e164 ?? null) : ($json.comunicador?.linha_oficial?.telefone_e164 ?? null) }}", "type": "string" },
+            { "id": "a8",  "name": "whatsapp_instance",      "value": "={{ $json.comunicador?.canal_escolhido === 'proprio' ? ($json.comunicador?.linha_propria_motorista?.instance_name ?? $json.comunicador?.linha_oficial?.instance_name ?? null) : ($json.comunicador?.linha_oficial?.instance_name ?? null) }}", "type": "string" },
+            { "id": "a9",  "name": "comunicador",            "value": "={{ $json.comunicador ?? null }}", "type": "object" },
+            { "id": "a10", "name": "payload_resumo",         "value": "={{ JSON.stringify($json).substring(0, 500) }}", "type": "string" },
+            { "id": "a11", "name": "recebido_em",            "value": "={{ new Date().toISOString() }}", "type": "string" }
+          ]
+        }
+      },
+      "id": "node-set-transfer-res",
+      "name": "Log transfer_reserva",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [460, -120]
+    },
+
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            { "id": "a1",  "name": "tipo",                   "value": "={{ (() => { const h = $('Webhook').first().json.headers ?? {}; return (h['x-e-transporte-tipo'] ?? h['X-E-Transporte-Tipo'] ?? '').toLowerCase().trim(); })() }}", "type": "string" },
+            { "id": "a2",  "name": "grupo_id",               "value": "={{ $json.grupo_id ?? $json.id ?? null }}", "type": "string" },
+            { "id": "a3",  "name": "nome_grupo",             "value": "={{ $json.nome ?? $json.nome_grupo ?? null }}", "type": "string" },
+            { "id": "a4",  "name": "membros",                "value": "={{ $json.membros ?? null }}", "type": "string" },
+            { "id": "a5",  "name": "data_hora",              "value": "={{ $json.data_hora ?? $json.datetime ?? null }}", "type": "string" },
+            { "id": "a6",  "name": "canal_whatsapp",         "value": "={{ $json.comunicador?.canal_escolhido ?? 'oficial' }}", "type": "string" },
+            { "id": "a7",  "name": "whatsapp_destino_e164",  "value": "={{ $json.comunicador?.canal_escolhido === 'proprio' ? ($json.comunicador?.linha_propria_motorista?.telefone_e164 ?? $json.comunicador?.linha_oficial?.telefone_e164 ?? null) : ($json.comunicador?.linha_oficial?.telefone_e164 ?? null) }}", "type": "string" },
+            { "id": "a8",  "name": "whatsapp_instance",      "value": "={{ $json.comunicador?.canal_escolhido === 'proprio' ? ($json.comunicador?.linha_propria_motorista?.instance_name ?? $json.comunicador?.linha_oficial?.instance_name ?? null) : ($json.comunicador?.linha_oficial?.instance_name ?? null) }}", "type": "string" },
+            { "id": "a9",  "name": "comunicador",            "value": "={{ $json.comunicador ?? null }}", "type": "object" },
+            { "id": "a10", "name": "payload_resumo",         "value": "={{ JSON.stringify($json).substring(0, 500) }}", "type": "string" },
+            { "id": "a11", "name": "recebido_em",            "value": "={{ new Date().toISOString() }}", "type": "string" }
+          ]
+        }
+      },
+      "id": "node-set-grupo-sol",
+      "name": "Log grupo_solicitacao",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [460, 40]
+    },
+
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            { "id": "a1",  "name": "tipo",                   "value": "={{ (() => { const h = $('Webhook').first().json.headers ?? {}; return (h['x-e-transporte-tipo'] ?? h['X-E-Transporte-Tipo'] ?? '').toLowerCase().trim(); })() }}", "type": "string" },
+            { "id": "a2",  "name": "grupo_id",               "value": "={{ $json.grupo_id ?? $json.id ?? null }}", "type": "string" },
+            { "id": "a3",  "name": "status",                 "value": "={{ $json.status ?? null }}", "type": "string" },
+            { "id": "a4",  "name": "data_hora",              "value": "={{ $json.data_hora ?? $json.datetime ?? null }}", "type": "string" },
+            { "id": "a5",  "name": "canal_whatsapp",         "value": "={{ $json.comunicador?.canal_escolhido ?? 'oficial' }}", "type": "string" },
+            { "id": "a6",  "name": "whatsapp_destino_e164",  "value": "={{ $json.comunicador?.canal_escolhido === 'proprio' ? ($json.comunicador?.linha_propria_motorista?.telefone_e164 ?? $json.comunicador?.linha_oficial?.telefone_e164 ?? null) : ($json.comunicador?.linha_oficial?.telefone_e164 ?? null) }}", "type": "string" },
+            { "id": "a7",  "name": "whatsapp_instance",      "value": "={{ $json.comunicador?.canal_escolhido === 'proprio' ? ($json.comunicador?.linha_propria_motorista?.instance_name ?? $json.comunicador?.linha_oficial?.instance_name ?? null) : ($json.comunicador?.linha_oficial?.instance_name ?? null) }}", "type": "string" },
+            { "id": "a8",  "name": "comunicador",            "value": "={{ $json.comunicador ?? null }}", "type": "object" },
+            { "id": "a9",  "name": "payload_resumo",         "value": "={{ JSON.stringify($json).substring(0, 500) }}", "type": "string" },
+            { "id": "a10", "name": "recebido_em",            "value": "={{ new Date().toISOString() }}", "type": "string" }
+          ]
+        }
+      },
+      "id": "node-set-grupo-res",
+      "name": "Log grupo_reserva",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [460, 200]
+    },
+
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            { "id": "a1",  "name": "tipo",                   "value": "={{ (() => { const h = $('Webhook').first().json.headers ?? {}; return (h['x-e-transporte-tipo'] ?? h['X-E-Transporte-Tipo'] ?? '').toLowerCase().trim(); })() }}", "type": "string" },
+            { "id": "a2",  "name": "motorista_id",           "value": "={{ $json.motorista_id ?? $json.id ?? null }}", "type": "string" },
+            { "id": "a3",  "name": "nome",                   "value": "={{ $json.nome ?? null }}", "type": "string" },
+            { "id": "a4",  "name": "cnh",                    "value": "={{ $json.cnh ?? null }}", "type": "string" },
+            { "id": "a5",  "name": "telefone",               "value": "={{ $json.telefone ?? null }}", "type": "string" },
+            { "id": "a6",  "name": "tem_pdf",                "value": "={{ $json.pdf_base64 != null }}", "type": "boolean" },
+            { "id": "a7",  "name": "canal_whatsapp",         "value": "={{ $json.comunicador?.canal_escolhido ?? 'oficial' }}", "type": "string" },
+            { "id": "a8",  "name": "whatsapp_destino_e164",  "value": "={{ $json.comunicador?.canal_escolhido === 'proprio' ? ($json.comunicador?.linha_propria_motorista?.telefone_e164 ?? $json.comunicador?.linha_oficial?.telefone_e164 ?? null) : ($json.comunicador?.linha_oficial?.telefone_e164 ?? null) }}", "type": "string" },
+            { "id": "a9",  "name": "whatsapp_instance",      "value": "={{ $json.comunicador?.canal_escolhido === 'proprio' ? ($json.comunicador?.linha_propria_motorista?.instance_name ?? $json.comunicador?.linha_oficial?.instance_name ?? null) : ($json.comunicador?.linha_oficial?.instance_name ?? null) }}", "type": "string" },
+            { "id": "a10", "name": "comunicador",            "value": "={{ $json.comunicador ?? null }}", "type": "object" },
+            { "id": "a11", "name": "payload_resumo",         "value": "={{ JSON.stringify(Object.fromEntries(Object.entries($json).filter(([k]) => k !== 'pdf_base64'))).substring(0, 500) }}", "type": "string" },
+            { "id": "a12", "name": "recebido_em",            "value": "={{ new Date().toISOString() }}", "type": "string" }
+          ]
+        }
+      },
+      "id": "node-set-motorista-intake",
+      "name": "Log motorista_intake",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [460, 360]
+    },
+
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            { "id": "a1",  "name": "tipo",                   "value": "={{ (() => { const h = $('Webhook').first().json.headers ?? {}; return (h['x-e-transporte-tipo'] ?? h['X-E-Transporte-Tipo'] ?? '').toLowerCase().trim(); })() }}", "type": "string" },
+            { "id": "a2",  "name": "total",                  "value": "={{ Array.isArray($json.motoristas) ? $json.motoristas.length : null }}", "type": "number" },
+            { "id": "a3",  "name": "primeiro_nome",          "value": "={{ Array.isArray($json.motoristas) && $json.motoristas[0] ? $json.motoristas[0].nome : null }}", "type": "string" },
+            { "id": "a4",  "name": "canal_whatsapp",         "value": "={{ $json.comunicador?.canal_escolhido ?? 'oficial' }}", "type": "string" },
+            { "id": "a5",  "name": "whatsapp_destino_e164",  "value": "={{ $json.comunicador?.canal_escolhido === 'proprio' ? ($json.comunicador?.linha_propria_motorista?.telefone_e164 ?? $json.comunicador?.linha_oficial?.telefone_e164 ?? null) : ($json.comunicador?.linha_oficial?.telefone_e164 ?? null) }}", "type": "string" },
+            { "id": "a6",  "name": "whatsapp_instance",      "value": "={{ $json.comunicador?.canal_escolhido === 'proprio' ? ($json.comunicador?.linha_propria_motorista?.instance_name ?? $json.comunicador?.linha_oficial?.instance_name ?? null) : ($json.comunicador?.linha_oficial?.instance_name ?? null) }}", "type": "string" },
+            { "id": "a7",  "name": "comunicador",            "value": "={{ $json.comunicador ?? null }}", "type": "object" },
+            { "id": "a8",  "name": "payload_resumo",         "value": "={{ JSON.stringify($json).substring(0, 500) }}", "type": "string" },
+            { "id": "a9",  "name": "recebido_em",            "value": "={{ new Date().toISOString() }}", "type": "string" }
+          ]
+        }
+      },
+      "id": "node-set-motoristas-cad",
+      "name": "Log motoristas_cadastrados",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [460, 520]
+    },
+
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            { "id": "a1",  "name": "tipo",                   "value": "={{ (() => { const h = $('Webhook').first().json.headers ?? {}; return (h['x-e-transporte-tipo'] ?? h['X-E-Transporte-Tipo'] ?? '').toLowerCase().trim(); })() }}", "type": "string" },
+            { "id": "a2",  "name": "lat",                    "value": "={{ $json.lat ?? $json.latitude ?? null }}", "type": "string" },
+            { "id": "a3",  "name": "lon",                    "value": "={{ $json.lon ?? $json.longitude ?? null }}", "type": "string" },
+            { "id": "a4",  "name": "motorista_id",           "value": "={{ $json.motorista_id ?? null }}", "type": "string" },
+            { "id": "a5",  "name": "ts",                     "value": "={{ $json.timestamp ?? $json.ts ?? null }}", "type": "string" },
+            { "id": "a6",  "name": "canal_whatsapp",         "value": "={{ $json.comunicador?.canal_escolhido ?? 'oficial' }}", "type": "string" },
+            { "id": "a7",  "name": "whatsapp_destino_e164",  "value": "={{ $json.comunicador?.canal_escolhido === 'proprio' ? ($json.comunicador?.linha_propria_motorista?.telefone_e164 ?? $json.comunicador?.linha_oficial?.telefone_e164 ?? null) : ($json.comunicador?.linha_oficial?.telefone_e164 ?? null) }}", "type": "string" },
+            { "id": "a8",  "name": "whatsapp_instance",      "value": "={{ $json.comunicador?.canal_escolhido === 'proprio' ? ($json.comunicador?.linha_propria_motorista?.instance_name ?? $json.comunicador?.linha_oficial?.instance_name ?? null) : ($json.comunicador?.linha_oficial?.instance_name ?? null) }}", "type": "string" },
+            { "id": "a9",  "name": "comunicador",            "value": "={{ $json.comunicador ?? null }}", "type": "object" },
+            { "id": "a10", "name": "payload_resumo",         "value": "={{ JSON.stringify($json).substring(0, 500) }}", "type": "string" },
+            { "id": "a11", "name": "recebido_em",            "value": "={{ new Date().toISOString() }}", "type": "string" }
+          ]
+        }
+      },
+      "id": "node-set-geo",
+      "name": "Log geolocalizacao",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [460, 680]
+    },
+
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            { "id": "a1", "name": "tipo_desconhecido",       "value": "={{ (() => { const h = $('Webhook').first().json.headers ?? {}; return h['x-e-transporte-tipo'] ?? h['X-E-Transporte-Tipo'] ?? 'HEADER_AUSENTE'; })() }}", "type": "string" },
+            { "id": "a2", "name": "aviso",                   "value": "TIPO NAO MAPEADO — verificar Switch ou header ausente", "type": "string" },
+            { "id": "a3", "name": "canal_whatsapp",          "value": "oficial", "type": "string" },
+            { "id": "a4", "name": "whatsapp_destino_e164",   "value": "={{ $json.comunicador?.linha_oficial?.telefone_e164 ?? null }}", "type": "string" },
+            { "id": "a5", "name": "whatsapp_instance",       "value": "={{ $json.comunicador?.linha_oficial?.instance_name ?? null }}", "type": "string" },
+            { "id": "a6", "name": "payload_resumo",          "value": "={{ JSON.stringify($json).substring(0, 300) }}", "type": "string" },
+            { "id": "a7", "name": "recebido_em",             "value": "={{ new Date().toISOString() }}", "type": "string" }
+          ]
+        }
+      },
+      "id": "node-set-default",
+      "name": "Log Default (desconhecido)",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [460, 840]
+    },
+
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok: true, tipo: $json.tipo ?? $json.tipo_desconhecido ?? 'unknown', canal_whatsapp: $json.canal_whatsapp ?? 'oficial', whatsapp_destino_e164: $json.whatsapp_destino_e164 ?? null, whatsapp_instance: $json.whatsapp_instance ?? null, recebido_em: $json.recebido_em }) }}",
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              { "name": "Content-Type", "value": "application/json" }
+            ]
+          }
+        }
+      },
+      "id": "node-respond",
+      "name": "Respond 200",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [720, 400]
+    }
+  ],
+
+  "connections": {
+    "Webhook": {
+      "main": [
+        [{ "node": "Normalizar body", "type": "main", "index": 0 }]
+      ]
+    },
+    "Normalizar body": {
+      "main": [
+        [{ "node": "Switch por Tipo", "type": "main", "index": 0 }]
+      ]
+    },
+    "Switch por Tipo": {
+      "main": [
+        [{ "node": "Log transfer_solicitacao",   "type": "main", "index": 0 }],
+        [{ "node": "Log transfer_reserva",       "type": "main", "index": 0 }],
+        [{ "node": "Log grupo_solicitacao",      "type": "main", "index": 0 }],
+        [{ "node": "Log grupo_reserva",          "type": "main", "index": 0 }],
+        [{ "node": "Log motorista_intake",       "type": "main", "index": 0 }],
+        [{ "node": "Log motoristas_cadastrados", "type": "main", "index": 0 }],
+        [{ "node": "Log geolocalizacao",         "type": "main", "index": 0 }],
+        [{ "node": "Log Default (desconhecido)", "type": "main", "index": 0 }]
+      ]
+    },
+    "Log transfer_solicitacao":   { "main": [[{ "node": "Respond 200", "type": "main", "index": 0 }]] },
+    "Log transfer_reserva":       { "main": [[{ "node": "Respond 200", "type": "main", "index": 0 }]] },
+    "Log grupo_solicitacao":      { "main": [[{ "node": "Respond 200", "type": "main", "index": 0 }]] },
+    "Log grupo_reserva":          { "main": [[{ "node": "Respond 200", "type": "main", "index": 0 }]] },
+    "Log motorista_intake":       { "main": [[{ "node": "Respond 200", "type": "main", "index": 0 }]] },
+    "Log motoristas_cadastrados": { "main": [[{ "node": "Respond 200", "type": "main", "index": 0 }]] },
+    "Log geolocalizacao":         { "main": [[{ "node": "Respond 200", "type": "main", "index": 0 }]] },
+    "Log Default (desconhecido)": { "main": [[{ "node": "Respond 200", "type": "main", "index": 0 }]] }
+  },
+
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "staticData": null,
+  "tags": ["e-transporte", "webhook", "saas", "whatsapp"],
+  "triggerCount": 1,
+  "versionId": "4"
+}

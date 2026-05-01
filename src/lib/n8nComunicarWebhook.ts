@@ -1,6 +1,21 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { ComunicadorRow } from "@/hooks/useComunicadoresEvolution";
 
+/** Estados Evolution/API que tratamos como “sessão ativa” para linha própria. */
+const CONNECTED_STATUS = new Set(["open", "conectado", "connected", "online"]);
+
+/**
+ * Escolhe a linha WhatsApp enviada no payload (`buildComunicadorSnapshot`).
+ * - Sem `instance_name` ou sessão não “aberta” → **oficial**.
+ * - `instance_name` + estado em CONNECTED_STATUS → **proprio** (sem exigir `telefone_conectado`).
+ */
+export function resolveCanalComunicador(row: ComunicadorRow | null): "oficial" | "proprio" {
+  if (!row?.instance_name?.trim()) return "oficial";
+  const status = (row.connection_status || "").trim().toLowerCase();
+  if (!CONNECTED_STATUS.has(status)) return "oficial";
+  return "proprio";
+}
+
 /** Tipos alinhados às colunas em `sistema_webhooks_comunicacao` e à Edge Function `comunicar-webhook-dispatch`. */
 export type WebhookComunicacaoTipo =
   | "transfer_solicitacao"
@@ -52,7 +67,6 @@ export async function fetchMotoristaPainelSnapshot(): Promise<Record<string, unk
 }
 
 export function buildComunicadorSnapshot(
-  canal: "oficial" | "proprio",
   sistema: ComunicadorRow | null,
   own: ComunicadorRow | null,
 ): Record<string, unknown> {
@@ -70,8 +84,14 @@ export function buildComunicadorSnapshot(
           comunicador_id: own.id ?? null,
         }
       : null;
+
+  let canalEscolhido = resolveCanalComunicador(own);
+  if (canalEscolhido === "proprio" && !linhaPropria) {
+    canalEscolhido = "oficial";
+  }
+
   return {
-    canal_escolhido: canal,
+    canal_escolhido: canalEscolhido,
     linha_oficial: telOf
       ? {
           telefone_e164: telOf,
