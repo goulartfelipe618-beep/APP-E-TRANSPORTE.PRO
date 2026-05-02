@@ -1,7 +1,10 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { RefreshCw, Plus, Link2, Copy, ArrowLeft, Sparkles, Save, Code2, Trash2, FlaskConical, Eye, X, Pencil, ChevronDown, ChevronRight, Check, Megaphone, CalendarClock } from "lucide-react";
+import {
+  RefreshCw, Plus, Link2, Copy, ArrowLeft, Sparkles, Save, Code2, Trash2, FlaskConical, Eye, X, Pencil, ChevronDown,
+  ChevronRight, Check, Megaphone, CalendarClock, AlertCircle,
+} from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -540,7 +543,7 @@ export default function SistemaAutomacoesPage() {
                     ? (isCampaign
                       ? "Dados recebidos serão encaminhados automaticamente para o submenu LEADS. Testes NÃO serão armazenados."
                       : selected.tipo === "motorista"
-                        ? "Com o webhook ativo, cada POST grava candidatos em Motoristas → Solicitações (a sua conta). Use testes à esquerda para mapear campos antes de ativar. Testes não entram nessa lista."
+                        ? "Com o webhook ativo, POSTs com o header X-Frota-Motorista-Intake (secret no Supabase) gravam em Motoristas → Solicitações. Sem o header, vão só para o Admin Master. Use testes à esquerda para mapear antes de ativar."
                         : `Dados recebidos serão encaminhados automaticamente para o menu Solicitações de ${tipoLabels[selected.tipo] || selected.tipo}. Testes NÃO serão armazenados.`)
                     : "Envie um POST para a URL acima para receber testes. Configure o mapeamento antes de ativar."}
                 </p>
@@ -551,6 +554,20 @@ export default function SistemaAutomacoesPage() {
               onCheckedChange={() => toggleWebhook(selected)}
             />
           </div>
+
+          {selected.tipo === "motorista" && (
+            <Alert className="border-amber-500/40 bg-amber-500/5">
+              <AlertCircle className="h-4 w-4 text-amber-500" />
+              <AlertTitle className="text-foreground">Motoristas parceiros (a sua frota)</AlertTitle>
+              <AlertDescription className="text-xs text-muted-foreground leading-relaxed">
+                O servidor só grava pedidos na sua lista <strong className="text-foreground">Motoristas → Solicitações</strong> se o POST incluir o cabeçalho{" "}
+                <code className="rounded bg-muted px-1 text-foreground">X-Frota-Motorista-Intake</code> com o valor do secret{" "}
+                <code className="rounded bg-muted px-1 text-foreground">FROTA_MOTORISTA_INTAKE_SECRET</code> (Supabase → Edge Functions → Secrets da função{" "}
+                <code className="rounded bg-muted px-1 text-foreground">webhook-solicitacao</code>). Configure o mesmo no n8n, Make, proxy, etc. Sem esse header, o
+                registo fica na fila de <strong className="text-foreground">cadastro na plataforma</strong> (apenas Admin Master).
+              </AlertDescription>
+            </Alert>
+          )}
         </div>
 
         {/* When ACTIVE: show message that data goes to Solicitações */}
@@ -564,8 +581,8 @@ export default function SistemaAutomacoesPage() {
                 : selected.tipo === "motorista"
                   ? (
                       <>
-                        Os pedidos estão a ser gravados em <strong>Motoristas → Solicitações</strong> (esta conta). Cole este URL nos formulários externos (n8n,
-                        Typeform, etc.) depois de mapear os campos com os testes.
+                        Só vão para <strong>Motoristas → Solicitações</strong> os POSTs que enviam o header <code className="text-xs">X-Frota-Motorista-Intake</code>{" "}
+                        correto. Os restantes ficam na fila Admin (cadastro na plataforma).
                       </>
                     )
                   : <>Todos os dados recebidos via webhook estão sendo encaminhados automaticamente para o menu <strong>Solicitações → {tipoLabels[selected.tipo]}</strong>.</>}

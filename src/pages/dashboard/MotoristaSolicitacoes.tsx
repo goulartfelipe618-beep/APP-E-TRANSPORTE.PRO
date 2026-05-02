@@ -136,10 +136,10 @@ export default function MotoristaSolicitacoesPage() {
         <div>
           <h1 className="text-2xl font-bold text-foreground">Solicitações</h1>
           <p className="text-muted-foreground">
-            Candidatos enviados pelo <strong className="text-foreground">seu</strong> URL de webhook <strong className="text-foreground">Motorista solicitação</strong>{" "}
-            (Sistema → Automações, produção, formulários externos). A landing <strong className="text-foreground">pública da plataforma</strong> usa segredo no
-            servidor (header <code className="text-xs">X-Platform-Landing-Secret</code>) — sem isso, pedidos podem cair na conta errada; a fila correta da plataforma
-            fica em <strong className="text-foreground">Admin → Usuários → Cadastro pelo site</strong>.
+            Só aparecem aqui pedidos em que o integrador enviou o header <code className="text-xs">X-Frota-Motorista-Intake</code> (igual ao secret{" "}
+            <code className="text-xs">FROTA_MOTORISTA_INTAKE_SECRET</code> da função <code className="text-xs">webhook-solicitacao</code>). Isso corresponde a
+            candidatos a <strong className="text-foreground">motorista parceiro da sua frota</strong>. Cadastros para <strong className="text-foreground">usar a
+            plataforma</strong> não usam esse header e ficam só em <strong className="text-foreground">Admin → Usuários → Cadastro pelo site</strong>.
           </p>
         </div>
         <Button type="button" variant="outline" size="sm" onClick={() => void fetchSolicitacoes()} disabled={loading}>
