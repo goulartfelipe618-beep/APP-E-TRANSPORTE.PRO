@@ -142,6 +142,7 @@ export default function AdminUsuariosSolicitacoes() {
       const { data: solicitacoes, error } = await supabase
         .from("solicitacoes_motoristas")
         .select("*")
+        .eq("motorista_intake_destino", "plataforma_landing")
         .order("created_at", { ascending: false });
 
       if (error) throw error;
@@ -331,7 +332,10 @@ export default function AdminUsuariosSolicitacoes() {
           Solicitações
         </h1>
         <p className="text-muted-foreground mt-1">
-          Cadastros vindos do site (plano FREE com acesso liberado) e solicitações de interesse no sistema.
+          <strong className="text-foreground">Cadastro pelo site</strong> mostra só pedidos da{" "}
+          <strong className="text-foreground">landing global da plataforma</strong>. Candidatos «seja motorista» da frota de
+          cada cliente aparecem apenas em <strong className="text-foreground">Motoristas → Solicitações</strong> do painel desse utilizador. Aba{" "}
+          <strong className="text-foreground">Interesse / contato</strong> continua para o formulário de interesse no sistema.
         </p>
       </div>
 
@@ -344,9 +348,10 @@ export default function AdminUsuariosSolicitacoes() {
         <TabsContent value="cadastro-site" className="space-y-4 mt-4">
           <div className="flex items-center justify-between">
             <p className="text-sm text-muted-foreground max-w-3xl">
-              O webhook cria o login em <strong className="text-foreground">FREE</strong>. Em{" "}
-              <strong className="text-foreground">Cadastrar</strong>, confirme o plano <strong className="text-foreground">PRÓ</strong>{" "}
-              para concluir o cadastro em Usuários → Cadastrados e retirar da fila.
+              Lista apenas intakes com <code className="text-xs">motorista_intake_destino = plataforma_landing</code> (header{" "}
+              <code className="text-xs">X-Platform-Landing-Secret</code> no webhook). O webhook cria o login em{" "}
+              <strong className="text-foreground">FREE</strong>. Em <strong className="text-foreground">Cadastrar</strong>, confirme o plano{" "}
+              <strong className="text-foreground">PRÓ</strong> para concluir em Usuários → Cadastrados e retirar da fila.
             </p>
             <Button variant="outline" size="icon" onClick={() => void fetchMotoristas()} disabled={loadingMotorista}>
               {loadingMotorista ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
@@ -379,7 +384,6 @@ export default function AdminUsuariosSolicitacoes() {
                       <TableHead>Detalhes</TableHead>
                       <TableHead>Data</TableHead>
                       <TableHead>Plano</TableHead>
-                      <TableHead>Origem</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead className="min-w-[200px]">Ações</TableHead>
                     </TableRow>
@@ -409,18 +413,6 @@ export default function AdminUsuariosSolicitacoes() {
                         </TableCell>
                         <TableCell>
                           <Badge variant="outline">{PLAN_LABELS[normalizeUserPlano(s.plano)]}</Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge
-                            variant="outline"
-                            className={
-                              s.motorista_intake_destino === "plataforma_landing"
-                                ? "border-amber-500/40 bg-amber-500/10 text-amber-800 dark:text-amber-200"
-                                : "border-border bg-muted/40 text-muted-foreground"
-                            }
-                          >
-                            {s.motorista_intake_destino === "plataforma_landing" ? "Plataforma" : "Frota / site"}
-                          </Badge>
                         </TableCell>
                         <TableCell>
                           <Badge
