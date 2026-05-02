@@ -93,9 +93,10 @@ export default function MotoristaSolicitacoesPage() {
     const { data, error } = await supabase
       .from("solicitacoes_motoristas")
       .select(
-        "id, nome, cpf, telefone, email, cidade, estado, cnh, mensagem, mensagem_observacoes, status, created_at, dados_webhook, lead_user_id",
+        "id, nome, cpf, telefone, email, cidade, estado, cnh, mensagem, mensagem_observacoes, status, created_at, dados_webhook, lead_user_id, motorista_intake_destino",
       )
       .eq("user_id", user.id)
+      .eq("motorista_intake_destino", "frota_parceiros")
       .neq("status", "cadastrado")
       .not("lead_user_id", "is", null)
       .order("created_at", { ascending: false });
@@ -135,9 +136,9 @@ export default function MotoristaSolicitacoesPage() {
         <div>
           <h1 className="text-2xl font-bold text-foreground">Solicitações</h1>
           <p className="text-muted-foreground">
-            Lista <strong className="text-foreground">só com pedidos reais</strong> enviados pelo formulário externo ao URL do webhook{" "}
-            <strong className="text-foreground">Motorista solicitação</strong> (<strong className="text-foreground">Sistema → Automações</strong>, automação
-            ativa). Não há dados de demonstração na app: cada conta vê apenas as suas solicitações e os seus cadastros (RLS + filtro por conta).
+            Apenas candidatos ao <strong className="text-foreground">seu site</strong> (URL do webhook <strong className="text-foreground">Motorista solicitação</strong>{" "}
+            em <strong className="text-foreground">Sistema → Automações</strong> marcado como fila da <strong className="text-foreground">sua frota</strong>). A
+            fila global de cadastro na plataforma fica só no painel <strong className="text-foreground">Admin Master</strong> — não aparece aqui.
           </p>
         </div>
         <Button type="button" variant="outline" size="sm" onClick={() => void fetchSolicitacoes()} disabled={loading}>
@@ -212,7 +213,7 @@ export default function MotoristaSolicitacoesPage() {
                   <Button
                     type="button"
                     size="sm"
-                    className="h-8 border-[#FF6600]/40 text-xs text-[#FF6600] hover:bg-[#FF6600]/10"
+                    className="h-8 border-0 bg-yellow-400 text-xs font-medium text-black hover:bg-yellow-500 hover:text-black"
                     onClick={() => abrirCompletarCadastro(m)}
                   >
                     <UserCheck className="mr-1 h-3.5 w-3.5" />
@@ -260,7 +261,7 @@ export default function MotoristaSolicitacoesPage() {
                           type="button"
                           variant="ghost"
                           size="sm"
-                          className="h-8 px-2 text-xs text-[#FF6600]"
+                          className="h-8 bg-yellow-400 px-2 text-xs font-medium text-black hover:bg-yellow-500 hover:text-black"
                           onClick={() => abrirCompletarCadastro(m)}
                         >
                           <UserCheck className="mr-1 h-3.5 w-3.5" />

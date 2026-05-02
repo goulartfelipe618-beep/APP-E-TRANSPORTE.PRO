@@ -42,6 +42,8 @@ interface Automacao {
   campanha_id?: string | null;
   is_campaign_webhook?: boolean;
   created_at: string;
+  /** motorista: frota_parceiros (site do operador) vs plataforma_landing (fila global só Admin). */
+  motorista_intake_destino?: string;
   /** Preenchido via join ao carregar a lista (webhooks de campanha). */
   campanhas?: CampanhaEmbed | CampanhaEmbed[] | null;
 }
@@ -199,6 +201,19 @@ export default function SistemaAutomacoesPage() {
   const [newCampaignField, setNewCampaignField] = useState("");
   const [campaignFieldLocked, setCampaignFieldLocked] = useState(false);
   const [campaignMeta, setCampaignMeta] = useState<any>(null);
+  const [isAdminMaster, setIsAdminMaster] = useState(false);
+
+  useEffect(() => {
+    void (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user?.id) {
+        setIsAdminMaster(false);
+        return;
+      }
+      const { data, error } = await supabase.rpc("is_admin_master", { _user_id: user.id });
+      setIsAdminMaster(!error && Boolean(data));
+    })();
+  }, []);
 
   const fetchAutomacoes = useCallback(async () => {
     const { data, error } = await supabase
@@ -211,6 +226,7 @@ export default function SistemaAutomacoesPage() {
         (data || []).map((a: any) => ({
           ...a,
           mappings: typeof a.mappings === "object" ? a.mappings : {},
+          motorista_intake_destino: a.motorista_intake_destino ?? "frota_parceiros",
         })),
       );
     setLoading(false);
@@ -369,6 +385,25 @@ export default function SistemaAutomacoesPage() {
       setAutomacoes((prev) => prev.map((a) => a.id === automacao.id ? { ...a, ativo: newAtivo } : a));
       if (selected?.id === automacao.id) setSelected({ ...selected, ativo: newAtivo });
     }
+  };
+
+  const toggleMotoristaIntakeDestino = async (automacao: Automacao, plataforma: boolean) => {
+    const next = plataforma ? "plataforma_landing" : "frota_parceiros";
+    const { error } = await supabase
+      .from("automacoes")
+      .update({ motorista_intake_destino: next, updated_at: new Date().toISOString() })
+      .eq("id", automacao.id);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    setAutomacoes((prev) => prev.map((a) => (a.id === automacao.id ? { ...a, motorista_intake_destino: next } : a)));
+    setSelected((s) => (s?.id === automacao.id ? { ...s, motorista_intake_destino: next } : s));
+    toast.success(
+      plataforma
+        ? "Esta URL grava na fila Admin (landing da plataforma), não no painel dos motoristas."
+        : "Esta URL grava em Motoristas → Solicitações do dono da automação.",
+    );
   };
 
   const getWebhookUrl = (automacao: Automacao) => {
@@ -540,7 +575,9 @@ export default function SistemaAutomacoesPage() {
                     ? (isCampaign
                       ? "Dados recebidos serão encaminhados automaticamente para o submenu LEADS. Testes NÃO serão armazenados."
                       : selected.tipo === "motorista"
-                        ? "Dados recebidos serão registados em Motoristas → Solicitações (só a sua conta). Testes NÃO entram nessa lista."
+                        ? selected.motorista_intake_destino === "plataforma_landing"
+                          ? "Dados recebidos vão para a fila Admin (cadastro na plataforma). Não aparecem em Motoristas → Solicitações dos utilizadores."
+                          : "Dados recebidos vão para Motoristas → Solicitações do dono desta automação (candidatos ao site do motorista). Testes NÃO entram nessa lista."
                         : `Dados recebidos serão encaminhados automaticamente para o menu Solicitações de ${tipoLabels[selected.tipo] || selected.tipo}. Testes NÃO serão armazenados.`)
                     : "Envie um POST para a URL acima para receber testes. Configure o mapeamento antes de ativar."}
                 </p>
@@ -551,6 +588,32 @@ export default function SistemaAutomacoesPage() {
               onCheckedChange={() => toggleWebhook(selected)}
             />
           </div>
+
+          {selected.tipo === "motorista" && isAdminMaster && (
+            <div className="rounded-lg border border-amber-500/35 bg-amber-500/5 p-4 space-y-2">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0 space-y-1">
+                  <p className="text-sm font-medium text-foreground">Fila da landing da plataforma (global)</p>
+                  <p className="text-xs text-muted-foreground">
+                    Ative só na automação cujo URL está no site público de cadastro na plataforma. Os pedidos ficam em{" "}
+                    <strong className="text-foreground">Admin → Usuários → Cadastro pelo site</strong> e deixam de ser visíveis aos motoristas no painel.
+                  </p>
+                </div>
+                <Switch
+                  checked={selected.motorista_intake_destino === "plataforma_landing"}
+                  onCheckedChange={(v) => void toggleMotoristaIntakeDestino(selected, v)}
+                  className="shrink-0"
+                />
+              </div>
+            </div>
+          )}
+
+          {selected.tipo === "motorista" && !isAdminMaster && (
+            <p className="text-xs text-muted-foreground">
+              Use este URL no formulário do <strong className="text-foreground">seu site</strong> para receber candidatos a motorista parceiro. A fila de quem se
+              cadastra na plataforma é tratada separadamente pelo Admin Master.
+            </p>
+          )}
         </div>
 
         {/* When ACTIVE: show message that data goes to Solicitações */}
@@ -562,7 +625,18 @@ export default function SistemaAutomacoesPage() {
               {isCampaign
                 ? <>Todos os dados recebidos via webhook estão sendo encaminhados automaticamente para o submenu <strong>LEADS</strong>.</>
                 : selected.tipo === "motorista"
-                  ? <>Todos os dados recebidos via webhook estão sendo registados em <strong>Motoristas → Solicitações</strong> (apenas a sua conta).</>
+                  ? selected.motorista_intake_destino === "plataforma_landing"
+                    ? (
+                        <>
+                          Os dados estão a ser gravados na <strong>fila global da plataforma</strong> (Admin → Usuários → Cadastro pelo site), não no painel dos
+                          motoristas.
+                        </>
+                      )
+                    : (
+                        <>
+                          Os dados estão a ser gravados em <strong>Motoristas → Solicitações</strong> do dono desta automação (candidatos ao site do motorista).
+                        </>
+                      )
                   : <>Todos os dados recebidos via webhook estão sendo encaminhados automaticamente para o menu <strong>Solicitações → {tipoLabels[selected.tipo]}</strong>.</>}
             </p>
             <p className="text-xs text-muted-foreground">

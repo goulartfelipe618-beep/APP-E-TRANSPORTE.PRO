@@ -511,9 +511,15 @@ Deno.serve(async (req) => {
         );
       }
 
-      // 6) Insert request row for Admin Master landing table
+      const intakeDestino =
+        (automacao as { motorista_intake_destino?: string }).motorista_intake_destino === "plataforma_landing"
+          ? "plataforma_landing"
+          : "frota_parceiros";
+
+      // 6) Insert: plataforma_landing = fila Admin Master; frota_parceiros = Motoristas→Solicitações do dono do webhook
       const record: Record<string, any> = {
         user_id: userId, // automation owner (keeps existing access patterns)
+        motorista_intake_destino: intakeDestino,
         lead_user_id: authUserId,
         nome: leadNome,
         email: leadEmail,

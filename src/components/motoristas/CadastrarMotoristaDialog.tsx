@@ -445,6 +445,7 @@ export default function CadastrarMotoristaDialog({ open, onOpenChange, onCreated
 
     const row: MotoristaInsert = {
       user_id: user.id,
+      motorista_intake_destino: "frota_parceiros",
       nome: nome.trim(),
       cpf: cpf.replace(/\D/g, "") || null,
       cnh: cnh.trim() || null,

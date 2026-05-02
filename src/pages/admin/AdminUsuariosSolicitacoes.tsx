@@ -48,6 +48,7 @@ interface SolicitacaoAcesso {
 type SolicitacaoMotorista = {
   id: string;
   user_id: string;
+  motorista_intake_destino?: string | null;
   lead_user_id?: string | null;
   nome: string;
   email: string | null;
@@ -378,6 +379,7 @@ export default function AdminUsuariosSolicitacoes() {
                       <TableHead>Detalhes</TableHead>
                       <TableHead>Data</TableHead>
                       <TableHead>Plano</TableHead>
+                      <TableHead>Origem</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead className="min-w-[200px]">Ações</TableHead>
                     </TableRow>
@@ -407,6 +409,18 @@ export default function AdminUsuariosSolicitacoes() {
                         </TableCell>
                         <TableCell>
                           <Badge variant="outline">{PLAN_LABELS[normalizeUserPlano(s.plano)]}</Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            variant="outline"
+                            className={
+                              s.motorista_intake_destino === "plataforma_landing"
+                                ? "border-amber-500/40 bg-amber-500/10 text-amber-800 dark:text-amber-200"
+                                : "border-border bg-muted/40 text-muted-foreground"
+                            }
+                          >
+                            {s.motorista_intake_destino === "plataforma_landing" ? "Plataforma" : "Frota / site"}
+                          </Badge>
                         </TableCell>
                         <TableCell>
                           <Badge
