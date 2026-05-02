@@ -1,7 +1,7 @@
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { MessageSquare, UserCheck } from "lucide-react";
+import { UserCheck } from "lucide-react";
 import type { Json } from "@/integrations/supabase/types";
 import { parseDadosWebhook } from "@/lib/motoristaFromSolicitacao";
 
@@ -26,8 +26,6 @@ interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onConverter: (s: SolicitacaoMotorista) => void;
-  /** Se omitido, o botão Comunicar não é exibido (ex.: painel do próprio motorista). */
-  onComunicar?: (s: SolicitacaoMotorista) => void;
 }
 
 export default function DetalhesSolicitacaoMotoristaSheet({
@@ -35,7 +33,6 @@ export default function DetalhesSolicitacaoMotoristaSheet({
   open,
   onOpenChange,
   onConverter,
-  onComunicar,
 }: Props) {
   if (!solicitacao) return null;
 
@@ -85,13 +82,8 @@ export default function DetalhesSolicitacaoMotoristaSheet({
 
           <div className="flex gap-2 border-t border-border pt-4">
             {podeConverter && (
-              <Button onClick={() => onConverter(solicitacao)} className="flex-1">
+              <Button onClick={() => onConverter(solicitacao)} className="w-full">
                 <UserCheck className="mr-2 h-4 w-4" /> Converter em cadastro
-              </Button>
-            )}
-            {onComunicar && (
-              <Button variant="outline" onClick={() => onComunicar(solicitacao)} className={podeConverter ? "flex-1" : "w-full"}>
-                <MessageSquare className="mr-2 h-4 w-4" /> Comunicar
               </Button>
             )}
           </div>
