@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { Search, LayoutGrid, List, UserCheck, Eye, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import CadastrarMotoristaDialog from "@/components/motoristas/CadastrarMotoristaDialog";
@@ -12,6 +13,8 @@ import type { Json } from "@/integrations/supabase/types";
 
 type SolicitacaoRow = {
   id: string;
+  /** Sempre preenchido em leads criados pelo webhook motorista (intake com login). */
+  lead_user_id?: string | null;
   nome: string;
   cpf: string | null;
   telefone: string | null;
@@ -36,8 +39,10 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 const STATUS_CLASS: Record<string, string> = {
-  testando: "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300",
-  pendente: "border-yellow-500/40 bg-yellow-500/10 text-yellow-800 dark:text-yellow-200",
+  testando:
+    "border-amber-600/50 bg-amber-400 text-black dark:border-amber-500/40 dark:bg-amber-500/15 dark:text-amber-200",
+  pendente:
+    "border-yellow-600/50 bg-yellow-400 text-black dark:border-yellow-500/40 dark:bg-yellow-500/15 dark:text-yellow-200",
   em_andamento: "border-blue-500/40 bg-blue-500/10 text-blue-800 dark:text-blue-200",
   recusado: "border-red-500/40 bg-red-500/10 text-red-800 dark:text-red-200",
   concluido: "border-emerald-500/40 bg-emerald-500/10 text-emerald-800",
@@ -88,10 +93,11 @@ export default function MotoristaSolicitacoesPage() {
     const { data, error } = await supabase
       .from("solicitacoes_motoristas")
       .select(
-        "id, nome, cpf, telefone, email, cidade, estado, cnh, mensagem, mensagem_observacoes, status, created_at, dados_webhook",
+        "id, nome, cpf, telefone, email, cidade, estado, cnh, mensagem, mensagem_observacoes, status, created_at, dados_webhook, lead_user_id",
       )
       .eq("user_id", user.id)
       .neq("status", "cadastrado")
+      .not("lead_user_id", "is", null)
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -129,8 +135,9 @@ export default function MotoristaSolicitacoesPage() {
         <div>
           <h1 className="text-2xl font-bold text-foreground">Solicitações</h1>
           <p className="text-muted-foreground">
-            Pedidos de motoristas gerados pelo seu webhook <strong className="text-foreground">Motorista solicitação</strong> em{" "}
-            <strong className="text-foreground">Sistema → Automações</strong>. Cada conta vê apenas as suas linhas.
+            Lista <strong className="text-foreground">só com pedidos reais</strong> enviados pelo formulário externo ao URL do webhook{" "}
+            <strong className="text-foreground">Motorista solicitação</strong> (<strong className="text-foreground">Sistema → Automações</strong>, automação
+            ativa). Não há dados de demonstração na app: cada conta vê apenas as suas solicitações e os seus cadastros (RLS + filtro por conta).
           </p>
         </div>
         <Button type="button" variant="outline" size="sm" onClick={() => void fetchSolicitacoes()} disabled={loading}>
@@ -145,10 +152,28 @@ export default function MotoristaSolicitacoesPage() {
           <Input placeholder="Buscar por nome, e-mail ou telefone…" className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
         <div className="flex overflow-hidden rounded-lg border border-border">
-          <Button variant={viewMode === "grid" ? "default" : "ghost"} size="icon" onClick={() => setViewMode("grid")}>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className={cn(
+              "rounded-none first:rounded-l-lg last:rounded-r-lg",
+              viewMode === "grid" && "bg-yellow-400 text-black hover:bg-yellow-500 hover:text-black",
+            )}
+            onClick={() => setViewMode("grid")}
+          >
             <LayoutGrid className="h-4 w-4" />
           </Button>
-          <Button variant={viewMode === "list" ? "default" : "ghost"} size="icon" onClick={() => setViewMode("list")}>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className={cn(
+              "rounded-none first:rounded-l-lg last:rounded-r-lg",
+              viewMode === "list" && "bg-yellow-400 text-black hover:bg-yellow-500 hover:text-black",
+            )}
+            onClick={() => setViewMode("list")}
+          >
             <List className="h-4 w-4" />
           </Button>
         </div>
@@ -160,8 +185,9 @@ export default function MotoristaSolicitacoesPage() {
         <div className="rounded-xl border border-border bg-card p-8 text-center text-muted-foreground">
           <p className="mb-2">Nenhuma solicitação em aberto.</p>
           <p className="text-sm">
-            Com o webhook ativado em Automações, novos POSTs aparecem aqui automaticamente. Motoristas já integrados na frota ficam em{" "}
-            <strong className="text-foreground">Motoristas → Cadastros</strong>.
+            Ligue o seu formulário (Typeform, Tally, n8n, etc.) ao URL do webhook com a automação <strong className="text-foreground">ativa</strong>. Em modo
+            teste (automação desligada), os dados vão para testes do webhook — não para esta lista. Após integrar, cada novo envio aparece aqui. Motoristas já
+            na frota ficam em <strong className="text-foreground">Motoristas → Cadastros</strong>.
           </p>
         </div>
       ) : viewMode === "grid" ? (

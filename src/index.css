@@ -16,7 +16,8 @@
     --popover-foreground: 220 15% 12%;
 
     --primary: 35 90% 48%;
-    --primary-foreground: 0 0% 100%;
+    /* Texto escuro sobre primário amarelo/laranja (melhor legibilidade no modo claro). */
+    --primary-foreground: 220 15% 10%;
 
     --secondary: 220 14% 96%;
     --secondary-foreground: 220 15% 18%;
@@ -39,7 +40,7 @@
     --sidebar-background: 220 14% 98%;
     --sidebar-foreground: 220 15% 18%;
     --sidebar-primary: 35 90% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-primary-foreground: 220 15% 10%;
     --sidebar-accent: 220 14% 94%;
     --sidebar-accent-foreground: 220 15% 18%;
     --sidebar-border: 220 13% 91%;
@@ -50,7 +51,7 @@
     --login-input: 220 14% 97%;
     --login-input-border: 220 13% 88%;
     --login-btn: 35 90% 48%;
-    --login-btn-foreground: 0 0% 100%;
+    --login-btn-foreground: 220 15% 10%;
     --captcha-bg: 220 14% 94%;
   }
 

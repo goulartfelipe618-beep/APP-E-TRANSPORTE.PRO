@@ -395,6 +395,10 @@ Deno.serve(async (req) => {
         extrasMerged.especificacao_origem = leadEspecificacao;
       }
 
+      // Marca de proveniência: Motoristas → Solicitações só lista leads com intake (lead_user_id) via webhook ativo.
+      extrasMerged._frota_webhook_ingresso = true;
+      extrasMerged._webhook_automacao_id = String(automacao.id);
+
       // Cadastro pelo site: solicitação sempre em FREE com login liberado (plano pago só no admin ou upgrade no painel).
       const leadPlano = "free";
 

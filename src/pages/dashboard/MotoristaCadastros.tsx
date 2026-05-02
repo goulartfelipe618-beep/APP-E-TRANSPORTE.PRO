@@ -8,6 +8,7 @@ import DetalhesMotoristaFrotaSheet from "@/components/motoristas/DetalhesMotoris
 import type { MotoristaInitialData } from "@/lib/motoristaFromSolicitacao";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 import type { Json } from "@/integrations/supabase/types";
 
 type MotoristaCadastroRow = {
@@ -141,10 +142,28 @@ export default function MotoristaCadastrosPage() {
           />
         </div>
         <div className="flex overflow-hidden rounded-lg border border-border">
-          <Button variant={viewMode === "grid" ? "default" : "ghost"} size="icon" onClick={() => setViewMode("grid")}>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className={cn(
+              "rounded-none first:rounded-l-lg last:rounded-r-lg",
+              viewMode === "grid" && "bg-yellow-400 text-black hover:bg-yellow-500 hover:text-black",
+            )}
+            onClick={() => setViewMode("grid")}
+          >
             <LayoutGrid className="h-4 w-4" />
           </Button>
-          <Button variant={viewMode === "list" ? "default" : "ghost"} size="icon" onClick={() => setViewMode("list")}>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className={cn(
+              "rounded-none first:rounded-l-lg last:rounded-r-lg",
+              viewMode === "list" && "bg-yellow-400 text-black hover:bg-yellow-500 hover:text-black",
+            )}
+            onClick={() => setViewMode("list")}
+          >
             <List className="h-4 w-4" />
           </Button>
         </div>
