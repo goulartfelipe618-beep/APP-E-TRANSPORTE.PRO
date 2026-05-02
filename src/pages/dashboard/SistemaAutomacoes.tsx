@@ -66,7 +66,7 @@ interface WebhookTeste {
 
 const tipoLabels: Record<string, string> = {
   transfer: "Transfer Executivo",
-  motorista: "Solicitação Motorista",
+  motorista: "Motorista solicitação",
   grupo: "Solicitação de Grupo",
   campanha: "Campanha",
 };
@@ -411,7 +411,11 @@ export default function SistemaAutomacoesPage() {
 
   const handleTestSubmit = (payload: Record<string, string>) => {
     if (!selected) return;
-    toast.success("Teste enviado! Verifique as Solicitações correspondentes.");
+    if (selected.tipo === "motorista") {
+      toast.success("Teste enviado! Confira o payload nos Testes Recebidos — não aparece em Motoristas → Solicitações até ativar o webhook.");
+    } else {
+      toast.success("Teste enviado! Verifique as Solicitações correspondentes.");
+    }
   };
 
   const addCampaignField = () => {
@@ -535,7 +539,9 @@ export default function SistemaAutomacoesPage() {
                   {selected.ativo
                     ? (isCampaign
                       ? "Dados recebidos serão encaminhados automaticamente para o submenu LEADS. Testes NÃO serão armazenados."
-                      : `Dados recebidos serão encaminhados automaticamente para o menu Solicitações de ${tipoLabels[selected.tipo] || selected.tipo}. Testes NÃO serão armazenados.`)
+                      : selected.tipo === "motorista"
+                        ? "Dados recebidos serão registados em Motoristas → Solicitações (só a sua conta). Testes NÃO entram nessa lista."
+                        : `Dados recebidos serão encaminhados automaticamente para o menu Solicitações de ${tipoLabels[selected.tipo] || selected.tipo}. Testes NÃO serão armazenados.`)
                     : "Envie um POST para a URL acima para receber testes. Configure o mapeamento antes de ativar."}
                 </p>
               </div>
@@ -555,7 +561,9 @@ export default function SistemaAutomacoesPage() {
             <p className="text-sm text-muted-foreground">
               {isCampaign
                 ? <>Todos os dados recebidos via webhook estão sendo encaminhados automaticamente para o submenu <strong>LEADS</strong>.</>
-                : <>Todos os dados recebidos via webhook estão sendo encaminhados automaticamente para o menu <strong>Solicitações → {tipoLabels[selected.tipo]}</strong>.</>}
+                : selected.tipo === "motorista"
+                  ? <>Todos os dados recebidos via webhook estão sendo registados em <strong>Motoristas → Solicitações</strong> (apenas a sua conta).</>
+                  : <>Todos os dados recebidos via webhook estão sendo encaminhados automaticamente para o menu <strong>Solicitações → {tipoLabels[selected.tipo]}</strong>.</>}
             </p>
             <p className="text-xs text-muted-foreground">
               Para receber testes novamente, desative o webhook acima.
@@ -1020,7 +1028,7 @@ export default function SistemaAutomacoesPage() {
                   <SelectGroup>
                     <SelectLabel>CATEGORIAS DO SISTEMA</SelectLabel>
                     <SelectItem value="transfer">Transfer Executivo</SelectItem>
-                    <SelectItem value="motorista">Solicitação Motorista</SelectItem>
+                    <SelectItem value="motorista">Motorista solicitação</SelectItem>
                     <SelectItem value="grupo">Solicitação de Grupo</SelectItem>
                   </SelectGroup>
                 </SelectContent>

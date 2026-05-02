@@ -9,6 +9,11 @@ export interface MotoristaInitialData {
    * RLS exige `user_id = auth.uid()`.
    */
   cadastro_row_id?: string;
+  /**
+   * Solicitação em aberto (webhook/automação) a concluir: **update** para `status = cadastrado` no mesmo id.
+   * Mutuamente exclusivo com `cadastro_row_id` em uso típico.
+   */
+  completar_lead_id?: string;
   nome?: string;
   email?: string;
   telefone?: string;

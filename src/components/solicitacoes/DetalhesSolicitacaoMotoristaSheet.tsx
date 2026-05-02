@@ -25,7 +25,8 @@ interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onConverter: (s: SolicitacaoMotorista) => void;
-  onComunicar: (s: SolicitacaoMotorista) => void;
+  /** Se omitido, o botão Comunicar não é exibido (ex.: painel do próprio motorista). */
+  onComunicar?: (s: SolicitacaoMotorista) => void;
 }
 
 export default function DetalhesSolicitacaoMotoristaSheet({
@@ -85,9 +86,11 @@ export default function DetalhesSolicitacaoMotoristaSheet({
                 <UserCheck className="mr-2 h-4 w-4" /> Converter em cadastro
               </Button>
             )}
-            <Button variant="outline" onClick={() => onComunicar(solicitacao)} className={podeConverter ? "flex-1" : "w-full"}>
-              <MessageSquare className="mr-2 h-4 w-4" /> Comunicar
-            </Button>
+            {onComunicar && (
+              <Button variant="outline" onClick={() => onComunicar(solicitacao)} className={podeConverter ? "flex-1" : "w-full"}>
+                <MessageSquare className="mr-2 h-4 w-4" /> Comunicar
+              </Button>
+            )}
           </div>
         </div>
       </SheetContent>
