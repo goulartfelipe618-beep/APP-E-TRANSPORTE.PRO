@@ -161,6 +161,13 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Landing pública da plataforma: enviar cabeçalho X-Platform-Landing-Secret = PLATFORM_LANDING_REQUEST_SECRET (Edge Secrets).
+    // Assim o intake fica em plataforma_landing mesmo que o formulário use um automacao_id errado (ex.: cópia de URL de outro utilizador).
+    const platformLandingSecret = (Deno.env.get("PLATFORM_LANDING_REQUEST_SECRET") || "").trim();
+    const requestPlatformSecret = (req.headers.get("x-platform-landing-secret") || "").trim();
+    const platformIntakeViaSecretHeader =
+      platformLandingSecret.length > 0 && requestPlatformSecret === platformLandingSecret;
+
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, serviceRoleKey);
@@ -511,12 +518,13 @@ Deno.serve(async (req) => {
         );
       }
 
-      // Landing pública da plataforma: definir em Supabase → Edge Functions → Secrets
-      // PLATFORM_MOTORISTA_LANDING_AUTOMACAO_ID = UUID da automação "motorista" usada só no formulário da landing.
-      // Qualquer outro automacao_id grava como frota_parceiros (Motoristas → Solicitações do dono).
-      const platformLandingId = (Deno.env.get("PLATFORM_MOTORISTA_LANDING_AUTOMACAO_ID") || "").trim();
+      // Fila Admin (landing plataforma) se: cabeçalho secreto correto OU automacao_id = PLATFORM_MOTORISTA_LANDING_AUTOMACAO_ID (Secrets).
+      const platformLandingAutomacaoId = (Deno.env.get("PLATFORM_MOTORISTA_LANDING_AUTOMACAO_ID") || "").trim();
       const intakeDestino =
-        platformLandingId !== "" && String(automacao.id) === platformLandingId ? "plataforma_landing" : "frota_parceiros";
+        platformIntakeViaSecretHeader ||
+        (platformLandingAutomacaoId !== "" && String(automacao.id) === platformLandingAutomacaoId)
+          ? "plataforma_landing"
+          : "frota_parceiros";
 
       // 6) Insert: plataforma_landing = fila Admin Master; frota_parceiros = Motoristas→Solicitações do dono do webhook
       const record: Record<string, any> = {

@@ -137,9 +137,9 @@ export default function MotoristaSolicitacoesPage() {
           <h1 className="text-2xl font-bold text-foreground">Solicitações</h1>
           <p className="text-muted-foreground">
             Candidatos enviados pelo <strong className="text-foreground">seu</strong> URL de webhook <strong className="text-foreground">Motorista solicitação</strong>{" "}
-            (criado em <strong className="text-foreground">Sistema → Automações</strong>, testes mapeados, depois produção e formulários externos). O formulário da
-            landing <strong className="text-foreground">pública da plataforma</strong> não entra nesta lista — esses pedidos vão só para{" "}
-            <strong className="text-foreground">Admin → Usuários → Cadastro pelo site</strong>.
+            (Sistema → Automações, produção, formulários externos). A landing <strong className="text-foreground">pública da plataforma</strong> usa segredo no
+            servidor (header <code className="text-xs">X-Platform-Landing-Secret</code>) — sem isso, pedidos podem cair na conta errada; a fila correta da plataforma
+            fica em <strong className="text-foreground">Admin → Usuários → Cadastro pelo site</strong>.
           </p>
         </div>
         <Button type="button" variant="outline" size="sm" onClick={() => void fetchSolicitacoes()} disabled={loading}>
