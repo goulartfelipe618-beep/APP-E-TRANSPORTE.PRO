@@ -136,9 +136,10 @@ export default function MotoristaSolicitacoesPage() {
         <div>
           <h1 className="text-2xl font-bold text-foreground">Solicitações</h1>
           <p className="text-muted-foreground">
-            Apenas candidatos ao <strong className="text-foreground">seu site</strong> (URL do webhook <strong className="text-foreground">Motorista solicitação</strong>{" "}
-            em <strong className="text-foreground">Sistema → Automações</strong> marcado como fila da <strong className="text-foreground">sua frota</strong>). A
-            fila global de cadastro na plataforma fica só no painel <strong className="text-foreground">Admin Master</strong> — não aparece aqui.
+            Candidatos enviados pelo <strong className="text-foreground">seu</strong> URL de webhook <strong className="text-foreground">Motorista solicitação</strong>{" "}
+            (criado em <strong className="text-foreground">Sistema → Automações</strong>, testes mapeados, depois produção e formulários externos). O formulário da
+            landing <strong className="text-foreground">pública da plataforma</strong> não entra nesta lista — esses pedidos vão só para{" "}
+            <strong className="text-foreground">Admin → Usuários → Cadastro pelo site</strong>.
           </p>
         </div>
         <Button type="button" variant="outline" size="sm" onClick={() => void fetchSolicitacoes()} disabled={loading}>

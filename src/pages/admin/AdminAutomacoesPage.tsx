@@ -190,7 +190,7 @@ export default function AdminAutomacoesPage() {
           <Zap className="h-6 w-6 text-primary" /> Automações — Configuração de Campos
         </h1>
         <p className="text-muted-foreground">
-          Defina os campos de formulário que aparecerão para os motoristas em cada categoria de automação.
+          Apenas os <strong className="text-foreground">rótulos dos campos</strong> que cada utilizador vê ao mapear testes em <strong className="text-foreground">Sistema → Automações</strong>. Isto não cria webhooks nem altera a fila da landing da plataforma (essa fila é só no Admin → Usuários).
         </p>
       </div>
 

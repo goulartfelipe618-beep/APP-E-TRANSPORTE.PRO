@@ -511,10 +511,12 @@ Deno.serve(async (req) => {
         );
       }
 
+      // Landing pública da plataforma: definir em Supabase → Edge Functions → Secrets
+      // PLATFORM_MOTORISTA_LANDING_AUTOMACAO_ID = UUID da automação "motorista" usada só no formulário da landing.
+      // Qualquer outro automacao_id grava como frota_parceiros (Motoristas → Solicitações do dono).
+      const platformLandingId = (Deno.env.get("PLATFORM_MOTORISTA_LANDING_AUTOMACAO_ID") || "").trim();
       const intakeDestino =
-        (automacao as { motorista_intake_destino?: string }).motorista_intake_destino === "plataforma_landing"
-          ? "plataforma_landing"
-          : "frota_parceiros";
+        platformLandingId !== "" && String(automacao.id) === platformLandingId ? "plataforma_landing" : "frota_parceiros";
 
       // 6) Insert: plataforma_landing = fila Admin Master; frota_parceiros = Motoristas→Solicitações do dono do webhook
       const record: Record<string, any> = {
