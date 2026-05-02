@@ -543,7 +543,7 @@ export default function SistemaAutomacoesPage() {
                     ? (isCampaign
                       ? "Dados recebidos serão encaminhados automaticamente para o submenu LEADS. Testes NÃO serão armazenados."
                       : selected.tipo === "motorista"
-                        ? "Com o webhook ativo, POSTs com o header X-Frota-Motorista-Intake (secret no Supabase) gravam em Motoristas → Solicitações. Sem o header, vão só para o Admin Master. Use testes à esquerda para mapear antes de ativar."
+                        ? "Com o webhook ativo, cada POST na URL da automação grava em Motoristas → Solicitações (formulário «seja nosso motorista» no seu site). Use testes à esquerda para mapear antes de ativar."
                         : `Dados recebidos serão encaminhados automaticamente para o menu Solicitações de ${tipoLabels[selected.tipo] || selected.tipo}. Testes NÃO serão armazenados.`)
                     : "Envie um POST para a URL acima para receber testes. Configure o mapeamento antes de ativar."}
                 </p>
@@ -560,11 +560,11 @@ export default function SistemaAutomacoesPage() {
               <AlertCircle className="h-4 w-4 text-amber-500" />
               <AlertTitle className="text-foreground">Motoristas parceiros (a sua frota)</AlertTitle>
               <AlertDescription className="text-xs text-muted-foreground leading-relaxed">
-                O servidor só grava pedidos na sua lista <strong className="text-foreground">Motoristas → Solicitações</strong> se o POST incluir o cabeçalho{" "}
-                <code className="rounded bg-muted px-1 text-foreground">X-Frota-Motorista-Intake</code> com o valor do secret{" "}
-                <code className="rounded bg-muted px-1 text-foreground">FROTA_MOTORISTA_INTAKE_SECRET</code> (Supabase → Edge Functions → Secrets da função{" "}
-                <code className="rounded bg-muted px-1 text-foreground">webhook-solicitacao</code>). Configure o mesmo no n8n, Make, proxy, etc. Sem esse header, o
-                registo fica na fila de <strong className="text-foreground">cadastro na plataforma</strong> (apenas Admin Master).
+                Com o webhook <strong className="text-foreground">ativo</strong>, os POSTs para o URL desta automação aparecem em{" "}
+                <strong className="text-foreground">Motoristas → Solicitações</strong>. A fila de cadastro na plataforma (landing global) é outro fluxo: o servidor da
+                landing deve enviar <code className="rounded bg-muted px-1 text-foreground">X-Platform-Landing-Secret</code> (secret{" "}
+                <code className="rounded bg-muted px-1 text-foreground">PLATFORM_LANDING_REQUEST_SECRET</code> na função{" "}
+                <code className="rounded bg-muted px-1 text-foreground">webhook-solicitacao</code>) — isso não se aplica ao formulário normal do seu site.
               </AlertDescription>
             </Alert>
           )}
@@ -581,8 +581,7 @@ export default function SistemaAutomacoesPage() {
                 : selected.tipo === "motorista"
                   ? (
                       <>
-                        Só vão para <strong>Motoristas → Solicitações</strong> os POSTs que enviam o header <code className="text-xs">X-Frota-Motorista-Intake</code>{" "}
-                        correto. Os restantes ficam na fila Admin (cadastro na plataforma).
+                        Os POSTs para o URL desta automação vão para <strong>Motoristas → Solicitações</strong> (candidatos à sua frota).
                       </>
                     )
                   : <>Todos os dados recebidos via webhook estão sendo encaminhados automaticamente para o menu <strong>Solicitações → {tipoLabels[selected.tipo]}</strong>.</>}

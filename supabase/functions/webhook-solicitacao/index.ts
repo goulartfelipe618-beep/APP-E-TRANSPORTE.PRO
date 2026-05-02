@@ -5,7 +5,7 @@ import { requireWebhookHmacIfConfigured } from "../_shared/webhook_hmac.ts";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-webhook-signature, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+    "authorization, x-client-info, apikey, content-type, x-webhook-signature, x-platform-landing-secret, x-frota-motorista-intake, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
@@ -161,13 +161,12 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Segurança: por defeito todo POST motorista = fila da PLATAFORMA (só Admin Master vê em aberto).
-    // Para gravar em Motoristas → Solicitações do dono da automação, o integrador DEVE enviar:
-    //   Header: X-Frota-Motorista-Intake = <FROTA_MOTORISTA_INTAKE_SECRET> (Edge Function → Secrets).
-    const frotaIntakeSecret = (Deno.env.get("FROTA_MOTORISTA_INTAKE_SECRET") || "").trim();
-    const frotaIntakeHeader = (req.headers.get("x-frota-motorista-intake") || "").trim();
-    const frotaMotoristaIntakeAuthorized =
-      frotaIntakeSecret.length > 0 && frotaIntakeHeader === frotaIntakeSecret;
+    // Motorista: por defeito = fila do dono da automação (Motoristas → Solicitações).
+    // Landing global da plataforma: POST deve incluir X-Platform-Landing-Secret = PLATFORM_LANDING_REQUEST_SECRET.
+    const platformLandingSecret = (Deno.env.get("PLATFORM_LANDING_REQUEST_SECRET") || "").trim();
+    const platformLandingHeader = (req.headers.get("x-platform-landing-secret") || "").trim();
+    const isPlatformLandingIntake =
+      platformLandingSecret.length > 0 && platformLandingHeader === platformLandingSecret;
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -406,9 +405,8 @@ Deno.serve(async (req) => {
       // Marca de proveniência: Motoristas → Solicitações só lista leads com intake (lead_user_id) via webhook ativo.
       extrasMerged._frota_webhook_ingresso = true;
       extrasMerged._webhook_automacao_id = String(automacao.id);
-      // Só o edge function pode afirmar isto (header secreto). Usado em migração/auditoria para separar frota real.
-      if (frotaMotoristaIntakeAuthorized) {
-        extrasMerged._intake_frota_header_ok = true;
+      if (isPlatformLandingIntake) {
+        extrasMerged._platform_landing_intake = true;
       }
 
       // Cadastro pelo site: solicitação sempre em FREE com login liberado (plano pago só no admin ou upgrade no painel).
@@ -523,7 +521,7 @@ Deno.serve(async (req) => {
         );
       }
 
-      const intakeDestino = frotaMotoristaIntakeAuthorized ? "frota_parceiros" : "plataforma_landing";
+      const intakeDestino = isPlatformLandingIntake ? "plataforma_landing" : "frota_parceiros";
 
       // 6) Insert: plataforma_landing = fila Admin Master; frota_parceiros = Motoristas→Solicitações do dono do webhook
       const record: Record<string, any> = {

@@ -97,7 +97,6 @@ export default function MotoristaSolicitacoesPage() {
       )
       .eq("user_id", user.id)
       .eq("motorista_intake_destino", "frota_parceiros")
-      .contains("dados_webhook", { _intake_frota_header_ok: true })
       .neq("status", "cadastrado")
       .not("lead_user_id", "is", null)
       .order("created_at", { ascending: false });
@@ -137,10 +136,10 @@ export default function MotoristaSolicitacoesPage() {
         <div>
           <h1 className="text-2xl font-bold text-foreground">Solicitações</h1>
           <p className="text-muted-foreground">
-            Só aparecem aqui pedidos em que o integrador enviou o header <code className="text-xs">X-Frota-Motorista-Intake</code> (igual ao secret{" "}
-            <code className="text-xs">FROTA_MOTORISTA_INTAKE_SECRET</code> da função <code className="text-xs">webhook-solicitacao</code>). Isso corresponde a
-            candidatos a <strong className="text-foreground">motorista parceiro da sua frota</strong>. Cadastros para <strong className="text-foreground">usar a
-            plataforma</strong> não usam esse header e ficam só em <strong className="text-foreground">Admin → Usuários → Cadastro pelo site</strong>.
+            Candidatos enviados pelo <strong className="text-foreground">webhook Motorista</strong> da sua automação (URL com <code className="text-xs">automacao_id</code>, automação{" "}
+            <strong className="text-foreground">ativa</strong>). O formulário público no site da frota não precisa de headers especiais. A fila de{" "}
+            <strong className="text-foreground">cadastro na plataforma</strong> (landing global) usa no servidor o header{" "}
+            <code className="text-xs">X-Platform-Landing-Secret</code> e aparece só em <strong className="text-foreground">Admin → Usuários → Cadastro pelo site</strong>.
           </p>
         </div>
         <Button type="button" variant="outline" size="sm" onClick={() => void fetchSolicitacoes()} disabled={loading}>
