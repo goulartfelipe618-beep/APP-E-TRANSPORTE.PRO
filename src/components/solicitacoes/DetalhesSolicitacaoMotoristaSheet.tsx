@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { MessageSquare, UserCheck } from "lucide-react";
 import type { Json } from "@/integrations/supabase/types";
+import { parseDadosWebhook } from "@/lib/motoristaFromSolicitacao";
 
 interface SolicitacaoMotorista {
   id: string;
@@ -40,10 +41,8 @@ export default function DetalhesSolicitacaoMotoristaSheet({
 
   const obs = solicitacao.mensagem_observacoes?.trim() || solicitacao.mensagem?.trim() || "";
   const podeConverter = solicitacao.status !== "cadastrado";
-  const extras =
-    solicitacao.dados_webhook && typeof solicitacao.dados_webhook === "object" && !Array.isArray(solicitacao.dados_webhook)
-      ? JSON.stringify(solicitacao.dados_webhook, null, 2)
-      : null;
+  const dw = parseDadosWebhook(solicitacao.dados_webhook);
+  const extrasRows = buildWebhookExtrasForDisplay(dw);
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -71,11 +70,15 @@ export default function DetalhesSolicitacaoMotoristaSheet({
             </div>
           ) : null}
 
-          {extras ? (
-            <details className="rounded-lg border border-border p-3 text-xs">
-              <summary className="cursor-pointer font-medium text-foreground">Dados extras (webhook)</summary>
-              <pre className="mt-2 max-h-48 overflow-auto text-muted-foreground">{extras}</pre>
-            </details>
+          {extrasRows.length > 0 ? (
+            <div className="rounded-lg border border-border p-3 space-y-3">
+              <p className="text-xs font-semibold text-foreground uppercase tracking-wide">Dados complementares</p>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {extrasRows.map(({ key, label, value }) => (
+                  <Field key={key} label={label} value={value} />
+                ))}
+              </div>
+            </div>
           ) : null}
 
           <div className="text-xs text-muted-foreground">Recebida em {new Date(solicitacao.created_at).toLocaleString("pt-BR")}</div>
@@ -102,7 +105,75 @@ function Field({ label, value }: { label: string; value: React.ReactNode | strin
   return (
     <div>
       <p className="text-xs text-muted-foreground">{label}</p>
-      <p className="text-sm font-medium">{value ?? "—"}</p>
+      <p className="text-sm font-medium break-words">{value ?? "—"}</p>
     </div>
   );
+}
+
+/** Chaves técnicas / proveniência — não mostrar ao utilizador comum. */
+function isInternalWebhookKey(key: string): boolean {
+  return key.startsWith("_");
+}
+
+const WEBHOOK_EXTRA_LABELS_PT: Record<string, string> = {
+  endereco: "Endereço",
+  endereco_completo: "Endereço completo",
+  numero_cnh: "Número da CNH",
+  data_nascimento: "Data de nascimento",
+  "data nascimento": "Data de nascimento",
+  categoria_cnh: "Categoria da CNH",
+  possui_veiculo: "Possui veículo",
+  marca_veiculo: "Marca do veículo",
+  modelo_veiculo: "Modelo do veículo",
+  ano_veiculo: "Ano do veículo",
+  placa_veiculo: "Placa do veículo",
+  experiencia: "Experiência profissional",
+  origem_captacao: "Como nos encontrou",
+  nome_empresa_lead: "Empresa",
+  especificacao_origem: "Detalhe (origem)",
+  rg: "RG",
+  cep: "CEP",
+  logradouro: "Logradouro",
+  numero: "Número",
+  bairro: "Bairro",
+  complemento: "Complemento",
+};
+
+function labelForWebhookExtraKey(key: string): string {
+  const normalized = key.trim().replace(/\s+/g, " ");
+  if (WEBHOOK_EXTRA_LABELS_PT[normalized]) return WEBHOOK_EXTRA_LABELS_PT[normalized];
+  const snake = normalized.replace(/\s+/g, "_").toLowerCase();
+  if (WEBHOOK_EXTRA_LABELS_PT[snake]) return WEBHOOK_EXTRA_LABELS_PT[snake];
+  return normalized
+    .replace(/_/g, " ")
+    .split(" ")
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(" ");
+}
+
+function formatWebhookExtraValue(value: unknown): string {
+  if (value === null || value === undefined) return "";
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") return String(value);
+  if (Array.isArray(value)) return value.map((v) => formatWebhookExtraValue(v)).filter(Boolean).join(", ");
+  if (typeof value === "object") {
+    try {
+      return JSON.stringify(value);
+    } catch {
+      return String(value);
+    }
+  }
+  return String(value);
+}
+
+function buildWebhookExtrasForDisplay(dw: Record<string, unknown>): { key: string; label: string; value: string }[] {
+  const rows: { key: string; label: string; value: string }[] = [];
+  for (const [key, raw] of Object.entries(dw)) {
+    if (isInternalWebhookKey(key)) continue;
+    const value = formatWebhookExtraValue(raw).trim();
+    if (!value) continue;
+    rows.push({ key, label: labelForWebhookExtraKey(key), value });
+  }
+  rows.sort((a, b) => a.label.localeCompare(b.label, "pt-BR"));
+  return rows;
 }
