@@ -97,6 +97,7 @@ export default function MotoristaSolicitacoesPage() {
       )
       .eq("user_id", user.id)
       .eq("motorista_intake_destino", "frota_parceiros")
+      .contains("dados_webhook", { _intake_frota_header_ok: true })
       .neq("status", "cadastrado")
       .not("lead_user_id", "is", null)
       .order("created_at", { ascending: false });
