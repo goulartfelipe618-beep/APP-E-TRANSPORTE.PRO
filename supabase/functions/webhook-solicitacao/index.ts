@@ -341,14 +341,42 @@ Deno.serve(async (req) => {
       const { error } = await supabase.from("solicitacoes_grupos").insert(record);
       insertError = error;
     } else if (tipo === "motorista") {
-      // 1) Campos principais (mapeamento + fallback no corpo JSON)
-      const leadNome: string = resolvedData.nome || body.nome_completo || body.nome || "Sem nome";
-      const leadEmail: string | null = resolvedData.email || body.email || null;
+      // 1) Campos principais (mapeamento na automação + fallbacks para nomes comuns de formulários / JSON)
+      const b = body as Record<string, unknown>;
+      const str = (v: unknown): string | null =>
+        v === undefined || v === null ? null : String(v).trim() === "" ? null : String(v).trim();
+
+      const leadNome: string =
+        str(resolvedData.nome) ||
+        str(b.nome_completo) ||
+        str(b.nome) ||
+        str(b.name) ||
+        "Sem nome";
+      const leadEmail: string | null =
+        str(resolvedData.email) ||
+        str(b.email) ||
+        str(b.e_mail) ||
+        str(b.mail) ||
+        str(b.Email) ||
+        null;
       const leadTelefone: string | null =
-        resolvedData.telefone || body.telefone || body.whatsapp || body.telefone_whatsapp || null;
-      const leadCidade: string | null = resolvedData.cidade || body.cidade || body.cidade_nome || null;
+        str(resolvedData.telefone) ||
+        str(b.telefone) ||
+        str(b.whatsapp) ||
+        str(b.telefone_whatsapp) ||
+        str(b.celular) ||
+        str(b.phone) ||
+        str(b.mobile) ||
+        null;
+      const leadCidade: string | null =
+        str(resolvedData.cidade) || str(b.cidade) || str(b.cidade_nome) || str(b.localidade) || null;
       const leadEstado: string | null =
-        resolvedData.estado || body.estado || body.uf || body.sigla_estado || body.state || null;
+        str(resolvedData.estado) ||
+        str(b.estado) ||
+        str(b.uf) ||
+        str(b.sigla_estado) ||
+        str(b.state) ||
+        null;
       const leadMensagemObs: string | null =
         resolvedData.mensagem_observacoes ||
         resolvedData.mensagem ||
@@ -361,10 +389,12 @@ Deno.serve(async (req) => {
       const leadEmpresa: string | null =
         resolvedData.nome_empresa || body.nome_empresa || body.empresa || null;
       const leadOrigem: string | null =
-        resolvedData.origem ||
-        body.origem ||
-        body.de_onde_nos_encontrou ||
-        body.onde_nos_encontrou ||
+        str(resolvedData.origem) ||
+        str(b.origem) ||
+        str(b.como_encontrou) ||
+        str(b.como_nos_encontrou) ||
+        str(b.de_onde_nos_encontrou) ||
+        str(b.onde_nos_encontrou) ||
         null;
       const leadEspecificacao: string | null =
         resolvedData.especificacao ||
@@ -389,9 +419,27 @@ Deno.serve(async (req) => {
         "numero_cnh",
       ];
       for (const k of bodyExtraKeys) {
-        const v = (body as Record<string, unknown>)[k];
+        const v = b[k];
         if (v !== undefined && v !== null && v !== "" && extrasMerged[k] === undefined) {
           extrasMerged[k] = v;
+        }
+      }
+      // Aliases frequentes (Typeform / JSON fixo) → chaves usadas em dados_webhook / pré-cadastro
+      const aliasIntoExtras: [string, string][] = [
+        ["data_de_nascimento", "data_nascimento"],
+        ["endereco_completo", "endereco"],
+        ["categoria_da_cnh", "categoria_cnh"],
+        ["possui_veiculo_sim_nao", "possui_veiculo"],
+        ["marca_do_veiculo", "marca_veiculo"],
+        ["modelo_do_veiculo", "modelo_veiculo"],
+        ["ano_do_veiculo", "ano_veiculo"],
+        ["placa_do_veiculo", "placa_veiculo"],
+        ["numero_da_cnh", "numero_cnh"],
+      ];
+      for (const [fromKey, toKey] of aliasIntoExtras) {
+        const v = b[fromKey];
+        if (v !== undefined && v !== null && v !== "" && extrasMerged[toKey] === undefined) {
+          extrasMerged[toKey] = v;
         }
       }
       if (leadOrigem != null && leadOrigem !== "") {
@@ -531,8 +579,8 @@ Deno.serve(async (req) => {
         nome: leadNome,
         email: leadEmail,
         telefone: leadTelefone,
-        cpf: resolvedData.cpf || body.cpf || null,
-        cnh: resolvedData.cnh || body.numero_cnh || null,
+        cpf: resolvedData.cpf || b.cpf || null,
+        cnh: resolvedData.cnh || b.numero_cnh || b.numero_da_cnh || null,
         cidade: leadCidade,
         estado: leadEstado,
         mensagem_observacoes: leadMensagemObs,

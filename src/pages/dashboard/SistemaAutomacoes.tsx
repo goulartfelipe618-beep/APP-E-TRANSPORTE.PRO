@@ -559,12 +559,24 @@ export default function SistemaAutomacoesPage() {
             <Alert className="border-amber-500/40 bg-amber-500/5">
               <AlertCircle className="h-4 w-4 text-amber-500" />
               <AlertTitle className="text-foreground">Motoristas parceiros (a sua frota)</AlertTitle>
-              <AlertDescription className="text-xs text-muted-foreground leading-relaxed">
-                Com o webhook <strong className="text-foreground">ativo</strong>, os POSTs para o URL desta automação aparecem em{" "}
-                <strong className="text-foreground">Motoristas → Solicitações</strong>. A fila de cadastro na plataforma (landing global) é outro fluxo: o servidor da
-                landing deve enviar <code className="rounded bg-muted px-1 text-foreground">X-Platform-Landing-Secret</code> (secret{" "}
-                <code className="rounded bg-muted px-1 text-foreground">PLATFORM_LANDING_REQUEST_SECRET</code> na função{" "}
-                <code className="rounded bg-muted px-1 text-foreground">webhook-solicitacao</code>) — isso não se aplica ao formulário normal do seu site.
+              <AlertDescription className="text-xs text-muted-foreground leading-relaxed space-y-2">
+                <p>
+                  Com o webhook <strong className="text-foreground">ativo</strong>, os POSTs para o URL desta automação aparecem em{" "}
+                  <strong className="text-foreground">Motoristas → Solicitações</strong>. O mapeamento à direita liga cada campo do sistema ao{" "}
+                  <strong className="text-foreground">caminho no JSON</strong> que o formulário envia (ex.: E-mail → <code className="text-xs">email</code> ou{" "}
+                  <code className="text-xs">e_mail</code>).
+                </p>
+                <p>
+                  O candidato <strong className="text-foreground">não</strong> preenche chave API: isso fica no <strong className="text-foreground">integrador</strong>{" "}
+                  (n8n, Make, Typeform “secret”, ou o servidor do site), que deve enviar o POST com <code className="text-xs">Authorization</code> e{" "}
+                  <code className="text-xs">apikey</code> com a chave anon do Supabase — requisito do gateway, não do JSON do formulário.
+                </p>
+                <p>
+                  A fila de cadastro na plataforma (landing global) é outro fluxo: o servidor da landing envia{" "}
+                  <code className="rounded bg-muted px-1 text-foreground">X-Platform-Landing-Secret</code> (secret{" "}
+                  <code className="rounded bg-muted px-1 text-foreground">PLATFORM_LANDING_REQUEST_SECRET</code> na função{" "}
+                  <code className="rounded bg-muted px-1 text-foreground">webhook-solicitacao</code>) — não se aplica ao «seja nosso motorista» da sua frota.
+                </p>
               </AlertDescription>
             </Alert>
           )}
