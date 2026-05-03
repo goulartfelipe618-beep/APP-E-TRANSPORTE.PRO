@@ -118,7 +118,9 @@ export default function MotoristaCadastrosPage() {
           <h1 className="text-2xl font-bold text-foreground">Cadastros de motoristas</h1>
           <p className="text-muted-foreground">
             Motoristas da <strong>sua frota</strong> (cada registo fica associado à sua conta; o painel Admin Master gere
-            pré-cadastros do site separadamente). A lista usa o mesmo critério de segurança na base de dados (RLS).
+            pré-cadastros do site separadamente). A lista usa o mesmo critério de segurança na base de dados (RLS). Cada
+            motorista recebe um <strong className="text-foreground">link fixo</strong> de portal; após definir a senha, só ele acede aos seus dados e
+            documentos.
           </p>
         </div>
         <Button

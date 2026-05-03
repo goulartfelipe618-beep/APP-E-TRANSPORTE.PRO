@@ -318,6 +318,39 @@ export default function CadastrarMotoristaDialog({ open, onOpenChange, onCreated
     setTabIndex((t) => Math.min(t + 1, TABS.length - 1));
   };
 
+  /** Não permite saltar etapas à frente sem validar as anteriores (cadastro completo obrigatório). */
+  const goToTab = (i: number) => {
+    if (i === tabIndex) return;
+    if (i < tabIndex) {
+      setTabIndex(i);
+      return;
+    }
+    if (i === 1) {
+      const e = validateTab0();
+      if (e) {
+        toast.error(e);
+        return;
+      }
+      setTabIndex(1);
+      return;
+    }
+    if (i === 2) {
+      const e0 = validateTab0();
+      if (e0) {
+        toast.error(e0);
+        setTabIndex(0);
+        return;
+      }
+      const e1 = validateTab1();
+      if (e1) {
+        toast.error(e1);
+        setTabIndex(1);
+        return;
+      }
+      setTabIndex(2);
+    }
+  };
+
   const handleCepBlur = async () => {
     const digits = cep.replace(/\D/g, "");
     if (digits.length !== 8) return;
@@ -577,6 +610,13 @@ export default function CadastrarMotoristaDialog({ open, onOpenChange, onCreated
           </p>
         )}
 
+        {!isEditExisting && (
+          <p className="rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+            <strong className="text-foreground">Obrigatório:</strong> conclua as três etapas — <strong className="text-foreground">Pessoal</strong>,{" "}
+            <strong className="text-foreground">Documentos</strong> e <strong className="text-foreground">Pagamento</strong> — antes de guardar. Não é possível saltar para uma etapa seguinte sem validar a anterior.
+          </p>
+        )}
+
         <div className="flex items-center overflow-hidden rounded-lg border border-border">
           {TABS.map((tab, i) => {
             const Icon = tab.icon;
@@ -585,7 +625,7 @@ export default function CadastrarMotoristaDialog({ open, onOpenChange, onCreated
               <button
                 key={tab.label}
                 type="button"
-                onClick={() => setTabIndex(i)}
+                onClick={() => (isEditExisting ? setTabIndex(i) : goToTab(i))}
                 className={`flex flex-1 items-center justify-center gap-1.5 px-2 py-2 text-xs font-medium transition-colors ${
                   active ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground hover:bg-muted"
                 }`}

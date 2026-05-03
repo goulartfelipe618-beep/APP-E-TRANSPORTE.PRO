@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { CalendarDays, ClipboardList, LogOut, Menu, Moon, Sun } from "lucide-react";
+import { CalendarDays, ClipboardList, FileText, LogOut, Menu, Moon, Sun } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -13,8 +13,9 @@ import {
 import { getPersistedSupabaseUserId } from "@/lib/supabaseSessionUser";
 import FrotaAgendaPage from "@/pages/frota/FrotaAgendaPage";
 import FrotaReservasPage from "@/pages/frota/FrotaReservasPage";
+import FrotaDocumentosPage from "@/pages/frota/FrotaDocumentosPage";
 
-type FrotaPage = "agenda" | "reservas";
+type FrotaPage = "agenda" | "reservas" | "documentos";
 
 export default function FrotaMotoristaLayout() {
   const [active, setActive] = useState<FrotaPage>("agenda");
@@ -113,6 +114,17 @@ export default function FrotaMotoristaLayout() {
           <ClipboardList className="h-4 w-4 shrink-0" />
           Reservas
         </button>
+        <button
+          type="button"
+          onClick={() => onNavigate("documentos")}
+          className={cn(
+            "flex min-h-[44px] items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm font-medium transition-colors",
+            active === "documentos" ? "bg-primary/15 text-primary" : "text-muted-foreground hover:bg-muted/60",
+          )}
+        >
+          <FileText className="h-4 w-4 shrink-0" />
+          Documentos
+        </button>
       </nav>
 
       <div className="border-t border-border p-2 space-y-1">
@@ -142,7 +154,9 @@ export default function FrotaMotoristaLayout() {
         </Button>
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold">{nomeProjeto || "Motorista"}</p>
-          <p className="truncate text-xs text-muted-foreground">{active === "agenda" ? "Agenda" : "Reservas"}</p>
+          <p className="truncate text-xs text-muted-foreground">
+            {active === "agenda" ? "Agenda" : active === "reservas" ? "Reservas" : "Documentos"}
+          </p>
         </div>
       </header>
 
@@ -163,7 +177,13 @@ export default function FrotaMotoristaLayout() {
       </aside>
 
       <main className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto p-3 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 sm:p-6">
-        {active === "agenda" ? <FrotaAgendaPage /> : <FrotaReservasPage />}
+        {active === "agenda" ? (
+          <FrotaAgendaPage />
+        ) : active === "reservas" ? (
+          <FrotaReservasPage />
+        ) : (
+          <FrotaDocumentosPage />
+        )}
       </main>
     </div>
   );

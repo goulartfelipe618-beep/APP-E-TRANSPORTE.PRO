@@ -177,7 +177,10 @@ export default function MotoristaFrotaAcessoPage() {
         <CardContent className="space-y-4">
           {!registered ? (
             <>
-              <p className="text-sm text-muted-foreground">Defina uma senha forte para entrar no painel (Agenda e Reservas).</p>
+              <p className="text-sm text-muted-foreground">
+                Defina uma senha forte para entrar no painel (Agenda, Reservas e Documentos). Guarde este link — é o acesso{" "}
+                <strong className="text-foreground">permanente e exclusivo</strong> à sua área.
+              </p>
               <div className="space-y-2">
                 <Label htmlFor="pw1">Senha</Label>
                 <Input
