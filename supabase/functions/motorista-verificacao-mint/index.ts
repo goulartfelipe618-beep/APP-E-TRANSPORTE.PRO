@@ -47,10 +47,17 @@ Deno.serve(async (req) => {
 
   const secret = (Deno.env.get("MOTORISTA_VERIFICACAO_JWT_SECRET") || "").trim();
   if (secret.length < 16) {
-    return new Response(JSON.stringify({ error: "Servidor sem MOTORISTA_VERIFICACAO_JWT_SECRET configurado." }), {
-      status: 503,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return new Response(
+      JSON.stringify({
+        error:
+          "Falta o secret MOTORISTA_VERIFICACAO_JWT_SECRET no Supabase (Edge Functions → Secrets). Use uma string aleatória com pelo menos 16 caracteres; o mesmo valor em motorista-verificacao-public.",
+        code: "missing_motorista_verificacao_jwt_secret",
+      }),
+      {
+        status: 503,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      },
+    );
   }
 
   const authHeader = req.headers.get("Authorization");

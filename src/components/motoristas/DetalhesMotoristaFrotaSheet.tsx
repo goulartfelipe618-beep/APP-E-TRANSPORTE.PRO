@@ -137,14 +137,24 @@ export default function DetalhesMotoristaFrotaSheet({ motorista, open, onOpenCha
         });
         const jwt = typeof mintData?.jwt === "string" ? mintData.jwt.trim() : "";
         if (mintErr || !jwt) {
-          const msg =
-            typeof mintData === "object" && mintData && "error" in mintData
-              ? String((mintData as { error?: string }).error || "")
-              : "";
+          let msg = "";
+          if (typeof mintData === "object" && mintData && "error" in mintData) {
+            msg = String((mintData as { error?: string }).error || "");
+          }
+          if (!msg && mintErr) {
+            const ctx = (mintErr as { context?: { body?: unknown; status?: number } }).context;
+            if (ctx?.body && typeof ctx.body === "object" && ctx.body !== null && "error" in (ctx.body as object)) {
+              msg = String((ctx.body as { error?: string }).error || "");
+            }
+            if (!msg && ctx?.status === 503) {
+              msg =
+                "No Supabase: crie o secret MOTORISTA_VERIFICACAO_JWT_SECRET (Edge Functions → Secrets), mín. 16 caracteres. O mesmo valor deve existir para a função motorista-verificacao-public.";
+            }
+            if (!msg) msg = mintErr.message || "";
+          }
           throw new Error(
             msg ||
-              mintErr?.message ||
-              "Não foi possível emitir o selo do QR. Confirme o deploy da função motorista-verificacao-mint e o segredo MOTORISTA_VERIFICACAO_JWT_SECRET no Supabase.",
+              "Não foi possível emitir o selo do QR. Confirme o deploy de motorista-verificacao-mint e os secrets no Supabase.",
           );
         }
         const urls = await signMotoristaFrotaDocUrls(supabase, motorista.dados_webhook, 7200);
