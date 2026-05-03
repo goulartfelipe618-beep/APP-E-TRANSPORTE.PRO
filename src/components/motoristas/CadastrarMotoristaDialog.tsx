@@ -19,6 +19,7 @@ import {
   type IbgeMunicipio,
 } from "@/lib/ibgeLocalidades";
 import { fetchViaCep } from "@/lib/viaCep";
+import { uploadMotoristaFrotaDocs, type MotoristaFrotaDocSlug } from "@/lib/motoristaFrotaStorage";
 
 const CNH_CATEGORIAS = ["A", "ACC", "B", "C", "D", "E", "AB", "AD", "AE"] as const;
 
@@ -371,6 +372,23 @@ export default function CadastrarMotoristaDialog({ open, onOpenChange, onCreated
     }
 
     if (isEditExisting && initialData?.cadastro_row_id) {
+      let dadosWebhookFinal: Json = dadosWebhookObj as unknown as Json;
+      const uploads: Partial<Record<MotoristaFrotaDocSlug, File>> = {};
+      if (arPerfil) uploads.perfil = arPerfil;
+      if (arCnhF) uploads.cnhFrente = arCnhF;
+      if (arCnhV) uploads.cnhVerso = arCnhV;
+      if (arResid) uploads.residencia = arResid;
+      if (Object.keys(uploads).length > 0) {
+        try {
+          const paths = await uploadMotoristaFrotaDocs(supabase, user.id, initialData.cadastro_row_id, uploads);
+          dadosWebhookFinal = { ...dadosWebhookObj, ...paths } as unknown as Json;
+        } catch (uploadErr) {
+          toast.error(`Erro ao enviar documentos: ${(uploadErr as Error).message}`);
+          setSaving(false);
+          return;
+        }
+      }
+
       const updatePayload: MotoristaUpdate = {
         nome: nome.trim(),
         cpf: cpf.replace(/\D/g, "") || null,
@@ -381,7 +399,7 @@ export default function CadastrarMotoristaDialog({ open, onOpenChange, onCreated
         estado: estadoUf,
         mensagem: observacoesInternas.trim() || null,
         mensagem_observacoes: observacoesInternas.trim() || null,
-        dados_webhook: dadosWebhookObj as unknown as Json,
+        dados_webhook: dadosWebhookFinal,
       };
       const { error: updErr } = await supabase
         .from("solicitacoes_motoristas")
@@ -426,6 +444,28 @@ export default function CadastrarMotoristaDialog({ open, onOpenChange, onCreated
         setSaving(false);
         return;
       }
+
+      const leadId = initialData.completar_lead_id;
+      try {
+        const paths = await uploadMotoristaFrotaDocs(supabase, user.id, leadId, {
+          perfil: arPerfil!,
+          cnhFrente: arCnhF!,
+          cnhVerso: arCnhV!,
+          residencia: arResid!,
+        });
+        const merged = { ...dadosWebhookObj, ...paths } as unknown as Json;
+        const { error: docErr } = await supabase
+          .from("solicitacoes_motoristas")
+          .update({ dados_webhook: merged })
+          .eq("id", leadId)
+          .eq("user_id", user.id);
+        if (docErr) {
+          toast.warning(`Cadastro concluído, mas os anexos não ficaram ligados: ${docErr.message}`);
+        }
+      } catch (uploadErr) {
+        toast.warning(`Cadastro concluído, mas o envio de ficheiros falhou: ${(uploadErr as Error).message}`);
+      }
+
       const portalToken = updated?.portal_token as string | undefined;
       const link =
         typeof window !== "undefined" && portalToken
@@ -464,6 +504,27 @@ export default function CadastrarMotoristaDialog({ open, onOpenChange, onCreated
       toast.error(`Erro ao salvar cadastro: ${error.message}`);
       setSaving(false);
       return;
+    }
+
+    const novoId = inserted.id as string;
+    try {
+      const paths = await uploadMotoristaFrotaDocs(supabase, user.id, novoId, {
+        perfil: arPerfil!,
+        cnhFrente: arCnhF!,
+        cnhVerso: arCnhV!,
+        residencia: arResid!,
+      });
+      const merged = { ...dadosWebhookObj, ...paths } as unknown as Json;
+      const { error: docErr } = await supabase
+        .from("solicitacoes_motoristas")
+        .update({ dados_webhook: merged })
+        .eq("id", novoId)
+        .eq("user_id", user.id);
+      if (docErr) {
+        toast.warning(`Motorista guardado, mas os anexos não ficaram ligados: ${docErr.message}`);
+      }
+    } catch (uploadErr) {
+      toast.warning(`Motorista guardado, mas o envio de ficheiros falhou: ${(uploadErr as Error).message}`);
     }
 
     const portalToken = inserted?.portal_token as string | undefined;
@@ -747,7 +808,7 @@ export default function CadastrarMotoristaDialog({ open, onOpenChange, onCreated
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
               {isEditExisting
-                ? "Na edição, os anexos são opcionais. Quando o envio ao servidor estiver ativo, poderá substituir documentos aqui; por agora pode avançar sem novos ficheiros."
+                ? "Na edição, os anexos são opcionais. Envie novos ficheiros apenas para substituir documentos já guardados (máx. 5 MB cada; imagem ou PDF)."
                 : "Envie os quatro ficheiros abaixo (obrigatório para concluir o cadastro)."}
             </p>
             <FileRow label="Foto de perfil" required={!isEditExisting} file={arPerfil} onFile={setArPerfil} />
