@@ -43,3 +43,7 @@ verify_jwt = false
 # Selo público do PDF (QR): só leitura de dados já públicos / mascarados.
 [functions.motorista-verificacao-public]
 verify_jwt = false
+
+# Emite JWT de uso único para o QR (operador autenticado).
+[functions.motorista-verificacao-mint]
+verify_jwt = true

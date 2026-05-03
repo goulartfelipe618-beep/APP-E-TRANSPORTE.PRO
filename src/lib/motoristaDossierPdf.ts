@@ -16,8 +16,13 @@ export interface MotoristaDossierPdfInput {
   created_at: string;
   dados_webhook: Json | null;
   docUrls: MotoristaFrotaDocSignedUrls;
-  /** Token da coluna `motorista_verificacao_qr_token` — QR abre página pública de autenticidade. */
-  verificacao_qr_token: string | null;
+  /**
+   * JWT emitido na exportação (uso único + expiração ~26h). Preferido no QR.
+   * Legado: `verificacao_qr_token` (UUID permanente na linha).
+   */
+  verificacao_jwt?: string | null;
+  /** Token da coluna `motorista_verificacao_qr_token` — apenas legado se não houver JWT. */
+  verificacao_qr_token?: string | null;
   /** Origem do site (ex.: `window.location.origin`) para o URL do QR. */
   app_public_origin: string;
 }
@@ -365,15 +370,26 @@ export async function downloadMotoristaDossierPdf(input: MotoristaDossierPdfInpu
   y += rowH + 10;
 
   const origin = (input.app_public_origin || "").replace(/\/$/, "");
-  const token = (input.verificacao_qr_token || "").trim();
-  if (!origin || !token) {
-    throw new Error(
-      !origin
-        ? "URL pública do app em falta: defina VITE_APP_PUBLIC_URL no ambiente ou abra o sistema no domínio correto."
-        : "Token de verificação em falta: atualize a lista de motoristas e tente exportar de novo.",
-    );
+  const jwtGate = (input.verificacao_jwt || "").trim();
+  const legacyToken = (input.verificacao_qr_token || "").trim();
+  let qrUrl: string;
+  if (jwtGate) {
+    if (!origin) {
+      throw new Error(
+        "URL do painel em falta: defina VITE_MOTORISTA_VERIFICACAO_APP_ORIGIN ou VITE_APP_PUBLIC_URL com o domínio onde a app corre (não use o site de marketing).",
+      );
+    }
+    qrUrl = `${origin}/verificar-motorista?g=${encodeURIComponent(jwtGate)}`;
+  } else if (legacyToken) {
+    if (!origin) {
+      throw new Error(
+        "URL pública do app em falta: defina VITE_APP_PUBLIC_URL no ambiente ou abra o sistema no domínio correto.",
+      );
+    }
+    qrUrl = `${origin}/verificar-motorista/${encodeURIComponent(legacyToken)}`;
+  } else {
+    throw new Error("Selo de verificação em falta: tente exportar de novo.");
   }
-  const qrUrl = `${origin}/verificar-motorista/${encodeURIComponent(token)}`;
   let hostLabel = origin.replace(/^https?:\/\//i, "");
   try {
     hostLabel = new URL(origin).hostname;
@@ -401,13 +417,21 @@ export async function downloadMotoristaDossierPdf(input: MotoristaDossierPdfInpu
   doc.text(authBlurb, M + 7, y + 11);
   doc.setFontSize(5.8);
   doc.setTextColor(220, 226, 240);
-  doc.text(`Selo digital · ${hostLabel}/verificar-motorista/…`, M + 7, y + footerH - 3);
+  doc.text(
+    jwtGate ? `Selo digital · ${hostLabel}/verificar-motorista (uso único)` : `Selo digital · ${hostLabel}/verificar-motorista/…`,
+    M + 7,
+    y + footerH - 3,
+  );
 
   const qrBox = 22;
   const qrPad = (footerH - qrBox) / 2;
   doc.setFillColor(255, 255, 255);
   doc.roundedRect(M + INNER_W - qrBox - qrPad - 1, y + qrPad - 0.5, qrBox + 2, qrBox + 2, 1.2, 1.2, "F");
-  const qr = await QRCode.toDataURL(qrUrl, { margin: 1, width: 200, errorCorrectionLevel: "M" });
+  const qr = await QRCode.toDataURL(qrUrl, {
+    margin: 1,
+    width: jwtGate ? 280 : 200,
+    errorCorrectionLevel: jwtGate ? "L" : "M",
+  });
   doc.addImage(qr, "PNG", M + INNER_W - qrBox - qrPad, y + qrPad, qrBox, qrBox);
 
   const safeName = (input.nome || "motorista")

@@ -17,3 +17,19 @@ export function getAppPublicOrigin(): string {
   }
   return "";
 }
+
+/**
+ * Origem usada só no QR do selo do motorista (evita apontar para site de marketing).
+ * Defina `VITE_MOTORISTA_VERIFICACAO_APP_ORIGIN` com a URL exacta do painel (ex.: https://app.e-transporte.pro).
+ */
+export function getMotoristaVerificacaoAppOrigin(): string {
+  const dedicated = (import.meta.env.VITE_MOTORISTA_VERIFICACAO_APP_ORIGIN as string | undefined)?.trim();
+  if (dedicated && dedicated.length > 0) {
+    try {
+      return new URL(dedicated).origin;
+    } catch {
+      return dedicated.replace(/\/$/, "");
+    }
+  }
+  return getAppPublicOrigin();
+}

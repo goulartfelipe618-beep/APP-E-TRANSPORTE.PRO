@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
-import { BadgeCheck, Building2, Loader2, MapPin, Shield, User } from "lucide-react";
+import { Link, useParams, useSearchParams } from "react-router-dom";
+import { BadgeCheck, Building2, Loader2, MapPin, QrCode, Shield, ShieldAlert, User } from "lucide-react";
 
-/** Aceita qualquer UUID em formato canónico (Postgres `uuid` / RFC). */
+/** Aceita qualquer UUID em formato canónico (legado com token na path). */
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 type VerificacaoPayload = {
@@ -18,7 +18,11 @@ type VerificacaoPayload = {
 };
 
 export default function VerificarMotoristaPage() {
-  const { token } = useParams<{ token: string }>();
+  const { token: pathToken } = useParams<{ token?: string }>();
+  const [searchParams] = useSearchParams();
+  const gateJwt = (searchParams.get("g") || "").trim();
+  const legacyUuid = (pathToken || "").trim();
+
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
   const [data, setData] = useState<VerificacaoPayload | null>(null);
@@ -48,12 +52,13 @@ export default function VerificarMotoristaPage() {
       setLoading(true);
       setErr(null);
       setData(null);
-      const t = (token || "").trim();
-      if (!t || !UUID_RE.test(t)) {
-        setErr("Link de verificação inválido.");
+
+      if (!gateJwt && (!legacyUuid || !UUID_RE.test(legacyUuid))) {
+        setErr(null);
         setLoading(false);
         return;
       }
+
       const base = import.meta.env.VITE_SUPABASE_URL as string | undefined;
       const anon = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined;
       if (!base || !anon) {
@@ -61,8 +66,13 @@ export default function VerificarMotoristaPage() {
         setLoading(false);
         return;
       }
+
+      const fnBase = base.replace(/\/$/, "");
+      const url = gateJwt
+        ? `${fnBase}/functions/v1/motorista-verificacao-public?g=${encodeURIComponent(gateJwt)}`
+        : `${fnBase}/functions/v1/motorista-verificacao-public?token=${encodeURIComponent(legacyUuid)}`;
+
       try {
-        const url = `${base.replace(/\/$/, "")}/functions/v1/motorista-verificacao-public?token=${encodeURIComponent(t)}`;
         const res = await fetch(url, {
           method: "GET",
           headers: {
@@ -86,7 +96,41 @@ export default function VerificarMotoristaPage() {
     return () => {
       cancelled = true;
     };
-  }, [token]);
+  }, [gateJwt, legacyUuid]);
+
+  if (!gateJwt && (!legacyUuid || !UUID_RE.test(legacyUuid))) {
+    return (
+      <div className="relative min-h-screen min-h-[100dvh] overflow-hidden bg-[#0f1419] text-foreground">
+        <div
+          className="pointer-events-none absolute inset-0 opacity-[0.35]"
+          style={{
+            backgroundImage:
+              "radial-gradient(circle at 20% 20%, rgba(255,102,0,0.12), transparent 45%), radial-gradient(circle at 80% 60%, rgba(201,162,39,0.08), transparent 40%)",
+          }}
+        />
+        <div className="relative z-10 mx-auto flex min-h-screen max-w-md flex-col justify-center px-4 py-12">
+          <div className="rounded-2xl border border-amber-500/25 bg-[#151b24]/95 p-8 text-center shadow-2xl backdrop-blur">
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-amber-500/15 ring-1 ring-amber-500/35">
+              <ShieldAlert className="h-8 w-8 text-amber-400" />
+            </div>
+            <h1 className="text-lg font-semibold text-white">Selo digital</h1>
+            <p className="mt-3 text-sm leading-relaxed text-white/65">
+              Utilize o QR no final da ficha PDF do motorista. O link é de uso único e expira; cada exportação gera um novo código.
+            </p>
+            <div className="mt-6 flex items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/[0.04] px-4 py-3 text-xs text-white/50">
+              <QrCode className="h-4 w-4 shrink-0 text-[#c9a227]" />
+              <span>O acesso público só funciona com o código emitido na exportação da ficha.</span>
+            </div>
+            <p className="mt-8 text-center text-xs text-white/40">
+              <Link to="/login" className="text-[#FF6600] underline-offset-4 hover:underline">
+                Aceder ao painel
+              </Link>
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="relative min-h-screen min-h-[100dvh] overflow-hidden bg-[#0f1419] text-foreground">

@@ -9,7 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { signMotoristaFrotaDocUrls, hasMotoristaDocAttachment, DOC_PATH_KEYS } from "@/lib/motoristaFrotaStorage";
 import type { MotoristaFrotaDocSignedUrls } from "@/lib/motoristaFrotaStorage";
 import { downloadMotoristaDossierPdf } from "@/lib/motoristaDossierPdf";
-import { getAppPublicOrigin } from "@/lib/appPublicUrl";
+import { getMotoristaVerificacaoAppOrigin } from "@/lib/appPublicUrl";
 import { toast } from "sonner";
 
 export interface MotoristaFrotaDetalheRow {
@@ -126,25 +126,25 @@ export default function DetalhesMotoristaFrotaSheet({ motorista, open, onOpenCha
   const handleExportPdf = () => {
     void toast.promise(
       (async () => {
-        const origin = getAppPublicOrigin();
+        const origin = getMotoristaVerificacaoAppOrigin();
         if (!origin) {
           throw new Error(
-            "Defina VITE_APP_PUBLIC_URL no ambiente (URL do site em produção) para o QR do PDF abrir nos telemóveis dos clientes.",
+            "Defina VITE_MOTORISTA_VERIFICACAO_APP_ORIGIN (URL do painel, ex.: https://app.seudominio.com) ou VITE_APP_PUBLIC_URL para o QR abrir na app certa — não use o domínio do site de marketing.",
           );
         }
-        let qrToken = motorista.motorista_verificacao_qr_token?.trim() || null;
-        if (!qrToken) {
-          const { data, error } = await supabase
-            .from("solicitacoes_motoristas")
-            .select("motorista_verificacao_qr_token")
-            .eq("id", motorista.id)
-            .maybeSingle();
-          if (error) throw new Error("Não foi possível obter o código de verificação. Tente de novo.");
-          qrToken = (data?.motorista_verificacao_qr_token as string | null)?.trim() || null;
-        }
-        if (!qrToken) {
+        const { data: mintData, error: mintErr } = await supabase.functions.invoke("motorista-verificacao-mint", {
+          body: { motorista_id: motorista.id },
+        });
+        const jwt = typeof mintData?.jwt === "string" ? mintData.jwt.trim() : "";
+        if (mintErr || !jwt) {
+          const msg =
+            typeof mintData === "object" && mintData && "error" in mintData
+              ? String((mintData as { error?: string }).error || "")
+              : "";
           throw new Error(
-            "Este motorista ainda não tem código de verificação. Peça um redeploy da base ou contacte o suporte.",
+            msg ||
+              mintErr?.message ||
+              "Não foi possível emitir o selo do QR. Confirme o deploy da função motorista-verificacao-mint e o segredo MOTORISTA_VERIFICACAO_JWT_SECRET no Supabase.",
           );
         }
         const urls = await signMotoristaFrotaDocUrls(supabase, motorista.dados_webhook, 7200);
@@ -160,7 +160,7 @@ export default function DetalhesMotoristaFrotaSheet({ motorista, open, onOpenCha
           created_at: motorista.created_at,
           dados_webhook: motorista.dados_webhook,
           docUrls: urls,
-          verificacao_qr_token: qrToken,
+          verificacao_jwt: jwt,
           app_public_origin: origin,
         });
       })(),
