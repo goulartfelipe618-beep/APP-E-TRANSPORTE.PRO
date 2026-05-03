@@ -16,10 +16,6 @@ function decodeB64url(str: string): string {
   return atob(s);
 }
 
-function b64urlFromString(s: string): string {
-  return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
-}
-
 async function hmacSha256B64Url(secret: string, data: string): Promise<string> {
   const enc = new TextEncoder();
   const key = await crypto.subtle.importKey(
