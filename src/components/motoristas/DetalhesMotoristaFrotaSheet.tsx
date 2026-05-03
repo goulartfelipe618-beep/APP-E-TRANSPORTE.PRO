@@ -6,7 +6,7 @@ import { ExternalLink, FileDown, User, CreditCard, FileText, MapPin, Calendar } 
 import type { Json } from "@/integrations/supabase/types";
 import { parseDadosWebhook, pickStr } from "@/lib/motoristaFromSolicitacao";
 import { supabase } from "@/integrations/supabase/client";
-import { signMotoristaFrotaDocUrls, hasMotoristaDocAttachment, DOC_PATH_KEYS } from "@/lib/motoristaFrotaStorage";
+import { resolveMotoristaFrotaDocViewUrls, hasMotoristaDocAttachment, DOC_PATH_KEYS } from "@/lib/motoristaFrotaStorage";
 import type { MotoristaFrotaDocSignedUrls } from "@/lib/motoristaFrotaStorage";
 import { downloadMotoristaDossierPdf } from "@/lib/motoristaDossierPdf";
 import { toast } from "sonner";
@@ -76,14 +76,12 @@ export default function DetalhesMotoristaFrotaSheet({ motorista, open, onOpenCha
       return;
     }
     let cancelled = false;
-    void (async () => {
-      try {
-        const u = await signMotoristaFrotaDocUrls(supabase, motorista.dados_webhook, 3600);
-        if (!cancelled) setDocUrls(u);
-      } catch {
-        if (!cancelled) setDocUrls({});
-      }
-    })();
+    try {
+      const u = resolveMotoristaFrotaDocViewUrls(supabase, motorista.dados_webhook);
+      if (!cancelled) setDocUrls(u);
+    } catch {
+      if (!cancelled) setDocUrls({});
+    }
     return () => {
       cancelled = true;
     };
@@ -124,7 +122,7 @@ export default function DetalhesMotoristaFrotaSheet({ motorista, open, onOpenCha
   const handleExportPdf = () => {
     void toast.promise(
       (async () => {
-        const urls = await signMotoristaFrotaDocUrls(supabase, motorista.dados_webhook, 7200);
+        const urls = resolveMotoristaFrotaDocViewUrls(supabase, motorista.dados_webhook);
         await downloadMotoristaDossierPdf({
           id: motorista.id,
           nome: motorista.nome,

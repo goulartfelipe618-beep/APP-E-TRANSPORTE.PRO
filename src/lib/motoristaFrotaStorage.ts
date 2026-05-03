@@ -16,6 +16,7 @@ export const DOC_PATH_KEYS = {
 
 export type MotoristaFrotaDocSlug = keyof typeof DOC_PATH_KEYS;
 
+/** URLs para pré-visualização (bucket público com path opaco) ou URLs legadas normalizadas. */
 export type MotoristaFrotaDocSignedUrls = Partial<Record<MotoristaFrotaDocSlug, string>>;
 
 function storagePath(userId: string, motoristaId: string, slug: string, ext: string): string {
@@ -55,47 +56,70 @@ function isHttpUrl(v: unknown): v is string {
 }
 
 /**
- * Resolve URLs assinadas (bucket privado) ou URLs legadas gravadas no JSON.
+ * Corrige URLs do tipo …/object/{bucket}/… (sem `public`) que devolvem 400 em browsers.
  */
-export async function signMotoristaFrotaDocUrls(
+export function normalizeMotoristaFrotaStorageHttpUrl(url: string): string {
+  const u = url.trim();
+  if (u.includes("/object/sign/")) return u;
+  const bucket = MOTORISTA_FROTA_DOCS_BUCKET;
+  const wrong = `/storage/v1/object/${bucket}/`;
+  const right = `/storage/v1/object/public/${bucket}/`;
+  if (u.includes(wrong) && !u.includes(`/object/public/${bucket}/`)) {
+    return u.replace(wrong, right);
+  }
+  return u;
+}
+
+function publicUrlForStoragePath(supabase: SupabaseClient<Database>, objectPath: string): string | undefined {
+  const path = objectPath.trim();
+  if (!path || isHttpUrl(path)) return undefined;
+  const { data } = supabase.storage.from(MOTORISTA_FROTA_DOCS_BUCKET).getPublicUrl(path);
+  return data?.publicUrl;
+}
+
+function resolveOneViewUrl(supabase: SupabaseClient<Database>, pathOrUrl: string | undefined): string | undefined {
+  const raw = (pathOrUrl || "").trim();
+  if (!raw) return undefined;
+  if (isHttpUrl(raw)) {
+    return normalizeMotoristaFrotaStorageHttpUrl(raw);
+  }
+  return publicUrlForStoragePath(supabase, raw);
+}
+
+/**
+ * Resolve URLs de visualização para documentos da frota (bucket público + path relativo em `dados_webhook`).
+ * @deprecated O parâmetro `expiresSec` é ignorado; mantido para compatibilidade de chamadas antigas.
+ */
+export function resolveMotoristaFrotaDocViewUrls(
   supabase: SupabaseClient<Database>,
   dadosWebhook: unknown,
-  expiresSec = 3600,
-): Promise<MotoristaFrotaDocSignedUrls> {
+  _expiresSec?: number,
+): MotoristaFrotaDocSignedUrls {
   const dw = parseDadosWebhook(dadosWebhook);
   const result: MotoristaFrotaDocSignedUrls = {};
-
-  const signPath = async (slug: MotoristaFrotaDocSlug, pathRaw: string) => {
-    const path = pathRaw.trim();
-    if (!path) return;
-    const { data, error } = await supabase.storage
-      .from(MOTORISTA_FROTA_DOCS_BUCKET)
-      .createSignedUrl(path, expiresSec);
-    if (!error && data?.signedUrl) result[slug] = data.signedUrl;
-  };
 
   const pPerfil = pickStr(dw, DOC_PATH_KEYS.perfil, "doc_foto_perfil_path");
   const pFrente = pickStr(dw, DOC_PATH_KEYS.cnhFrente);
   const pVerso = pickStr(dw, DOC_PATH_KEYS.cnhVerso);
   const pRes = pickStr(dw, DOC_PATH_KEYS.residencia);
 
-  if (pPerfil && !isHttpUrl(pPerfil)) await signPath("perfil", pPerfil);
-  else if (isHttpUrl(pickStr(dw, "doc_perfil_url", "foto_perfil_url"))) {
-    result.perfil = pickStr(dw, "doc_perfil_url", "foto_perfil_url").trim();
-  }
+  const uPerfil = resolveOneViewUrl(supabase, pPerfil) ?? resolveOneViewUrl(supabase, pickStr(dw, "doc_perfil_url", "foto_perfil_url"));
+  if (uPerfil) result.perfil = uPerfil;
 
-  if (pFrente && !isHttpUrl(pFrente)) await signPath("cnhFrente", pFrente);
-  else if (isHttpUrl(pickStr(dw, "doc_cnh_frente_url"))) result.cnhFrente = pickStr(dw, "doc_cnh_frente_url").trim();
+  const uFrente = resolveOneViewUrl(supabase, pFrente) ?? resolveOneViewUrl(supabase, pickStr(dw, "doc_cnh_frente_url"));
+  if (uFrente) result.cnhFrente = uFrente;
 
-  if (pVerso && !isHttpUrl(pVerso)) await signPath("cnhVerso", pVerso);
-  else if (isHttpUrl(pickStr(dw, "doc_cnh_verso_url"))) result.cnhVerso = pickStr(dw, "doc_cnh_verso_url").trim();
+  const uVerso = resolveOneViewUrl(supabase, pVerso) ?? resolveOneViewUrl(supabase, pickStr(dw, "doc_cnh_verso_url"));
+  if (uVerso) result.cnhVerso = uVerso;
 
-  if (pRes && !isHttpUrl(pRes)) await signPath("residencia", pRes);
-  else if (isHttpUrl(pickStr(dw, "doc_comprovante_residencia_url")))
-    result.residencia = pickStr(dw, "doc_comprovante_residencia_url").trim();
+  const uRes = resolveOneViewUrl(supabase, pRes) ?? resolveOneViewUrl(supabase, pickStr(dw, "doc_comprovante_residencia_url"));
+  if (uRes) result.residencia = uRes;
 
   return result;
 }
+
+/** @deprecated Use `resolveMotoristaFrotaDocViewUrls` (síncrono). */
+export const signMotoristaFrotaDocUrls = resolveMotoristaFrotaDocViewUrls;
 
 export function hasMotoristaDocAttachment(dadosWebhook: unknown, slug: MotoristaFrotaDocSlug): boolean {
   const dw = parseDadosWebhook(dadosWebhook);
