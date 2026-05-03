@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { signMotoristaFrotaDocUrls, hasMotoristaDocAttachment, DOC_PATH_KEYS } from "@/lib/motoristaFrotaStorage";
 import type { MotoristaFrotaDocSignedUrls } from "@/lib/motoristaFrotaStorage";
 import { downloadMotoristaDossierPdf } from "@/lib/motoristaDossierPdf";
+import { getAppPublicOrigin } from "@/lib/appPublicUrl";
 import { toast } from "sonner";
 
 export interface MotoristaFrotaDetalheRow {
@@ -125,6 +126,27 @@ export default function DetalhesMotoristaFrotaSheet({ motorista, open, onOpenCha
   const handleExportPdf = () => {
     void toast.promise(
       (async () => {
+        const origin = getAppPublicOrigin();
+        if (!origin) {
+          throw new Error(
+            "Defina VITE_APP_PUBLIC_URL no ambiente (URL do site em produção) para o QR do PDF abrir nos telemóveis dos clientes.",
+          );
+        }
+        let qrToken = motorista.motorista_verificacao_qr_token?.trim() || null;
+        if (!qrToken) {
+          const { data, error } = await supabase
+            .from("solicitacoes_motoristas")
+            .select("motorista_verificacao_qr_token")
+            .eq("id", motorista.id)
+            .maybeSingle();
+          if (error) throw new Error("Não foi possível obter o código de verificação. Tente de novo.");
+          qrToken = (data?.motorista_verificacao_qr_token as string | null)?.trim() || null;
+        }
+        if (!qrToken) {
+          throw new Error(
+            "Este motorista ainda não tem código de verificação. Peça um redeploy da base ou contacte o suporte.",
+          );
+        }
         const urls = await signMotoristaFrotaDocUrls(supabase, motorista.dados_webhook, 7200);
         await downloadMotoristaDossierPdf({
           id: motorista.id,
@@ -138,11 +160,15 @@ export default function DetalhesMotoristaFrotaSheet({ motorista, open, onOpenCha
           created_at: motorista.created_at,
           dados_webhook: motorista.dados_webhook,
           docUrls: urls,
-          verificacao_qr_token: motorista.motorista_verificacao_qr_token,
-          app_public_origin: typeof window !== "undefined" ? window.location.origin : "",
+          verificacao_qr_token: qrToken,
+          app_public_origin: origin,
         });
       })(),
-      { loading: "A gerar o PDF…", success: "Ficha exportada com sucesso.", error: "Não foi possível gerar o PDF." },
+      {
+        loading: "A gerar o PDF…",
+        success: "Ficha exportada com sucesso.",
+        error: (e) => (e instanceof Error ? e.message : "Não foi possível gerar o PDF."),
+      },
     );
   };
 

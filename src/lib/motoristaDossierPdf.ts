@@ -383,12 +383,15 @@ export async function downloadMotoristaDossierPdf(input: MotoristaDossierPdfInpu
   doc.text("Uso exclusivo da empresa.", M + 55, y + 12.5);
 
   const origin = (input.app_public_origin || "").replace(/\/$/, "");
-  const qrUrl =
-    input.verificacao_qr_token && origin
-      ? `${origin}/verificar-motorista/${input.verificacao_qr_token}`
-      : origin
-        ? `${origin}/verificar-motorista`
-        : `https://verificar-motorista.local/invalid`;
+  const token = (input.verificacao_qr_token || "").trim();
+  if (!origin || !token) {
+    throw new Error(
+      !origin
+        ? "URL pública do app em falta: defina VITE_APP_PUBLIC_URL no ambiente ou abra o sistema no domínio correto."
+        : "Token de verificação em falta: atualize a lista de motoristas e tente exportar de novo.",
+    );
+  }
+  const qrUrl = `${origin}/verificar-motorista/${encodeURIComponent(token)}`;
   const qr = await QRCode.toDataURL(qrUrl, { margin: 0, width: 120, errorCorrectionLevel: "M" });
   doc.addImage(qr, "PNG", M + INNER_W - 20, y + 2, 18, 18);
 
