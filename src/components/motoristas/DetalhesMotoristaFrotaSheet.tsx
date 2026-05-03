@@ -180,7 +180,9 @@ export default function DetalhesMotoristaFrotaSheet({ motorista, open, onOpenCha
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <SheetTitle className="text-lg text-[#1a2744] dark:text-foreground">Dossiê do motorista</SheetTitle>
-                <p className="mt-1 text-xs text-muted-foreground">Relatório com dados cadastrais e documentos da sua frota.</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Relatório com dados cadastrais e documentos. O QR no final do PDF abre a verificação pública de autenticidade do motorista.
+                </p>
               </div>
               <Button
                 type="button"

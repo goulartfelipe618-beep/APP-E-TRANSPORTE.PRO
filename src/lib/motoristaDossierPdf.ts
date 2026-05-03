@@ -364,24 +364,6 @@ export async function downloadMotoristaDossierPdf(input: MotoristaDossierPdfInpu
   statusPill(doc, xs[4], y + 7.5, statusLabel);
   y += rowH + 10;
 
-  y = ensureSpace(doc, y, 28);
-  doc.setFillColor(...NAVY);
-  doc.rect(M, y, INNER_W, 22, "F");
-  doc.setTextColor(255, 255, 255);
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(9);
-  doc.text("TRANSPORTES", M + 4, y + 8);
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(6.5);
-  doc.text("Gestão de Motoristas", M + 4, y + 13);
-
-  doc.setFillColor(240, 242, 246);
-  doc.setTextColor(...NAVY);
-  doc.roundedRect(M + 52, y + 3, 88, 16, 1.5, 1.5, "F");
-  doc.setFontSize(6.5);
-  doc.text("Documento seguro e confidencial.", M + 55, y + 8.5);
-  doc.text("Uso exclusivo da empresa.", M + 55, y + 12.5);
-
   const origin = (input.app_public_origin || "").replace(/\/$/, "");
   const token = (input.verificacao_qr_token || "").trim();
   if (!origin || !token) {
@@ -392,8 +374,41 @@ export async function downloadMotoristaDossierPdf(input: MotoristaDossierPdfInpu
     );
   }
   const qrUrl = `${origin}/verificar-motorista/${encodeURIComponent(token)}`;
-  const qr = await QRCode.toDataURL(qrUrl, { margin: 0, width: 120, errorCorrectionLevel: "M" });
-  doc.addImage(qr, "PNG", M + INNER_W - 20, y + 2, 18, 18);
+  let hostLabel = origin.replace(/^https?:\/\//i, "");
+  try {
+    hostLabel = new URL(origin).hostname;
+  } catch {
+    /* noop */
+  }
+
+  const footerH = 32;
+  y = ensureSpace(doc, y, footerH + 6);
+  doc.setFillColor(...NAVY);
+  doc.rect(M, y, INNER_W, footerH, "F");
+  doc.setFillColor(...GOLD);
+  doc.rect(M, y, 3, footerH, "F");
+
+  doc.setTextColor(255, 255, 255);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(9.5);
+  doc.text("Verificação de autenticidade", M + 7, y + 6.5);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(6.4);
+  const authBlurb = doc.splitTextToSize(
+    "Digitalize o QR com a câmara. Abre a página pública do sistema para confirmar motorista oficial do operador — sem morada nem documentos confidenciais.",
+    INNER_W - 34,
+  );
+  doc.text(authBlurb, M + 7, y + 11);
+  doc.setFontSize(5.8);
+  doc.setTextColor(220, 226, 240);
+  doc.text(`Selo digital · ${hostLabel}/verificar-motorista/…`, M + 7, y + footerH - 3);
+
+  const qrBox = 22;
+  const qrPad = (footerH - qrBox) / 2;
+  doc.setFillColor(255, 255, 255);
+  doc.roundedRect(M + INNER_W - qrBox - qrPad - 1, y + qrPad - 0.5, qrBox + 2, qrBox + 2, 1.2, 1.2, "F");
+  const qr = await QRCode.toDataURL(qrUrl, { margin: 1, width: 200, errorCorrectionLevel: "M" });
+  doc.addImage(qr, "PNG", M + INNER_W - qrBox - qrPad, y + qrPad, qrBox, qrBox);
 
   const safeName = (input.nome || "motorista")
     .replace(/[^\w\u00C0-\u024f\s-]/gi, "")
