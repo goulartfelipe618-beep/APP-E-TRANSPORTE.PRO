@@ -16,7 +16,7 @@ export const DOC_PATH_KEYS = {
 
 export type MotoristaFrotaDocSlug = keyof typeof DOC_PATH_KEYS;
 
-/** URLs para pré-visualização (bucket público com path opaco) ou URLs legadas normalizadas. */
+/** URLs assinadas (bucket privado); válidas até expirarem. */
 export type MotoristaFrotaDocSignedUrls = Partial<Record<MotoristaFrotaDocSlug, string>>;
 
 function storagePath(userId: string, motoristaId: string, slug: string, ext: string): string {
@@ -25,6 +25,7 @@ function storagePath(userId: string, motoristaId: string, slug: string, ext: str
 
 /**
  * Envia os anexos do cadastro de frota para o Storage e devolve entradas a fundir em `dados_webhook`.
+ * O path começa sempre por `user_id` do dono — alinhado às políticas RLS do bucket.
  */
 export async function uploadMotoristaFrotaDocs(
   supabase: SupabaseClient<Database>,
@@ -56,70 +57,102 @@ function isHttpUrl(v: unknown): v is string {
 }
 
 /**
- * Corrige URLs do tipo …/object/{bucket}/… (sem `public`) que devolvem 400 em browsers.
+ * Extrai o path do objeto dentro do bucket a partir de URLs do Supabase Storage (públicas, assinadas ou malformadas).
  */
-export function normalizeMotoristaFrotaStorageHttpUrl(url: string): string {
-  const u = url.trim();
-  if (u.includes("/object/sign/")) return u;
+export function extractMotoristaFrotaDocObjectPath(rawUrl: string): string | null {
+  const u = rawUrl.trim();
   const bucket = MOTORISTA_FROTA_DOCS_BUCKET;
-  const wrong = `/storage/v1/object/${bucket}/`;
-  const right = `/storage/v1/object/public/${bucket}/`;
-  if (u.includes(wrong) && !u.includes(`/object/public/${bucket}/`)) {
-    return u.replace(wrong, right);
+  const markers = [
+    `/object/public/${bucket}/`,
+    `/object/sign/${bucket}/`,
+    `/object/authenticated/${bucket}/`,
+    `/object/${bucket}/`,
+  ];
+  for (const m of markers) {
+    const i = u.indexOf(m);
+    if (i === -1) continue;
+    let tail = u.slice(i + m.length);
+    const q = tail.indexOf("?");
+    if (q !== -1) tail = tail.slice(0, q);
+    try {
+      return decodeURIComponent(tail);
+    } catch {
+      return tail;
+    }
   }
-  return u;
-}
-
-function publicUrlForStoragePath(supabase: SupabaseClient<Database>, objectPath: string): string | undefined {
-  const path = objectPath.trim();
-  if (!path || isHttpUrl(path)) return undefined;
-  const { data } = supabase.storage.from(MOTORISTA_FROTA_DOCS_BUCKET).getPublicUrl(path);
-  return data?.publicUrl;
-}
-
-function resolveOneViewUrl(supabase: SupabaseClient<Database>, pathOrUrl: string | undefined): string | undefined {
-  const raw = (pathOrUrl || "").trim();
-  if (!raw) return undefined;
-  if (isHttpUrl(raw)) {
-    return normalizeMotoristaFrotaStorageHttpUrl(raw);
-  }
-  return publicUrlForStoragePath(supabase, raw);
+  return null;
 }
 
 /**
- * Resolve URLs de visualização para documentos da frota (bucket público + path relativo em `dados_webhook`).
- * @deprecated O parâmetro `expiresSec` é ignorado; mantido para compatibilidade de chamadas antigas.
+ * URLs assinadas para pré-visualização / PDF. Requer sessão do **dono** do ficheiro (RLS no Storage).
+ * @param expiresSeg TTL em segundos (ex.: 3600 na ficha, 7200 no PDF).
  */
-export function resolveMotoristaFrotaDocViewUrls(
+export async function signMotoristaFrotaDocUrls(
   supabase: SupabaseClient<Database>,
   dadosWebhook: unknown,
-  _expiresSec?: number,
-): MotoristaFrotaDocSignedUrls {
+  expiresSeg = 3600,
+): Promise<MotoristaFrotaDocSignedUrls> {
   const dw = parseDadosWebhook(dadosWebhook);
   const result: MotoristaFrotaDocSignedUrls = {};
+
+  const signPath = async (pathRaw: string): Promise<string | undefined> => {
+    const path = pathRaw.trim();
+    if (!path) return undefined;
+    if (isHttpUrl(path)) {
+      if (!path.includes("supabase.co") || !path.includes(MOTORISTA_FROTA_DOCS_BUCKET)) {
+        return path;
+      }
+      const extracted = extractMotoristaFrotaDocObjectPath(path);
+      if (!extracted) return undefined;
+      const { data, error } = await supabase.storage
+        .from(MOTORISTA_FROTA_DOCS_BUCKET)
+        .createSignedUrl(extracted, expiresSeg);
+      if (error || !data?.signedUrl) return undefined;
+      return data.signedUrl;
+    }
+    const { data, error } = await supabase.storage
+      .from(MOTORISTA_FROTA_DOCS_BUCKET)
+      .createSignedUrl(path, expiresSeg);
+    if (error || !data?.signedUrl) return undefined;
+    return data.signedUrl;
+  };
 
   const pPerfil = pickStr(dw, DOC_PATH_KEYS.perfil, "doc_foto_perfil_path");
   const pFrente = pickStr(dw, DOC_PATH_KEYS.cnhFrente);
   const pVerso = pickStr(dw, DOC_PATH_KEYS.cnhVerso);
   const pRes = pickStr(dw, DOC_PATH_KEYS.residencia);
 
-  const uPerfil = resolveOneViewUrl(supabase, pPerfil) ?? resolveOneViewUrl(supabase, pickStr(dw, "doc_perfil_url", "foto_perfil_url"));
-  if (uPerfil) result.perfil = uPerfil;
+  const perfil = await signPath(pPerfil);
+  if (perfil) result.perfil = perfil;
+  else {
+    const leg = pickStr(dw, "doc_perfil_url", "foto_perfil_url");
+    const s = await signPath(leg);
+    if (s) result.perfil = s;
+  }
 
-  const uFrente = resolveOneViewUrl(supabase, pFrente) ?? resolveOneViewUrl(supabase, pickStr(dw, "doc_cnh_frente_url"));
-  if (uFrente) result.cnhFrente = uFrente;
+  const cnhFrente = await signPath(pFrente);
+  if (cnhFrente) result.cnhFrente = cnhFrente;
+  else {
+    const s = await signPath(pickStr(dw, "doc_cnh_frente_url"));
+    if (s) result.cnhFrente = s;
+  }
 
-  const uVerso = resolveOneViewUrl(supabase, pVerso) ?? resolveOneViewUrl(supabase, pickStr(dw, "doc_cnh_verso_url"));
-  if (uVerso) result.cnhVerso = uVerso;
+  const cnhVerso = await signPath(pVerso);
+  if (cnhVerso) result.cnhVerso = cnhVerso;
+  else {
+    const s = await signPath(pickStr(dw, "doc_cnh_verso_url"));
+    if (s) result.cnhVerso = s;
+  }
 
-  const uRes = resolveOneViewUrl(supabase, pRes) ?? resolveOneViewUrl(supabase, pickStr(dw, "doc_comprovante_residencia_url"));
-  if (uRes) result.residencia = uRes;
+  const residencia = await signPath(pRes);
+  if (residencia) result.residencia = residencia;
+  else {
+    const s = await signPath(pickStr(dw, "doc_comprovante_residencia_url"));
+    if (s) result.residencia = s;
+  }
 
   return result;
 }
-
-/** @deprecated Use `resolveMotoristaFrotaDocViewUrls` (síncrono). */
-export const signMotoristaFrotaDocUrls = resolveMotoristaFrotaDocViewUrls;
 
 export function hasMotoristaDocAttachment(dadosWebhook: unknown, slug: MotoristaFrotaDocSlug): boolean {
   const dw = parseDadosWebhook(dadosWebhook);
