@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { resolveMotoristaJwtSecret } from "../_shared/motoristaJwtSecret.ts";
 
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
@@ -186,7 +187,7 @@ Deno.serve(async (req) => {
 
   try {
     if (g) {
-      const secret = (Deno.env.get("MOTORISTA_VERIFICACAO_JWT_SECRET") || "").trim();
+      const secret = await resolveMotoristaJwtSecret();
       if (secret.length < 16) {
         return new Response(JSON.stringify({ error: "Serviço de verificação indisponível." }), {
           status: 503,

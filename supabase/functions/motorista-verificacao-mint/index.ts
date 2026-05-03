@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { resolveMotoristaJwtSecret } from "../_shared/motoristaJwtSecret.ts";
 
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
@@ -45,12 +46,12 @@ Deno.serve(async (req) => {
     });
   }
 
-  const secret = (Deno.env.get("MOTORISTA_VERIFICACAO_JWT_SECRET") || "").trim();
+  const secret = await resolveMotoristaJwtSecret();
   if (secret.length < 16) {
     return new Response(
       JSON.stringify({
         error:
-          "Falta o secret MOTORISTA_VERIFICACAO_JWT_SECRET no Supabase (Edge Functions → Secrets). Use uma string aleatória com pelo menos 16 caracteres; o mesmo valor em motorista-verificacao-public.",
+          "Não foi possível obter chave de assinatura do JWT. Defina MOTORISTA_VERIFICACAO_JWT_SECRET nas secrets das Edge Functions (ou confirme que SUPABASE_SERVICE_ROLE_KEY está disponível).",
         code: "missing_motorista_verificacao_jwt_secret",
       }),
       {
