@@ -27,6 +27,7 @@ type MotoristaCadastroRow = {
   dados_webhook: Json | null;
   portal_token: string;
   portal_auth_user_id: string | null;
+  motorista_verificacao_qr_token: string | null;
 };
 
 function rowToInitialData(m: MotoristaCadastroRow): MotoristaInitialData {
@@ -74,7 +75,7 @@ export default function MotoristaCadastrosPage() {
     const { data, error } = await supabase
       .from("solicitacoes_motoristas")
       .select(
-        "id, nome, cpf, telefone, email, cidade, estado, cnh, mensagem, mensagem_observacoes, status, created_at, dados_webhook, portal_token, portal_auth_user_id",
+        "id, nome, cpf, telefone, email, cidade, estado, cnh, mensagem, mensagem_observacoes, status, created_at, dados_webhook, portal_token, portal_auth_user_id, motorista_verificacao_qr_token",
       )
       .eq("user_id", user.id)
       .eq("status", "cadastrado")

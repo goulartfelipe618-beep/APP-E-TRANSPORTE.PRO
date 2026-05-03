@@ -27,6 +27,7 @@ export interface MotoristaFrotaDetalheRow {
   created_at: string;
   portal_token: string;
   portal_auth_user_id: string | null;
+  motorista_verificacao_qr_token: string | null;
 }
 
 interface Props {
@@ -137,6 +138,8 @@ export default function DetalhesMotoristaFrotaSheet({ motorista, open, onOpenCha
           created_at: motorista.created_at,
           dados_webhook: motorista.dados_webhook,
           docUrls: urls,
+          verificacao_qr_token: motorista.motorista_verificacao_qr_token,
+          app_public_origin: typeof window !== "undefined" ? window.location.origin : "",
         });
       })(),
       { loading: "A gerar o PDF…", success: "Ficha exportada com sucesso.", error: "Não foi possível gerar o PDF." },

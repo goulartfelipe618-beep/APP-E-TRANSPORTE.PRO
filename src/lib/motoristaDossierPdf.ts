@@ -16,6 +16,10 @@ export interface MotoristaDossierPdfInput {
   created_at: string;
   dados_webhook: Json | null;
   docUrls: MotoristaFrotaDocSignedUrls;
+  /** Token da coluna `motorista_verificacao_qr_token` — QR abre página pública de autenticidade. */
+  verificacao_qr_token: string | null;
+  /** Origem do site (ex.: `window.location.origin`) para o URL do QR. */
+  app_public_origin: string;
 }
 
 const NAVY: [number, number, number] = [26, 39, 68];
@@ -378,8 +382,14 @@ export async function downloadMotoristaDossierPdf(input: MotoristaDossierPdfInpu
   doc.text("Documento seguro e confidencial.", M + 55, y + 8.5);
   doc.text("Uso exclusivo da empresa.", M + 55, y + 12.5);
 
-  const qrData = `${input.nome} | #${rid}`;
-  const qr = await QRCode.toDataURL(qrData, { margin: 0, width: 120, errorCorrectionLevel: "M" });
+  const origin = (input.app_public_origin || "").replace(/\/$/, "");
+  const qrUrl =
+    input.verificacao_qr_token && origin
+      ? `${origin}/verificar-motorista/${input.verificacao_qr_token}`
+      : origin
+        ? `${origin}/verificar-motorista`
+        : `https://verificar-motorista.local/invalid`;
+  const qr = await QRCode.toDataURL(qrUrl, { margin: 0, width: 120, errorCorrectionLevel: "M" });
   doc.addImage(qr, "PNG", M + INNER_W - 20, y + 2, 18, 18);
 
   const safeName = (input.nome || "motorista")
