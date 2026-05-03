@@ -44,6 +44,7 @@ verify_jwt = false
 [functions.motorista-verificacao-public]
 verify_jwt = false
 
-# Emite JWT de uso único para o QR (operador autenticado).
+# Emite JWT para o QR; verify_jwt=false para o browser conseguir OPTIONS (preflight) sem Bearer.
+# A função valida Authorization manualmente (igual admin-users).
 [functions.motorista-verificacao-mint]
-verify_jwt = true
+verify_jwt = false
