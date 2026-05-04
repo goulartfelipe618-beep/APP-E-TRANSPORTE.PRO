@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { RefreshCw, Plus, CalendarDays } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -12,6 +12,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
+import { getLocalDateYmd } from "@/lib/localCalendarDate";
 import { toast } from "sonner";
 
 const CAMPAIGN_COLORS = [
@@ -53,8 +54,6 @@ export default function CampanhasAtivosPage() {
     setDataFim("");
   };
 
-  const todayIso = useMemo(() => new Date().toISOString().slice(0, 10), []);
-
   const fetchCampanhas = useCallback(async () => {
     setLoading(true);
     const { data: authData } = await supabase.auth.getUser();
@@ -82,17 +81,18 @@ export default function CampanhasAtivosPage() {
     const { data: authData } = await supabase.auth.getUser();
     const uid = authData.user?.id;
     if (!uid) return;
+    const todayYmd = getLocalDateYmd();
     const { data, error } = await supabase
       .from("campanhas" as any)
       .select("id")
       .eq("user_id", uid)
       .eq("status", "ativa")
-      .lt("data_fim", todayIso);
+      .lt("data_fim", todayYmd);
     if (error || !data || data.length === 0) return;
     const ids = data.map((c: any) => c.id);
     await supabase.from("campanhas" as any).update({ status: "encerrada" }).in("id", ids);
     await supabase.from("automacoes").delete().in("campanha_id", ids);
-  }, [todayIso]);
+  }, []);
 
   useEffect(() => {
     (async () => {

@@ -213,17 +213,43 @@ export default function SistemaAutomacoesPage() {
     }
     const { data, error } = await supabase
       .from("automacoes")
-      .select("*, campanhas ( id, nome, data_inicio, data_fim, status )")
+      .select("*")
       .eq("user_id", uid)
       .order("created_at", { ascending: false });
-    if (error) toast.error("Erro ao carregar automações");
-    else
-      setAutomacoes(
-        (data || []).map((a: any) => ({
-          ...a,
-          mappings: typeof a.mappings === "object" ? a.mappings : {},
-        })),
-      );
+    if (error) {
+      toast.error("Erro ao carregar automações");
+      setLoading(false);
+      return;
+    }
+    const rows: Automacao[] = (data || []).map((a: any) => ({
+      ...a,
+      mappings: typeof a.mappings === "object" ? a.mappings : {},
+    }));
+    const campanhaIds = [
+      ...new Set(
+        rows.map((a) => a.campanha_id).filter((id): id is string => Boolean(id)),
+      ),
+    ];
+    let campanhaById: Record<string, CampanhaEmbed> = {};
+    if (campanhaIds.length > 0) {
+      const { data: campRows, error: campErr } = await supabase
+        .from("campanhas" as any)
+        .select("id, nome, data_inicio, data_fim, status")
+        .eq("user_id", uid)
+        .in("id", campanhaIds);
+      if (!campErr && campRows) {
+        campanhaById = Object.fromEntries(
+          (campRows as CampanhaEmbed[]).map((c) => [c.id, c]),
+        );
+      }
+    }
+    setAutomacoes(
+      rows.map((a) => {
+        if (!a.campanha_id) return a;
+        const c = campanhaById[a.campanha_id];
+        return c ? { ...a, campanhas: c } : a;
+      }),
+    );
     setLoading(false);
   }, []);
 
