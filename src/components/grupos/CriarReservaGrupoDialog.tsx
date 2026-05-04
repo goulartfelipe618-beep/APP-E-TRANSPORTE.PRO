@@ -1,4 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
+import { cn } from "@/lib/utils";
+import { computeClienteProfilePercent } from "@/lib/clienteCompleteness";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,10 +8,11 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { ArrowLeftRight, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import type { Tables } from "@/integrations/supabase/types";
+import type { Json, Tables } from "@/integrations/supabase/types";
 import { RESERVA_STATUS_OPTIONS } from "@/lib/reservaStatus";
 
 const TIPOS_VEICULO = ["van", "micro_onibus", "onibus"] as const;
@@ -56,6 +59,15 @@ interface CriarReservaGrupoDialogProps {
   reservaGrupoEdicao?: Tables<"reservas_grupos"> | null;
 }
 
+type ClienteReservaOpt = {
+  id: string;
+  nome_exibicao: string;
+  email: string | null;
+  telefone_1: string | null;
+  telefone_2: string | null;
+  cpf_cnpj: string | null;
+};
+
 export default function CriarReservaGrupoDialog({
   open,
   onOpenChange,
@@ -88,6 +100,16 @@ export default function CriarReservaGrupoDialog({
   const [repasseMotorista, setRepasseMotorista] = useState("");
   const [motoristasFrota, setMotoristasFrota] = useState<{ id: string; nome: string; portal_auth_user_id: string }[]>([]);
   const [motoristaAtribUid, setMotoristaAtribUid] = useState<string>("");
+  const [modoClienteReserva, setModoClienteReserva] = useState<"novo" | "cadastrado">("novo");
+  const [clientesReservaOpts, setClientesReservaOpts] = useState<ClienteReservaOpt[]>([]);
+  const [cadastroClienteIdReserva, setCadastroClienteIdReserva] = useState("");
+  const [clientSearch, setClientSearch] = useState("");
+
+  const clientesFiltrados = useMemo(() => {
+    const q = clientSearch.trim().toLowerCase();
+    if (!q) return clientesReservaOpts;
+    return clientesReservaOpts.filter((c) => c.nome_exibicao.toLowerCase().includes(q));
+  }, [clientSearch, clientesReservaOpts]);
 
   const valorTotalNum = useMemo(() => {
     const base = parseFloat(valorBase) || 0;
@@ -130,6 +152,15 @@ export default function CriarReservaGrupoDialog({
       );
       if (row.motorista_id) setMotoristaAtribUid(row.motorista_id);
       else setMotoristaAtribUid("");
+      const cid = (row as { cadastro_cliente_id?: string | null }).cadastro_cliente_id;
+      if (cid) {
+        setModoClienteReserva("cadastrado");
+        setCadastroClienteIdReserva(String(cid));
+      } else {
+        setModoClienteReserva("novo");
+        setCadastroClienteIdReserva("");
+      }
+      setClientSearch("");
       return;
     }
 
@@ -147,6 +178,9 @@ export default function CriarReservaGrupoDialog({
       setNumPassageiros(initialData.num_passageiros?.toString() || "");
       setCupom(initialData.cupom || "");
       setObservacoesViagem(initialData.mensagem || "");
+      setModoClienteReserva("novo");
+      setCadastroClienteIdReserva("");
+      setClientSearch("");
       return;
     }
 
@@ -159,14 +193,22 @@ export default function CriarReservaGrupoDialog({
       const { data: auth } = await supabase.auth.getUser();
       if (!auth.user) {
         setMotoristasFrota([]);
+        setClientesReservaOpts([]);
         return;
       }
-      const { data } = await supabase
-        .from("solicitacoes_motoristas")
-        .select("id, nome, portal_auth_user_id")
-        .eq("user_id", auth.user.id)
-        .eq("status", "cadastrado")
-        .not("portal_auth_user_id", "is", null);
+      const [{ data }, { data: cli }] = await Promise.all([
+        supabase
+          .from("solicitacoes_motoristas")
+          .select("id, nome, portal_auth_user_id")
+          .eq("user_id", auth.user.id)
+          .eq("status", "cadastrado")
+          .not("portal_auth_user_id", "is", null),
+        supabase
+          .from("cadastro_clientes")
+          .select("id,nome_exibicao,email,telefone_1,telefone_2,cpf_cnpj")
+          .eq("user_id", auth.user.id)
+          .order("nome_exibicao", { ascending: true }),
+      ]);
       const rows = (data ?? []) as { id: string; nome: string; portal_auth_user_id: string | null }[];
       setMotoristasFrota(
         rows.filter((r) => r.portal_auth_user_id != null).map((r) => ({
@@ -175,6 +217,7 @@ export default function CriarReservaGrupoDialog({
           portal_auth_user_id: r.portal_auth_user_id as string,
         })),
       );
+      setClientesReservaOpts((cli ?? []) as ClienteReservaOpt[]);
     })();
   }, [open]);
 
@@ -186,6 +229,9 @@ export default function CriarReservaGrupoDialog({
     setValorBase("0"); setDesconto("0"); setMetodoPagamento("");
     setStatusOperacional("pendente"); setRepasseMotorista("");
     setMotoristaAtribUid("");
+    setModoClienteReserva("novo");
+    setCadastroClienteIdReserva("");
+    setClientSearch("");
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -194,6 +240,55 @@ export default function CriarReservaGrupoDialog({
 
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { toast.error("Você precisa estar logado."); setSaving(false); return; }
+
+    if (modoClienteReserva === "cadastrado" && !cadastroClienteIdReserva.trim()) {
+      toast.error("Selecione um cliente cadastrado ou mude para NOVO CLIENTE.");
+      setSaving(false);
+      return;
+    }
+
+    let cadastroClienteIdOut: string | null = null;
+    let novoClientePct: number | null = null;
+
+    if (modoClienteReserva === "cadastrado") {
+      cadastroClienteIdOut = cadastroClienteIdReserva.trim() || null;
+    } else if (reservaGrupoEdicao?.id) {
+      cadastroClienteIdOut =
+        (reservaGrupoEdicao as { cadastro_cliente_id?: string | null }).cadastro_cliente_id ?? null;
+    } else {
+      const digits = cpfCnpj.replace(/\D/g, "");
+      const tipoCliente: "pf" | "pj" = digits.length > 11 ? "pj" : "pf";
+      const { data: novoCli, error: cliErr } = await supabase
+        .from("cadastro_clientes")
+        .insert({
+          user_id: user.id,
+          tipo: tipoCliente,
+          nome_exibicao: nomeCompleto.trim(),
+          cpf_cnpj: cpfCnpj.trim() || null,
+          email: email.trim() || null,
+          telefone_1: whatsapp.trim() || null,
+          telefone_2: null,
+          enderecos: [],
+          documentos: {},
+        })
+        .select("id,nome_exibicao,cpf_cnpj,email,telefone_1,telefone_2,enderecos,documentos")
+        .single();
+      if (cliErr || !novoCli) {
+        toast.error(cliErr?.message || "Não foi possível criar o cliente no cadastro.");
+        setSaving(false);
+        return;
+      }
+      cadastroClienteIdOut = String(novoCli.id);
+      novoClientePct = computeClienteProfilePercent({
+        nome_exibicao: String(novoCli.nome_exibicao),
+        cpf_cnpj: novoCli.cpf_cnpj as string | null,
+        email: novoCli.email as string | null,
+        telefone_1: novoCli.telefone_1 as string | null,
+        telefone_2: novoCli.telefone_2 as string | null,
+        enderecos: novoCli.enderecos as Json,
+        documentos: novoCli.documentos as Json,
+      });
+    }
 
     const rowPayload = {
       nome_completo: nomeCompleto,
@@ -226,6 +321,7 @@ export default function CriarReservaGrupoDialog({
         const hit = motoristasFrota.find((m) => m.portal_auth_user_id === motoristaAtribUid.trim());
         return (hit?.nome ?? nomeMotorista) || null;
       })(),
+      cadastro_cliente_id: cadastroClienteIdOut,
     };
 
     const { error } = reservaGrupoEdicao?.id
@@ -236,7 +332,11 @@ export default function CriarReservaGrupoDialog({
     if (error) {
       toast.error(reservaGrupoEdicao?.id ? "Erro ao atualizar reserva: " + error.message : "Erro ao criar reserva: " + error.message);
     } else {
-      toast.success(reservaGrupoEdicao?.id ? "Reserva de grupo atualizada com sucesso!" : "Reserva de grupo criada com sucesso!");
+      if (novoClientePct != null) {
+        toast.success(`Reserva criada. Novo cliente no menu CLIENTES — perfil ${novoClientePct}% (complete dados quando quiser).`);
+      } else {
+        toast.success(reservaGrupoEdicao?.id ? "Reserva de grupo atualizada com sucesso!" : "Reserva de grupo criada com sucesso!");
+      }
       resetForm();
       onOpenChange(false);
       onCreated?.();
@@ -256,6 +356,73 @@ export default function CriarReservaGrupoDialog({
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
             <h3 className="font-semibold text-foreground mb-3">Informações do Cliente</h3>
+            <div className="mb-4 space-y-2 rounded-lg border border-border bg-muted/20 p-3">
+              <Label className="text-xs text-muted-foreground">Origem do cliente</Label>
+              <RadioGroup
+                value={modoClienteReserva}
+                onValueChange={(v) => {
+                  const m = v as "novo" | "cadastrado";
+                  setModoClienteReserva(m);
+                  if (m === "novo") {
+                    setCadastroClienteIdReserva("");
+                    setClientSearch("");
+                  } else {
+                    setClientSearch("");
+                  }
+                }}
+                className="flex flex-wrap gap-4"
+              >
+                <label className="flex cursor-pointer items-center gap-2 text-sm">
+                  <RadioGroupItem value="cadastrado" id="gr-cli-cad" />
+                  Cliente cadastrado
+                </label>
+                <label className="flex cursor-pointer items-center gap-2 text-sm">
+                  <RadioGroupItem value="novo" id="gr-cli-novo" />
+                  NOVO CLIENTE
+                </label>
+              </RadioGroup>
+              {modoClienteReserva === "cadastrado" ? (
+                <div className="space-y-2 pt-1">
+                  <Label className="text-xs">Buscar e selecionar</Label>
+                  <Input
+                    placeholder="Digite as primeiras letras do nome…"
+                    value={clientSearch}
+                    onChange={(e) => setClientSearch(e.target.value)}
+                    className="h-9"
+                  />
+                  <div className="max-h-40 overflow-y-auto rounded-md border border-border bg-background">
+                    {clientesReservaOpts.length === 0 ? (
+                      <p className="px-3 py-2 text-xs text-muted-foreground">Nenhum cliente — cadastre no menu CLIENTES.</p>
+                    ) : clientesFiltrados.length === 0 ? (
+                      <p className="px-3 py-2 text-xs text-muted-foreground">Sem resultados.</p>
+                    ) : (
+                      <ul className="divide-y divide-border">
+                        {clientesFiltrados.map((c) => (
+                          <li key={c.id}>
+                            <button
+                              type="button"
+                              className={cn(
+                                "w-full px-3 py-2 text-left text-sm hover:bg-muted/80",
+                                cadastroClienteIdReserva === c.id && "bg-muted font-medium",
+                              )}
+                              onClick={() => {
+                                setCadastroClienteIdReserva(c.id);
+                                setNomeCompleto(c.nome_exibicao);
+                                setEmail(c.email ?? "");
+                                setWhatsapp(c.telefone_1 ?? "");
+                                setCpfCnpj(c.cpf_cnpj ?? "");
+                              }}
+                            >
+                              {c.nome_exibicao}
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                </div>
+              ) : null}
+            </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5"><Label>Nome Completo *</Label><Input required value={nomeCompleto} onChange={(e) => setNomeCompleto(e.target.value)} /></div>
               <div className="space-y-1.5"><Label>CPF/CNPJ *</Label><Input placeholder="000.000.000-00" required value={cpfCnpj} onChange={(e) => setCpfCnpj(e.target.value)} /></div>

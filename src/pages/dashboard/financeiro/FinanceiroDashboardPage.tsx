@@ -1,16 +1,20 @@
-import { useMemo, useState } from "react";
-import { Wallet, List, Inbox, Banknote, FileBarChart, ChevronLeft, ChevronRight } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Wallet, List, Inbox, Banknote, FileBarChart, ChevronLeft, ChevronRight, User, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useActivePage } from "@/contexts/ActivePageContext";
 import { useFinancialTransactions } from "@/hooks/useFinancialTransactions";
 import { formatBRL, monthRangeUtc } from "@/lib/financeiroFrota";
+import { FINANCEIRO_HIGHLIGHT_CLIENTE_ID_KEY } from "@/lib/sessionKeys";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
 
 export default function FinanceiroDashboardPage() {
   const { setActivePage } = useActivePage();
   const today = new Date();
   const [cursor, setCursor] = useState({ y: today.getFullYear(), m: today.getMonth() });
+  const [clienteFinanceiroBanner, setClienteFinanceiroBanner] = useState<{ id: string; nome: string } | null>(null);
   const { start, end } = monthRangeUtc(cursor.y, cursor.m);
   const { rows, loading, error } = useFinancialTransactions(start, end, { limit: 2000, offset: 0 });
 
@@ -47,6 +51,16 @@ export default function FinanceiroDashboardPage() {
     };
   }, [rows]);
 
+  useEffect(() => {
+    const raw = sessionStorage.getItem(FINANCEIRO_HIGHLIGHT_CLIENTE_ID_KEY);
+    if (!raw) return;
+    sessionStorage.removeItem(FINANCEIRO_HIGHLIGHT_CLIENTE_ID_KEY);
+    void (async () => {
+      const { data } = await supabase.from("cadastro_clientes").select("nome_exibicao").eq("id", raw).maybeSingle();
+      setClienteFinanceiroBanner({ id: raw, nome: data?.nome_exibicao ? String(data.nome_exibicao) : "Cliente" });
+    })();
+  }, []);
+
   const prevMonth = () => {
     setCursor((c) => {
       const nm = c.m - 1;
@@ -73,6 +87,28 @@ export default function FinanceiroDashboardPage() {
           Receitas ligadas às reservas, despesas manuais e estado de pagamento. Cada conta vê apenas os seus dados (RLS). Ao concluir uma reserva com repasse ao motorista, gera-se uma despesa automática — o lucro projetado já reflete receita menos repasses e outras despesas do mês.
         </p>
       </div>
+
+      {clienteFinanceiroBanner ? (
+        <Alert className="border-primary/40 bg-primary/5">
+          <User className="h-4 w-4 text-primary" />
+          <AlertTitle className="text-foreground">Cliente (menu CLIENTES)</AlertTitle>
+          <AlertDescription className="flex flex-wrap items-center justify-between gap-2">
+            <span>
+              A analisar movimentos no contexto de <strong className="text-foreground">{clienteFinanceiroBanner.nome}</strong>. Em breve: totais por cliente (viagens, gasto).
+            </span>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="shrink-0 gap-1"
+              onClick={() => setClienteFinanceiroBanner(null)}
+            >
+              <X className="h-4 w-4" />
+              Fechar
+            </Button>
+          </AlertDescription>
+        </Alert>
+      ) : null}
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">

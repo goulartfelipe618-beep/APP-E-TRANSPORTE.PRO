@@ -11,6 +11,7 @@ import {
   List,
   Inbox,
   Banknote,
+  ContactRound,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -119,6 +120,7 @@ const getMenuStructure = (showNetwork: boolean, exibirComunicadorMotorista: bool
           { title: "Solicitações", page: "motoristas/solicitacoes", icon: FileText },
         ],
       },
+      { title: "CLIENTES", page: "clientes", icon: ContactRound },
       { title: "Veículos", page: "veiculos", icon: Car },
       { title: "Mentoria", page: "mentoria", icon: GraduationCap },
     ],
