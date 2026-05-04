@@ -86,7 +86,7 @@ export default function ClientesPage() {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 border-b border-border pb-6 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">CLIENTES</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">Clientes</h1>
           <p className="mt-1 max-w-xl text-sm text-muted-foreground">
             Cadastros privados da sua conta — cada utilizador vê apenas os clientes que criou. Use nas reservas Transfer e Grupos.
           </p>

@@ -333,7 +333,7 @@ export default function CriarReservaGrupoDialog({
       toast.error(reservaGrupoEdicao?.id ? "Erro ao atualizar reserva: " + error.message : "Erro ao criar reserva: " + error.message);
     } else {
       if (novoClientePct != null) {
-        toast.success(`Reserva criada. Novo cliente no menu CLIENTES — perfil ${novoClientePct}% (complete dados quando quiser).`);
+        toast.success(`Reserva criada. Novo cliente no menu Clientes — perfil ${novoClientePct}% (complete dados quando quiser).`);
       } else {
         toast.success(reservaGrupoEdicao?.id ? "Reserva de grupo atualizada com sucesso!" : "Reserva de grupo criada com sucesso!");
       }
@@ -392,7 +392,7 @@ export default function CriarReservaGrupoDialog({
                   />
                   <div className="max-h-40 overflow-y-auto rounded-md border border-border bg-background">
                     {clientesReservaOpts.length === 0 ? (
-                      <p className="px-3 py-2 text-xs text-muted-foreground">Nenhum cliente — cadastre no menu CLIENTES.</p>
+                      <p className="px-3 py-2 text-xs text-muted-foreground">Nenhum cliente — cadastre no menu Clientes.</p>
                     ) : clientesFiltrados.length === 0 ? (
                       <p className="px-3 py-2 text-xs text-muted-foreground">Sem resultados.</p>
                     ) : (

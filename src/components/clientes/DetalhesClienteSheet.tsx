@@ -104,7 +104,7 @@ export default function DetalhesClienteSheet({ row, open, onOpenChange, onEdit }
               <div className="h-full rounded-full bg-[#FF6600] transition-all" style={{ width: `${pct}%` }} />
             </div>
             <p className="text-[11px] text-muted-foreground">
-              Complete endereços e documentos no menu CLIENTES para subir a percentagem.
+              Complete endereços e documentos no menu Clientes para subir a percentagem.
             </p>
           </div>
 
