@@ -47,7 +47,12 @@ Deno.serve(async (req) => {
 
   try {
     if (req.method === "POST") {
-      const json = (await req.json()) as { action?: string; token?: string; password?: string };
+      const json = (await req.json()) as {
+        action?: string;
+        token?: string;
+        password?: string;
+        motorista_id?: string;
+      };
       const action = json.action ?? url.searchParams.get("action") ?? "status";
 
       if (action === "status") {
@@ -176,9 +181,98 @@ Deno.serve(async (req) => {
           { headers: { ...corsHeaders, "Content-Type": "application/json" } },
         );
       }
+
+      if (action === "reset_portal_password") {
+        const authHeader = req.headers.get("Authorization");
+        if (!authHeader?.trim()) {
+          return new Response(JSON.stringify({ error: "Sessão obrigatória." }), {
+            status: 401,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+        const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+        const userClient = createClient(supabaseUrl, anonKey, {
+          global: { headers: { Authorization: authHeader } },
+        });
+        const { data: { user }, error: authErr } = await userClient.auth.getUser();
+        if (authErr || !user) {
+          return new Response(JSON.stringify({ error: "Sessão inválida." }), {
+            status: 401,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        const motoristaId = String(json.motorista_id ?? "").trim();
+        const password = json.password ?? "";
+        if (!motoristaId) {
+          return new Response(JSON.stringify({ error: "motorista_id obrigatório." }), {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        const pwErr = validatePortalPassword(password);
+        if (pwErr) {
+          return new Response(JSON.stringify({ error: pwErr }), {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        const { data: row, error: qErr } = await supabaseAdmin
+          .from("solicitacoes_motoristas")
+          .select("id, user_id, portal_auth_user_id, status")
+          .eq("id", motoristaId)
+          .eq("status", "cadastrado")
+          .maybeSingle();
+
+        if (qErr || !row) {
+          return new Response(JSON.stringify({ error: "Cadastro não encontrado." }), {
+            status: 422,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        if (row.user_id !== user.id) {
+          return new Response(JSON.stringify({ error: "Sem permissão para redefinir este motorista." }), {
+            status: 403,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        if (!row.portal_auth_user_id) {
+          return new Response(
+            JSON.stringify({
+              error:
+                "O motorista ainda não definiu a senha pelo link do portal. Partilhe o link «Copiar link» para a primeira configuração.",
+            }),
+            {
+              status: 422,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            },
+          );
+        }
+
+        const { error: updErr } = await supabaseAdmin.auth.admin.updateUserById(row.portal_auth_user_id, {
+          password,
+        });
+
+        if (updErr) {
+          return new Response(JSON.stringify({ error: updErr.message ?? "Erro ao atualizar senha." }), {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        return new Response(
+          JSON.stringify({ ok: true, message: "Senha do portal do motorista atualizada." }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
     }
 
-    return new Response(JSON.stringify({ error: "Use POST com action: status | bootstrap" }), {
+    return new Response(JSON.stringify({ error: "Use POST com action: status | bootstrap | reset_portal_password" }), {
       status: 405,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

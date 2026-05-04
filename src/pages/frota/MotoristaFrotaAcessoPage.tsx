@@ -7,17 +7,8 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 import { applyThemeForRoute } from "@/lib/panelTheme";
+import { validateMotoristaPortalPassword } from "@/lib/motoristaPortalPassword";
 import { Loader2 } from "lucide-react";
-
-function validatePortalPassword(password: string): string | null {
-  if (password.length < 12) return "A senha deve ter pelo menos 12 caracteres.";
-  if (password.length > 128) return "Senha demasiado longa.";
-  if (!/[a-z]/.test(password)) return "Inclua pelo menos uma letra minúscula.";
-  if (!/[A-Z]/.test(password)) return "Inclua pelo menos uma letra maiúscula.";
-  if (!/[0-9]/.test(password)) return "Inclua pelo menos um número.";
-  if (!/[^A-Za-z0-9]/.test(password)) return "Inclua pelo menos um símbolo (ex.: ! @ # ?).";
-  return null;
-}
 
 function mapAuthError(message: string): string {
   const m = message.toLowerCase();
@@ -78,7 +69,7 @@ export default function MotoristaFrotaAcessoPage() {
 
   const handleBootstrap = async () => {
     if (!token) return;
-    const pwErr = validatePortalPassword(password);
+    const pwErr = validateMotoristaPortalPassword(password);
     if (pwErr) {
       toast.error(pwErr);
       return;

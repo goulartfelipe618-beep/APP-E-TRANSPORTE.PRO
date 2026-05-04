@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ExternalLink, FileDown, User, CreditCard, FileText, MapPin, Calendar } from "lucide-react";
+import { ExternalLink, FileDown, User, CreditCard, FileText, MapPin, Calendar, Copy, Link2, KeyRound } from "lucide-react";
 import type { Json } from "@/integrations/supabase/types";
 import { parseDadosWebhook, pickStr } from "@/lib/motoristaFromSolicitacao";
 import { supabase } from "@/integrations/supabase/client";
@@ -39,6 +39,8 @@ interface Props {
   motorista: MotoristaFrotaDetalheRow | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Dono da frota: abre fluxo de redefinição de senha do portal (motorista não pode). */
+  onRequestResetSenhaPortal?: (row: MotoristaFrotaDetalheRow) => void;
 }
 
 function Field({ label, value }: { label: string; value: React.ReactNode | string | null | undefined }) {
@@ -75,7 +77,12 @@ const PATH_VALUE_SET = new Set<string>(Object.values(DOC_PATH_KEYS));
 
 const emptyDocBundle: MotoristaFrotaDocUrlBundle = { share: {}, preview: {} };
 
-export default function DetalhesMotoristaFrotaSheet({ motorista, open, onOpenChange }: Props) {
+export default function DetalhesMotoristaFrotaSheet({
+  motorista,
+  open,
+  onOpenChange,
+  onRequestResetSenhaPortal,
+}: Props) {
   const [docBundle, setDocBundle] = useState<MotoristaFrotaDocUrlBundle>(emptyDocBundle);
 
   useEffect(() => {
@@ -129,6 +136,15 @@ export default function DetalhesMotoristaFrotaSheet({ motorista, open, onOpenCha
     docPreview("cnhVerso", "CNH — verso"),
     docPreview("residencia", "Comprovante de residência"),
   ];
+
+  const portalUrl = () =>
+    typeof window !== "undefined" ? `${window.location.origin}/frota/acesso/${motorista.portal_token}` : "";
+
+  const copyPortalLink = () => {
+    const u = portalUrl();
+    if (!u) return;
+    void navigator.clipboard.writeText(u).then(() => toast.success("Link copiado."));
+  };
 
   const handleExportPdf = () => {
     void toast.promise(
@@ -382,11 +398,41 @@ export default function DetalhesMotoristaFrotaSheet({ motorista, open, onOpenCha
               </pre>
             </details>
 
-            <div className="text-xs text-muted-foreground border-t border-border pt-3">
+            <div className="space-y-3 border-t border-border pt-3 text-xs text-muted-foreground">
               <p>Cadastrado em {new Date(motorista.created_at).toLocaleString("pt-BR")}</p>
-              <p className="mt-1">
-                Portal do motorista: {motorista.portal_auth_user_id ? "senha já definida" : "link enviado — definir senha"}
-              </p>
+              <div className="rounded-lg border border-border bg-muted/20 p-3 text-foreground">
+                <p className="mb-2 flex items-center gap-2 font-medium text-foreground">
+                  <Link2 className="h-3.5 w-3.5 text-[#FF6600]" />
+                  Portal do motorista
+                </p>
+                <p className="mb-3 text-muted-foreground">
+                  {motorista.portal_auth_user_id ? "Senha já definida — pode redefinir abaixo se necessário." : "Partilhe o link para o motorista definir a primeira senha."}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <Button type="button" variant="outline" size="sm" className="h-8 text-xs" onClick={copyPortalLink}>
+                    <Copy className="mr-1 h-3 w-3" />
+                    Copiar link
+                  </Button>
+                  {onRequestResetSenhaPortal ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 border-[#FF6600]/40 text-xs text-[#FF6600] hover:bg-[#FF6600]/10"
+                      disabled={!motorista.portal_auth_user_id}
+                      onClick={() => motorista.portal_auth_user_id && onRequestResetSenhaPortal(motorista)}
+                      title={
+                        motorista.portal_auth_user_id
+                          ? "Redefinir senha do mini painel (só o dono da frota)"
+                          : "Disponível após o motorista ativar o link"
+                      }
+                    >
+                      <KeyRound className="mr-1 h-3 w-3" />
+                      Redefinir senha
+                    </Button>
+                  ) : null}
+                </div>
+              </div>
             </div>
           </div>
         </div>

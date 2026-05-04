@@ -25,6 +25,7 @@ import {
 import LoginAvisosBanner from "@/components/LoginAvisosBanner";
 import { applyDocumentClassDark, applyThemeForRoute } from "@/lib/panelTheme";
 import { clearAuthStartedAt, isAuthExpired, readAuthStartedAt, setAuthStartedAt } from "@/lib/authExpiry";
+import { sessionRequiresMfaTotpChallenge } from "@/lib/mfaGate";
 
 /** Persistência opcional; não ler na montagem — evita exibir URL antiga da imagem antes do fetch. */
 const LOGIN_CONFIG_CACHE_KEY = "etp_login_painel_config_v1";
@@ -116,15 +117,9 @@ const Login = () => {
         return;
       }
 
-      try {
-        const { data: assuranceData, error: assuranceErr } =
-          await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-        if (!assuranceErr && assuranceData?.nextLevel === "aal2" && assuranceData?.currentLevel !== "aal2") {
-          navigate("/mfa", { replace: true });
-          return;
-        }
-      } catch {
-        /* segue fluxo normal */
+      if (await sessionRequiresMfaTotpChallenge(supabase)) {
+        navigate("/mfa", { replace: true });
+        return;
       }
 
       const path = await getPostLoginPath(session.user.id);
@@ -204,15 +199,9 @@ const Login = () => {
       await supabase.auth.refreshSession();
       toast.success("Senha atualizada com sucesso.");
 
-      try {
-        const { data: assuranceData, error: assuranceErr } =
-          await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-        if (!assuranceErr && assuranceData?.nextLevel === "aal2" && assuranceData?.currentLevel !== "aal2") {
-          navigate("/mfa", { replace: true });
-          return;
-        }
-      } catch {
-        /* ignora */
+      if (await sessionRequiresMfaTotpChallenge(supabase)) {
+        navigate("/mfa", { replace: true });
+        return;
       }
 
       const {
@@ -336,19 +325,10 @@ const Login = () => {
       return;
     }
 
-    // Se o usuário já tiver TOTP enrolado mas ainda não fez o desafio (aal1 -> aal2),
-    // direciona para a tela de verificação 2FA antes de consultar roles no banco.
-    try {
-      const { data: assuranceData, error: assuranceErr } =
-        await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-
-      if (!assuranceErr && assuranceData?.nextLevel === "aal2" && assuranceData?.currentLevel !== "aal2") {
-        setLoading(false);
-        navigate("/mfa", { replace: true });
-        return;
-      }
-    } catch {
-      // Caso a verificação de AAL falhe, seguimos com o fluxo normal.
+    if (await sessionRequiresMfaTotpChallenge(supabase)) {
+      setLoading(false);
+      navigate("/mfa", { replace: true });
+      return;
     }
 
     const path = await getPostLoginPath(data.user.id);

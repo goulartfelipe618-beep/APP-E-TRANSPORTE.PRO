@@ -3,6 +3,7 @@ import { Navigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { clearAuthStartedAt, isAuthExpired, readAuthStartedAt, setAuthStartedAt } from "@/lib/authExpiry";
 import { isMotoristaFrotaUser } from "@/lib/motoristaFrotaRole";
+import { sessionRequiresMfaTotpChallenge } from "@/lib/mfaGate";
 
 /**
  * Rotas autenticadas do painel (motorista executivo). O JWT é gerido pelo cliente Supabase
@@ -56,21 +57,9 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
           return;
         }
 
-        try {
-          const { data: assuranceData, error: assuranceErr } =
-            await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-
-          const shouldChallenge =
-            !assuranceErr &&
-            assuranceData?.nextLevel === "aal2" &&
-            assuranceData?.currentLevel !== "aal2";
-
-          setNeedsMfa(!!shouldChallenge);
-          setAuthenticated(true);
-        } catch {
-          setNeedsMfa(false);
-          setAuthenticated(true);
-        }
+        const shouldChallenge = await sessionRequiresMfaTotpChallenge(supabase);
+        setNeedsMfa(shouldChallenge);
+        setAuthenticated(true);
       } finally {
         if (mounted && withSpinner) setLoading(false);
       }

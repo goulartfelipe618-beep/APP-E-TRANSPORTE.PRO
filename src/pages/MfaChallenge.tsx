@@ -1,10 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Shield, Loader2 } from "lucide-react";
+import { Shield, Loader2, LogOut } from "lucide-react";
 import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
 import { getPostLoginPath } from "@/lib/sessionRole";
+import {
+  getVerifiedTotpFactorId,
+  jwtAuthenticatorAssuranceLevel,
+  sessionRequiresMfaTotpChallenge,
+} from "@/lib/mfaGate";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -17,11 +22,6 @@ import {
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { Label } from "@/components/ui/label";
 
-type Assurance = {
-  currentLevel: string;
-  nextLevel: string;
-};
-
 export default function MfaChallengePage() {
   const navigate = useNavigate();
 
@@ -30,11 +30,14 @@ export default function MfaChallengePage() {
   const [verifyCode, setVerifyCode] = useState("");
   const [error, setError] = useState<string>("");
   const [verifying, setVerifying] = useState(false);
+  const [fatalMessage, setFatalMessage] = useState<string | null>(null);
 
   const codeSlots = useMemo(() => Array.from({ length: 6 }, (_, i) => i), []);
 
   async function redirectByRole() {
-    const { data: { session } } = await supabase.auth.getSession();
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
     if (!session) {
       navigate("/login", { replace: true });
       return;
@@ -44,49 +47,58 @@ export default function MfaChallengePage() {
     navigate(path, { replace: true });
   }
 
+  const signOutAndLogin = async (message?: string) => {
+    try {
+      await supabase.auth.signOut();
+    } catch {
+      /* ignore */
+    }
+    if (message) toast.error(message);
+    navigate("/login", { replace: true });
+  };
+
   useEffect(() => {
     const run = async () => {
+      setFatalMessage(null);
       try {
-        const { data: assurance, error: assuranceErr } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel() as {
-          data: Assurance;
-          error: { message: string } | null;
-        };
-
-        if (assuranceErr) {
-          // Se falhar a verificação de AAL, não travamos o usuário.
-          toast.error(assuranceErr.message || "Falha ao verificar 2FA.");
-          setLoading(false);
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        if (!session?.access_token) {
+          navigate("/login", { replace: true });
           return;
         }
 
-        const needsMfa = assurance.nextLevel === "aal2" && assurance.currentLevel !== "aal2";
-        if (!needsMfa) {
+        if (jwtAuthenticatorAssuranceLevel(session.access_token) === "aal2") {
           await redirectByRole();
           return;
         }
 
-        const factors = await supabase.auth.mfa.listFactors();
-        if (factors.error) {
-          throw factors.error;
-        }
-
-        const totpFactor = factors.data?.totp?.[0];
-        if (!totpFactor?.id) {
-          toast.error("Nenhum fator TOTP encontrado para esta conta.");
-          navigate("/dashboard", { replace: true });
+        const needChallenge = await sessionRequiresMfaTotpChallenge(supabase);
+        if (!needChallenge) {
+          await redirectByRole();
           return;
         }
 
-        setFactorId(totpFactor.id);
+        const verifiedId = await getVerifiedTotpFactorId(supabase);
+        if (!verifiedId) {
+          setFatalMessage(
+            "A sua conta está marcada para 2FA, mas não foi encontrado um autenticador válido. Termine a sessão e contacte o suporte, ou volte a configurar o 2FA após entrar por outro meio.",
+          );
+          setLoading(false);
+          return;
+        }
+
+        setFactorId(verifiedId);
         setLoading(false);
       } catch (e: unknown) {
-        const message = e instanceof Error ? e.message : "Falha ao iniciar o desafio 2FA.";
+        const message = e instanceof Error ? e.message : "Falha ao preparar o desafio 2FA.";
         setError(message);
         setLoading(false);
       }
     };
 
-    run();
+    void run();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -114,6 +126,12 @@ export default function MfaChallengePage() {
 
       toast.success("2FA verificado com sucesso.");
       await supabase.auth.refreshSession();
+
+      const stillNeeds = await sessionRequiresMfaTotpChallenge(supabase);
+      if (stillNeeds) {
+        throw new Error("A sessão não foi elevada a AAL2. Atualize a página ou termine a sessão e entre de novo.");
+      }
+
       await redirectByRole();
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : "Código inválido. Tente novamente.";
@@ -125,38 +143,60 @@ export default function MfaChallengePage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+      <div className="flex min-h-screen items-center justify-center bg-background p-4">
         <div className="flex flex-col items-center gap-3">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <p className="text-sm text-muted-foreground">Verificando 2FA...</p>
+          <p className="text-sm text-muted-foreground">A preparar verificação em dois fatores…</p>
         </div>
       </div>
     );
   }
 
+  if (fatalMessage) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background p-4">
+        <Dialog open>
+          <DialogContent className="sm:max-w-md" onPointerDownOutside={(e) => e.preventDefault()}>
+            <DialogHeader>
+              <DialogTitle>2FA — intervenção necessária</DialogTitle>
+              <DialogDescription className="text-left text-muted-foreground">{fatalMessage}</DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="flex-col gap-2 sm:flex-col">
+              <Button type="button" variant="outline" className="w-full" onClick={() => void signOutAndLogin()}>
+                <LogOut className="mr-2 h-4 w-4" />
+                Terminar sessão
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
+    <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <Dialog open>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent
+          className="sm:max-w-md"
+          onPointerDownOutside={(e) => e.preventDefault()}
+          onEscapeKeyDown={(e) => e.preventDefault()}
+        >
           <DialogHeader>
             <div className="flex items-center gap-2">
               <Shield className="h-5 w-5 text-foreground" />
-              <DialogTitle>Autenticação em 2 Fatores</DialogTitle>
+              <DialogTitle>Autenticação em 2 fatores</DialogTitle>
             </div>
             <DialogDescription>
-              Abra seu app autenticador e informe o código do TOTP.
+              Cada conta tem o seu próprio segredo TOTP. Abra a aplicação autenticadora associada a{" "}
+              <strong className="text-foreground">esta</strong> sessão e introduza o código de 6 dígitos. Não é possível
+              aceder ao painel sem este passo enquanto o 2FA estiver ativo.
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-3">
             <div className="space-y-2">
-              <Label>Senha de verificação (TOTP)</Label>
-              <InputOTP
-                maxLength={6}
-                value={verifyCode}
-                onChange={(v) => setVerifyCode(v)}
-                aria-label="Código 2FA"
-              >
+              <Label>Código TOTP (6 dígitos)</Label>
+              <InputOTP maxLength={6} value={verifyCode} onChange={(v) => setVerifyCode(v)} aria-label="Código 2FA">
                 <InputOTPGroup>
                   {codeSlots.map((i) => (
                     <InputOTPSlot key={i} index={i} />
@@ -165,23 +205,28 @@ export default function MfaChallengePage() {
               </InputOTP>
             </div>
 
-            {error && <p className="text-sm text-destructive">{error}</p>}
+            {error ? <p className="text-sm text-destructive">{error}</p> : null}
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="flex flex-col gap-2 sm:flex-col sm:space-x-0">
             <Button
-              onClick={handleVerify}
+              type="button"
+              onClick={() => void handleVerify()}
               disabled={!factorId || verifying}
-              className="bg-primary text-primary-foreground"
+              className="w-full bg-[#FF6600] text-white hover:bg-[#e65c00]"
             >
               {verifying ? (
                 <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Verificando...
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  A verificar…
                 </>
               ) : (
-                "Verificar 2FA"
+                "Verificar e continuar"
               )}
+            </Button>
+            <Button type="button" variant="outline" className="w-full" disabled={verifying} onClick={() => void signOutAndLogin()}>
+              <LogOut className="mr-2 h-4 w-4" />
+              Terminar sessão
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -189,4 +234,3 @@ export default function MfaChallengePage() {
     </div>
   );
 }
-

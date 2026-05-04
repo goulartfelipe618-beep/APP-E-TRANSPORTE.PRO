@@ -28,6 +28,14 @@ import { FONTES_GLOBAIS, FONTE_GLOBAL_PADRAO, resolveFonteCss } from "@/lib/font
 
 const COOLDOWN_DAYS = 60;
 
+/** GoTrue envia o QR como `data:image/...`; se vier só base64 cru, compõe a data URL para o `<img>` renderizar. */
+function totpQrCodeToImageSrc(raw: string): string {
+  const t = raw.trim();
+  if (!t) return "";
+  if (t.startsWith("data:") || /^https?:\/\//i.test(t)) return t;
+  return `data:image/png;base64,${t}`;
+}
+
 function NetworkSection() {
   const networkAceito = localStorage.getItem("network_nacional_aceito") === "sim";
   const saida = localStorage.getItem("network_saida_data");
@@ -599,17 +607,24 @@ export default function SistemaConfiguracoesPage() {
         }
       }
 
-      // 3) Enroll novo, com friendlyName único (evita colisão em reconfig).
-      const friendlyName = `E-Transporte TOTP · ${Date.now().toString(36)}`;
+      const {
+        data: { user: authUser },
+      } = await supabase.auth.getUser();
+      const emailTag = authUser?.email?.trim() || authUser?.id?.slice(0, 8) || "conta";
+      const issuer =
+        (typeof import.meta.env.VITE_PUBLIC_APP_NAME === "string" && import.meta.env.VITE_PUBLIC_APP_NAME.trim()) ||
+        "E-Transporte.pro";
+      // Nome amigável por conta — o segredo TOTP fica sempre ligado ao auth.uid() desta sessão (Supabase).
+      const friendlyName = `Painel · ${emailTag} · ${Date.now().toString(36)}`;
       const { data, error } = await supabase.auth.mfa.enroll({
         factorType: "totp",
-        issuer: "E-Transporte",
+        issuer,
         friendlyName,
       });
       if (error) throw error;
 
       setMfaFactorId(data.id);
-      setMfaQrCode(data.totp.qr_code);
+      setMfaQrCode(totpQrCodeToImageSrc(data.totp.qr_code));
       setMfaSecret(data.totp.secret);
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : "Falha ao iniciar o enrolamento de 2FA.";
@@ -1175,7 +1190,8 @@ export default function SistemaConfiguracoesPage() {
           <DialogHeader>
             <DialogTitle>Configurar Autenticação em 2 Fatores</DialogTitle>
             <DialogDescription id="configurar-2fa-desc">
-              Use seu app autenticador (TOTP) para habilitar a camada extra de segurança.
+              O QR e o segredo são <strong className="text-foreground">exclusivos desta conta</strong> (não são partilhados com outros utilizadores). Depois de ativar,{" "}
+              <strong className="text-foreground">cada início de sessão</strong> exigirá o código TOTP até terminar sessão.
             </DialogDescription>
           </DialogHeader>
 
@@ -1187,11 +1203,14 @@ export default function SistemaConfiguracoesPage() {
             ) : (
               <>
                 {mfaQrCode ? (
-                  <div className="flex justify-center">
+                  <div className="flex justify-center rounded-lg border border-border bg-white p-3">
                     <img
                       src={mfaQrCode}
-                      alt="QR Code para 2FA"
-                      className="h-44 w-44"
+                      alt="QR Code para configurar o autenticador TOTP desta conta"
+                      width={176}
+                      height={176}
+                      className="h-44 w-44 object-contain"
+                      decoding="async"
                     />
                   </div>
                 ) : (

@@ -3,6 +3,7 @@ import { Navigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { getPostLoginPath } from "@/lib/sessionRole";
 import { clearAuthStartedAt, isAuthExpired, readAuthStartedAt, setAuthStartedAt } from "@/lib/authExpiry";
+import { sessionRequiresMfaTotpChallenge } from "@/lib/mfaGate";
 
 export default function ProtectedAdminRoute({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
@@ -28,24 +29,12 @@ export default function ProtectedAdminRoute({ children }: { children: React.Reac
         return;
       }
 
-      try {
-        setNeedsMfa(false);
-        const { data: assuranceData, error: assuranceErr } =
-          await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-
-        const shouldChallenge =
-          !assuranceErr &&
-          assuranceData?.nextLevel === "aal2" &&
-          assuranceData?.currentLevel !== "aal2";
-
-        if (shouldChallenge) {
-          setNeedsMfa(true);
-          setAuthorized(false);
-          setLoading(false);
-          return;
-        }
-      } catch {
-        // Se falhar a verificação de AAL, não bloqueamos o fluxo.
+      const shouldChallenge = await sessionRequiresMfaTotpChallenge(supabase);
+      if (shouldChallenge) {
+        setNeedsMfa(true);
+        setAuthorized(false);
+        setLoading(false);
+        return;
       }
 
       const path = await getPostLoginPath(session.user.id);

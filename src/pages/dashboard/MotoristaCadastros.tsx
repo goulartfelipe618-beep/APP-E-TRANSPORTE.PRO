@@ -1,15 +1,22 @@
 import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, LayoutGrid, List, Link2, Copy, Eye, Pencil } from "lucide-react";
+import { Plus, Search, LayoutGrid, List, Link2, Copy, Eye, Pencil, KeyRound } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import CadastrarMotoristaDialog from "@/components/motoristas/CadastrarMotoristaDialog";
 import DetalhesMotoristaFrotaSheet from "@/components/motoristas/DetalhesMotoristaFrotaSheet";
+import RedefinirSenhaPortalMotoristaDialog from "@/components/motoristas/RedefinirSenhaPortalMotoristaDialog";
 import type { MotoristaInitialData } from "@/lib/motoristaFromSolicitacao";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import type { Json } from "@/integrations/supabase/types";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 type MotoristaCadastroRow = {
   id: string;
@@ -54,13 +61,15 @@ function situacaoFrotaFromWebhook(dw: Json | null): "ativo" | "inativo" {
 }
 
 export default function MotoristaCadastrosPage() {
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  /** `list` = tabela (predefinido); `grid` = cards */
+  const [viewMode, setViewMode] = useState<"grid" | "list">("list");
   const [cadastroDialogOpen, setCadastroDialogOpen] = useState(false);
   const [cadastroInitial, setCadastroInitial] = useState<MotoristaInitialData | null>(null);
   const [detalheMotorista, setDetalheMotorista] = useState<MotoristaCadastroRow | null>(null);
   const [motoristas, setMotoristas] = useState<MotoristaCadastroRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [resetSenhaMotorista, setResetSenhaMotorista] = useState<MotoristaCadastroRow | null>(null);
 
   const fetchMotoristas = useCallback(async () => {
     setLoading(true);
@@ -113,200 +122,279 @@ export default function MotoristaCadastrosPage() {
   });
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Cadastros de motoristas</h1>
-          <p className="text-muted-foreground">
-            Motoristas da <strong>sua frota</strong> (cada registo fica associado à sua conta; o painel Admin Master gere
-            pré-cadastros do site separadamente). A lista usa o mesmo critério de segurança na base de dados (RLS). Cada
-            motorista recebe um <strong className="text-foreground">link fixo</strong> de portal; após definir a senha, só ele acede aos seus dados e
-            documentos.
-          </p>
-        </div>
-        <Button
-          onClick={() => {
-            setCadastroInitial(null);
-            setCadastroDialogOpen(true);
-          }}
-        >
-          <Plus className="mr-2 h-4 w-4" /> Novo motorista
-        </Button>
-      </div>
-
-      <div className="flex items-center gap-3">
-        <div className="relative max-w-md flex-1">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Buscar por nome ou CPF..."
-            className="pl-9"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </div>
-        <div className="flex overflow-hidden rounded-lg border border-border">
+    <TooltipProvider>
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">Cadastros de motoristas</h1>
+            <p className="text-muted-foreground">
+              Motoristas da <strong>sua frota</strong> (cada registo fica associado à sua conta; o painel Admin Master gere
+              pré-cadastros do site separadamente). A lista usa o mesmo critério de segurança na base de dados (RLS). Cada
+              motorista recebe um <strong className="text-foreground">link fixo</strong> de portal; após definir a senha, só ele acede aos seus dados e
+              documentos. <strong className="text-foreground">Só a sua conta</strong> pode redefinir a senha do mini painel do motorista.
+            </p>
+          </div>
           <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className={cn(
-              "rounded-none first:rounded-l-lg last:rounded-r-lg",
-              viewMode === "grid" && "bg-yellow-400 text-black hover:bg-yellow-500 hover:text-black",
-            )}
-            onClick={() => setViewMode("grid")}
+            onClick={() => {
+              setCadastroInitial(null);
+              setCadastroDialogOpen(true);
+            }}
           >
-            <LayoutGrid className="h-4 w-4" />
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className={cn(
-              "rounded-none first:rounded-l-lg last:rounded-r-lg",
-              viewMode === "list" && "bg-yellow-400 text-black hover:bg-yellow-500 hover:text-black",
-            )}
-            onClick={() => setViewMode("list")}
-          >
-            <List className="h-4 w-4" />
+            <Plus className="mr-2 h-4 w-4" /> Novo motorista
           </Button>
         </div>
-      </div>
 
-      {loading ? (
-        <div className="flex items-center justify-center py-20 text-muted-foreground">A carregar…</div>
-      ) : filtered.length === 0 ? (
-        <div className="flex items-center justify-center py-20 text-muted-foreground">Nenhum motorista cadastrado.</div>
-      ) : viewMode === "grid" ? (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {filtered.map((m) => {
-            const situacao = situacaoFrotaFromWebhook(m.dados_webhook);
-            return (
-              <div key={m.id} className="space-y-2 rounded-xl border border-border bg-card p-4">
-                <div className="flex items-center justify-between gap-2">
-                  <h3 className="font-semibold text-foreground">{m.nome}</h3>
-                  <div className="flex shrink-0 flex-wrap justify-end gap-1">
-                    <Badge variant="outline">Cadastrado</Badge>
-                    <Badge variant={situacao === "ativo" ? "default" : "secondary"}>
-                      {situacao === "ativo" ? "Ativo" : "Inativo"}
-                    </Badge>
-                  </div>
-                </div>
-                <p className="text-sm text-muted-foreground">CPF: {m.cpf || "—"}</p>
-                <p className="text-sm text-muted-foreground">Telefone: {m.telefone || "—"}</p>
-                <p className="text-sm text-muted-foreground">
-                  Cidade/UF: {m.cidade || "—"} {m.estado ? `- ${m.estado}` : ""}
-                </p>
-                <p className="text-xs text-muted-foreground">Cadastrado em {new Date(m.created_at).toLocaleDateString("pt-BR")}</p>
-                <div className="flex flex-wrap gap-2 border-t border-border pt-2">
-                  <Button type="button" variant="outline" size="sm" className="h-8 text-xs" onClick={() => setDetalheMotorista(m)}>
-                    <Eye className="mr-1 h-3.5 w-3.5" />
-                    Ver detalhes
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="h-8 border-[#FF6600]/40 text-xs text-[#FF6600] hover:bg-[#FF6600]/10"
-                    onClick={() => {
-                      setCadastroInitial(rowToInitialData(m));
-                      setCadastroDialogOpen(true);
-                    }}
-                  >
-                    <Pencil className="mr-1 h-3.5 w-3.5" />
-                    Editar
-                  </Button>
-                </div>
-                <div className="flex flex-wrap items-center gap-2 border-t border-border pt-2">
-                  <Link2 className="h-3.5 w-3.5 text-muted-foreground" />
-                  <span className="text-xs text-muted-foreground">
-                    Portal: {m.portal_auth_user_id ? "senha definida" : "enviar link para definir senha"}
-                  </span>
-                  <Button type="button" variant="outline" size="sm" className="h-7 text-xs" onClick={() => copyPortalLink(m.portal_token)}>
-                    <Copy className="mr-1 h-3 w-3" />
-                    Copiar link
-                  </Button>
-                </div>
-              </div>
-            );
-          })}
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative min-w-0 max-w-md flex-1">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Buscar por nome ou CPF..."
+              className="pl-9"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+          <div className="flex shrink-0 overflow-hidden rounded-lg border border-border">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className={cn(
+                    "rounded-none first:rounded-l-lg last:rounded-r-lg",
+                    viewMode === "list" && "bg-yellow-400 text-black hover:bg-yellow-500 hover:text-black",
+                  )}
+                  onClick={() => setViewMode("list")}
+                  aria-label="Vista em tabela"
+                >
+                  <List className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Tabela</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className={cn(
+                    "rounded-none first:rounded-l-lg last:rounded-r-lg",
+                    viewMode === "grid" && "bg-yellow-400 text-black hover:bg-yellow-500 hover:text-black",
+                  )}
+                  onClick={() => setViewMode("grid")}
+                  aria-label="Vista em cards"
+                >
+                  <LayoutGrid className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Cards</TooltipContent>
+            </Tooltip>
+          </div>
         </div>
-      ) : (
-        <div className="overflow-hidden rounded-xl border border-border bg-card">
-          <table className="w-full text-sm">
-            <thead className="bg-muted/40">
-              <tr>
-                <th className="p-3 text-left">Nome</th>
-                <th className="p-3 text-left">CPF</th>
-                <th className="p-3 text-left">Telefone</th>
-                <th className="p-3 text-left">Cidade/UF</th>
-                <th className="p-3 text-left">Frota</th>
-                <th className="p-3 text-left">Data</th>
-                <th className="p-3 text-right">Ações</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((m) => {
-                const situacao = situacaoFrotaFromWebhook(m.dados_webhook);
-                return (
-                  <tr key={m.id} className="border-t border-border">
-                    <td className="p-3">{m.nome}</td>
-                    <td className="p-3">{m.cpf || "—"}</td>
-                    <td className="p-3">{m.telefone || "—"}</td>
-                    <td className="p-3">
-                      {m.cidade || "—"} {m.estado ? `- ${m.estado}` : ""}
-                    </td>
-                    <td className="p-3">
-                      <Badge variant={situacao === "ativo" ? "default" : "secondary"} className="text-xs">
+
+        {loading ? (
+          <div className="flex items-center justify-center py-20 text-muted-foreground">A carregar…</div>
+        ) : filtered.length === 0 ? (
+          <div className="flex items-center justify-center py-20 text-muted-foreground">Nenhum motorista cadastrado.</div>
+        ) : viewMode === "grid" ? (
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {filtered.map((m) => {
+              const situacao = situacaoFrotaFromWebhook(m.dados_webhook);
+              return (
+                <div key={m.id} className="space-y-2 rounded-xl border border-border bg-card p-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <h3 className="font-semibold text-foreground">{m.nome}</h3>
+                    <div className="flex shrink-0 flex-wrap justify-end gap-1">
+                      <Badge variant="outline">Cadastrado</Badge>
+                      <Badge variant={situacao === "ativo" ? "default" : "secondary"}>
                         {situacao === "ativo" ? "Ativo" : "Inativo"}
                       </Badge>
-                    </td>
-                    <td className="p-3">{new Date(m.created_at).toLocaleDateString("pt-BR")}</td>
-                    <td className="p-3 text-right">
-                      <div className="flex justify-end gap-1">
-                        <Button type="button" variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={() => setDetalheMotorista(m)}>
-                          <Eye className="mr-1 h-3.5 w-3.5" />
-                          Detalhes
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 px-2 text-xs text-[#FF6600]"
-                          onClick={() => {
-                            setCadastroInitial(rowToInitialData(m));
-                            setCadastroDialogOpen(true);
-                          }}
-                        >
-                          <Pencil className="mr-1 h-3.5 w-3.5" />
-                          Editar
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
+                    </div>
+                  </div>
+                  <p className="text-sm text-muted-foreground">CPF: {m.cpf || "—"}</p>
+                  <p className="text-sm text-muted-foreground">Telefone: {m.telefone || "—"}</p>
+                  <p className="text-sm text-muted-foreground">
+                    Cidade/UF: {m.cidade || "—"} {m.estado ? `- ${m.estado}` : ""}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Cadastrado em {new Date(m.created_at).toLocaleDateString("pt-BR")}</p>
+                  <div className="flex flex-wrap gap-2 border-t border-border pt-2">
+                    <Button type="button" variant="outline" size="sm" className="h-8 text-xs" onClick={() => setDetalheMotorista(m)}>
+                      <Eye className="mr-1 h-3.5 w-3.5" />
+                      Ver detalhes
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 border-[#FF6600]/40 text-xs text-[#FF6600] hover:bg-[#FF6600]/10"
+                      onClick={() => {
+                        setCadastroInitial(rowToInitialData(m));
+                        setCadastroDialogOpen(true);
+                      }}
+                    >
+                      <Pencil className="mr-1 h-3.5 w-3.5" />
+                      Editar
+                    </Button>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2 border-t border-border pt-2">
+                    <Link2 className="h-3.5 w-3.5 text-muted-foreground" />
+                    <span className="text-xs text-muted-foreground">
+                      Portal: {m.portal_auth_user_id ? "senha definida" : "enviar link para definir senha"}
+                    </span>
+                    <Button type="button" variant="outline" size="sm" className="h-7 text-xs" onClick={() => copyPortalLink(m.portal_token)}>
+                      <Copy className="mr-1 h-3 w-3" />
+                      Copiar link
+                    </Button>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="inline-flex">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-7 text-xs"
+                            disabled={!m.portal_auth_user_id}
+                            onClick={() => m.portal_auth_user_id && setResetSenhaMotorista(m)}
+                          >
+                            <KeyRound className="mr-1 h-3 w-3" />
+                            Redefinir senha
+                          </Button>
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs">
+                        {m.portal_auth_user_id
+                          ? "Altera a senha do mini painel do motorista (só o dono da frota)."
+                          : "Disponível depois do motorista definir a primeira senha pelo link."}
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="overflow-x-auto rounded-xl border border-border bg-card">
+            <table className="w-full min-w-[720px] text-sm">
+              <thead className="bg-muted/40">
+                <tr>
+                  <th className="p-3 text-left font-medium">Nome</th>
+                  <th className="p-3 text-left font-medium">CPF</th>
+                  <th className="p-3 text-left font-medium">Telefone</th>
+                  <th className="p-3 text-left font-medium">Cidade/UF</th>
+                  <th className="p-3 text-left font-medium">Frota</th>
+                  <th className="p-3 text-left font-medium">Portal</th>
+                  <th className="p-3 text-left font-medium">Data</th>
+                  <th className="p-3 text-right font-medium">Ações</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((m) => {
+                  const situacao = situacaoFrotaFromWebhook(m.dados_webhook);
+                  return (
+                    <tr key={m.id} className="border-t border-border">
+                      <td className="p-3 font-medium text-foreground">{m.nome}</td>
+                      <td className="p-3 whitespace-nowrap">{m.cpf || "—"}</td>
+                      <td className="p-3 whitespace-nowrap">{m.telefone || "—"}</td>
+                      <td className="p-3">
+                        {m.cidade || "—"} {m.estado ? `- ${m.estado}` : ""}
+                      </td>
+                      <td className="p-3">
+                        <Badge variant={situacao === "ativo" ? "default" : "secondary"} className="text-xs">
+                          {situacao === "ativo" ? "Ativo" : "Inativo"}
+                        </Badge>
+                      </td>
+                      <td className="p-3 text-xs text-muted-foreground">
+                        {m.portal_auth_user_id ? "Senha OK" : "Pendente"}
+                      </td>
+                      <td className="p-3 whitespace-nowrap">{new Date(m.created_at).toLocaleDateString("pt-BR")}</td>
+                      <td className="p-3 text-right">
+                        <div className="flex flex-wrap justify-end gap-1">
+                          <Button type="button" variant="outline" size="sm" className="h-8 px-2 text-xs" onClick={() => copyPortalLink(m.portal_token)}>
+                            <Copy className="mr-1 h-3 w-3" />
+                            Copiar link
+                          </Button>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="inline-flex">
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-8 px-2 text-xs"
+                                  disabled={!m.portal_auth_user_id}
+                                  onClick={() => m.portal_auth_user_id && setResetSenhaMotorista(m)}
+                                >
+                                  <KeyRound className="mr-1 h-3 w-3" />
+                                  Senha
+                                </Button>
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              {m.portal_auth_user_id
+                                ? "Redefinir senha do portal (só o dono)"
+                                : "Após o motorista ativar o link"}
+                            </TooltipContent>
+                          </Tooltip>
+                          <Button type="button" variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={() => setDetalheMotorista(m)}>
+                            <Eye className="mr-1 h-3.5 w-3.5" />
+                            Detalhes
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 px-2 text-xs text-[#FF6600]"
+                            onClick={() => {
+                              setCadastroInitial(rowToInitialData(m));
+                              setCadastroDialogOpen(true);
+                            }}
+                          >
+                            <Pencil className="mr-1 h-3.5 w-3.5" />
+                            Editar
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
 
-      <CadastrarMotoristaDialog
-        open={cadastroDialogOpen}
-        onOpenChange={(v) => {
-          setCadastroDialogOpen(v);
-          if (!v) setCadastroInitial(null);
-        }}
-        onCreated={handleCreated}
-        initialData={cadastroInitial}
-      />
+        <CadastrarMotoristaDialog
+          open={cadastroDialogOpen}
+          onOpenChange={(v) => {
+            setCadastroDialogOpen(v);
+            if (!v) setCadastroInitial(null);
+          }}
+          onCreated={handleCreated}
+          initialData={cadastroInitial}
+        />
 
-      <DetalhesMotoristaFrotaSheet
-        motorista={detalheMotorista}
-        open={detalheMotorista !== null}
-        onOpenChange={(o) => {
-          if (!o) setDetalheMotorista(null);
-        }}
-      />
-    </div>
+        <DetalhesMotoristaFrotaSheet
+          motorista={detalheMotorista}
+          open={detalheMotorista !== null}
+          onOpenChange={(o) => {
+            if (!o) setDetalheMotorista(null);
+          }}
+          onRequestResetSenhaPortal={(row) => {
+            setDetalheMotorista(null);
+            setResetSenhaMotorista(row);
+          }}
+        />
+
+        <RedefinirSenhaPortalMotoristaDialog
+          open={resetSenhaMotorista !== null}
+          onOpenChange={(o) => {
+            if (!o) setResetSenhaMotorista(null);
+          }}
+          motoristaId={resetSenhaMotorista?.id ?? null}
+          motoristaNome={resetSenhaMotorista?.nome}
+        />
+      </div>
+    </TooltipProvider>
   );
 }
