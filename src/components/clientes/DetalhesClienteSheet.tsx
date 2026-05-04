@@ -7,6 +7,7 @@ import type { CadastroClienteRow } from "@/components/clientes/CadastrarClienteD
 import { computeClienteProfilePercent } from "@/lib/clienteCompleteness";
 import { useActivePage } from "@/contexts/ActivePageContext";
 import type { Json } from "@/integrations/supabase/types";
+import { getCadastroClienteSignedUrl, getFotoPerfilPathFromDocumentos } from "@/lib/cadastroClienteStorage";
 
 import { FINANCEIRO_HIGHLIGHT_CLIENTE_ID_KEY } from "@/lib/sessionKeys";
 
@@ -30,11 +31,32 @@ interface Props {
 
 export default function DetalhesClienteSheet({ row, open, onOpenChange, onEdit }: Props) {
   const { setActivePage } = useActivePage();
+  const [fotoUrl, setFotoUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [nTransfer, setNTransfer] = useState(0);
   const [nGrupo, setNGrupo] = useState(0);
   const [sumTransfer, setSumTransfer] = useState(0);
   const [sumGrupo, setSumGrupo] = useState(0);
+
+  useEffect(() => {
+    if (!open || !row) {
+      setFotoUrl(null);
+      return;
+    }
+    const path = getFotoPerfilPathFromDocumentos(row.documentos);
+    if (!path) {
+      setFotoUrl(null);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      const u = await getCadastroClienteSignedUrl(supabase, path);
+      if (!cancelled) setFotoUrl(u);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, row?.id, row?.documentos]);
 
   useEffect(() => {
     if (!open || !row) {
@@ -108,7 +130,13 @@ export default function DetalhesClienteSheet({ row, open, onOpenChange, onEdit }
             </p>
           </div>
 
-          <div>
+          <div className="flex gap-4">
+            {fotoUrl ? (
+              <div className="h-16 w-16 shrink-0 overflow-hidden rounded-full border border-border bg-muted">
+                <img src={fotoUrl} alt="" className="h-full w-full object-cover" />
+              </div>
+            ) : null}
+            <div className="min-w-0 flex-1">
             <p className="text-lg font-semibold text-foreground">{row.nome_exibicao}</p>
             <p className="mt-1 text-xs text-muted-foreground">
               {row.tipo === "pj" ? (
@@ -119,6 +147,7 @@ export default function DetalhesClienteSheet({ row, open, onOpenChange, onEdit }
                 "Pessoa física"
               )}
             </p>
+            </div>
           </div>
 
           <div className="space-y-2 text-sm">

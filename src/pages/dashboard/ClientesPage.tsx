@@ -1,12 +1,15 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Building2, Eye, Pencil, UserPlus, Users } from "lucide-react";
+import { Building2, Eye, LayoutGrid, Pencil, Table2, UserPlus, Users } from "lucide-react";
 import CadastrarClienteDialog, { type CadastroClienteRow } from "@/components/clientes/CadastrarClienteDialog";
 import DetalhesClienteSheet from "@/components/clientes/DetalhesClienteSheet";
 import type { Json } from "@/integrations/supabase/types";
 import { computeClienteProfilePercent } from "@/lib/clienteCompleteness";
+import { getCadastroClienteSignedUrl, getFotoPerfilPathFromDocumentos } from "@/lib/cadastroClienteStorage";
+import { cn } from "@/lib/utils";
 
 function rowFromDb(r: Record<string, unknown>): CadastroClienteRow {
   return {
@@ -25,9 +28,47 @@ function rowFromDb(r: Record<string, unknown>): CadastroClienteRow {
   };
 }
 
+function ClienteListFoto({ documentos, nome, className }: { documentos: Json; nome: string; className?: string }) {
+  const path = useMemo(() => getFotoPerfilPathFromDocumentos(documentos), [documentos]);
+  const [src, setSrc] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!path) {
+      setSrc(null);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      const u = await getCadastroClienteSignedUrl(supabase, path);
+      if (!cancelled) setSrc(u);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [path]);
+
+  const initial = (nome.trim().slice(0, 1) || "?").toUpperCase();
+
+  return (
+    <div
+      className={cn(
+        "relative shrink-0 overflow-hidden rounded-full border border-border bg-muted text-muted-foreground",
+        className ?? "h-10 w-10",
+      )}
+    >
+      {src ? (
+        <img src={src} alt="" className="h-full w-full object-cover" />
+      ) : (
+        <div className="flex h-full w-full items-center justify-center text-xs font-semibold text-foreground/80">{initial}</div>
+      )}
+    </div>
+  );
+}
+
 export default function ClientesPage() {
   const [rows, setRows] = useState<CadastroClienteRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [viewMode, setViewMode] = useState<"cards" | "table">("cards");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editRow, setEditRow] = useState<CadastroClienteRow | null>(null);
   const [detailRow, setDetailRow] = useState<CadastroClienteRow | null>(null);
@@ -91,14 +132,40 @@ export default function ClientesPage() {
             Cadastros privados da sua conta — cada utilizador vê apenas os clientes que criou. Use nas reservas Transfer e Grupos.
           </p>
         </div>
-        <Button
-          type="button"
-          onClick={openCreate}
-          className="shrink-0 bg-[#FF6600] text-white hover:bg-[#e65c00]"
-        >
-          <UserPlus className="mr-2 h-4 w-4" />
-          + CADASTRAR CLIENTE
-        </Button>
+        <div className="flex w-full flex-col items-stretch gap-3 sm:w-auto sm:flex-row sm:items-center">
+          <div className="flex rounded-lg border border-border bg-muted/30 p-0.5">
+            <Button
+              type="button"
+              variant={viewMode === "cards" ? "secondary" : "ghost"}
+              size="sm"
+              className="gap-1.5 rounded-md"
+              onClick={() => setViewMode("cards")}
+              aria-pressed={viewMode === "cards"}
+            >
+              <LayoutGrid className="h-4 w-4" />
+              Cartões
+            </Button>
+            <Button
+              type="button"
+              variant={viewMode === "table" ? "secondary" : "ghost"}
+              size="sm"
+              className="gap-1.5 rounded-md"
+              onClick={() => setViewMode("table")}
+              aria-pressed={viewMode === "table"}
+            >
+              <Table2 className="h-4 w-4" />
+              Tabela
+            </Button>
+          </div>
+          <Button
+            type="button"
+            onClick={openCreate}
+            className="shrink-0 bg-[#FF6600] text-white hover:bg-[#e65c00]"
+          >
+            <UserPlus className="mr-2 h-4 w-4" />
+            + CADASTRAR CLIENTE
+          </Button>
+        </div>
       </div>
 
       {loading ? (
@@ -111,7 +178,7 @@ export default function ClientesPage() {
             Criar o primeiro
           </Button>
         </div>
-      ) : (
+      ) : viewMode === "cards" ? (
         <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {rows.map((r) => {
             const pct = computeClienteProfilePercent(r);
@@ -121,17 +188,20 @@ export default function ClientesPage() {
                 className="flex flex-col rounded-xl border border-border bg-card p-4 shadow-sm transition hover:border-[#FF6600]/40"
               >
                 <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="truncate font-semibold text-foreground">{r.nome_exibicao}</p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">
-                      {r.tipo === "pj" ? (
-                        <span className="inline-flex items-center gap-1">
-                          <Building2 className="h-3 w-3" /> PJ
-                        </span>
-                      ) : (
-                        "PF"
-                      )}
-                    </p>
+                  <div className="flex min-w-0 flex-1 gap-3">
+                    <ClienteListFoto documentos={r.documentos} nome={r.nome_exibicao} className="h-11 w-11" />
+                    <div className="min-w-0">
+                      <p className="truncate font-semibold text-foreground">{r.nome_exibicao}</p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        {r.tipo === "pj" ? (
+                          <span className="inline-flex items-center gap-1">
+                            <Building2 className="h-3 w-3" /> PJ
+                          </span>
+                        ) : (
+                          "PF"
+                        )}
+                      </p>
+                    </div>
                   </div>
                   <div className="flex shrink-0 gap-1">
                     <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => openDetail(r)} title="Detalhes">
@@ -157,6 +227,74 @@ export default function ClientesPage() {
             );
           })}
         </ul>
+      ) : (
+        <div className="rounded-xl border border-border bg-card overflow-hidden">
+          <Table>
+            <TableHeader>
+              <TableRow className="border-border hover:bg-transparent">
+                <TableHead className="w-12 text-center">Foto</TableHead>
+                <TableHead>Nome</TableHead>
+                <TableHead className="hidden sm:table-cell w-20">Tipo</TableHead>
+                <TableHead className="hidden md:table-cell">E-mail</TableHead>
+                <TableHead className="hidden lg:table-cell">Telefone</TableHead>
+                <TableHead className="w-28">Perfil</TableHead>
+                <TableHead className="w-24 text-right">Ações</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {rows.map((r) => {
+                const pct = computeClienteProfilePercent(r);
+                return (
+                  <TableRow key={r.id} className="border-border">
+                    <TableCell className="align-middle">
+                      <div className="flex justify-center">
+                        <ClienteListFoto documentos={r.documentos} nome={r.nome_exibicao} className="h-9 w-9" />
+                      </div>
+                    </TableCell>
+                    <TableCell className="align-middle font-medium text-foreground">
+                      <div className="max-w-[200px] truncate sm:max-w-xs">{r.nome_exibicao}</div>
+                      <div className="mt-0.5 text-xs text-muted-foreground sm:hidden">
+                        {r.tipo === "pj" ? "PJ" : "PF"}
+                        {r.telefone_1 ? ` · ${r.telefone_1}` : ""}
+                      </div>
+                    </TableCell>
+                    <TableCell className="hidden sm:table-cell align-middle text-muted-foreground">
+                      {r.tipo === "pj" ? (
+                        <span className="inline-flex items-center gap-1">
+                          <Building2 className="h-3.5 w-3.5" /> PJ
+                        </span>
+                      ) : (
+                        "PF"
+                      )}
+                    </TableCell>
+                    <TableCell className="hidden md:table-cell align-middle text-muted-foreground">
+                      <span className="line-clamp-2 break-all text-sm">{r.email ?? "—"}</span>
+                    </TableCell>
+                    <TableCell className="hidden lg:table-cell align-middle text-muted-foreground text-sm">{r.telefone_1 ?? "—"}</TableCell>
+                    <TableCell className="align-middle">
+                      <div className="flex items-center gap-2">
+                        <div className="h-1.5 min-w-[48px] flex-1 overflow-hidden rounded-full bg-muted">
+                          <div className="h-full rounded-full bg-[#FF6600]" style={{ width: `${pct}%` }} />
+                        </div>
+                        <span className="shrink-0 text-xs font-semibold text-[#FF6600]">{pct}%</span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="align-middle text-right">
+                      <div className="flex justify-end gap-0.5">
+                        <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => openDetail(r)} title="Detalhes">
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(r)} title="Editar">
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </div>
       )}
 
       <CadastrarClienteDialog

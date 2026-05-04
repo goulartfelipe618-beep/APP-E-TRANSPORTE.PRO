@@ -6,9 +6,15 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Loader2, Plus, Trash2, Upload } from "lucide-react";
+import { Loader2, Plus, Trash2, Upload, UserRound, X } from "lucide-react";
 import type { Json } from "@/integrations/supabase/types";
-import { uploadCadastroClienteDocs } from "@/lib/cadastroClienteStorage";
+import {
+  CADASTRO_CLIENTES_BUCKET,
+  FOTO_PERFIL_DOC_KEY,
+  getCadastroClienteSignedUrl,
+  getFotoPerfilPathFromDocumentos,
+  uploadCadastroClienteDocs,
+} from "@/lib/cadastroClienteStorage";
 
 export type ClienteTipo = "pf" | "pj";
 
@@ -70,6 +76,9 @@ export default function CadastrarClienteDialog({ open, onOpenChange, onSaved, ed
   const [tel2, setTel2] = useState("");
   const [enderecos, setEnderecos] = useState<ClienteEnderecoLinha[]>([{ rotulo: "", endereco: "" }]);
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [pendingFotoFile, setPendingFotoFile] = useState<File | null>(null);
+  const [fotoExistenteRemovida, setFotoExistenteRemovida] = useState(false);
+  const [fotoPreviewUrl, setFotoPreviewUrl] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -83,6 +92,8 @@ export default function CadastrarClienteDialog({ open, onOpenChange, onSaved, ed
       const lines = parseEnderecos(editRow.enderecos);
       setEnderecos(lines.length ? lines : [{ rotulo: "", endereco: "" }]);
       setPendingFiles([]);
+      setPendingFotoFile(null);
+      setFotoExistenteRemovida(false);
       return;
     }
     setTipo("pf");
@@ -93,7 +104,36 @@ export default function CadastrarClienteDialog({ open, onOpenChange, onSaved, ed
     setTel2("");
     setEnderecos([{ rotulo: "", endereco: "" }]);
     setPendingFiles([]);
+    setPendingFotoFile(null);
+    setFotoExistenteRemovida(false);
+    setFotoPreviewUrl(null);
   }, [open, editRow]);
+
+  useEffect(() => {
+    if (!open) return;
+    if (pendingFotoFile) {
+      const u = URL.createObjectURL(pendingFotoFile);
+      setFotoPreviewUrl(u);
+      return () => URL.revokeObjectURL(u);
+    }
+    if (!editRow || fotoExistenteRemovida) {
+      setFotoPreviewUrl(null);
+      return;
+    }
+    const path = getFotoPerfilPathFromDocumentos(editRow.documentos);
+    if (!path) {
+      setFotoPreviewUrl(null);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      const signed = await getCadastroClienteSignedUrl(supabase, path);
+      if (!cancelled) setFotoPreviewUrl(signed);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, editRow?.id, editRow?.documentos, pendingFotoFile, fotoExistenteRemovida]);
 
   const addEndereco = () => setEnderecos((prev) => [...prev, { rotulo: "", endereco: "" }]);
   const removeEndereco = (i: number) => setEnderecos((prev) => prev.filter((_, idx) => idx !== i));
@@ -124,7 +164,7 @@ export default function CadastrarClienteDialog({ open, onOpenChange, onSaved, ed
 
     setSaving(true);
     try {
-      const basePayload = {
+      const baseFields = {
         tipo,
         nome_exibicao: nomeTrim,
         cpf_cnpj: cpfCnpj.trim() || null,
@@ -132,13 +172,35 @@ export default function CadastrarClienteDialog({ open, onOpenChange, onSaved, ed
         telefone_1: tel1.trim() || null,
         telefone_2: tel2.trim() || null,
         enderecos: endOk as unknown as Json,
-        documentos: (editRow ? parseDocumentos(editRow.documentos) : {}) as unknown as Json,
       };
 
       if (editRow?.id) {
-        const { error: upErr } = await supabase.from("cadastro_clientes").update(basePayload).eq("id", editRow.id);
+        let mergedDocs: Record<string, string> = { ...parseDocumentos(editRow.documentos) };
+        const oldFotoPath = fotoExistenteRemovida ? getFotoPerfilPathFromDocumentos(editRow.documentos) : null;
+        if (fotoExistenteRemovida) {
+          delete mergedDocs[FOTO_PERFIL_DOC_KEY];
+        }
+        const { error: upErr } = await supabase
+          .from("cadastro_clientes")
+          .update({ ...baseFields, documentos: mergedDocs as unknown as Json })
+          .eq("id", editRow.id);
         if (upErr) throw new Error(upErr.message);
-        let mergedDocs = parseDocumentos(editRow.documentos);
+        if (fotoExistenteRemovida && oldFotoPath) {
+          await supabase.storage.from(CADASTRO_CLIENTES_BUCKET).remove([oldFotoPath]).catch(() => undefined);
+        }
+
+        if (pendingFotoFile) {
+          const up = await uploadCadastroClienteDocs(supabase, user.id, editRow.id, [
+            { slug: FOTO_PERFIL_DOC_KEY, file: pendingFotoFile },
+          ]);
+          mergedDocs = { ...mergedDocs, ...up };
+          const { error: fErr } = await supabase
+            .from("cadastro_clientes")
+            .update({ documentos: mergedDocs as unknown as Json })
+            .eq("id", editRow.id);
+          if (fErr) toast.warning(`Cliente guardado; foto: ${fErr.message}`);
+        }
+
         if (pendingFiles.length > 0) {
           const uploaded = await uploadCadastroClienteDocs(
             supabase,
@@ -157,11 +219,17 @@ export default function CadastrarClienteDialog({ open, onOpenChange, onSaved, ed
       } else {
         const { data: inserted, error: insErr } = await supabase
           .from("cadastro_clientes")
-          .insert({ user_id: user.id, ...basePayload })
+          .insert({ user_id: user.id, ...baseFields, documentos: {} as unknown as Json })
           .select("id")
           .single();
         if (insErr || !inserted?.id) throw new Error(insErr?.message || "Erro ao criar cliente.");
         const newId = inserted.id as string;
+        let mergedDocs: Record<string, string> = {};
+        if (pendingFotoFile) {
+          mergedDocs = await uploadCadastroClienteDocs(supabase, user.id, newId, [
+            { slug: FOTO_PERFIL_DOC_KEY, file: pendingFotoFile },
+          ]);
+        }
         if (pendingFiles.length > 0) {
           const uploaded = await uploadCadastroClienteDocs(
             supabase,
@@ -169,11 +237,14 @@ export default function CadastrarClienteDialog({ open, onOpenChange, onSaved, ed
             newId,
             pendingFiles.map((f, i) => ({ slug: `doc_${Date.now()}_${i}`, file: f })),
           );
+          mergedDocs = { ...mergedDocs, ...uploaded };
+        }
+        if (Object.keys(mergedDocs).length > 0) {
           const { error: docErr } = await supabase
             .from("cadastro_clientes")
-            .update({ documentos: uploaded as unknown as Json })
+            .update({ documentos: mergedDocs as unknown as Json })
             .eq("id", newId);
-          if (docErr) toast.warning(`Cliente criado; anexos: ${docErr.message}`);
+          if (docErr) toast.warning(`Cliente criado; ficheiros: ${docErr.message}`);
         }
         toast.success("Cliente cadastrado.");
       }
@@ -213,6 +284,69 @@ export default function CadastrarClienteDialog({ open, onOpenChange, onSaved, ed
                 Pessoa jurídica
               </label>
             </RadioGroup>
+          </div>
+
+          <div className="space-y-2 rounded-lg border border-border bg-muted/20 p-3">
+            <Label className="text-foreground">Foto de perfil (opcional)</Label>
+            <p className="text-xs text-muted-foreground">Só no cadastro de clientes — imagem quadrada ou retrato; PNG ou JPEG.</p>
+            <div className="flex flex-wrap items-center gap-4">
+              <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-full border border-border bg-muted">
+                {fotoPreviewUrl ? (
+                  <img src={fotoPreviewUrl} alt="" className="h-full w-full object-cover" />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center text-muted-foreground">
+                    <UserRound className="h-8 w-8" />
+                  </div>
+                )}
+              </div>
+              <div className="flex flex-col gap-2">
+                <label className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-dashed border-border px-3 py-2 text-sm text-muted-foreground hover:bg-muted/50">
+                  <Upload className="h-4 w-4 shrink-0 text-[#FF6600]" />
+                  <span>Escolher imagem</span>
+                  <input
+                    type="file"
+                    className="hidden"
+                    accept="image/png,image/jpeg,image/jpg,image/webp"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      e.target.value = "";
+                      if (!f) return;
+                      if (!f.type.startsWith("image/")) {
+                        toast.error("Use uma imagem (PNG, JPEG ou WebP).");
+                        return;
+                      }
+                      if (f.size > 4 * 1024 * 1024) {
+                        toast.error("Imagem até 4 MB.");
+                        return;
+                      }
+                      setFotoExistenteRemovida(false);
+                      setPendingFotoFile(f);
+                    }}
+                  />
+                </label>
+                {pendingFotoFile ||
+                (editRow && getFotoPerfilPathFromDocumentos(editRow.documentos) && !fotoExistenteRemovida) ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 justify-start gap-1 text-muted-foreground"
+                    onClick={() => {
+                      if (pendingFotoFile) {
+                        setPendingFotoFile(null);
+                        return;
+                      }
+                      if (editRow && getFotoPerfilPathFromDocumentos(editRow.documentos)) {
+                        setFotoExistenteRemovida(true);
+                      }
+                    }}
+                  >
+                    <X className="h-3.5 w-3.5" />
+                    Remover foto
+                  </Button>
+                ) : null}
+              </div>
+            </div>
           </div>
 
           <div className="space-y-1.5">

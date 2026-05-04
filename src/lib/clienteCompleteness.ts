@@ -32,8 +32,11 @@ export function computeClienteProfilePercent(c: ClienteCompletenessInput): numbe
   }
 
   const docs = c.documentos;
-  if (docs && typeof docs === "object" && !Array.isArray(docs) && Object.keys(docs as object).length > 0) {
-    pts += 8;
+  if (docs && typeof docs === "object" && !Array.isArray(docs)) {
+    const o = docs as Record<string, unknown>;
+    const hasFoto = typeof o.foto_perfil === "string" && String(o.foto_perfil).trim().length > 0;
+    const otherDocKeys = Object.keys(o).filter((k) => k !== "foto_perfil");
+    if (hasFoto || otherDocKeys.length > 0) pts += 8;
   }
 
   return Math.min(max, Math.round(pts));
