@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, Plus, Trash2, CalendarDays } from "lucide-react";
+import { RefreshCw, Plus, Trash2, CalendarDays, Copy, Link2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { buildWebhookSolicitacaoUrl } from "@/lib/webhookSolicitacaoUrl";
 
 const CAMPAIGN_COLORS = [
   "#3B82F6", "#10B981", "#F43F5E", "#F59E0B",
@@ -32,6 +33,8 @@ export default function CampanhasAtivosPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [campanhas, setCampanhas] = useState<any[]>([]);
+  /** campanha_id → automacao_id (webhook de leads) */
+  const [webhookByCampanha, setWebhookByCampanha] = useState<Record<string, string>>({});
 
   const slugify = (value: string) =>
     value
@@ -57,19 +60,57 @@ export default function CampanhasAtivosPage() {
 
   const fetchCampanhas = useCallback(async () => {
     setLoading(true);
+    const { data: authData } = await supabase.auth.getUser();
+    const uid = authData.user?.id;
+    if (!uid) {
+      setCampanhas([]);
+      setWebhookByCampanha({});
+      setLoading(false);
+      return;
+    }
     const { data, error } = await supabase
       .from("campanhas" as any)
       .select("*")
+      .eq("user_id", uid)
       .order("created_at", { ascending: false });
-    if (error) toast.error("Erro ao carregar campanhas");
-    else setCampanhas(data || []);
+    if (error) {
+      toast.error("Erro ao carregar campanhas");
+      setCampanhas([]);
+      setWebhookByCampanha({});
+    } else {
+      const rows = data || [];
+      setCampanhas(rows);
+      const campIds = rows.map((c: { id: string }) => c.id);
+      if (campIds.length === 0) {
+        setWebhookByCampanha({});
+      } else {
+        const { data: autos } = await supabase
+          .from("automacoes")
+          .select("id, campanha_id")
+          .eq("user_id", uid)
+          .eq("tipo", "campanha")
+          .eq("is_campaign_webhook", true)
+          .in("campanha_id", campIds);
+        const map: Record<string, string> = {};
+        for (const a of autos || []) {
+          const cid = (a as { campanha_id?: string }).campanha_id;
+          const aid = (a as { id?: string }).id;
+          if (cid && aid) map[cid] = aid;
+        }
+        setWebhookByCampanha(map);
+      }
+    }
     setLoading(false);
   }, []);
 
   const syncExpiredCampaigns = useCallback(async () => {
+    const { data: authData } = await supabase.auth.getUser();
+    const uid = authData.user?.id;
+    if (!uid) return;
     const { data, error } = await supabase
       .from("campanhas" as any)
       .select("id")
+      .eq("user_id", uid)
       .eq("status", "ativa")
       .lt("data_fim", todayIso);
     if (error || !data || data.length === 0) return;
@@ -133,7 +174,8 @@ export default function CampanhasAtivosPage() {
       user_id: user.id,
       nome: campanha.nome,
       tipo: "campanha",
-      ativo: false,
+      /** Activo para POST externos gravarem em campanha_leads (não só «testes»). */
+      ativo: true,
       mappings: {},
       campanha_id: campanha.id,
       is_campaign_webhook: true,
@@ -148,7 +190,7 @@ export default function CampanhasAtivosPage() {
       return;
     }
 
-    toast.success("Campanha criada com webhook automático em Automações.");
+    toast.success("Campanha criada. O webhook aparece no cartão — use-o na landing page (POST JSON). Leads em Campanhas → Leads.");
     setSaving(false);
     setOpen(false);
     resetForm();
@@ -218,6 +260,43 @@ export default function CampanhasAtivosPage() {
                   <span>|</span>
                   <span>Término: <strong>{new Date(`${campanha.data_fim}T00:00:00`).toLocaleDateString("pt-BR")}</strong></span>
                 </div>
+                {webhookByCampanha[campanha.id] ? (
+                  <div className="rounded-lg border border-primary/25 bg-primary/5 p-3 space-y-2">
+                    <div className="flex items-center gap-2 text-xs font-semibold text-foreground">
+                      <Link2 className="h-3.5 w-3.5 text-primary" />
+                      Webhook (landing / formulário externo)
+                    </div>
+                    <p className="text-[11px] text-muted-foreground">
+                      Envie <code className="rounded bg-muted px-1">POST</code> com corpo JSON. Os dados aparecem em{" "}
+                      <strong className="text-foreground">Campanhas → Leads</strong>. Este URL não pode ser removido em Automações até a campanha encerrar.
+                    </p>
+                    <p className="break-all rounded border border-border bg-background px-2 py-1.5 font-mono text-[10px] leading-relaxed text-foreground">
+                      {buildWebhookSolicitacaoUrl(webhookByCampanha[campanha.id])}
+                    </p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 gap-1.5"
+                      onClick={() => {
+                        const u = buildWebhookSolicitacaoUrl(webhookByCampanha[campanha.id]);
+                        if (!u) {
+                          toast.error("URL indisponível (confirme VITE_SUPABASE_URL).");
+                          return;
+                        }
+                        void navigator.clipboard.writeText(u);
+                        toast.success("URL do webhook copiada.");
+                      }}
+                    >
+                      <Copy className="h-3.5 w-3.5" />
+                      Copiar URL
+                    </Button>
+                  </div>
+                ) : (
+                  <p className="text-xs text-amber-600 dark:text-amber-500">
+                    Webhook em sincronização… use «Atualizar» se não aparecer dentro de instantes.
+                  </p>
+                )}
               </div>
             ))}
           </div>

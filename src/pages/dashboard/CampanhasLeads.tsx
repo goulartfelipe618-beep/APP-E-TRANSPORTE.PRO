@@ -19,15 +19,30 @@ export default function CampanhasLeadsPage() {
 
   const fetchData = useCallback(async () => {
     setLoading(true);
+    const { data: authData } = await supabase.auth.getUser();
+    const uid = authData.user?.id;
+    if (!uid) {
+      setLeads([]);
+      setCampaigns([]);
+      setActiveCampaignWebhooks(0);
+      setLoading(false);
+      return;
+    }
     const [leadRes, campaignRes, webhookRes] = await Promise.all([
       supabase
         .from("campanha_leads" as any)
         .select("*, campanhas(id, nome, slug)")
+        .eq("user_id", uid)
         .order("created_at", { ascending: false }),
-      supabase.from("campanhas" as any).select("id, nome, slug").order("nome", { ascending: true }),
+      supabase
+        .from("campanhas" as any)
+        .select("id, nome, slug")
+        .eq("user_id", uid)
+        .order("nome", { ascending: true }),
       supabase
         .from("automacoes")
         .select("id", { count: "exact", head: true })
+        .eq("user_id", uid)
         .eq("tipo", "campanha")
         .eq("is_campaign_webhook", true)
         .eq("ativo", true),

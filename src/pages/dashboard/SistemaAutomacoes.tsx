@@ -19,6 +19,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { buildWebhookSolicitacaoUrl } from "@/lib/webhookSolicitacaoUrl";
 import FerramentasDevDialog from "@/components/automacoes/FerramentasDevDialog";
 import { ConfirmDeleteDialog } from "@/components/ConfirmDeleteDialog";
 
@@ -195,7 +196,6 @@ export default function SistemaAutomacoesPage() {
   const [containerTestes, setContainerTestes] = useState<Record<string, string>>({});
   // Track which containers are collapsed (saved)
   const [collapsedContainers, setCollapsedContainers] = useState<Record<string, boolean>>({});
-  const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID || "seu-projeto";
   const [deleteIntent, setDeleteIntent] = useState<DeleteIntent | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [campaignFields, setCampaignFields] = useState<string[]>([]);
@@ -204,9 +204,17 @@ export default function SistemaAutomacoesPage() {
   const [campaignMeta, setCampaignMeta] = useState<any>(null);
 
   const fetchAutomacoes = useCallback(async () => {
+    const { data: authData } = await supabase.auth.getUser();
+    const uid = authData.user?.id;
+    if (!uid) {
+      setAutomacoes([]);
+      setLoading(false);
+      return;
+    }
     const { data, error } = await supabase
       .from("automacoes")
       .select("*, campanhas ( id, nome, data_inicio, data_fim, status )")
+      .eq("user_id", uid)
       .order("created_at", { ascending: false });
     if (error) toast.error("Erro ao carregar automações");
     else
@@ -229,14 +237,6 @@ export default function SistemaAutomacoesPage() {
     () => automacoes.filter((a) => isWebhookCampanhaAutomacao(a)),
     [automacoes],
   );
-
-  const slugify = (value: string) =>
-    value
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "");
 
   const fetchTestes = useCallback(async (automacaoId: string) => {
     const { data, error } = await supabase
@@ -374,13 +374,7 @@ export default function SistemaAutomacoesPage() {
     }
   };
 
-  const getWebhookUrl = (automacao: Automacao) => {
-    if (automacao.tipo === "campanha") {
-      const campaignSlug = slugify(automacao.nome) || "campanha";
-      return `https://${projectId}.supabase.co/functions/v1/webhook-solicitacao?campanha=${encodeURIComponent(campaignSlug)}&automacao_id=${automacao.id}`;
-    }
-    return `https://${projectId}.supabase.co/functions/v1/webhook-solicitacao?automacao_id=${automacao.id}`;
-  };
+  const getWebhookUrl = (automacao: Automacao) => buildWebhookSolicitacaoUrl(automacao.id);
 
   const copyUrl = (automacao: Automacao) => {
     navigator.clipboard.writeText(getWebhookUrl(automacao));
