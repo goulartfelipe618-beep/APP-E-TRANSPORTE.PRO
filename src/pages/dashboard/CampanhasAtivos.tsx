@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, Plus, Trash2, CalendarDays, Copy, Link2 } from "lucide-react";
+import { RefreshCw, Plus, CalendarDays } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -13,7 +13,6 @@ import {
 } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { buildWebhookSolicitacaoUrl } from "@/lib/webhookSolicitacaoUrl";
 
 const CAMPAIGN_COLORS = [
   "#3B82F6", "#10B981", "#F43F5E", "#F59E0B",
@@ -33,8 +32,6 @@ export default function CampanhasAtivosPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [campanhas, setCampanhas] = useState<any[]>([]);
-  /** campanha_id → automacao_id (webhook de leads) */
-  const [webhookByCampanha, setWebhookByCampanha] = useState<Record<string, string>>({});
 
   const slugify = (value: string) =>
     value
@@ -64,7 +61,6 @@ export default function CampanhasAtivosPage() {
     const uid = authData.user?.id;
     if (!uid) {
       setCampanhas([]);
-      setWebhookByCampanha({});
       setLoading(false);
       return;
     }
@@ -76,29 +72,8 @@ export default function CampanhasAtivosPage() {
     if (error) {
       toast.error("Erro ao carregar campanhas");
       setCampanhas([]);
-      setWebhookByCampanha({});
     } else {
-      const rows = data || [];
-      setCampanhas(rows);
-      const campIds = rows.map((c: { id: string }) => c.id);
-      if (campIds.length === 0) {
-        setWebhookByCampanha({});
-      } else {
-        const { data: autos } = await supabase
-          .from("automacoes")
-          .select("id, campanha_id")
-          .eq("user_id", uid)
-          .eq("tipo", "campanha")
-          .eq("is_campaign_webhook", true)
-          .in("campanha_id", campIds);
-        const map: Record<string, string> = {};
-        for (const a of autos || []) {
-          const cid = (a as { campanha_id?: string }).campanha_id;
-          const aid = (a as { id?: string }).id;
-          if (cid && aid) map[cid] = aid;
-        }
-        setWebhookByCampanha(map);
-      }
+      setCampanhas(data || []);
     }
     setLoading(false);
   }, []);
@@ -190,29 +165,13 @@ export default function CampanhasAtivosPage() {
       return;
     }
 
-    toast.success("Campanha criada. O webhook aparece no cartão — use-o na landing page (POST JSON). Leads em Campanhas → Leads.");
+    toast.success(
+      "Campanha criada. Copie o URL do webhook em Automações → secção «Webhooks de campanha». Os POSTs aparecem em Campanhas → Leads.",
+    );
     setSaving(false);
     setOpen(false);
     resetForm();
     fetchCampanhas();
-  };
-
-  const handleDelete = async (campanha: any) => {
-    const inActivePeriod =
-      campanha.status === "ativa" &&
-      todayIso >= campanha.data_inicio &&
-      todayIso <= campanha.data_fim;
-    if (inActivePeriod) {
-      toast.error("Campanhas ativas no período não podem ser excluídas.");
-      return;
-    }
-
-    const { error } = await supabase.from("campanhas" as any).delete().eq("id", campanha.id);
-    if (error) toast.error(`Erro ao excluir campanha: ${error.message}`);
-    else {
-      toast.success("Campanha excluída.");
-      fetchCampanhas();
-    }
   };
 
   const campanhasAtivas = campanhas.filter((c) => c.status !== "encerrada");
@@ -223,7 +182,11 @@ export default function CampanhasAtivosPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Campanhas Ativas</h1>
-          <p className="text-muted-foreground">Gerencie suas campanhas de marketing</p>
+          <p className="text-muted-foreground">
+            Só vê as suas campanhas. Após a data de término, a campanha encerra e o respetivo webhook é removido
+            automaticamente. O URL do webhook está em <strong className="text-foreground">Automações</strong> → Webhooks
+            de campanha.
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="icon" onClick={fetchCampanhas}><RefreshCw className="h-4 w-4" /></Button>
@@ -241,62 +204,20 @@ export default function CampanhasAtivosPage() {
           <div className="space-y-3">
             {campanhasAtivas.map((campanha) => (
               <div key={campanha.id} className="rounded-lg border border-border p-4 space-y-3">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="inline-block w-3 h-3 rounded-full" style={{ backgroundColor: campanha.cor || "#3B82F6" }} />
-                      <h4 className="font-semibold text-foreground">{campanha.nome}</h4>
-                      <Badge variant={campanha.status === "ativa" ? "default" : "outline"}>{campanha.status}</Badge>
-                    </div>
-                    <p className="text-sm text-muted-foreground">{campanha.descricao || "Sem descrição."}</p>
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="inline-block w-3 h-3 rounded-full" style={{ backgroundColor: campanha.cor || "#3B82F6" }} />
+                    <h4 className="font-semibold text-foreground">{campanha.nome}</h4>
+                    <Badge variant={campanha.status === "ativa" ? "default" : "outline"}>{campanha.status}</Badge>
                   </div>
-                  <Button variant="ghost" size="icon" onClick={() => handleDelete(campanha)}>
-                    <Trash2 className="h-4 w-4 text-destructive" />
-                  </Button>
+                  <p className="text-sm text-muted-foreground">{campanha.descricao || "Sem descrição."}</p>
                 </div>
-                <div className="rounded-md bg-muted/40 p-3 text-xs text-foreground flex items-center gap-2">
-                  <CalendarDays className="h-3.5 w-3.5 text-primary" />
+                <div className="rounded-md bg-muted/40 p-3 text-xs text-foreground flex flex-wrap items-center gap-2">
+                  <CalendarDays className="h-3.5 w-3.5 text-primary shrink-0" />
                   <span>Início: <strong>{new Date(`${campanha.data_inicio}T00:00:00`).toLocaleDateString("pt-BR")}</strong></span>
                   <span>|</span>
                   <span>Término: <strong>{new Date(`${campanha.data_fim}T00:00:00`).toLocaleDateString("pt-BR")}</strong></span>
                 </div>
-                {webhookByCampanha[campanha.id] ? (
-                  <div className="rounded-lg border border-primary/25 bg-primary/5 p-3 space-y-2">
-                    <div className="flex items-center gap-2 text-xs font-semibold text-foreground">
-                      <Link2 className="h-3.5 w-3.5 text-primary" />
-                      Webhook (landing / formulário externo)
-                    </div>
-                    <p className="text-[11px] text-muted-foreground">
-                      Envie <code className="rounded bg-muted px-1">POST</code> com corpo JSON. Os dados aparecem em{" "}
-                      <strong className="text-foreground">Campanhas → Leads</strong>. Este URL não pode ser removido em Automações até a campanha encerrar.
-                    </p>
-                    <p className="break-all rounded border border-border bg-background px-2 py-1.5 font-mono text-[10px] leading-relaxed text-foreground">
-                      {buildWebhookSolicitacaoUrl(webhookByCampanha[campanha.id])}
-                    </p>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="h-8 gap-1.5"
-                      onClick={() => {
-                        const u = buildWebhookSolicitacaoUrl(webhookByCampanha[campanha.id]);
-                        if (!u) {
-                          toast.error("URL indisponível (confirme VITE_SUPABASE_URL).");
-                          return;
-                        }
-                        void navigator.clipboard.writeText(u);
-                        toast.success("URL do webhook copiada.");
-                      }}
-                    >
-                      <Copy className="h-3.5 w-3.5" />
-                      Copiar URL
-                    </Button>
-                  </div>
-                ) : (
-                  <p className="text-xs text-amber-600 dark:text-amber-500">
-                    Webhook em sincronização… use «Atualizar» se não aparecer dentro de instantes.
-                  </p>
-                )}
               </div>
             ))}
           </div>
@@ -330,7 +251,10 @@ export default function CampanhasAtivosPage() {
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>Nova Campanha</DialogTitle>
-            <DialogDescription>Crie uma campanha e receba um webhook para capturar leads automaticamente.</DialogDescription>
+            <DialogDescription>
+              Cria a campanha e um webhook na sua conta (visível em Automações → Webhooks de campanha). Os leads chegam a
+              Campanhas → Leads.
+            </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
