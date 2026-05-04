@@ -28,6 +28,7 @@ import {
 } from "@/lib/n8nComunicarWebhook";
 import AcompanharRastreioDialog from "@/components/geolocalizacao/AcompanharRastreioDialog";
 import DetalhesViagemRastreioSheet from "@/components/geolocalizacao/DetalhesViagemRastreioSheet";
+import { buildRastreioShareUrl } from "@/lib/appPublicUrl";
 
 type ReservaTransfer = Tables<"reservas_transfer">;
 type ReservaGrupo = Tables<"reservas_grupos">;
@@ -46,13 +47,6 @@ function labelGrupo(r: ReservaGrupo) {
   const rota = r.destino || r.embarque || "—";
   const data = r.data_ida ? new Date(r.data_ida).toLocaleDateString("pt-BR") : "";
   return `#${r.numero_reserva} · ${r.nome_completo}${data ? ` · ${data}` : ""} · ${rota}`;
-}
-
-function buildRastreioUrl(token: string): string {
-  const envBase = (import.meta.env.VITE_APP_PUBLIC_URL as string | undefined)?.trim();
-  const base = (envBase && envBase.length > 0 ? envBase.replace(/\/$/, "") : "") ||
-    (typeof window !== "undefined" ? window.location.origin : "");
-  return `${base}/rastreio/${token}`;
 }
 
 function statusLabel(status: string | null | undefined): { label: string; tone: "on" | "off" | "idle" } {
@@ -230,7 +224,7 @@ export default function TransferGeolocalizacaoPage() {
       }
 
       // Otimista: copia URL para área de transferência
-      const url = buildRastreioUrl(inserted.token);
+      const url = buildRastreioShareUrl(inserted.token);
       try { await navigator.clipboard?.writeText(url); } catch { /* noop */ }
 
       toast.success("Link criado! URL copiada para a área de transferência.");
@@ -264,7 +258,7 @@ export default function TransferGeolocalizacaoPage() {
   const handleComunicar = async (r: RastreioRow) => {
     setComunicandoId(r.id);
     try {
-      const url = buildRastreioUrl(r.token);
+      const url = buildRastreioShareUrl(r.token);
       const motorista = await fetchMotoristaPainelSnapshot();
 
       let reservaSnapshot: Record<string, unknown> = {};
@@ -320,7 +314,7 @@ export default function TransferGeolocalizacaoPage() {
   };
 
   const handleCopiar = async (r: RastreioRow) => {
-    const url = buildRastreioUrl(r.token);
+    const url = buildRastreioShareUrl(r.token);
     try {
       await navigator.clipboard.writeText(url);
       setCopiedId(r.id);
@@ -430,7 +424,7 @@ export default function TransferGeolocalizacaoPage() {
         {!loadingRastreios && rastreiosAtivos.length > 0 && (
           <div className="divide-y divide-border">
             {rastreiosAtivos.map((r) => {
-              const url = buildRastreioUrl(r.token);
+              const url = buildRastreioShareUrl(r.token);
               const st = statusLabel(r.status);
               const comunicandoAtual = comunicandoId === r.id;
               const encerrandoAtual = encerrandoId === r.id;

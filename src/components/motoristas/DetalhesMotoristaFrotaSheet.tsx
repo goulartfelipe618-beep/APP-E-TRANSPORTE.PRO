@@ -6,8 +6,12 @@ import { ExternalLink, FileDown, User, CreditCard, FileText, MapPin, Calendar } 
 import type { Json } from "@/integrations/supabase/types";
 import { parseDadosWebhook, pickStr } from "@/lib/motoristaFromSolicitacao";
 import { supabase } from "@/integrations/supabase/client";
-import { signMotoristaFrotaDocUrls, hasMotoristaDocAttachment, DOC_PATH_KEYS } from "@/lib/motoristaFrotaStorage";
-import type { MotoristaFrotaDocSignedUrls } from "@/lib/motoristaFrotaStorage";
+import {
+  signMotoristaFrotaDocUrls,
+  hasMotoristaDocAttachment,
+  DOC_PATH_KEYS,
+  type MotoristaFrotaDocUrlBundle,
+} from "@/lib/motoristaFrotaStorage";
 import { downloadMotoristaDossierPdf } from "@/lib/motoristaDossierPdf";
 import { getMotoristaVerificacaoAppOrigin } from "@/lib/appPublicUrl";
 import { toast } from "sonner";
@@ -69,21 +73,23 @@ function reportIdLabel(createdAt: string, rowId: string): string {
 
 const PATH_VALUE_SET = new Set<string>(Object.values(DOC_PATH_KEYS));
 
+const emptyDocBundle: MotoristaFrotaDocUrlBundle = { share: {}, preview: {} };
+
 export default function DetalhesMotoristaFrotaSheet({ motorista, open, onOpenChange }: Props) {
-  const [docUrls, setDocUrls] = useState<MotoristaFrotaDocSignedUrls>({});
+  const [docBundle, setDocBundle] = useState<MotoristaFrotaDocUrlBundle>(emptyDocBundle);
 
   useEffect(() => {
     if (!open || !motorista) {
-      setDocUrls({});
+      setDocBundle(emptyDocBundle);
       return;
     }
     let cancelled = false;
     void (async () => {
       try {
         const u = await signMotoristaFrotaDocUrls(supabase, motorista.dados_webhook, 3600);
-        if (!cancelled) setDocUrls(u);
+        if (!cancelled) setDocBundle(u);
       } catch {
-        if (!cancelled) setDocUrls({});
+        if (!cancelled) setDocBundle(emptyDocBundle);
       }
     })();
     return () => {
@@ -108,11 +114,12 @@ export default function DetalhesMotoristaFrotaSheet({ motorista, open, onOpenCha
   const hoje = new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
 
   const docPreview = (
-    slug: keyof MotoristaFrotaDocSignedUrls,
+    slug: keyof MotoristaFrotaDocUrlBundle["share"],
     title: string,
-  ): { title: string; url?: string; ok: boolean } => ({
+  ): { title: string; shareUrl?: string; previewUrl?: string; ok: boolean } => ({
     title,
-    url: docUrls[slug],
+    shareUrl: docBundle.share[slug],
+    previewUrl: docBundle.preview[slug],
     ok: hasMotoristaDocAttachment(motorista.dados_webhook, slug),
   });
 
@@ -169,7 +176,7 @@ export default function DetalhesMotoristaFrotaSheet({ motorista, open, onOpenCha
           cnh: motorista.cnh,
           created_at: motorista.created_at,
           dados_webhook: motorista.dados_webhook,
-          docUrls: urls,
+          docUrls: urls.preview,
           verificacao_jwt: jwt,
           app_public_origin: origin,
         });
@@ -217,8 +224,8 @@ export default function DetalhesMotoristaFrotaSheet({ motorista, open, onOpenCha
         <div className="flex-1 overflow-y-auto px-6 py-6">
           <div className="flex gap-4 border-b border-border pb-6">
             <div className="h-28 w-28 shrink-0 overflow-hidden rounded-xl border-2 border-[#c9a227]/40 bg-muted">
-              {docUrls.perfil ? (
-                <img src={docUrls.perfil} alt="" className="h-full w-full object-cover" />
+              {docBundle.preview.perfil ? (
+                <img src={docBundle.preview.perfil} alt="" className="h-full w-full object-cover" />
               ) : (
                 <div className="flex h-full w-full items-center justify-center text-muted-foreground">
                   <User className="h-10 w-10 opacity-40" />
@@ -310,23 +317,23 @@ export default function DetalhesMotoristaFrotaSheet({ motorista, open, onOpenCha
                         {p.ok ? "Anexada" : "Pendente"}
                       </Badge>
                     </div>
-                    {p.url ? (
+                    {p.previewUrl ? (
                       <a
-                        href={p.url}
+                        href={p.shareUrl || p.previewUrl}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="group block overflow-hidden rounded-md border border-border bg-background"
                       >
-                        <img src={p.url} alt="" className="max-h-36 w-full object-contain transition-opacity group-hover:opacity-90" />
+                        <img src={p.previewUrl} alt="" className="max-h-36 w-full object-contain transition-opacity group-hover:opacity-90" />
                       </a>
                     ) : (
                       <div className="flex h-24 items-center justify-center rounded-md border border-dashed border-border bg-muted/30 text-xs text-muted-foreground">
                         {p.ok ? "Pré-visualização indisponível" : "Sem ficheiro"}
                       </div>
                     )}
-                    {p.url ? (
+                    {(p.shareUrl || p.previewUrl) ? (
                       <a
-                        href={p.url}
+                        href={p.shareUrl || p.previewUrl}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="mt-2 inline-flex items-center gap-1 text-xs text-[#FF6600] hover:underline"

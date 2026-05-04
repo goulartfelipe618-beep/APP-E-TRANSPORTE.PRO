@@ -12,7 +12,8 @@ function initChatwootSupportWidget() {
     path === "/" ||
     path === "/login" ||
     path === "/mfa" ||
-    path.startsWith("/rastreio/");
+    path.startsWith("/rastreio/") ||
+    path.startsWith("/motorista-frota-doc");
   if (skipPublic) return;
 
   const enabled = String(import.meta.env.VITE_CHATWOOT_ENABLED ?? "").toLowerCase();

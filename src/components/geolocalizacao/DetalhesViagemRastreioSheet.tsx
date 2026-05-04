@@ -3,16 +3,9 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Button } from "@/components/ui/button";
 import ResumoViagemCard from "./ResumoViagemCard";
 import type { Tables } from "@/integrations/supabase/types";
+import { buildRastreioShareUrl } from "@/lib/appPublicUrl";
 
 type RastreioRow = Tables<"rastreios_ao_vivo">;
-
-function buildRastreioUrl(token: string): string {
-  const envBase = (import.meta.env.VITE_APP_PUBLIC_URL as string | undefined)?.trim();
-  const base =
-    (envBase && envBase.length > 0 ? envBase.replace(/\/$/, "") : "") ||
-    (typeof window !== "undefined" ? window.location.origin : "");
-  return `${base}/rastreio/${token}`;
-}
 
 function mapsLink(lat: number | null | undefined, lng: number | null | undefined): string | null {
   if (lat == null || lng == null || !Number.isFinite(lat) || !Number.isFinite(lng)) return null;
@@ -28,7 +21,7 @@ interface Props {
 export default function DetalhesViagemRastreioSheet({ rastreio, open, onOpenChange }: Props) {
   if (!rastreio) return null;
 
-  const urlPublica = buildRastreioUrl(rastreio.token);
+  const urlPublica = buildRastreioShareUrl(rastreio.token);
   const linkInicio = mapsLink(rastreio.inicio_latitude, rastreio.inicio_longitude);
   const linkFim = mapsLink(rastreio.fim_latitude, rastreio.fim_longitude);
 

@@ -30,6 +30,7 @@ const RastreioPublico = lazy(() => import("./pages/RastreioPublico"));
 const MotoristaFrotaAcessoPage = lazy(() => import("./pages/frota/MotoristaFrotaAcessoPage"));
 const FrotaMotoristaLayout = lazy(() => import("./components/FrotaMotoristaLayout"));
 const VerificarMotoristaPage = lazy(() => import("./pages/VerificarMotoristaPage"));
+const MotoristaFrotaDocViewPage = lazy(() => import("./pages/MotoristaFrotaDocViewPage"));
 
 function RouteFallback() {
   return (
@@ -55,6 +56,7 @@ const App = () => (
             <Route path="/" element={<RootToLoginRedirect />} />
             <Route path="/login" element={<Login />} />
             <Route path="/mfa" element={<MfaChallengePage />} />
+            <Route path="/motorista-frota-doc" element={<MotoristaFrotaDocViewPage />} />
             <Route path="/rastreio/:token" element={<RastreioPublico />} />
             <Route path="/frota/acesso/:token" element={<MotoristaFrotaAcessoPage />} />
             <Route path="/verificar-motorista/:token?" element={<VerificarMotoristaPage />} />

@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { assertUploadMagicBytes, extensionForDetectedMime } from "@/lib/validateUploadMagicBytes";
 import { parseDadosWebhook, pickStr } from "@/lib/motoristaFromSolicitacao";
 import type { Database } from "@/integrations/supabase/types";
+import { getAppPublicOrigin, getMotoristaVerificacaoAppOrigin } from "@/lib/appPublicUrl";
 
 export const MOTORISTA_FROTA_DOCS_BUCKET = "motorista-frota-docs" as const;
 
@@ -18,6 +19,12 @@ export type MotoristaFrotaDocSlug = keyof typeof DOC_PATH_KEYS;
 
 /** URLs assinadas (bucket privado); válidas até expirarem. */
 export type MotoristaFrotaDocSignedUrls = Partial<Record<MotoristaFrotaDocSlug, string>>;
+
+/** share = domínio da app (abrir/copiar); preview = Edge Function (img/PDF). */
+export type MotoristaFrotaDocUrlBundle = {
+  share: MotoristaFrotaDocSignedUrls;
+  preview: MotoristaFrotaDocSignedUrls;
+};
 
 function storagePath(userId: string, motoristaId: string, slug: string, ext: string): string {
   return `${userId}/${motoristaId}/${slug}.${ext}`;
@@ -83,19 +90,32 @@ export function extractMotoristaFrotaDocObjectPath(rawUrl: string): string | nul
   return null;
 }
 
+function buildMotoristaFrotaDocViewerUrl(token: string): string {
+  const base = getMotoristaVerificacaoAppOrigin() || getAppPublicOrigin();
+  if (!base) return "";
+  return `${base.replace(/\/$/, "")}/motorista-frota-doc?t=${encodeURIComponent(token)}`;
+}
+
+function buildMotoristaFrotaDocEdgeUrl(token: string): string {
+  const u = (import.meta.env.VITE_SUPABASE_URL as string | undefined)?.trim();
+  if (!u) return "";
+  return `${u.replace(/\/$/, "")}/functions/v1/motorista-frota-doc-link?t=${encodeURIComponent(token)}`;
+}
+
 /**
- * URLs assinadas para pré-visualização / PDF. Requer sessão do **dono** do ficheiro (RLS no Storage).
- * @param expiresSeg TTL em segundos (ex.: 3600 na ficha, 7200 no PDF).
+ * URLs para pré-visualização (preview) e partilha (share = domínio app).
+ * Usa Edge Function `motorista-frota-doc-link` quando disponível; fallback para CreateSignedUrl.
  */
 export async function signMotoristaFrotaDocUrls(
   supabase: SupabaseClient<Database>,
   dadosWebhook: unknown,
-  expiresSeg = 3600,
-): Promise<MotoristaFrotaDocSignedUrls> {
+  _expiresSeg = 3600,
+): Promise<MotoristaFrotaDocUrlBundle> {
   const dw = parseDadosWebhook(dadosWebhook);
-  const result: MotoristaFrotaDocSignedUrls = {};
+  const share: MotoristaFrotaDocSignedUrls = {};
+  const preview: MotoristaFrotaDocSignedUrls = {};
 
-  const signPath = async (pathRaw: string): Promise<string | undefined> => {
+  const signPathLegacy = async (pathRaw: string): Promise<string | undefined> => {
     const path = pathRaw.trim();
     if (!path) return undefined;
     if (isHttpUrl(path)) {
@@ -106,52 +126,103 @@ export async function signMotoristaFrotaDocUrls(
       if (!extracted) return undefined;
       const { data, error } = await supabase.storage
         .from(MOTORISTA_FROTA_DOCS_BUCKET)
-        .createSignedUrl(extracted, expiresSeg);
+        .createSignedUrl(extracted, 3600);
       if (error || !data?.signedUrl) return undefined;
       return data.signedUrl;
     }
     const { data, error } = await supabase.storage
       .from(MOTORISTA_FROTA_DOCS_BUCKET)
-      .createSignedUrl(path, expiresSeg);
+      .createSignedUrl(path, 3600);
     if (error || !data?.signedUrl) return undefined;
     return data.signedUrl;
   };
 
-  const pPerfil = pickStr(dw, DOC_PATH_KEYS.perfil, "doc_foto_perfil_path");
-  const pFrente = pickStr(dw, DOC_PATH_KEYS.cnhFrente);
-  const pVerso = pickStr(dw, DOC_PATH_KEYS.cnhVerso);
-  const pRes = pickStr(dw, DOC_PATH_KEYS.residencia);
+  /** Path relativo no bucket ou null se for URL externa / vazio. */
+  const toBucketPath = (raw: string | undefined): string | null => {
+    if (!raw || !String(raw).trim()) return null;
+    const s = String(raw).trim();
+    if (isHttpUrl(s)) {
+      if (!s.includes(MOTORISTA_FROTA_DOCS_BUCKET)) return null;
+      return extractMotoristaFrotaDocObjectPath(s);
+    }
+    return s;
+  };
 
-  const perfil = await signPath(pPerfil);
-  if (perfil) result.perfil = perfil;
-  else {
-    const leg = pickStr(dw, "doc_perfil_url", "foto_perfil_url");
-    const s = await signPath(leg);
-    if (s) result.perfil = s;
+  const pathPerfil =
+    toBucketPath(pickStr(dw, DOC_PATH_KEYS.perfil, "doc_foto_perfil_path")) ??
+    toBucketPath(pickStr(dw, "doc_perfil_url", "foto_perfil_url"));
+  const pathFrente =
+    toBucketPath(pickStr(dw, DOC_PATH_KEYS.cnhFrente)) ??
+    toBucketPath(pickStr(dw, "doc_cnh_frente_url"));
+  const pathVerso =
+    toBucketPath(pickStr(dw, DOC_PATH_KEYS.cnhVerso)) ??
+    toBucketPath(pickStr(dw, "doc_cnh_verso_url"));
+  const pathRes =
+    toBucketPath(pickStr(dw, DOC_PATH_KEYS.residencia)) ??
+    toBucketPath(pickStr(dw, "doc_comprovante_residencia_url"));
+
+  const slugToPath: Partial<Record<MotoristaFrotaDocSlug, string>> = {};
+  if (pathPerfil) slugToPath.perfil = pathPerfil;
+  if (pathFrente) slugToPath.cnhFrente = pathFrente;
+  if (pathVerso) slugToPath.cnhVerso = pathVerso;
+  if (pathRes) slugToPath.residencia = pathRes;
+
+  const uniquePaths = [...new Set(Object.values(slugToPath).filter(Boolean))] as string[];
+
+  let tokens: Record<string, string> = {};
+  if (uniquePaths.length > 0) {
+    const { data, error } = await supabase.functions.invoke("motorista-frota-doc-link" as never, {
+      body: { paths: uniquePaths },
+    });
+    if (!error && data && typeof data === "object" && data !== null && "tokens" in data) {
+      const t = (data as { tokens?: Record<string, string> }).tokens;
+      if (t && typeof t === "object") tokens = t;
+    }
   }
 
-  const cnhFrente = await signPath(pFrente);
-  if (cnhFrente) result.cnhFrente = cnhFrente;
-  else {
-    const s = await signPath(pickStr(dw, "doc_cnh_frente_url"));
-    if (s) result.cnhFrente = s;
-  }
+  const fillSlug = async (slug: MotoristaFrotaDocSlug, bucketPath: string | null) => {
+    if (!bucketPath) {
+      let raw = "";
+      if (slug === "perfil") {
+        raw =
+          pickStr(dw, DOC_PATH_KEYS.perfil, "doc_foto_perfil_path") ||
+          pickStr(dw, "doc_perfil_url", "foto_perfil_url");
+      } else if (slug === "cnhFrente") {
+        raw = pickStr(dw, DOC_PATH_KEYS.cnhFrente) || pickStr(dw, "doc_cnh_frente_url");
+      } else if (slug === "cnhVerso") {
+        raw = pickStr(dw, DOC_PATH_KEYS.cnhVerso) || pickStr(dw, "doc_cnh_verso_url");
+      } else {
+        raw = pickStr(dw, DOC_PATH_KEYS.residencia) || pickStr(dw, "doc_comprovante_residencia_url");
+      }
+      const leg = await signPathLegacy(raw);
+      if (leg) {
+        share[slug] = leg;
+        preview[slug] = leg;
+      }
+      return;
+    }
 
-  const cnhVerso = await signPath(pVerso);
-  if (cnhVerso) result.cnhVerso = cnhVerso;
-  else {
-    const s = await signPath(pickStr(dw, "doc_cnh_verso_url"));
-    if (s) result.cnhVerso = s;
-  }
+    const tok = tokens[bucketPath];
+    if (tok) {
+      const sUrl = buildMotoristaFrotaDocViewerUrl(tok);
+      const pUrl = buildMotoristaFrotaDocEdgeUrl(tok);
+      if (sUrl) share[slug] = sUrl;
+      if (pUrl) preview[slug] = pUrl;
+    } else {
+      const leg = await signPathLegacy(bucketPath);
+      if (leg) {
+        share[slug] = leg;
+        preview[slug] = leg;
+      }
+    }
+  };
 
-  const residencia = await signPath(pRes);
-  if (residencia) result.residencia = residencia;
-  else {
-    const s = await signPath(pickStr(dw, "doc_comprovante_residencia_url"));
-    if (s) result.residencia = s;
-  }
+  await fillSlug("perfil", pathPerfil);
+  await fillSlug("cnhFrente", pathFrente);
+  await fillSlug("cnhVerso", pathVerso);
+  await fillSlug("residencia", pathRes);
 
-  return result;
+  return { share, preview };
 }
 
 export function hasMotoristaDocAttachment(dadosWebhook: unknown, slug: MotoristaFrotaDocSlug): boolean {

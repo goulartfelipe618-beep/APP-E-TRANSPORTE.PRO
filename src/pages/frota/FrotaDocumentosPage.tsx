@@ -7,15 +7,15 @@ import { toast } from "sonner";
 import {
   signMotoristaFrotaDocUrls,
   hasMotoristaDocAttachment,
-  type MotoristaFrotaDocSignedUrls,
   type MotoristaFrotaDocSlug,
+  type MotoristaFrotaDocUrlBundle,
 } from "@/lib/motoristaFrotaStorage";
 
 export default function FrotaDocumentosPage() {
   const [loading, setLoading] = useState(true);
   const [nome, setNome] = useState("");
   const [dadosWebhook, setDadosWebhook] = useState<Json | null>(null);
-  const [docUrls, setDocUrls] = useState<MotoristaFrotaDocSignedUrls>({});
+  const [docBundle, setDocBundle] = useState<MotoristaFrotaDocUrlBundle>({ share: {}, preview: {} });
 
   useEffect(() => {
     let cancelled = false;
@@ -39,7 +39,7 @@ export default function FrotaDocumentosPage() {
             toast.error("Não foi possível carregar os documentos.");
             setNome("");
             setDadosWebhook(null);
-            setDocUrls({});
+            setDocBundle({ share: {}, preview: {} });
           }
           return;
         }
@@ -48,7 +48,7 @@ export default function FrotaDocumentosPage() {
           setDadosWebhook((data.dados_webhook as Json) ?? null);
         }
         const urls = await signMotoristaFrotaDocUrls(supabase, data.dados_webhook, 3600);
-        if (!cancelled) setDocUrls(urls);
+        if (!cancelled) setDocBundle(urls);
       } catch {
         if (!cancelled) toast.error("Erro ao carregar documentos.");
       } finally {
@@ -94,7 +94,8 @@ export default function FrotaDocumentosPage() {
 
       <div className="grid gap-4 sm:grid-cols-2">
         {rows.map(({ slug, title }) => {
-          const url = docUrls[slug];
+          const previewUrl = docBundle.preview[slug];
+          const shareUrl = docBundle.share[slug];
           const ok = hasMotoristaDocAttachment(dadosWebhook, slug);
           return (
             <div key={slug} className="rounded-xl border border-border bg-card p-4 shadow-sm">
@@ -114,18 +115,18 @@ export default function FrotaDocumentosPage() {
                   {ok ? "Anexada" : "Pendente"}
                 </Badge>
               </div>
-              {url ? (
+              {previewUrl ? (
                 <>
                   <a
-                    href={url}
+                    href={shareUrl || previewUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="block overflow-hidden rounded-lg border border-border bg-muted/20"
                   >
-                    <img src={url} alt="" className="max-h-48 w-full object-contain" />
+                    <img src={previewUrl} alt="" className="max-h-48 w-full object-contain" />
                   </a>
                   <a
-                    href={url}
+                    href={shareUrl || previewUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="mt-2 inline-flex items-center gap-1 text-sm text-[#FF6600] hover:underline"
