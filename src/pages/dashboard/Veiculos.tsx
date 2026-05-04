@@ -42,8 +42,12 @@ export default function VeiculosPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const { data: auth } = await supabase.auth.getUser();
-    const uid = auth.user?.id;
+    const { data: sessionData } = await supabase.auth.getSession();
+    let uid = sessionData.session?.user?.id;
+    if (!uid) {
+      const { data: auth } = await supabase.auth.getUser();
+      uid = auth.user?.id;
+    }
     if (!uid) {
       setVeiculos([]);
       setLoading(false);

@@ -141,20 +141,28 @@ export default function AdminVeiculosPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from("veiculos_frota")
-      .select("*")
-      .order("created_at", { ascending: false });
-
-    if (error) {
-      toast.error("Não foi possível carregar os veículos.");
-      setRows([]);
-      setUserById({});
-      setLoading(false);
-      return;
+    const rpcRes = await supabase.rpc("admin_list_veiculos_frota" as never);
+    let list: VeiculoFrotaAdminRow[] = [];
+    if (!rpcRes.error && rpcRes.data != null) {
+      list = rpcRes.data as VeiculoFrotaAdminRow[];
+    } else {
+      const fb = await supabase
+        .from("veiculos_frota")
+        .select("*")
+        .order("created_at", { ascending: false });
+      if (fb.error) {
+        toast.error(
+          rpcRes.error
+            ? `Não foi possível carregar os veículos: ${rpcRes.error.message}`
+            : "Não foi possível carregar os veículos.",
+        );
+        setRows([]);
+        setUserById({});
+        setLoading(false);
+        return;
+      }
+      list = (fb.data || []) as VeiculoFrotaAdminRow[];
     }
-
-    const list = (data || []) as VeiculoFrotaAdminRow[];
     setRows(list);
 
     const userIds = [...new Set(list.map((r) => r.user_id).filter(Boolean))];
