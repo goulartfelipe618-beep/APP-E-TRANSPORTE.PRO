@@ -67,7 +67,7 @@ Deno.serve(async (req) => {
 
         if (error || !row) {
           return new Response(JSON.stringify({ error: "Link inválido ou cadastro indisponível." }), {
-            status: 404,
+            status: 422,
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
         }
@@ -115,7 +115,7 @@ Deno.serve(async (req) => {
 
         if (qErr || !row) {
           return new Response(JSON.stringify({ error: "Link inválido." }), {
-            status: 404,
+            status: 422,
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
         }
