@@ -56,12 +56,20 @@ export default function CampanhasAtivosPage() {
 
   const fetchCampanhas = useCallback(async () => {
     setLoading(true);
-    const { data: authData } = await supabase.auth.getUser();
-    const uid = authData.user?.id;
+    const { data: sessionData } = await supabase.auth.getSession();
+    let uid = sessionData.session?.user?.id;
+    if (!uid) {
+      const { data: authData } = await supabase.auth.getUser();
+      uid = authData.user?.id;
+    }
     if (!uid) {
       setCampanhas([]);
       setLoading(false);
       return;
+    }
+    const { error: rpcErr } = await supabase.rpc("ensure_my_campaign_webhooks" as never);
+    if (rpcErr) {
+      console.warn("ensure_my_campaign_webhooks:", rpcErr.message);
     }
     const { data, error } = await supabase
       .from("campanhas" as any)

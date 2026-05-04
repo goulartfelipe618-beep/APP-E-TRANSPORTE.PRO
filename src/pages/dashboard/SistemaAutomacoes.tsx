@@ -204,12 +204,21 @@ export default function SistemaAutomacoesPage() {
   const [campaignMeta, setCampaignMeta] = useState<any>(null);
 
   const fetchAutomacoes = useCallback(async () => {
-    const { data: authData } = await supabase.auth.getUser();
-    const uid = authData.user?.id;
+    setLoading(true);
+    const { data: sessionData } = await supabase.auth.getSession();
+    let uid = sessionData.session?.user?.id;
+    if (!uid) {
+      const { data: authData } = await supabase.auth.getUser();
+      uid = authData.user?.id;
+    }
     if (!uid) {
       setAutomacoes([]);
       setLoading(false);
       return;
+    }
+    const { error: rpcErr } = await supabase.rpc("ensure_my_campaign_webhooks" as never);
+    if (rpcErr) {
+      console.warn("ensure_my_campaign_webhooks:", rpcErr.message);
     }
     const { data, error } = await supabase
       .from("automacoes")
@@ -253,7 +262,20 @@ export default function SistemaAutomacoesPage() {
     setLoading(false);
   }, []);
 
-  useEffect(() => { fetchAutomacoes(); }, [fetchAutomacoes]);
+  useEffect(() => {
+    void fetchAutomacoes();
+    const { data: sub } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_OUT") {
+        setAutomacoes([]);
+        setLoading(false);
+        return;
+      }
+      if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED" || event === "USER_UPDATED") {
+        void fetchAutomacoes();
+      }
+    });
+    return () => sub.subscription.unsubscribe();
+  }, [fetchAutomacoes]);
 
   const automacoesPlataforma = useMemo(
     () => automacoes.filter((a) => !isWebhookCampanhaAutomacao(a)),
