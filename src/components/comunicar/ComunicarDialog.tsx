@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { useComunicadoresEvolution } from "@/hooks/useComunicadoresEvolution";
 import {
   buildComunicadorSnapshot,
+  buildN8nEnvioWhatsappCampos,
   dispatchComunicarWebhook,
   fetchMotoristaPainelSnapshot,
   jsonSafeRecord,
@@ -253,6 +254,7 @@ export default function ComunicarDialog({
         }
 
         const motorista = await fetchMotoristaPainelSnapshot();
+        const comunicadorSnap = buildComunicadorSnapshot(sistema, own);
         await dispatchComunicarWebhook(webhookTipo, {
           evento: isReservaN8n ? "comunicar_reserva_webhook" : "comunicar_envio_webhook",
           webhook_tipo: webhookTipo,
@@ -271,8 +273,15 @@ export default function ComunicarDialog({
             final: msgAbaixo,
           },
           motorista_painel: motorista,
-          comunicador: buildComunicadorSnapshot(sistema, own),
+          comunicador: comunicadorSnap,
           confirmacao_reserva_pdf: confirmacaoPdf,
+          ...buildN8nEnvioWhatsappCampos(comunicadorSnap, phone, {
+            mensagem: message,
+            tipo: webhookTipo,
+          }),
+          ...(confirmacaoPdf
+            ? { pdf_base64: confirmacaoPdf.base64, pdf_filename: confirmacaoPdf.filename }
+            : {}),
         });
       } catch (e) {
         console.error(e);

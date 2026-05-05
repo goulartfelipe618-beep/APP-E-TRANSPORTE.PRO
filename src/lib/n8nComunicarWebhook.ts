@@ -1,6 +1,12 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { ComunicadorRow } from "@/hooks/useComunicadoresEvolution";
 
+/**
+ * Número público da linha oficial da plataforma (E.164 sem `+`), para metadata no webhook / n8n
+ * quando o envio não usa o WhatsApp próprio do motorista na Evolution.
+ */
+export const NUMERO_OFICIAL_PLATAFORMA_E164 = "554796234862";
+
 /** Estados Evolution/API que tratamos como “sessão ativa” para linha própria. */
 const CONNECTED_STATUS = new Set(["open", "conectado", "connected", "online"]);
 
@@ -70,7 +76,9 @@ export function buildComunicadorSnapshot(
   sistema: ComunicadorRow | null,
   own: ComunicadorRow | null,
 ): Record<string, unknown> {
-  const telOf = sistema?.telefone_conectado?.trim() || null;
+  const telOfDb = sistema?.telefone_conectado?.trim() || null;
+  /** Sempre definido para o n8n indicar a linha oficial humana, mesmo sem sync no banco. */
+  const telOficialPublico = telOfDb || NUMERO_OFICIAL_PLATAFORMA_E164;
   const telOwn = own?.telefone_conectado?.trim() || null;
   const ownInstance = own?.instance_name?.trim() || null;
   const linhaPropria =
@@ -92,16 +100,70 @@ export function buildComunicadorSnapshot(
 
   return {
     canal_escolhido: canalEscolhido,
-    linha_oficial: telOf
-      ? {
-          telefone_e164: telOf,
-          nome_dispositivo: sistema?.nome_dispositivo ?? null,
-          instance_name: sistema?.instance_name ?? null,
-          connection_status: sistema?.connection_status ?? null,
-          comunicador_id: sistema?.id ?? null,
-        }
-      : null,
+    linha_oficial: {
+      telefone_e164: telOficialPublico,
+      nome_dispositivo: sistema?.nome_dispositivo ?? null,
+      instance_name: sistema?.instance_name ?? null,
+      connection_status: sistema?.connection_status ?? null,
+      comunicador_id: sistema?.id ?? null,
+    },
     linha_propria_motorista: linhaPropria,
+  };
+}
+
+/**
+ * Campos na raiz do JSON esperados pelo n8n (ex. nó “Extrair e Validar”): destinatário,
+ * instância Evolution da linha própria, canal e remetente explícitos.
+ */
+export function normalizeTelefoneDestinoE164(digitsOrRaw: string | null | undefined): string | null {
+  if (digitsOrRaw == null) return null;
+  let tel = String(digitsOrRaw).replace(/\D/g, "");
+  if (!tel) return null;
+  if (!tel.startsWith("55")) tel = `55${tel}`;
+  return tel;
+}
+
+export function buildN8nEnvioWhatsappCampos(
+  comunicador: Record<string, unknown>,
+  telefoneClienteDigitsOrRaw: string | null | undefined,
+  extras?: { mensagem?: string | null; tipo?: string | null },
+): Record<string, unknown> {
+  const canalRaw = comunicador.canal_escolhido;
+  const canal = canalRaw === "proprio" ? "proprio" : "oficial";
+
+  const linhaOf = comunicador.linha_oficial as
+    | { telefone_e164?: string | null; instance_name?: string | null }
+    | null
+    | undefined;
+  const linhaOwn = comunicador.linha_propria_motorista as
+    | { telefone_e164?: string | null; instance_name?: string | null }
+    | null
+    | undefined;
+
+  const instanceProprio = linhaOwn?.instance_name?.trim() || null;
+  const whatsapp_destino_e164 = normalizeTelefoneDestinoE164(telefoneClienteDigitsOrRaw);
+
+  const numeroOficial =
+    linhaOf?.telefone_e164?.trim() || NUMERO_OFICIAL_PLATAFORMA_E164;
+  const numeroRemetenteE164 =
+    canal === "proprio" ? (linhaOwn?.telefone_e164?.trim() || null) : numeroOficial;
+
+  const mensagem = extras?.mensagem ?? null;
+  const tipo = extras?.tipo ?? null;
+
+  return {
+    whatsapp_destino_e164,
+    canal_whatsapp: canal,
+    /** Instância Evolution do motorista (vazia se só usar oficial). Usada no n8n para `/instance/connectionState/{instance}`. */
+    whatsapp_instance: instanceProprio,
+    numero_oficial_plataforma_e164: NUMERO_OFICIAL_PLATAFORMA_E164,
+    numero_remetente_e164: numeroRemetenteE164,
+    envio_pela_linha:
+      canal === "proprio" ? "whatsapp_proprio_motorista" : "whatsapp_oficial_plataforma",
+    usa_linha_propria_evolution: canal === "proprio",
+    mensagem,
+    mensagem_completa: mensagem,
+    tipo,
   };
 }
 

@@ -21,7 +21,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { Tables } from "@/integrations/supabase/types";
+import { useComunicadoresEvolution } from "@/hooks/useComunicadoresEvolution";
 import {
+  buildComunicadorSnapshot,
+  buildN8nEnvioWhatsappCampos,
   dispatchComunicarWebhook,
   fetchMotoristaPainelSnapshot,
   jsonSafeRecord,
@@ -64,6 +67,7 @@ function statusLabel(status: string | null | undefined): { label: string; tone: 
 }
 
 export default function TransferGeolocalizacaoPage() {
+  const { sistema, own } = useComunicadoresEvolution();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadingRastreios, setLoadingRastreios] = useState(true);
@@ -281,6 +285,8 @@ export default function TransferGeolocalizacaoPage() {
         if (data) reservaSnapshot = jsonSafeRecord(data as unknown as Record<string, unknown>);
       }
 
+      const mensagemGeo = `Acompanhe em tempo real: ${url}`;
+      const comunicadorSnap = buildComunicadorSnapshot(sistema, own);
       await dispatchComunicarWebhook("geolocalizacao", {
         evento: "enviar_link_rastreamento",
         momento: new Date().toISOString(),
@@ -295,6 +301,11 @@ export default function TransferGeolocalizacaoPage() {
         observacoes: r.observacoes,
         reserva: reservaSnapshot,
         motorista_painel: motorista,
+        comunicador: comunicadorSnap,
+        ...buildN8nEnvioWhatsappCampos(comunicadorSnap, r.cliente_telefone, {
+          mensagem: mensagemGeo,
+          tipo: "geolocalizacao",
+        }),
       });
 
       const { error: updErr } = await supabase
