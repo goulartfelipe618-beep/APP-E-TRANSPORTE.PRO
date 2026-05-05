@@ -28,6 +28,15 @@ async function hasVerifiedTotpFactor(supabase: SupabaseClient): Promise<boolean>
   return false;
 }
 
+export type MfaTotpChallengeOptions = {
+  /**
+   * Logo após `signInWithPassword` (ou nova senha por recuperação): se existir TOTP verificado na conta,
+   * **sempre** exigir `/mfa` neste acesso. Não confiar no JWT (pode ficar `aal2` de uma sessão antiga na
+   * mesma aba antes do GoTrue actualizar o armazenamento).
+   */
+  afterPasswordSignIn?: boolean;
+};
+
 /**
  * Indica se a sessão atual precisa completar o desafio TOTP antes de aceder ao painel.
  * Cada utilizador tem os seus próprios fatores em `auth.mfa_factors` (ligados ao `user_id` da sessão).
@@ -35,16 +44,22 @@ async function hasVerifiedTotpFactor(supabase: SupabaseClient): Promise<boolean>
  * `sessionHint`: usar **sempre** após `signInWithPassword` / evento com a sessão nova — `getSession()` pode
  * devolver momentaneamente o token antigo (ex.: ainda `aal2`), saltando o 2FA indevidamente.
  *
- * Regra: nunca contornar 2FA quando existir fator TOTP verificado e o JWT ainda não estiver em `aal2`.
+ * Regra: nunca contornar 2FA quando existir fator TOTP verificado e o JWT ainda não estiver em `aal2`
+ * (excepto quando `afterPasswordSignIn` força o desafio sempre que houver TOTP, independentemente do JWT).
  */
 export async function sessionRequiresMfaTotpChallenge(
   supabase: SupabaseClient,
   sessionHint?: Session | null,
+  opts?: MfaTotpChallengeOptions,
 ): Promise<boolean> {
   const { data: sessionData } = await supabase.auth.getSession();
   /** Preferir sessão explícita (evita token antigo na mesma aba após novo login). */
   const session = sessionHint ?? sessionData.session;
   if (!session?.access_token) return false;
+
+  if (opts?.afterPasswordSignIn) {
+    return await hasVerifiedTotpFactor(supabase);
+  }
 
   let accessToken = session.access_token;
 

@@ -27,6 +27,7 @@ import { applyDocumentClassDark, applyThemeForRoute } from "@/lib/panelTheme";
 import { clearAuthStartedAt, isAuthExpired, readAuthStartedAt, setAuthStartedAt } from "@/lib/authExpiry";
 import type { Session } from "@supabase/supabase-js";
 import { sessionRequiresMfaTotpChallenge } from "@/lib/mfaGate";
+import { formatAuthSignInError } from "@/lib/authSignInErrors";
 
 /** Persistência opcional; não ler na montagem — evita exibir URL antiga da imagem antes do fetch. */
 const LOGIN_CONFIG_CACHE_KEY = "etp_login_painel_config_v1";
@@ -203,7 +204,7 @@ const Login = () => {
       const {
         data: { session: recoverySession },
       } = await supabase.auth.getSession();
-      if (await sessionRequiresMfaTotpChallenge(supabase, recoverySession)) {
+      if (await sessionRequiresMfaTotpChallenge(supabase, recoverySession, { afterPasswordSignIn: true })) {
         navigate("/mfa", { replace: true });
         return;
       }
@@ -323,14 +324,25 @@ const Login = () => {
     });
 
     if (authError) {
-      setError(authError.message);
+      if (import.meta.env.DEV) {
+        // eslint-disable-next-line no-console
+        console.warn("[login] signInWithPassword", authError.message, authError);
+      }
+      setError(formatAuthSignInError(authError));
+      setLoading(false);
+      refreshCaptcha();
+      return;
+    }
+
+    if (!data.user) {
+      setError("Resposta de autenticação inválida. Tente novamente.");
       setLoading(false);
       refreshCaptcha();
       return;
     }
 
     const sessionAfterSignIn = data.session ?? (await supabase.auth.getSession()).data.session;
-    if (await sessionRequiresMfaTotpChallenge(supabase, sessionAfterSignIn)) {
+    if (await sessionRequiresMfaTotpChallenge(supabase, sessionAfterSignIn, { afterPasswordSignIn: true })) {
       setLoading(false);
       navigate("/mfa", { replace: true });
       return;
@@ -485,7 +497,7 @@ const Login = () => {
                         <Label className="text-xs">Codigo de seguranca</Label>
                         <div className="flex items-center gap-2">
                           <Key className="h-4 w-4 text-muted-foreground" />
-                          <div className="rounded-md border bg-muted px-4 py-1.5 text-sm font-mono tracking-widest line-through decoration-muted-foreground/40">
+                          <div className="rounded-md border bg-muted px-4 py-1.5 text-sm font-mono tracking-widest select-none">
                             {captcha}
                           </div>
                           <button
