@@ -1,4 +1,4 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Session, SupabaseClient } from "@supabase/supabase-js";
 
 /** Nível AAL presente no JWT emitido pelo GoTrue (após verificação TOTP fica `aal2`). */
 export function jwtAuthenticatorAssuranceLevel(accessToken: string): "aal1" | "aal2" | null {
@@ -32,11 +32,18 @@ async function hasVerifiedTotpFactor(supabase: SupabaseClient): Promise<boolean>
  * Indica se a sessão atual precisa completar o desafio TOTP antes de aceder ao painel.
  * Cada utilizador tem os seus próprios fatores em `auth.mfa_factors` (ligados ao `user_id` da sessão).
  *
+ * `sessionHint`: usar **sempre** após `signInWithPassword` / evento com a sessão nova — `getSession()` pode
+ * devolver momentaneamente o token antigo (ex.: ainda `aal2`), saltando o 2FA indevidamente.
+ *
  * Regra: nunca contornar 2FA quando existir fator TOTP verificado e o JWT ainda não estiver em `aal2`.
  */
-export async function sessionRequiresMfaTotpChallenge(supabase: SupabaseClient): Promise<boolean> {
+export async function sessionRequiresMfaTotpChallenge(
+  supabase: SupabaseClient,
+  sessionHint?: Session | null,
+): Promise<boolean> {
   const { data: sessionData } = await supabase.auth.getSession();
-  const session = sessionData.session;
+  /** Preferir sessão explícita (evita token antigo na mesma aba após novo login). */
+  const session = sessionHint ?? sessionData.session;
   if (!session?.access_token) return false;
 
   let accessToken = session.access_token;
@@ -48,15 +55,23 @@ export async function sessionRequiresMfaTotpChallenge(supabase: SupabaseClient):
   const runAssurance = () => supabase.auth.mfa.getAuthenticatorAssuranceLevel();
 
   let { data: assurance, error: assuranceErr } = await runAssurance();
+
   if (assuranceErr) {
-    await supabase.auth.refreshSession();
-    const { data: s2 } = await supabase.auth.getSession();
-    const t2 = s2.session?.access_token;
-    if (t2 && jwtAuthenticatorAssuranceLevel(t2) === "aal2") {
-      return false;
+    if (sessionHint) {
+      /** Logo após login, não refrescar de imediato — pode misturar estado; só repetir AAL. */
+      await new Promise((r) => setTimeout(r, 120));
+      ({ data: assurance, error: assuranceErr } = await runAssurance());
     }
-    if (t2) accessToken = t2;
-    ({ data: assurance, error: assuranceErr } = await runAssurance());
+    if (assuranceErr && !sessionHint) {
+      await supabase.auth.refreshSession();
+      const { data: s2 } = await supabase.auth.getSession();
+      const t2 = s2.session?.access_token;
+      if (t2 && jwtAuthenticatorAssuranceLevel(t2) === "aal2") {
+        return false;
+      }
+      if (t2) accessToken = t2;
+      ({ data: assurance, error: assuranceErr } = await runAssurance());
+    }
   }
 
   const apiRequiresStepUp =

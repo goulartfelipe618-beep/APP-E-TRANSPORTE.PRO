@@ -25,6 +25,7 @@ import {
 import LoginAvisosBanner from "@/components/LoginAvisosBanner";
 import { applyDocumentClassDark, applyThemeForRoute } from "@/lib/panelTheme";
 import { clearAuthStartedAt, isAuthExpired, readAuthStartedAt, setAuthStartedAt } from "@/lib/authExpiry";
+import type { Session } from "@supabase/supabase-js";
 import { sessionRequiresMfaTotpChallenge } from "@/lib/mfaGate";
 
 /** Persistência opcional; não ler na montagem — evita exibir URL antiga da imagem antes do fetch. */
@@ -105,7 +106,7 @@ const Login = () => {
       setGateReady(true);
     };
 
-    const redirectLoggedInUser = async (session: { user: { id: string }; access_token: string }) => {
+    const redirectLoggedInUser = async (session: Session) => {
       if (cancelled || passwordRecoveryRef.current) return;
 
       const startedAt = readAuthStartedAt();
@@ -117,7 +118,7 @@ const Login = () => {
         return;
       }
 
-      if (await sessionRequiresMfaTotpChallenge(supabase)) {
+      if (await sessionRequiresMfaTotpChallenge(supabase, session)) {
         navigate("/mfa", { replace: true });
         return;
       }
@@ -127,7 +128,7 @@ const Login = () => {
       navigate(path, { replace: true });
     };
 
-    const scheduleRedirectIfLoggedIn = (session: { user: { id: string }; access_token: string } | null) => {
+    const scheduleRedirectIfLoggedIn = (session: Session | null) => {
       if (!session || passwordRecoveryRef.current) {
         if (!passwordRecoveryRef.current) setGateReady(true);
         return;
@@ -199,7 +200,10 @@ const Login = () => {
       await supabase.auth.refreshSession();
       toast.success("Senha atualizada com sucesso.");
 
-      if (await sessionRequiresMfaTotpChallenge(supabase)) {
+      const {
+        data: { session: recoverySession },
+      } = await supabase.auth.getSession();
+      if (await sessionRequiresMfaTotpChallenge(supabase, recoverySession)) {
         navigate("/mfa", { replace: true });
         return;
       }
@@ -325,13 +329,15 @@ const Login = () => {
       return;
     }
 
-    if (await sessionRequiresMfaTotpChallenge(supabase)) {
+    const sessionAfterSignIn = data.session ?? (await supabase.auth.getSession()).data.session;
+    if (await sessionRequiresMfaTotpChallenge(supabase, sessionAfterSignIn)) {
       setLoading(false);
       navigate("/mfa", { replace: true });
       return;
     }
 
     const path = await getPostLoginPath(data.user.id);
+    setLoading(false);
     setAuthStartedAt(Date.now());
     // Aplica o tema do utilizador para a rota de destino antes da navegação,
     // garantindo que o DashboardLayout monta já com a classe correcta no <html>.
