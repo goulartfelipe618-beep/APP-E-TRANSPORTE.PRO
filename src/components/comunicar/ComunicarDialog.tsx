@@ -10,6 +10,7 @@ import { useComunicadoresEvolution } from "@/hooks/useComunicadoresEvolution";
 import {
   buildComunicadorSnapshot,
   buildN8nEnvioWhatsappCampos,
+  coletarTelefoneDestinoDoRegistro,
   dispatchComunicarWebhook,
   fetchMotoristaPainelSnapshot,
   jsonSafeRecord,
@@ -234,7 +235,9 @@ export default function ComunicarDialog({
         return;
       }
 
-      const phone = telefone?.replace(/\D/g, "") || "";
+      const row = jsonSafeRecord(dadosRef.current as Record<string, unknown>) as Record<string, unknown>;
+      const phoneSource = coletarTelefoneDestinoDoRegistro(telefone, row);
+      const phone = phoneSource.replace(/\D/g, "") || "";
       const message = base;
 
       setEnviando(true);
@@ -263,9 +266,7 @@ export default function ComunicarDialog({
           titulo_modal: titulo,
           telefone_cliente: phone || null,
           telefone_cliente_disponivel: Boolean(phone),
-          dados_registro: dadosRegistroComunicarParaWebhook(
-            jsonSafeRecord(dadosRef.current as Record<string, unknown>) as Record<string, unknown>,
-          ),
+          dados_registro: dadosRegistroComunicarParaWebhook(row),
           variaveis_chaves_incluidas: [...selectedVars],
           mensagem_completa: message,
           mensagem_partes: {

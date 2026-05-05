@@ -123,6 +123,40 @@ export function normalizeTelefoneDestinoE164(digitsOrRaw: string | null | undefi
   return tel;
 }
 
+const CANDIDATE_FONE_KEYS = [
+  "whatsapp",
+  "contato",
+  "telefone",
+  "telefone_cliente",
+  "phone",
+] as const;
+
+/**
+ * Telefone do cliente para o n8n: prioriza o passado pelo ecrã; se vazio, procura colunas usuais no registo
+ * (ex.: solicitações de grupo só preenchem `whatsapp`).
+ */
+export function coletarTelefoneDestinoDoRegistro(
+  preferido: string | null | undefined,
+  dados: Record<string, unknown>,
+): string {
+  const extrair = (v: unknown): string | null => {
+    if (v == null || v === "") return null;
+    const s = String(v).trim();
+    const digitos = s.replace(/\D/g, "");
+    if (digitos.length < 8) return null;
+    return s;
+  };
+  const p = extrair(preferido);
+  if (p) return p;
+  for (const k of CANDIDATE_FONE_KEYS) {
+    if (Object.prototype.hasOwnProperty.call(dados, k)) {
+      const e = extrair(dados[k]);
+      if (e) return e;
+    }
+  }
+  return preferido != null && String(preferido).trim() !== "" ? String(preferido).trim() : "";
+}
+
 export function buildN8nEnvioWhatsappCampos(
   comunicador: Record<string, unknown>,
   telefoneClienteDigitsOrRaw: string | null | undefined,
@@ -163,6 +197,8 @@ export function buildN8nEnvioWhatsappCampos(
     usa_linha_propria_evolution: canal === "proprio",
     mensagem,
     mensagem_completa: mensagem,
+    /** Id do webhook no painel Admin (ex. `grupo_solicitacao`); use no n8n em vez de `tipo` do registo. */
+    tipo_webhook: tipo,
     tipo,
   };
 }
