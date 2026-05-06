@@ -42,6 +42,13 @@ type Props = {
   hideViteHint?: boolean;
   /** Layout motorista: conectado = foto + número + menu ⋮ para excluir; sem botões grandes de remover/gerar quando conectado. */
   motoristaOwn?: boolean;
+  /** Texto do número a mostrar (ex.: oficial fixo), independentemente de `row.telefone_conectado`. */
+  telefoneExibicao?: string | null;
+  /**
+   * Quando true, a secção trata a linha como desligada na UI (badge e fluxo “conectado”),
+   * útil quando o utilizador usa apenas o WhatsApp próprio para envios.
+   */
+  forcarDesconectado?: boolean;
 };
 
 export function ComunicadorEvolutionSection({
@@ -59,17 +66,27 @@ export function ComunicadorEvolutionSection({
   hideQr,
   hideViteHint,
   motoristaOwn,
+  telefoneExibicao,
+  forcarDesconectado,
 }: Props) {
   const [removeOpen, setRemoveOpen] = useState(false);
   const img = qrSrc(row?.qr_code_base64 ?? null);
   const envOk = hideViteHint || evolutionEnvConfigured(evolutionCreds ?? undefined);
 
-  const isConnected =
+  const derivedConnected =
     Boolean(row?.telefone_conectado?.trim()) || row?.connection_status === "conectado";
+  const isConnected = forcarDesconectado ? false : derivedConnected;
+
+  const numeroLinha =
+    telefoneExibicao?.trim() ||
+    (row?.telefone_conectado ? formatPhoneBrDisplay(row.telefone_conectado) : null);
+
+  const badgeStatus = forcarDesconectado ? "desconectado" : (row?.connection_status ?? "—");
 
   const displayName =
-    row?.nome_dispositivo?.trim() ||
-    (isConnected ? "WhatsApp conectado" : null);
+    forcarDesconectado && !motoristaOwn
+      ? null
+      : row?.nome_dispositivo?.trim() || (isConnected ? "WhatsApp conectado" : null);
 
   const initials = (displayName || "WA")
     .split(/\s+/)
@@ -92,16 +109,15 @@ export function ComunicadorEvolutionSection({
             <div className="min-w-0 flex-1 space-y-1">
               <CardTitle className="flex flex-wrap items-center gap-2 text-lg">
                 {title}
-                <Badge variant="outline">{row?.connection_status ?? "—"}</Badge>
+                <Badge variant="outline">{badgeStatus}</Badge>
               </CardTitle>
               <CardDescription>{description}</CardDescription>
               {displayName && (motoristaOwn ? isConnected : true) ? (
                 <p className="pt-1 text-sm font-medium text-foreground">{displayName}</p>
               ) : null}
-              {row?.telefone_conectado ? (
+              {numeroLinha ? (
                 <p className="pt-1 text-sm text-foreground">
-                  Número:{" "}
-                  <span className="font-mono font-semibold">{formatPhoneBrDisplay(row.telefone_conectado)}</span>
+                  Número: <span className="font-mono font-semibold">{numeroLinha}</span>
                 </p>
               ) : null}
               {row?.instance_name ? (
@@ -149,7 +165,7 @@ export function ComunicadorEvolutionSection({
             A conexão com a Evolution é feita ao salvar os dados acima; o número sincronizado aparece aqui e para todos os motoristas.
           </p>
         )}
-        {readOnly && !row?.telefone_conectado && !img && !loading && (
+        {readOnly && !numeroLinha && !img && !loading && (
           <p className="text-sm text-muted-foreground">
             Quando a linha oficial estiver sincronizada (n8n / backend), o número aparecerá aqui para referência.
           </p>

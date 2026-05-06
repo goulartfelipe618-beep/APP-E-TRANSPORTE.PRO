@@ -52,6 +52,67 @@ function labelGrupo(r: ReservaGrupo) {
   return `#${r.numero_reserva} · ${r.nome_completo}${data ? ` · ${data}` : ""} · ${rota}`;
 }
 
+/** Normaliza valor da BD para YYYY-MM-DD (fuso local ao comparar com o relógio do utilizador). */
+function parseYmdFromDb(v: string | null | undefined): string | null {
+  if (!v) return null;
+  const s = String(v).trim();
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+  const d = new Date(s);
+  if (Number.isNaN(d.getTime())) return null;
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function parseHm(hora: string | null | undefined): { h: number; m: number } | null {
+  if (!hora) return null;
+  const s = String(hora).trim();
+  const m = s.match(/(\d{1,2}):(\d{2})/);
+  if (!m) return null;
+  return { h: Number(m[1]), m: Number(m[2]) };
+}
+
+/**
+ * true se a data/hora de início do serviço ainda não passou no calendário local:
+ * — dia futuro; ou — mesmo dia sem hora (considera o dia ainda elegível); ou — mesmo dia com hora > agora.
+ */
+function instanteAindaPorVir(dataRaw: string | null | undefined, hora: string | null | undefined, now: Date): boolean {
+  const ymd = parseYmdFromDb(dataRaw);
+  if (!ymd) return false;
+  const [y, mo, d] = ymd.split("-").map(Number);
+  if (!Number.isFinite(y) || !Number.isFinite(mo) || !Number.isFinite(d)) return false;
+  const dayStart = new Date(y, mo - 1, d, 0, 0, 0, 0);
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+  if (dayStart.getTime() > todayStart.getTime()) return true;
+  if (dayStart.getTime() < todayStart.getTime()) return false;
+  const hm = parseHm(hora);
+  if (!hm) return true;
+  const scheduled = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hm.h, hm.m, 0, 0);
+  return scheduled.getTime() > now.getTime();
+}
+
+function reservaTransferTemAgendaFutura(r: ReservaTransfer, now: Date): boolean {
+  const tvRaw = (r.tipo_viagem ?? "").trim();
+  const tv = tvRaw === "ida" ? "somente_ida" : tvRaw;
+  if (tv === "por_hora") {
+    return instanteAindaPorVir(r.por_hora_data, r.por_hora_hora, now);
+  }
+  const idaOk = instanteAindaPorVir(r.ida_data, r.ida_hora, now);
+  if (tv === "ida_volta") {
+    const voltaOk = instanteAindaPorVir(r.volta_data, r.volta_hora, now);
+    return idaOk || voltaOk;
+  }
+  return idaOk;
+}
+
+function reservaGrupoTemAgendaFutura(r: ReservaGrupo, now: Date): boolean {
+  const idaOk = instanteAindaPorVir(r.data_ida, r.hora_ida, now);
+  const dataRet = parseYmdFromDb(r.data_retorno) ?? parseYmdFromDb(r.data_ida);
+  const voltaOk = instanteAindaPorVir(dataRet, r.hora_retorno, now);
+  return idaOk || voltaOk;
+}
+
 function statusLabel(status: string | null | undefined): { label: string; tone: "on" | "off" | "idle" } {
   switch (status) {
     case "ativo":
@@ -175,7 +236,17 @@ export default function TransferGeolocalizacaoPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reservaKey]);
 
-  const totalReservas = reservasTransfer.length + reservasGrupos.length;
+  const reservasTransferFuturas = useMemo(() => {
+    const now = new Date();
+    return reservasTransfer.filter((r) => reservaTransferTemAgendaFutura(r, now));
+  }, [reservasTransfer, open]);
+
+  const reservasGruposFuturas = useMemo(() => {
+    const now = new Date();
+    return reservasGrupos.filter((r) => reservaGrupoTemAgendaFutura(r, now));
+  }, [reservasGrupos, open]);
+
+  const totalReservasFuturas = reservasTransferFuturas.length + reservasGruposFuturas.length;
 
   /**
    * Cria o rastreio na base de dados (token gerado automaticamente por default).
@@ -658,28 +729,28 @@ export default function TransferGeolocalizacaoPage() {
                 )}
                 value={reservaKey || ""}
                 onChange={(e) => setReservaKey(e.target.value)}
-                disabled={loading || totalReservas === 0}
+                disabled={loading || totalReservasFuturas === 0}
                 aria-label="Reserva (Transfer ou Grupo)"
               >
                 <option value="">
                   {loading
                     ? "Carregando reservas…"
-                    : totalReservas === 0
-                      ? "Nenhuma reserva — cadastre em Transfer / Grupos → Reservas"
+                    : totalReservasFuturas === 0
+                      ? "Nenhuma reserva futura — cadastre em Transfer / Grupos → Reservas"
                       : "Selecione uma reserva"}
                 </option>
-                {reservasTransfer.length > 0 ? (
+                {reservasTransferFuturas.length > 0 ? (
                   <optgroup label="Transfer">
-                    {reservasTransfer.map((r) => (
+                    {reservasTransferFuturas.map((r) => (
                       <option key={`t-${r.id}`} value={`transfer:${r.id}`}>
                         {labelTransfer(r)}
                       </option>
                     ))}
                   </optgroup>
                 ) : null}
-                {reservasGrupos.length > 0 ? (
+                {reservasGruposFuturas.length > 0 ? (
                   <optgroup label="Grupos">
-                    {reservasGrupos.map((r) => (
+                    {reservasGruposFuturas.map((r) => (
                       <option key={`g-${r.id}`} value={`grupo:${r.id}`}>
                         {labelGrupo(r)}
                       </option>
@@ -687,6 +758,12 @@ export default function TransferGeolocalizacaoPage() {
                   </optgroup>
                 ) : null}
               </select>
+              <p className="mt-1.5 text-[11px] text-muted-foreground">
+                Só entram viagens com data e hora de <strong className="text-foreground">ida</strong>,{" "}
+                <strong className="text-foreground">volta</strong> ou serviço{" "}
+                <strong className="text-foreground">por hora</strong> ainda por ocorrer (inclui hoje com horário
+                posterior). Reservas já concluídas no tempo não aparecem.
+              </p>
             </div>
 
             <div>

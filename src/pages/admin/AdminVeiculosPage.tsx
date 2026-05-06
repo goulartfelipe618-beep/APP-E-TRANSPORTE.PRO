@@ -141,28 +141,19 @@ export default function AdminVeiculosPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const rpcRes = await supabase.rpc("admin_list_veiculos_frota" as never);
-    let list: VeiculoFrotaAdminRow[] = [];
-    if (!rpcRes.error && rpcRes.data != null) {
-      list = rpcRes.data as VeiculoFrotaAdminRow[];
-    } else {
-      const fb = await supabase
-        .from("veiculos_frota")
-        .select("*")
-        .order("created_at", { ascending: false });
-      if (fb.error) {
-        toast.error(
-          rpcRes.error
-            ? `Não foi possível carregar os veículos: ${rpcRes.error.message}`
-            : "Não foi possível carregar os veículos.",
-        );
-        setRows([]);
-        setUserById({});
-        setLoading(false);
-        return;
-      }
-      list = (fb.data || []) as VeiculoFrotaAdminRow[];
+    /** RLS: admin_master lê todas as linhas; utilizadores comuns só a própria. Evita depender só do RPC (ex.: função ausente ou resposta vazia). */
+    const { data, error } = await supabase
+      .from("veiculos_frota")
+      .select("*")
+      .order("created_at", { ascending: false });
+    if (error) {
+      toast.error(`Não foi possível carregar os veículos: ${error.message}`);
+      setRows([]);
+      setUserById({});
+      setLoading(false);
+      return;
     }
+    const list = (data || []) as VeiculoFrotaAdminRow[];
     setRows(list);
 
     const userIds = [...new Set(list.map((r) => r.user_id).filter(Boolean))];
@@ -223,7 +214,7 @@ export default function AdminVeiculosPage() {
         <div className="min-w-0">
           <h1 className="text-xl font-bold text-foreground sm:text-2xl">Veículos (frota dos motoristas)</h1>
           <p className="text-pretty text-sm text-muted-foreground sm:text-base">
-            Visualização completa e somente leitura de todos os veículos cadastrados pelos motoristas executivos. O admin não pode
+            Visualização completa e somente leitura de todos os veículos cadastrados pelos utilizadores da frota. O admin não pode
             editar daqui.
           </p>
         </div>

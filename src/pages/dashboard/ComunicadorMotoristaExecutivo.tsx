@@ -5,15 +5,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { usePainelMotoristaEvolutionAtivo } from "@/hooks/usePainelMotoristaEvolutionAtivo";
 import { ComunicadorEvolutionSection } from "@/components/comunicador/ComunicadorEvolutionSection";
 import { useComunicadoresEvolution, qrSrc, type ComunicadorRow } from "@/hooks/useComunicadoresEvolution";
+import { WHATSAPP_OFICIAL_PLATAFORMA_EXIBICAO } from "@/lib/comunicadorOficial";
 import {
   fetchEvolutionMotoristaDeleteFromServer,
   fetchEvolutionMotoristaQrFromServer,
   fetchEvolutionMotoristaSyncFromServer,
-  formatPhoneBrDisplay,
 } from "@/lib/evolutionApi";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Info, Loader2, Smartphone } from "lucide-react";
+import { Info, Loader2, ShieldAlert, Smartphone } from "lucide-react";
 
 const QR_SESSION_MS = 10 * 60 * 1000;
 const POLL_MS = 3000;
@@ -273,9 +273,9 @@ export default function ComunicadorMotoristaExecutivoPage() {
         <div>
           <h1 className="text-2xl font-bold text-foreground">Comunicador</h1>
           <p className="text-pretty text-muted-foreground">
-            A plataforma mantém o <strong className="text-foreground">WhatsApp oficial</strong> para referência. Se
-            desejar, pode <strong className="text-foreground">ligar o seu próprio número</strong> por QR Code: quando
-            estiver conectado, os envios em <strong className="text-foreground">Comunicar</strong> usam o seu WhatsApp;
+            A plataforma indica o <strong className="text-foreground">WhatsApp oficial</strong> para referência. Pode
+            também <strong className="text-foreground">ligar o seu próprio número</strong> por QR Code: quando estiver
+            conectado, os envios em <strong className="text-foreground">Comunicar</strong> usam apenas o seu WhatsApp;
             caso contrário, usam a linha oficial.
           </p>
         </div>
@@ -284,26 +284,36 @@ export default function ComunicadorMotoristaExecutivoPage() {
         </Button>
       </div>
 
-      {sistema?.telefone_conectado ? (
-        <Card className="border-primary/40 bg-primary/5 shadow-sm">
-          <CardContent className="space-y-2 pb-6 pt-6 text-center">
-            <p className="text-sm font-medium uppercase tracking-wide text-muted-foreground">Número oficial da plataforma</p>
-            {sistema.nome_dispositivo ? (
-              <p className="text-base font-medium text-foreground">{sistema.nome_dispositivo}</p>
-            ) : null}
-            <p className="break-all font-mono text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
-              {formatPhoneBrDisplay(sistema.telefone_conectado)}
-            </p>
-            <p className="mx-auto max-w-md pt-2 text-xs text-muted-foreground">
-              Use este WhatsApp para comunicação oficial com clientes quando a política da sua operação assim exigir.
-            </p>
-          </CardContent>
-        </Card>
-      ) : null}
+      <Alert className="border-[#FF6600]/50 bg-[#FF6600]/10 text-foreground">
+        <ShieldAlert className="h-4 w-4 text-[#FF6600]" />
+        <AlertTitle className="text-foreground">Recomendação importante</AlertTitle>
+        <AlertDescription className="text-sm text-muted-foreground">
+          A plataforma recomenda fortemente que utilize um <strong className="text-foreground">número de WhatsApp alternativo</strong>{" "}
+          (não o seu contacto principal ou o WhatsApp Business oficial da empresa) para esta integração. O envio de
+          mensagens utiliza uma API <strong className="text-foreground">não oficial da Meta</strong>, sem garantias da
+          Meta/WhatsApp, com riscos de bloqueio ou indisponibilidade.
+        </AlertDescription>
+      </Alert>
+
+      <Card className="border-primary/40 bg-primary/5 shadow-sm">
+        <CardContent className="space-y-2 pb-6 pt-6 text-center">
+          <p className="text-sm font-medium uppercase tracking-wide text-muted-foreground">Número oficial da plataforma</p>
+          <p className="break-words font-mono text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+            {WHATSAPP_OFICIAL_PLATAFORMA_EXIBICAO}
+          </p>
+          <p className="mx-auto max-w-md pt-2 text-xs text-muted-foreground">
+            Contacto institucional de referência. Pode divergir do estado da integração Evolution mostrado abaixo.
+          </p>
+        </CardContent>
+      </Card>
 
       <ComunicadorEvolutionSection
         title="Comunicador oficial E-Transporte.pro"
-        description="Linha oficial da plataforma (sincronizada via n8n / backend). Referência para todos os motoristas."
+        description={
+          ownConnected
+            ? "Enquanto o seu WhatsApp estiver conectado, apenas o seu número é utilizado para comunicação em Comunicar. O canal oficial da plataforma permanece aqui como referência, com estado desconectado relativamente aos seus envios."
+            : "Linha oficial da plataforma (sincronizada via n8n / backend). Referência para o seu painel."
+        }
         row={sistema}
         readOnly
         loading={loading}
@@ -312,6 +322,8 @@ export default function ComunicadorMotoristaExecutivoPage() {
         onGerarQr={() => {}}
         evolutionCreds={undefined}
         hideQr
+        telefoneExibicao={WHATSAPP_OFICIAL_PLATAFORMA_EXIBICAO}
+        forcarDesconectado={ownConnected}
       />
 
       {ownConnected ? (

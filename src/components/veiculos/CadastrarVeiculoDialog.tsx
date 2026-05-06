@@ -199,6 +199,32 @@ export default function CadastrarVeiculoDialog({ open, onOpenChange, veiculoId =
     return null;
   };
 
+  /** Campos operacionais opcionais: se preenchidos, devem ser números válidos. */
+  const validateOptionalNonNegative = (label: string, raw: string): string | null => {
+    const t = raw.trim();
+    if (!t) return null;
+    const n = asNumber(t);
+    if (!Number.isFinite(n)) return `${label} deve ser um número válido.`;
+    if (n < 0) return `${label} não pode ser negativo.`;
+    return null;
+  };
+
+  const validateOptionalPositive = (label: string, raw: string): string | null => {
+    const t = raw.trim();
+    if (!t) return null;
+    const n = asNumber(t);
+    if (!Number.isFinite(n)) return `${label} deve ser um número válido.`;
+    if (n <= 0) return `${label} deve ser maior que zero.`;
+    return null;
+  };
+
+  const numOrDefault = (raw: string, defaultVal: number): number => {
+    const t = raw.trim();
+    if (!t) return defaultVal;
+    const n = asNumber(t);
+    return Number.isFinite(n) ? n : defaultVal;
+  };
+
   const validate = async (): Promise<string | null> => {
     if (!marca.trim()) return "Informe a marca do veículo.";
     if (!modelo.trim()) return "Informe o modelo do veículo.";
@@ -210,30 +236,21 @@ export default function CadastrarVeiculoDialog({ open, onOpenChange, veiculoId =
     if (!chassi.trim()) return "Informe o chassi.";
     if (!status) return "Selecione o status do veículo.";
     if (!observacoes.trim()) return "Informe as observações do veículo.";
-    if (!tipoCobranca) return "Selecione o tipo de cobrança.";
 
-    const eKm = validateNumeric("Valor por KM", valorKm);
-    if (eKm) return eKm;
-    const eHora = validateNumeric("Valor por hora", valorHora);
-    if (eHora) return eHora;
-    const eBase = validateNumeric("Tarifa base", tarifaBase);
-    if (eBase) return eBase;
-    const eMin = validateNumeric("Valor mínimo da corrida", valorMinimo);
-    if (eMin) return eMin;
-    const eKmMin = validateNumeric("Distância mínima (KM)", kmMinimo);
-    if (eKmMin) return eKmMin;
-    const eTol = validateNumeric("Tolerância (minutos)", toleranciaMinutos);
-    if (eTol) return eTol;
-    const eEsp = validateNumeric("Valor/hora de espera", valorHoraEspera);
-    if (eEsp) return eEsp;
-    const eFrac = validateNumeric("Cobrança por fração (minutos)", fracaoMinutos);
-    if (eFrac) return eFrac;
-    if (asNumber(fracaoMinutos) <= 0) return "Cobrança por fração (minutos) deve ser maior que zero.";
-    const eMult = validateNumeric("Multiplicador ida e volta", multiplicadorIdaVolta);
-    if (eMult) return eMult;
-    if (asNumber(multiplicadorIdaVolta) <= 0) return "Multiplicador ida e volta deve ser maior que zero.";
-
-    if (!precoFixoRota) return "Indique se permite preço fixo por rota (Sim ou Não).";
+    const opChecks: (string | null)[] = [
+      validateOptionalNonNegative("Valor por KM", valorKm),
+      validateOptionalNonNegative("Valor por hora", valorHora),
+      validateOptionalNonNegative("Tarifa base", tarifaBase),
+      validateOptionalNonNegative("Valor mínimo da corrida", valorMinimo),
+      validateOptionalNonNegative("Distância mínima (KM)", kmMinimo),
+      validateOptionalNonNegative("Tolerância (minutos)", toleranciaMinutos),
+      validateOptionalNonNegative("Valor/hora de espera", valorHoraEspera),
+      validateOptionalPositive("Cobrança por fração (minutos)", fracaoMinutos),
+      validateOptionalPositive("Multiplicador ida e volta", multiplicadorIdaVolta),
+    ];
+    for (const e of opChecks) {
+      if (e) return e;
+    }
 
     const eNot = validateNumeric("Taxa noturna (%)", taxaNoturnaPct);
     if (eNot) return eNot;
@@ -324,16 +341,16 @@ export default function CadastrarVeiculoDialog({ open, onOpenChange, veiculoId =
         chassi: chassi.trim(),
         status: status,
         observacoes: observacoes.trim(),
-        valor_km: asNumber(valorKm),
-        valor_hora: asNumber(valorHora),
-        tarifa_base: asNumber(tarifaBase),
-        valor_minimo_corrida: asNumber(valorMinimo),
-        distancia_minima_km: asNumber(kmMinimo),
-        tempo_tolerancia_min: asNumber(toleranciaMinutos),
-        valor_hora_espera: asNumber(valorHoraEspera),
-        fracao_tempo_min: asNumber(fracaoMinutos),
-        tipo_cobranca: tipoCobranca,
-        multiplicador_ida_volta: asNumber(multiplicadorIdaVolta),
+        valor_km: numOrDefault(valorKm, 0),
+        valor_hora: numOrDefault(valorHora, 0),
+        tarifa_base: numOrDefault(tarifaBase, 0),
+        valor_minimo_corrida: numOrDefault(valorMinimo, 0),
+        distancia_minima_km: numOrDefault(kmMinimo, 0),
+        tempo_tolerancia_min: numOrDefault(toleranciaMinutos, 0),
+        valor_hora_espera: numOrDefault(valorHoraEspera, 0),
+        fracao_tempo_min: numOrDefault(fracaoMinutos, 15),
+        tipo_cobranca: (tipoCobranca || "hibrido") as "km" | "hora" | "hibrido",
+        multiplicador_ida_volta: numOrDefault(multiplicadorIdaVolta, 2),
         permitir_preco_fixo_rota: precoFixoRota === "sim",
         taxa_noturna_percentual: asNumber(taxaNoturnaPct),
         taxa_aeroporto_fixa: asNumber(taxaAeroportoFixa),
@@ -381,7 +398,9 @@ export default function CadastrarVeiculoDialog({ open, onOpenChange, veiculoId =
         ) : (
           <>
             <p className="text-xs text-muted-foreground sm:text-sm">
-              Todos os campos são obrigatórios. A capa deve ter exactamente{" "}
+              Os dados do veículo, imagens e taxas adicionais são obrigatórios.{" "}
+              <strong className="text-foreground">Dados operacionais e cálculo</strong> são opcionais (valores podem variar por
+              corrida). A capa deve ter exactamente{" "}
               <strong className="text-foreground">
                 {VEHICLE_COVER_DIMENSIONS.width}×{VEHICLE_COVER_DIMENSIONS.height} px
               </strong>
@@ -482,33 +501,40 @@ export default function CadastrarVeiculoDialog({ open, onOpenChange, veiculoId =
             </fieldset>
 
             <fieldset className="space-y-4 rounded-lg border border-border p-3 sm:p-4">
-              <legend className="px-1 text-sm font-semibold text-foreground">Dados operacionais e cálculo *</legend>
+              <legend className="px-1 text-sm font-semibold text-foreground">Dados operacionais e cálculo (opcional)</legend>
+              <p className="text-xs text-muted-foreground">
+                Deixe em branco se os valores forem definidos por corrida ou noutro sistema. Valores em branco usam predefinições
+                da plataforma (zeros, híbrido, fração 15 min, multiplicador 2).
+              </p>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 <div>
-                  <Label>Valor por KM *</Label>
-                  <Input className="mt-1" value={valorKm} onChange={(e) => setValorKm(e.target.value)} />
+                  <Label>Valor por KM</Label>
+                  <Input className="mt-1" value={valorKm} onChange={(e) => setValorKm(e.target.value)} placeholder="Opcional" />
                 </div>
                 <div>
-                  <Label>Valor por hora *</Label>
-                  <Input className="mt-1" value={valorHora} onChange={(e) => setValorHora(e.target.value)} />
+                  <Label>Valor por hora</Label>
+                  <Input className="mt-1" value={valorHora} onChange={(e) => setValorHora(e.target.value)} placeholder="Opcional" />
                 </div>
                 <div>
-                  <Label>Tarifa base *</Label>
-                  <Input className="mt-1" value={tarifaBase} onChange={(e) => setTarifaBase(e.target.value)} />
+                  <Label>Tarifa base</Label>
+                  <Input className="mt-1" value={tarifaBase} onChange={(e) => setTarifaBase(e.target.value)} placeholder="Opcional" />
                 </div>
                 <div>
-                  <Label>Valor mínimo *</Label>
-                  <Input className="mt-1" value={valorMinimo} onChange={(e) => setValorMinimo(e.target.value)} />
+                  <Label>Valor mínimo</Label>
+                  <Input className="mt-1" value={valorMinimo} onChange={(e) => setValorMinimo(e.target.value)} placeholder="Opcional" />
                 </div>
                 <div>
-                  <Label>Distância mínima (KM) *</Label>
-                  <Input className="mt-1" value={kmMinimo} onChange={(e) => setKmMinimo(e.target.value)} />
+                  <Label>Distância mínima (KM)</Label>
+                  <Input className="mt-1" value={kmMinimo} onChange={(e) => setKmMinimo(e.target.value)} placeholder="Opcional" />
                 </div>
                 <div>
-                  <Label>Tipo de cobrança *</Label>
-                  <Select value={tipoCobranca || undefined} onValueChange={(v) => setTipoCobranca(v as "km" | "hora" | "hibrido")}>
+                  <Label>Tipo de cobrança</Label>
+                  <Select
+                    value={tipoCobranca || undefined}
+                    onValueChange={(v) => setTipoCobranca(v as "km" | "hora" | "hibrido")}
+                  >
                     <SelectTrigger className="mt-1">
-                      <SelectValue placeholder="Selecione" />
+                      <SelectValue placeholder="Predefinição: híbrido" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="km">Por KM</SelectItem>
@@ -518,23 +544,43 @@ export default function CadastrarVeiculoDialog({ open, onOpenChange, veiculoId =
                   </Select>
                 </div>
                 <div>
-                  <Label>Tolerância (min) *</Label>
-                  <Input className="mt-1" value={toleranciaMinutos} onChange={(e) => setToleranciaMinutos(e.target.value)} />
+                  <Label>Tolerância (min)</Label>
+                  <Input
+                    className="mt-1"
+                    value={toleranciaMinutos}
+                    onChange={(e) => setToleranciaMinutos(e.target.value)}
+                    placeholder="Opcional"
+                  />
                 </div>
                 <div>
-                  <Label>Valor/hora espera *</Label>
-                  <Input className="mt-1" value={valorHoraEspera} onChange={(e) => setValorHoraEspera(e.target.value)} />
+                  <Label>Valor/hora espera</Label>
+                  <Input
+                    className="mt-1"
+                    value={valorHoraEspera}
+                    onChange={(e) => setValorHoraEspera(e.target.value)}
+                    placeholder="Opcional"
+                  />
                 </div>
                 <div>
-                  <Label>Cobrança por fração (min) *</Label>
-                  <Input className="mt-1" value={fracaoMinutos} onChange={(e) => setFracaoMinutos(e.target.value)} />
+                  <Label>Cobrança por fração (min)</Label>
+                  <Input
+                    className="mt-1"
+                    value={fracaoMinutos}
+                    onChange={(e) => setFracaoMinutos(e.target.value)}
+                    placeholder="Predefinição: 15"
+                  />
                 </div>
                 <div>
-                  <Label>Multiplicador ida e volta *</Label>
-                  <Input className="mt-1" value={multiplicadorIdaVolta} onChange={(e) => setMultiplicadorIdaVolta(e.target.value)} />
+                  <Label>Multiplicador ida e volta</Label>
+                  <Input
+                    className="mt-1"
+                    value={multiplicadorIdaVolta}
+                    onChange={(e) => setMultiplicadorIdaVolta(e.target.value)}
+                    placeholder="Predefinição: 2"
+                  />
                 </div>
                 <div className="sm:col-span-2 lg:col-span-3">
-                  <Label className="mb-2 block">Permitir preço fixo por rota *</Label>
+                  <Label className="mb-2 block">Permitir preço fixo por rota</Label>
                   <RadioGroup
                     value={precoFixoRota === "" ? undefined : precoFixoRota}
                     onValueChange={(v) => setPrecoFixoRota(v as "sim" | "nao")}
