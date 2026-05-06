@@ -20,6 +20,7 @@ import {
   FINANCEIRO_PAYMENT_METHOD_LABEL,
   FINANCEIRO_STATUS_LABEL,
   RECEITA_MANUAL_PRESETS,
+  financeiroListagemRangePadrao,
   formatBRL,
   type FinancialTransaction,
   type FinanceiroPaymentMethod,
@@ -32,12 +33,7 @@ function isoFromDate(d: Date): string {
 
 export default function FinanceiroLancamentosPage() {
   const { setActivePage } = useActivePage();
-  const fromDefault = useMemo(() => {
-    const d = new Date();
-    d.setFullYear(d.getFullYear() - 2);
-    return isoFromDate(d);
-  }, []);
-  const toDefault = useMemo(() => isoFromDate(new Date()), []);
+  const { from: fromDefault, to: toDefault } = useMemo(() => financeiroListagemRangePadrao(), []);
   const { rows, loading, error, reload, hasMore, loadMore } = useFinancialTransactionsPaginated(fromDefault, toDefault, 50);
 
   const [dialogOpen, setDialogOpen] = useState(false);

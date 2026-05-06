@@ -4,20 +4,11 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useActivePage } from "@/contexts/ActivePageContext";
 import { useFinancialTransactions } from "@/hooks/useFinancialTransactions";
-import { FINANCEIRO_STATUS_LABEL, formatBRL } from "@/lib/financeiroFrota";
-
-function isoFromDate(d: Date): string {
-  return d.toISOString().slice(0, 10);
-}
+import { FINANCEIRO_STATUS_LABEL, financeiroListagemRangePadrao, formatBRL } from "@/lib/financeiroFrota";
 
 export default function FinanceiroPagarPage() {
   const { setActivePage } = useActivePage();
-  const from = useMemo(() => {
-    const d = new Date();
-    d.setFullYear(d.getFullYear() - 2);
-    return isoFromDate(d);
-  }, []);
-  const to = useMemo(() => isoFromDate(new Date()), []);
+  const { from, to } = useMemo(() => financeiroListagemRangePadrao(), []);
   const { rows, loading, error } = useFinancialTransactions(from, to, { limit: 1500, offset: 0 });
 
   const despesas = useMemo(() => rows.filter((r) => r.kind === "despesa"), [rows]);

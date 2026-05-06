@@ -62,3 +62,15 @@ export function monthRangeUtc(year: number, monthIndex0: number): { start: strin
   const iso = (d: Date) => d.toISOString().slice(0, 10);
   return { start: iso(start), end: iso(end) };
 }
+
+/** Intervalo padrão para listagens financeiras: inclui receitas/despesas com data de competência futura (viagens marcadas). */
+export function financeiroListagemRangePadrao(): { from: string; to: string } {
+  const from = new Date();
+  from.setUTCHours(0, 0, 0, 0);
+  from.setUTCFullYear(from.getUTCFullYear() - 2);
+  const to = new Date();
+  to.setUTCHours(0, 0, 0, 0);
+  to.setUTCFullYear(to.getUTCFullYear() + 5);
+  const iso = (d: Date) => d.toISOString().slice(0, 10);
+  return { from: iso(from), to: iso(to) };
+}

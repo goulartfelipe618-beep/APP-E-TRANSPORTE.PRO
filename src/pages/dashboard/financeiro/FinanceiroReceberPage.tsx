@@ -7,22 +7,14 @@ import { useFinancialTransactions } from "@/hooks/useFinancialTransactions";
 import {
   FINANCEIRO_PAYMENT_METHOD_LABEL,
   FINANCEIRO_STATUS_LABEL,
+  financeiroListagemRangePadrao,
   formatBRL,
   type FinanceiroPaymentMethod,
 } from "@/lib/financeiroFrota";
 
-function isoFromDate(d: Date): string {
-  return d.toISOString().slice(0, 10);
-}
-
 export default function FinanceiroReceberPage() {
   const { setActivePage } = useActivePage();
-  const from = useMemo(() => {
-    const d = new Date();
-    d.setFullYear(d.getFullYear() - 2);
-    return isoFromDate(d);
-  }, []);
-  const to = useMemo(() => isoFromDate(new Date()), []);
+  const { from, to } = useMemo(() => financeiroListagemRangePadrao(), []);
   const { rows, loading, error } = useFinancialTransactions(from, to, { limit: 1500, offset: 0 });
 
   const receitasReserva = useMemo(
@@ -35,7 +27,9 @@ export default function FinanceiroReceberPage() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Contas a receber</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Receitas geradas pelas reservas (transfer e grupos).</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Receitas geradas pelas reservas (transfer e grupos), incluindo viagens com data futura em contas a receber.
+          </p>
         </div>
         <Button type="button" variant="outline" onClick={() => setActivePage("financeiro/lancamentos")}>
           Todos os lançamentos
@@ -66,7 +60,7 @@ export default function FinanceiroReceberPage() {
             ) : receitasReserva.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={8} className="text-center text-sm text-muted-foreground">
-                  Sem receitas de reserva neste intervalo.
+                  Sem receitas de reserva no intervalo configurado.
                 </TableCell>
               </TableRow>
             ) : (

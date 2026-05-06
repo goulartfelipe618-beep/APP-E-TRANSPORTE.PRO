@@ -5,7 +5,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useActivePage } from "@/contexts/ActivePageContext";
 import { useFinancialTransactions } from "@/hooks/useFinancialTransactions";
-import { type FinancialTransaction, formatBRL, monthRangeUtc } from "@/lib/financeiroFrota";
+import {
+  FINANCIAL_TRANSACTION_COLUMNS,
+  type FinancialTransaction,
+  formatBRL,
+  monthRangeUtc,
+} from "@/lib/financeiroFrota";
 import { FINANCEIRO_HIGHLIGHT_CLIENTE_ID_KEY } from "@/lib/sessionKeys";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -53,7 +58,10 @@ export default function FinanceiroDashboardPage() {
   const [reservaGrupoIds, setReservaGrupoIds] = useState<string[]>([]);
   const [idsReservasLoading, setIdsReservasLoading] = useState(false);
   const [valorReservasTabelaMes, setValorReservasTabelaMes] = useState<number | null>(null);
+  const [valorReservasClienteTodas, setValorReservasClienteTodas] = useState<number | null>(null);
   const [reservasTabelaMesLoading, setReservasTabelaMesLoading] = useState(false);
+  const [clienteTxRows, setClienteTxRows] = useState<FinancialTransaction[]>([]);
+  const [clienteTxLoading, setClienteTxLoading] = useState(false);
 
   const { start, end } = monthRangeUtc(cursor.y, cursor.m);
   const { rows, loading, error } = useFinancialTransactions(start, end, { limit: 2000, offset: 0 });
@@ -61,15 +69,54 @@ export default function FinanceiroDashboardPage() {
   const transferIdSet = useMemo(() => new Set(reservaTransferIds), [reservaTransferIds]);
   const grupoIdSet = useMemo(() => new Set(reservaGrupoIds), [reservaGrupoIds]);
 
+  /**
+   * Vista normal: métricas do mês (occurred_on). Com filtro por cliente: todos os lançamentos das reservas
+   * desse cliente (qualquer mês), senão viagens futuras ficam fora da janela e os totais aparecem zerados.
+   */
   const rowsVisiveis = useMemo(() => {
     if (!filtroCliente) return rows;
-    if (transferIdSet.size === 0 && grupoIdSet.size === 0) return [];
-    return rows.filter(
-      (r) =>
-        (r.reserva_transfer_id != null && transferIdSet.has(r.reserva_transfer_id)) ||
-        (r.reserva_grupo_id != null && grupoIdSet.has(r.reserva_grupo_id)),
-    );
-  }, [rows, filtroCliente, transferIdSet, grupoIdSet]);
+    return clienteTxRows;
+  }, [rows, filtroCliente, clienteTxRows]);
+
+  useEffect(() => {
+    if (!filtroCliente?.id) {
+      setClienteTxRows([]);
+      setClienteTxLoading(false);
+      return;
+    }
+    if (reservaTransferIds.length === 0 && reservaGrupoIds.length === 0) {
+      setClienteTxRows([]);
+      setClienteTxLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setClienteTxLoading(true);
+    void (async () => {
+      const clauses: string[] = [];
+      if (reservaTransferIds.length > 0) {
+        clauses.push(`reserva_transfer_id.in.(${reservaTransferIds.join(",")})`);
+      }
+      if (reservaGrupoIds.length > 0) {
+        clauses.push(`reserva_grupo_id.in.(${reservaGrupoIds.join(",")})`);
+      }
+      const { data, error: qErr } = await supabase
+        .from("financial_transactions")
+        .select(FINANCIAL_TRANSACTION_COLUMNS)
+        .or(clauses.join(","))
+        .order("occurred_on", { ascending: false })
+        .limit(5000);
+      if (cancelled) return;
+      if (qErr) {
+        setClienteTxRows([]);
+      } else {
+        setClienteTxRows((data as FinancialTransaction[]) ?? []);
+      }
+      setClienteTxLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [filtroCliente?.id, reservaTransferIds, reservaGrupoIds]);
 
   const sums = useMemo(() => sumRowsForSums(rowsVisiveis), [rowsVisiveis]);
 
@@ -116,10 +163,14 @@ export default function FinanceiroDashboardPage() {
     };
   }, [filtroCliente?.id]);
 
-  /** Soma `valor_total` das reservas com data principal no mês (referência das tabelas de reserva, não substitui o financeiro). */
+  /**
+   * Referência a partir das tabelas de reserva: data principal = ida / por hora / volta (transfer) ou ida / retorno (grupo).
+   * Soma no mês do calendário + total absoluto do cliente.
+   */
   useEffect(() => {
     if (!filtroCliente?.id) {
       setValorReservasTabelaMes(null);
+      setValorReservasClienteTodas(null);
       return;
     }
     let cancelled = false;
@@ -128,23 +179,46 @@ export default function FinanceiroDashboardPage() {
       const [t, g] = await Promise.all([
         supabase
           .from("reservas_transfer")
-          .select("valor_total")
-          .eq("cadastro_cliente_id", filtroCliente.id)
-          .gte("ida_data", start)
-          .lte("ida_data", end),
+          .select("valor_total, ida_data, por_hora_data, volta_data")
+          .eq("cadastro_cliente_id", filtroCliente.id),
         supabase
           .from("reservas_grupos")
-          .select("valor_total")
-          .eq("cadastro_cliente_id", filtroCliente.id)
-          .gte("data_ida", start)
-          .lte("data_ida", end),
+          .select("valor_total, data_ida, data_retorno")
+          .eq("cadastro_cliente_id", filtroCliente.id),
       ]);
       if (cancelled) return;
-      const sum = (rowsIn: { valor_total?: unknown }[] | null) =>
-        (rowsIn ?? []).reduce((a, r) => a + (Number(r.valor_total) || 0), 0);
-      setValorReservasTabelaMes(
-        sum(t.data as { valor_total?: unknown }[]) + sum(g.data as { valor_total?: unknown }[]),
-      );
+      const dateT = (r: {
+        ida_data?: string | null;
+        por_hora_data?: string | null;
+        volta_data?: string | null;
+      }) => (r.ida_data || r.por_hora_data || r.volta_data || "").slice(0, 10);
+      const dateG = (r: { data_ida?: string | null; data_retorno?: string | null }) =>
+        (r.data_ida || r.data_retorno || "").slice(0, 10);
+      let sumMonth = 0;
+      let sumAll = 0;
+      for (const r of (t.data ?? []) as {
+        valor_total?: number | null;
+        ida_data?: string | null;
+        por_hora_data?: string | null;
+        volta_data?: string | null;
+      }[]) {
+        const v = Number(r.valor_total) || 0;
+        sumAll += v;
+        const d = dateT(r);
+        if (d && d >= start && d <= end) sumMonth += v;
+      }
+      for (const r of (g.data ?? []) as {
+        valor_total?: number | null;
+        data_ida?: string | null;
+        data_retorno?: string | null;
+      }[]) {
+        const v = Number(r.valor_total) || 0;
+        sumAll += v;
+        const d = dateG(r);
+        if (d && d >= start && d <= end) sumMonth += v;
+      }
+      setValorReservasTabelaMes(sumMonth);
+      setValorReservasClienteTodas(sumAll);
       setReservasTabelaMesLoading(false);
     })();
     return () => {
@@ -158,9 +232,12 @@ export default function FinanceiroDashboardPage() {
     setReservaTransferIds([]);
     setReservaGrupoIds([]);
     setValorReservasTabelaMes(null);
+    setValorReservasClienteTodas(null);
+    setClienteTxRows([]);
   };
 
-  const numerosLoading = loading || (Boolean(filtroCliente) && idsReservasLoading);
+  const numerosLoading =
+    loading || (Boolean(filtroCliente) && (idsReservasLoading || clienteTxLoading));
 
   const prevMonth = () => {
     setCursor((c) => {
@@ -196,14 +273,14 @@ export default function FinanceiroDashboardPage() {
           <AlertDescription className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
             <div className="space-y-1 text-sm">
               <p>
-                A mostrar apenas lançamentos do mês ligados a reservas de{" "}
-                <strong className="text-foreground">{filtroCliente.nome}</strong> (transfer ou grupo com cliente
-                atribuído).
+                Totais de <strong className="text-foreground">{filtroCliente.nome}</strong> incluem{" "}
+                <strong className="text-foreground">todos os lançamentos</strong> das reservas com este cliente
+                (receitas, repasses e extras), em qualquer mês — incluindo viagens futuras em contas a receber.
               </p>
               <p className="text-xs text-muted-foreground">
-                {idsReservasLoading
-                  ? "A carregar reservas…"
-                  : `${reservaTransferIds.length + reservaGrupoIds.length} reserva(s) com vínculo · ${rowsVisiveis.length} lançamento(s) no mês · ${viagensComMovimentoNoMes} reserva(s) com movimento financeiro neste mês.`}
+                {idsReservasLoading || clienteTxLoading
+                  ? "A carregar reservas e lançamentos…"
+                  : `${reservaTransferIds.length + reservaGrupoIds.length} reserva(s) com vínculo · ${rowsVisiveis.length} lançamento(s) financeiros · ${viagensComMovimentoNoMes} reserva(s) com linha no extrato.`}
               </p>
             </div>
             <div className="flex shrink-0 flex-wrap gap-2">
@@ -218,13 +295,37 @@ export default function FinanceiroDashboardPage() {
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
-          <Button type="button" variant="outline" size="icon" onClick={prevMonth} aria-label="Mês anterior">
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            onClick={prevMonth}
+            aria-label="Mês anterior"
+            disabled={Boolean(filtroCliente)}
+            title={filtroCliente ? "Com filtro por cliente, os totais principais não usam o mês." : undefined}
+          >
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <Button type="button" variant="outline" size="icon" onClick={nextMonth} aria-label="Próximo mês">
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            onClick={nextMonth}
+            aria-label="Próximo mês"
+            disabled={Boolean(filtroCliente)}
+            title={filtroCliente ? "Com filtro por cliente, os totais principais não usam o mês." : undefined}
+          >
             <ChevronRight className="h-4 w-4" />
           </Button>
-          <span className="min-w-[10rem] capitalize text-sm font-semibold text-foreground">{monthLabel}</span>
+          <span
+            className={cn(
+              "min-w-[10rem] capitalize text-sm font-semibold text-foreground",
+              filtroCliente && "text-muted-foreground",
+            )}
+          >
+            {monthLabel}
+            {filtroCliente ? " (só referência)" : ""}
+          </span>
           {filtroCliente ? (
             <span className="rounded-full border border-primary/40 bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
               Filtro: {filtroCliente.nome}
@@ -246,16 +347,26 @@ export default function FinanceiroDashboardPage() {
       {filtroCliente ? (
         <Card className="border-primary/30 bg-primary/5">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-foreground">Valor total nas reservas (mês)</CardTitle>
+            <CardTitle className="text-sm font-medium text-foreground">Reservas (referência nas tabelas)</CardTitle>
             <p className="text-xs text-muted-foreground">
-              Soma de <code className="rounded bg-muted px-1">valor_total</code> das reservas transfer (ida neste mês) e
-              grupo (data_ida neste mês) com este cliente. O quadro acima usa os lançamentos financeiros filtrados.
+              Soma de <code className="rounded bg-muted px-1">valor_total</code> com data principal da viagem no mês
+              indicado (transfer: ida, por hora ou volta; grupo: ida ou retorno). Abaixo, o total de todas as reservas
+              deste cliente.
             </p>
           </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold text-foreground">
-              {reservasTabelaMesLoading ? "…" : formatBRL(valorReservasTabelaMes ?? 0)}
-            </p>
+          <CardContent className="space-y-2">
+            <div>
+              <p className="text-xs text-muted-foreground">No mês {monthLabel}</p>
+              <p className="text-xl font-bold text-foreground">
+                {reservasTabelaMesLoading ? "…" : formatBRL(valorReservasTabelaMes ?? 0)}
+              </p>
+            </div>
+            <div className="border-t border-border pt-2">
+              <p className="text-xs text-muted-foreground">Todas as reservas com este cliente</p>
+              <p className="text-xl font-bold text-foreground">
+                {reservasTabelaMesLoading ? "…" : formatBRL(valorReservasClienteTodas ?? 0)}
+              </p>
+            </div>
           </CardContent>
         </Card>
       ) : null}
@@ -270,7 +381,9 @@ export default function FinanceiroDashboardPage() {
           <CardContent>
             <p className="text-2xl font-bold text-foreground">{numerosLoading ? "…" : formatBRL(sums.faturado)}</p>
             <p className="mt-1 text-xs text-muted-foreground">
-              Soma de receitas não canceladas no mês{filtroCliente ? " (filtrado)." : "."}
+              {filtroCliente
+                ? "Soma de receitas não canceladas (todas as viagens deste cliente)."
+                : "Soma de receitas não canceladas no mês."}
             </p>
           </CardContent>
         </Card>
@@ -318,7 +431,9 @@ export default function FinanceiroDashboardPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Despesas no mês{filtroCliente ? " (filtrado)" : ""}</CardTitle>
+          <CardTitle className="text-base">
+            {filtroCliente ? "Despesas (todas as deste cliente)" : "Despesas no mês"}
+          </CardTitle>
         </CardHeader>
         <CardContent className="flex flex-wrap gap-6 text-sm">
           <div>
@@ -375,7 +490,10 @@ export default function FinanceiroDashboardPage() {
       </div>
 
       <p className="text-xs text-muted-foreground">
-        Reservas novas ou atualizadas geram ou ajustam lançamentos automaticamente. O estado financeiro (pago/pendente) é independente do estado da viagem. Repasses de motorista entram como despesas quando a reserva passa a concluída com valor de repasse.
+        Reservas novas ou atualizadas geram ou ajustam lançamentos automaticamente (receita pendente em contas a receber).
+        Marcar como <strong>pago</strong> é manual em Lançamentos. Ao concluir a viagem com repasse, cria-se despesa de
+        repasse ao motorista (contas a pagar). Cancelar a reserva cancela a receita no financeiro. Cada conta vê apenas os
+        seus dados (RLS).
       </p>
     </div>
   );
