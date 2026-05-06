@@ -151,8 +151,6 @@ const getMenuStructure = (showNetwork: boolean, exibirComunicadorMotorista: bool
     labelTone: "beta",
     items: [
       { title: "Disparador", page: "disparador", icon: Megaphone },
-      { title: "Catálogo", page: "catalogo", icon: BookOpen },
-      { title: "Google Maps", page: "google", icon: MapPin },
       { title: "Empty Legs", page: "empty-legs", icon: Plane },
     ],
   },

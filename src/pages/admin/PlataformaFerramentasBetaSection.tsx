@@ -12,7 +12,6 @@ export default function PlataformaFerramentasBetaSection() {
   const queryClient = useQueryClient();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [googleOk, setGoogleOk] = useState(false);
   const [disparadorOk, setDisparadorOk] = useState(false);
 
   const load = useCallback(async () => {
@@ -20,7 +19,7 @@ export default function PlataformaFerramentasBetaSection() {
     try {
       const { data, error } = await supabase
         .from("plataforma_ferramentas_disponibilidade")
-        .select("google_maps_consumo_liberado, disparador_consumo_liberado")
+        .select("disparador_consumo_liberado")
         .eq("id", 1)
         .maybeSingle();
       if (error) {
@@ -28,8 +27,7 @@ export default function PlataformaFerramentasBetaSection() {
         return;
       }
       if (data) {
-        const row = data as { google_maps_consumo_liberado: boolean; disparador_consumo_liberado: boolean };
-        setGoogleOk(!!row.google_maps_consumo_liberado);
+        const row = data as { disparador_consumo_liberado: boolean };
         setDisparadorOk(!!row.disparador_consumo_liberado);
       }
     } finally {
@@ -41,7 +39,7 @@ export default function PlataformaFerramentasBetaSection() {
     void load();
   }, [load]);
 
-  const persist = async (patch: { google_maps_consumo_liberado?: boolean; disparador_consumo_liberado?: boolean }) => {
+  const persist = async (patch: { disparador_consumo_liberado?: boolean }) => {
     setSaving(true);
     try {
       const { error } = await supabase
@@ -68,8 +66,8 @@ export default function PlataformaFerramentasBetaSection() {
           Ferramentas BETA — liberação de uso
         </CardTitle>
         <CardDescription>
-          Enquanto desligado, motoristas executivos veem aviso fixo e não conseguem usar Google Maps nem Disparador no painel.
-          Ative quando as ferramentas estiverem prontas para consumo.
+          Enquanto desligado, motoristas executivos veem aviso fixo e não conseguem usar o Disparador no painel.
+          Ative quando a ferramenta estiver pronta para consumo.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -79,42 +77,23 @@ export default function PlataformaFerramentasBetaSection() {
             Carregando…
           </div>
         ) : (
-          <>
-            <div className="flex items-center justify-between gap-4 rounded-lg border border-border p-3">
-              <div className="min-w-0">
-                <Label htmlFor="flag-google" className="text-foreground">
-                  Google Maps (painel motorista)
-                </Label>
-                <p className="text-xs text-muted-foreground mt-0.5">Permite interação e fluxos na página Google Maps.</p>
-              </div>
-              <Switch
-                id="flag-google"
-                disabled={saving}
-                checked={googleOk}
-                onCheckedChange={(v) => {
-                  setGoogleOk(v);
-                  void persist({ google_maps_consumo_liberado: v });
-                }}
-              />
+          <div className="flex items-center justify-between gap-4 rounded-lg border border-border p-3">
+            <div className="min-w-0">
+              <Label htmlFor="flag-disparador" className="text-foreground">
+                Disparador de mensagens
+              </Label>
+              <p className="text-xs text-muted-foreground mt-0.5">Permite o botão de acesso e conteúdo utilizável na página Disparador.</p>
             </div>
-            <div className="flex items-center justify-between gap-4 rounded-lg border border-border p-3">
-              <div className="min-w-0">
-                <Label htmlFor="flag-disparador" className="text-foreground">
-                  Disparador de mensagens
-                </Label>
-                <p className="text-xs text-muted-foreground mt-0.5">Permite o botão de acesso e conteúdo utilizável na página Disparador.</p>
-              </div>
-              <Switch
-                id="flag-disparador"
-                disabled={saving}
-                checked={disparadorOk}
-                onCheckedChange={(v) => {
-                  setDisparadorOk(v);
-                  void persist({ disparador_consumo_liberado: v });
-                }}
-              />
-            </div>
-          </>
+            <Switch
+              id="flag-disparador"
+              disabled={saving}
+              checked={disparadorOk}
+              onCheckedChange={(v) => {
+                setDisparadorOk(v);
+                void persist({ disparador_consumo_liberado: v });
+              }}
+            />
+          </div>
         )}
       </CardContent>
     </Card>

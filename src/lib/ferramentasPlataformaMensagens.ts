@@ -1,4 +1,4 @@
-/** Textos fixos do bloqueio BETA (Google Maps / Disparador) até liberação pelo admin. */
+/** Textos fixos do bloqueio BETA (Disparador) até liberação pelo admin. */
 
 export const FERRAMENTA_BETA_MSG_LINHA1 =
   "ESTA FERRAMENTA AINDA ESTÁ EM PROCESSO DE CONSTRUÇÃO, E ESTARÁ DISPONÍVEL PARA CONSUMO A PARTIR DE 06/06/2026";

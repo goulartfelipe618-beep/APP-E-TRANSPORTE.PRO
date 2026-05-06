@@ -128,8 +128,6 @@ function buildHomeSections(showNetwork: boolean, exibirComunicadorMotorista: boo
 
   const betaItems: ToolDef[] = [
     { title: "Disparador", page: "disparador", desc: "Envio de mensagens em massa (WhatsApp dedicado).", icon: Megaphone },
-    { title: "Catálogo", page: "catalogo", desc: "Catálogo comercial em PDF e materiais para a sua operação.", icon: BookOpen },
-    { title: "Google Maps", page: "google", desc: "Presença no Google Meu Negócio e buscas.", icon: MapPin },
     { title: "Empty Legs", page: "empty-legs", desc: "Trechos e oportunidades de retorno.", icon: Plane },
   ];
 

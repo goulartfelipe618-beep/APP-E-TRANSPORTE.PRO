@@ -35,7 +35,6 @@ import CampanhasLeadsPage from "@/pages/dashboard/CampanhasLeads";
 import MarketingReceptivosPage from "@/pages/dashboard/MarketingReceptivos";
 import MarketingQRCodePage from "@/pages/dashboard/MarketingQRCode";
 import NetworkPage from "@/pages/dashboard/NetworkPage";
-import GooglePage from "@/pages/dashboard/GooglePage";
 import EmailBusinessPage from "@/pages/dashboard/EmailBusinessPage";
 import WebsitePage from "@/pages/dashboard/WebsitePage";
 import DominiosPage from "@/pages/dashboard/DominiosPage";
@@ -49,7 +48,6 @@ import MentoriaPage from "@/pages/dashboard/MentoriaPage";
 import EmptyLegsPage from "@/pages/dashboard/EmptyLegsPage";
 import AtualizacoesPage from "@/pages/dashboard/AtualizacoesPage";
 import PainelAgendaPage from "@/pages/dashboard/PainelAgendaPage";
-import CatalogoPage from "@/pages/dashboard/Catalogo";
 import CommunityPage from "@/pages/dashboard/CommunityPage";
 import FinanceiroDashboardPage from "@/pages/dashboard/financeiro/FinanceiroDashboardPage";
 import FinanceiroLancamentosPage from "@/pages/dashboard/financeiro/FinanceiroLancamentosPage";
@@ -83,7 +81,6 @@ const PAGE_MAP: Record<string, React.ComponentType> = {
   "marketing/qrcode": MarketingQRCodePage,
   network: NetworkPage,
   comunidade: CommunityPage,
-  google: GooglePage,
   "email-business": EmailBusinessPage,
   website: WebsitePage,
   dominios: DominiosPage,
@@ -95,7 +92,6 @@ const PAGE_MAP: Record<string, React.ComponentType> = {
   disparador: DisparadorPage,
   mentoria: MentoriaPage,
   "empty-legs": EmptyLegsPage,
-  catalogo: CatalogoPage,
   financeiro: FinanceiroDashboardPage,
   "financeiro/lancamentos": FinanceiroLancamentosPage,
   "financeiro/receber": FinanceiroReceberPage,
@@ -163,6 +159,13 @@ function DashboardContent() {
       setActivePage("sistema/configuracoes");
     }
   }, [painelComunicadorReady, activePage, painelMotoristaEvolutionAtivo, setActivePage]);
+
+  /** Rotas descontinuadas (Catálogo / Google Maps): evita sessão antiga presa numa página removida. */
+  useEffect(() => {
+    if (activePage === "catalogo" || activePage === "google") {
+      setActivePage("home");
+    }
+  }, [activePage, setActivePage]);
 
   /**
    * Quando as configurações obrigatórias passam a estar concluídas, força refresh completo

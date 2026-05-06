@@ -69,7 +69,7 @@ const PAGE_OPTIONS = [
 ];
 
 const INTEGRATION_OPTIONS = [
-  "WhatsApp", "Google Maps", "Instagram", "Sistema de reservas",
+  "WhatsApp", "Instagram", "Sistema de reservas",
 ];
 
 const EMAIL_REGISTER_VALUE = "__email_business_cadastrar__";
