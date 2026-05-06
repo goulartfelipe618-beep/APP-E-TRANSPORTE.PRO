@@ -10,6 +10,7 @@ import CriarReservaGrupoDialog, { type GrupoInitialData } from "@/components/gru
 import ComunicarDialog from "@/components/comunicar/ComunicarDialog";
 import { generateSolicitacaoGrupoPDF } from "@/lib/pdfGenerator";
 import { Tables } from "@/integrations/supabase/types";
+import { SolicitacoesCapturaExternaInfo } from "@/components/solicitacoes/SolicitacoesCapturaExternaInfo";
 
 type Solicitacao = Tables<"solicitacoes_grupos">;
 export default function GruposSolicitacoesPage() {
@@ -76,6 +77,7 @@ export default function GruposSolicitacoesPage() {
 
   return (
     <div className="space-y-6">
+      <SolicitacoesCapturaExternaInfo />
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Solicitações de Grupos</h1>

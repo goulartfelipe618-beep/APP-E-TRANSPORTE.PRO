@@ -9,6 +9,7 @@ import DetalhesSolicitacaoMotoristaSheet from "@/components/solicitacoes/Detalhe
 import type { MotoristaInitialData } from "@/lib/motoristaFromSolicitacao";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { SolicitacoesCapturaExternaInfo } from "@/components/solicitacoes/SolicitacoesCapturaExternaInfo";
 import type { Json } from "@/integrations/supabase/types";
 
 type SolicitacaoRow = {
@@ -132,6 +133,7 @@ export default function MotoristaSolicitacoesPage() {
 
   return (
     <div className="space-y-6">
+      <SolicitacoesCapturaExternaInfo />
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Solicitações</h1>

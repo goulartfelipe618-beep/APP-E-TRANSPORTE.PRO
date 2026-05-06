@@ -8,6 +8,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { SolicitacoesCapturaExternaInfo } from "@/components/solicitacoes/SolicitacoesCapturaExternaInfo";
 
 export default function CampanhasLeadsPage() {
   const [loading, setLoading] = useState(true);
@@ -98,6 +99,7 @@ export default function CampanhasLeadsPage() {
 
   return (
     <div className="space-y-6">
+      <SolicitacoesCapturaExternaInfo />
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Leads</h1>

@@ -10,6 +10,7 @@ import CriarReservaTransferDialog, { type TransferInitialData } from "@/componen
 import ComunicarDialog from "@/components/comunicar/ComunicarDialog";
 import { generateSolicitacaoTransferPDF } from "@/lib/pdfGenerator";
 import { Tables } from "@/integrations/supabase/types";
+import { SolicitacoesCapturaExternaInfo } from "@/components/solicitacoes/SolicitacoesCapturaExternaInfo";
 
 type Solicitacao = Tables<"solicitacoes_transfer">;
 export default function TransferSolicitacoesPage() {
@@ -90,6 +91,7 @@ export default function TransferSolicitacoesPage() {
 
   return (
     <div className="space-y-6">
+      <SolicitacoesCapturaExternaInfo />
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Solicitações de Transfer</h1>
