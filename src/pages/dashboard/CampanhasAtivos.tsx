@@ -14,6 +14,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { getLocalDateYmd } from "@/lib/localCalendarDate";
 import { toast } from "sonner";
+import { SolicitacoesCapturaExternaInfo } from "@/components/solicitacoes/SolicitacoesCapturaExternaInfo";
 
 const CAMPAIGN_COLORS = [
   "#3B82F6", "#10B981", "#F43F5E", "#F59E0B",
@@ -187,6 +188,7 @@ export default function CampanhasAtivosPage() {
 
   return (
     <div className="space-y-6">
+      <SolicitacoesCapturaExternaInfo variant="campanhas-ativos" />
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Campanhas Ativas</h1>

@@ -24,6 +24,7 @@ import {
   Map,
   Monitor,
   StickyNote,
+  Link2,
   ChevronRight,
   Calendar,
   Wallet2,
@@ -55,8 +56,8 @@ type Subsection = { title: string; items: ToolDef[] };
 type MajorSection = {
   id: string;
   label: string;
-  /** Destaque âmbar alinhado ao grupo Beta do menu lateral. */
-  labelTone?: "beta";
+  /** Destaque âmbar (Beta) ou laranja (Marketing), alinhado ao menu lateral. */
+  labelTone?: "beta" | "marketing";
   subsections: Subsection[];
 };
 
@@ -95,10 +96,7 @@ function buildHomeSections(showNetwork: boolean, exibirComunicadorMotorista: boo
     },
     {
       title: "Frota e oportunidades",
-      items: [
-        { title: "Veículos", page: "veiculos", desc: "Cadastro e gestão da frota.", icon: Car },
-        { title: "Mentoria", page: "mentoria", desc: "Conteúdos e trilha de desenvolvimento.", icon: GraduationCap },
-      ],
+      items: [{ title: "Veículos", page: "veiculos", desc: "Cadastro e gestão da frota.", icon: Car }],
     },
     {
       title: "Financeiro",
@@ -112,23 +110,28 @@ function buildHomeSections(showNetwork: boolean, exibirComunicadorMotorista: boo
     },
   ];
 
-  const ferramentasItems: ToolDef[] = [
+  const marketingItems: ToolDef[] = [
     { title: "Campanhas — Ativos", page: "campanhas/ativos", desc: "Páginas e campanhas de captação ativas.", icon: Globe },
     { title: "Campanhas — Leads", page: "campanhas/leads", desc: "Leads gerados pelas campanhas.", icon: UserCheck },
-    { title: "Geolocalização", page: "transfer/geolocalizacao", desc: "Rastreamento e envio de posição ao cliente.", icon: Map },
-    { title: "Receptivos", page: "marketing/receptivos", desc: "Materiais e páginas para receptivo.", icon: Globe },
-    { title: "QR Codes", page: "marketing/qrcode", desc: "QR Codes para divulgação e acesso rápido.", icon: Search },
+    { title: "E-mail Business", page: "email-business", desc: "E-mail profissional com domínio próprio.", icon: Mail },
+    { title: "Website", page: "website", desc: "Site institucional integrado à operação.", icon: Monitor },
+    { title: "Domínios", page: "dominios", desc: "Domínios e DNS ligados à sua operação.", icon: Link2 },
+    { title: "Comunidade", page: "comunidade", desc: "Canal com a comunidade da plataforma.", icon: Users },
     ...(showNetwork
       ? [{ title: "Network", page: "network", desc: "Oportunidades de viagens com outros motoristas.", icon: Globe } as ToolDef]
       : []),
-    { title: "Comunidade", page: "comunidade", desc: "Canal com a comunidade da plataforma.", icon: Users },
-    { title: "E-mail Business", page: "email-business", desc: "E-mail profissional com domínio próprio.", icon: Mail },
-    { title: "Website", page: "website", desc: "Site institucional integrado à operação.", icon: Monitor },
+  ];
+
+  const ferramentasItems: ToolDef[] = [
+    { title: "Geolocalização", page: "transfer/geolocalizacao", desc: "Rastreamento e envio de posição ao cliente.", icon: Map },
+    { title: "Receptivos", page: "marketing/receptivos", desc: "Materiais e páginas para receptivo.", icon: Globe },
+    { title: "QR Codes", page: "marketing/qrcode", desc: "QR Codes para divulgação e acesso rápido.", icon: Search },
   ];
 
   const betaItems: ToolDef[] = [
     { title: "Disparador", page: "disparador", desc: "Envio de mensagens em massa (WhatsApp dedicado).", icon: Megaphone },
     { title: "Empty Legs", page: "empty-legs", desc: "Trechos e oportunidades de retorno.", icon: Plane },
+    { title: "Mentoria", page: "mentoria", desc: "Conteúdos e trilha de desenvolvimento.", icon: GraduationCap },
   ];
 
   const configuracao: Subsection[] = [
@@ -146,7 +149,7 @@ function buildHomeSections(showNetwork: boolean, exibirComunicadorMotorista: boo
       title: "Suporte interno",
       items: [
         { title: "Anotações", page: "anotacoes", desc: "Notas e lembretes da operação.", icon: StickyNote },
-        { title: "Tickets", page: "tickets", desc: "Chamados e solicitações de suporte.", icon: ClipboardList },
+        { title: "Suporte", page: "tickets", desc: "Chamados e solicitações de suporte.", icon: ClipboardList },
       ],
     },
   ];
@@ -154,9 +157,15 @@ function buildHomeSections(showNetwork: boolean, exibirComunicadorMotorista: boo
   return [
     { id: "principal", label: "Principal", subsections: principal },
     {
+      id: "marketing",
+      label: "Marketing",
+      labelTone: "marketing",
+      subsections: [{ title: "Presença e captação", items: marketingItems }],
+    },
+    {
       id: "ferramentas",
       label: "Ferramentas",
-      subsections: [{ title: "Marketing e operação", items: ferramentasItems }],
+      subsections: [{ title: "Operação e divulgação", items: ferramentasItems }],
     },
     {
       id: "beta",
@@ -486,6 +495,8 @@ export default function HomePage() {
                   "text-xl font-bold text-foreground",
                   major.labelTone === "beta" &&
                     "uppercase tracking-wide text-amber-600 dark:text-amber-400",
+                  major.labelTone === "marketing" &&
+                    "uppercase tracking-wide text-[#FF6600] dark:text-[#FF6600]",
                 )}
               >
                 {major.label}

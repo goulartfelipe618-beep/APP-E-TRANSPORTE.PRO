@@ -64,6 +64,128 @@ function reportId(createdAt: string, rowId: string): string {
   return `MTR-${y}-${tail}`;
 }
 
+/** EXIF orientation 1–8 (JPEG); 1 = sem rotação. */
+function readJpegExifOrientation(arr: Uint8Array): number {
+  if (arr.byteLength < 4) return 1;
+  const view = new DataView(arr.buffer, arr.byteOffset, arr.byteLength);
+  if (view.getUint16(0, false) !== 0xffd8) return 1;
+
+  let offset = 2;
+  while (offset + 4 < arr.byteLength) {
+    if (arr[offset] !== 0xff) {
+      offset += 1;
+      continue;
+    }
+    const marker = arr[offset + 1]!;
+    if (marker === 0xda || marker === 0xd9) break;
+
+    const segLen = view.getUint16(offset + 2, false);
+    if (segLen < 2 || offset + 2 + segLen > arr.byteLength) break;
+
+    if (marker === 0xe1) {
+      const exifStart = offset + 4;
+      if (
+        exifStart + 6 <= arr.byteLength &&
+        arr[exifStart] === 0x45 &&
+        arr[exifStart + 1] === 0x78 &&
+        arr[exifStart + 2] === 0x69 &&
+        arr[exifStart + 3] === 0x66 &&
+        arr[exifStart + 4] === 0 &&
+        arr[exifStart + 5] === 0
+      ) {
+        const tiff = exifStart + 6;
+        const le = arr[tiff] === 0x49 && arr[tiff + 1] === 0x49;
+        const be = arr[tiff] === 0x4d && arr[tiff + 1] === 0x4d;
+        if (!le && !be) return 1;
+        const bom = le;
+        const r16 = (p: number) => view.getUint16(p, bom);
+        const r32 = (p: number) => view.getUint32(p, bom);
+        if (r16(tiff + 2) !== 0x002a) return 1;
+        const ifd0 = tiff + r32(tiff + 4);
+        if (ifd0 + 2 > arr.byteLength) return 1;
+        const n = r16(ifd0);
+        if (ifd0 + 2 + n * 12 > arr.byteLength) return 1;
+        for (let i = 0; i < n; i++) {
+          const e = ifd0 + 2 + i * 12;
+          if (r16(e) === 0x0112) {
+            const typ = r16(e + 2);
+            const cnt = r32(e + 4);
+            if (typ === 3 && cnt === 1) {
+              const o = r16(e + 8);
+              if (o >= 1 && o <= 8) return o;
+            }
+            return 1;
+          }
+        }
+      }
+    }
+    offset += 2 + segLen;
+  }
+  return 1;
+}
+
+function decodeImageElement(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error("decode"));
+    img.src = src;
+  });
+}
+
+/** Corrige orientação EXIF desenhando no canvas (jsPDF ignora EXIF no JPEG bruto). */
+function orientedJpegDataUrlFromImage(img: HTMLImageElement, orientation: number): string | null {
+  const iw = img.naturalWidth;
+  const ih = img.naturalHeight;
+  if (!iw || !ih) return null;
+
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return null;
+
+  if (orientation > 4 && orientation < 9) {
+    canvas.width = ih;
+    canvas.height = iw;
+  } else {
+    canvas.width = iw;
+    canvas.height = ih;
+  }
+
+  switch (orientation) {
+    case 2:
+      ctx.transform(-1, 0, 0, 1, iw, 0);
+      break;
+    case 3:
+      ctx.transform(-1, 0, 0, -1, iw, ih);
+      break;
+    case 4:
+      ctx.transform(1, 0, 0, -1, 0, ih);
+      break;
+    case 5:
+      ctx.transform(0, 1, 1, 0, 0, 0);
+      break;
+    case 6:
+      ctx.transform(0, 1, -1, 0, ih, 0);
+      break;
+    case 7:
+      ctx.transform(0, -1, -1, 0, ih, iw);
+      break;
+    case 8:
+      ctx.transform(0, -1, 1, 0, 0, iw);
+      break;
+    default:
+      break;
+  }
+
+  ctx.drawImage(img, 0, 0);
+  try {
+    return canvas.toDataURL("image/jpeg", 0.92);
+  } catch {
+    return null;
+  }
+}
+
 async function loadRasterForPdf(
   url: string,
 ): Promise<{ dataUrl: string; fmt: "JPEG" | "PNG" | "WEBP" } | null> {
@@ -74,6 +196,28 @@ async function loadRasterForPdf(
     if (ct.includes("pdf")) return null;
     const buf = await res.arrayBuffer();
     const u8 = new Uint8Array(buf);
+
+    const looksJpeg = u8[0] === 0xff && u8[1] === 0xd8;
+    let orientation = 1;
+    if (ct.includes("jpeg") || ct.includes("jpg") || (!ct.includes("png") && !ct.includes("webp") && looksJpeg)) {
+      orientation = readJpegExifOrientation(u8);
+    }
+
+    const mime = ct.includes("png") ? "image/png" : ct.includes("webp") ? "image/webp" : "image/jpeg";
+    const blob = new Blob([u8], { type: mime });
+    const objUrl = URL.createObjectURL(blob);
+    try {
+      const img = await decodeImageElement(objUrl);
+      const oriented = orientedJpegDataUrlFromImage(img, orientation);
+      if (oriented) {
+        return { dataUrl: oriented, fmt: "JPEG" };
+      }
+    } catch {
+      /* fallback abaixo */
+    } finally {
+      URL.revokeObjectURL(objUrl);
+    }
+
     let bin = "";
     for (let i = 0; i < u8.length; i++) bin += String.fromCharCode(u8[i]!);
     const b64 = btoa(bin);
@@ -83,6 +227,12 @@ async function loadRasterForPdf(
   } catch {
     return null;
   }
+}
+
+/** Marcador visível: Helvetica do PDF não suporta ●/◆ (apareciam como "%Ï"). */
+function drawPdfGoldDot(doc: jsPDF, cx: number, baselineY: number) {
+  doc.setFillColor(...GOLD);
+  doc.circle(cx, baselineY - 1.85, 1.45, "F");
 }
 
 function ensureSpace(doc: jsPDF, y: number, need: number): number {
@@ -199,18 +349,13 @@ export async function downloadMotoristaDossierPdf(input: MotoristaDossierPdfInpu
   doc.text(input.nome || "—", colX, y + 7);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8.5);
-  doc.setTextColor(...GOLD);
-  doc.text("●", colX, y + 14);
+  drawPdfGoldDot(doc, colX + 1.45, y + 14);
   doc.setTextColor(30, 30, 30);
-  doc.text(`CPF: ${fmtCpf(input.cpf)}`, colX + 4, y + 14);
-  doc.setTextColor(...GOLD);
-  doc.text("●", colX, y + 20);
-  doc.setTextColor(30, 30, 30);
-  doc.text(`Telefone: ${input.telefone || "—"}`, colX + 4, y + 20);
-  doc.setTextColor(...GOLD);
-  doc.text("●", colX, y + 26);
-  doc.setTextColor(30, 30, 30);
-  doc.text(`E-mail: ${input.email || "—"}`, colX + 4, y + 26);
+  doc.text(`CPF: ${fmtCpf(input.cpf)}`, colX + 5.5, y + 14);
+  drawPdfGoldDot(doc, colX + 1.45, y + 20);
+  doc.text(`Telefone: ${input.telefone || "—"}`, colX + 5.5, y + 20);
+  drawPdfGoldDot(doc, colX + 1.45, y + 26);
+  doc.text(`E-mail: ${input.email || "—"}`, colX + 5.5, y + 26);
 
   y += box + 10;
 
@@ -242,8 +387,7 @@ export async function downloadMotoristaDossierPdf(input: MotoristaDossierPdfInpu
       doc.rect(x0, y0, cellW, cellH, "S");
       doc.setFont("helvetica", "bold");
       doc.setFontSize(6.5);
-      doc.setTextColor(...GOLD);
-      doc.text("◆", x0 + 2, y0 + 5);
+      drawPdfGoldDot(doc, x0 + 2.3, y0 + 5);
       doc.setTextColor(...MUTED);
       doc.text(c.label, x0 + 6, y0 + 5);
       if (c.pill) {

@@ -90,7 +90,7 @@ export default function TicketsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Tickets</h1>
+          <h1 className="text-2xl font-bold text-foreground">Suporte</h1>
           <p className="text-muted-foreground text-sm">Relate melhorias, erros ou dúvidas</p>
         </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>

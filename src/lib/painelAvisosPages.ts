@@ -21,8 +21,6 @@ export const PAGINAS_MOTORISTA: { value: string; label: string }[] = [
   { value: "financeiro/receber", label: "Financeiro — Contas a receber" },
   { value: "financeiro/pagar", label: "Financeiro — Contas a pagar" },
   { value: "financeiro/relatorios", label: "Financeiro — Relatórios" },
-  { value: "empty-legs", label: "Empty Legs" },
-  { value: "mentoria", label: "Mentoria" },
   { value: "campanhas/ativos", label: "Campanhas — Ativos" },
   { value: "campanhas/leads", label: "Campanhas — Leads" },
   { value: "marketing/receptivos", label: "Receptivos" },
@@ -33,11 +31,13 @@ export const PAGINAS_MOTORISTA: { value: string; label: string }[] = [
   { value: "website", label: "Website" },
   { value: "dominios", label: "Domínios" },
   { value: "disparador", label: "Disparador" },
+  { value: "empty-legs", label: "Empty Legs" },
+  { value: "mentoria", label: "Mentoria" },
   { value: "anotacoes", label: "Anotações" },
   { value: "sistema/configuracoes", label: "Sistema — Configurações" },
   { value: "sistema/automacoes", label: "Sistema — Automações" },
   { value: "sistema/comunicador", label: "Sistema — Comunicador" },
-  { value: "tickets", label: "Tickets" },
+  { value: "tickets", label: "Suporte" },
 ];
 
 /** Chaves `activePage` do painel táxi. */
@@ -52,7 +52,7 @@ export const PAGINAS_TAXI: { value: string; label: string }[] = [
   { value: "anotacoes", label: "Anotações" },
   { value: "sistema/configuracoes", label: "Sistema — Configurações" },
   { value: "sistema/automacoes", label: "Sistema — Automações" },
-  { value: "tickets", label: "Tickets" },
+  { value: "tickets", label: "Suporte" },
 ];
 
 export type PainelTipo = "motorista" | "taxi";

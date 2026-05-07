@@ -3,6 +3,8 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { usePainelMotoristaEvolutionAtivo } from "@/hooks/usePainelMotoristaEvolutionAtivo";
+import { useUserPlan } from "@/hooks/useUserPlan";
+import UpgradePlanDialog from "@/components/planos/UpgradePlanDialog";
 import { ComunicadorEvolutionSection } from "@/components/comunicador/ComunicadorEvolutionSection";
 import { useComunicadoresEvolution, qrSrc, type ComunicadorRow } from "@/hooks/useComunicadoresEvolution";
 import { WHATSAPP_OFICIAL_PLATAFORMA_EXIBICAO } from "@/lib/comunicadorOficial";
@@ -13,7 +15,7 @@ import {
 } from "@/lib/evolutionApi";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Info, Loader2, ShieldAlert, Smartphone } from "lucide-react";
+import { Info, Loader2, ShieldAlert, Smartphone, Sparkles } from "lucide-react";
 
 const QR_SESSION_MS = 10 * 60 * 1000;
 const POLL_MS = 3000;
@@ -43,7 +45,10 @@ function formatMmSs(ms: number): string {
 
 export default function ComunicadorMotoristaExecutivoPage() {
   const { painelMotoristaEvolutionAtivo, ready: painelComunicadorReady } = usePainelMotoristaEvolutionAtivo();
+  const { plano, loading: planLoading } = useUserPlan();
   const { sistema, own, loading, reload, setOwn } = useComunicadoresEvolution();
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
+  const planoFree = !planLoading && plano === "free";
 
   const [qrSession, setQrSession] = useState(false);
   const [sessionDeadline, setSessionDeadline] = useState<number | null>(null);
@@ -180,6 +185,11 @@ export default function ComunicadorMotoristaExecutivoPage() {
   }, [qrSession, sessionDeadline, clearTimers]);
 
   const handleConectarAgora = useCallback(async () => {
+    if (plano === "free") {
+      toast.message("Conectar o seu WhatsApp próprio está disponível no plano PRÓ (Premium).");
+      setUpgradeOpen(true);
+      return;
+    }
     setBusyQr(true);
     try {
       const pack = await fetchEvolutionMotoristaQrFromServer();
@@ -210,7 +220,7 @@ export default function ComunicadorMotoristaExecutivoPage() {
     } finally {
       setBusyQr(false);
     }
-  }, [persistOwnPatch, trySync, own]);
+  }, [persistOwnPatch, trySync, own, plano]);
 
   const handleRemoverOwn = useCallback(async () => {
     setBusyDelete(true);
@@ -283,6 +293,27 @@ export default function ComunicadorMotoristaExecutivoPage() {
           Atualizar
         </Button>
       </div>
+
+      {planoFree ? (
+        <Alert className="border-[#FF6600]/45 bg-[#FF6600]/10 text-foreground">
+          <Sparkles className="h-4 w-4 text-[#FF6600]" />
+          <AlertTitle className="text-foreground">WhatsApp no seu número</AlertTitle>
+          <AlertDescription className="space-y-3 text-sm text-muted-foreground">
+            <p>
+              Deseja conectar o seu WhatsApp? Migre para o plano <strong className="text-foreground">PRÓ (Premium)</strong>{" "}
+              agora mesmo.
+            </p>
+            <Button
+              type="button"
+              size="sm"
+              className="bg-[#FF6600] text-white hover:bg-[#FF6600]/90"
+              onClick={() => setUpgradeOpen(true)}
+            >
+              Ver planos e migrar
+            </Button>
+          </AlertDescription>
+        </Alert>
+      ) : null}
 
       <Alert className="border-[#FF6600]/50 bg-[#FF6600]/10 text-foreground">
         <ShieldAlert className="h-4 w-4 text-[#FF6600]" />
@@ -391,26 +422,42 @@ export default function ComunicadorMotoristaExecutivoPage() {
           <CardHeader>
             <CardTitle className="text-lg">WhatsApp próprio</CardTitle>
             <CardDescription>
-              Clique no botão abaixo para abrir o QR Code e conectar seu WhatsApp.
+              {planoFree
+                ? "No plano FREE pode consultar a linha oficial acima. Para ligar o seu próprio WhatsApp por QR Code, migre para o plano PRÓ (Premium)."
+                : "Clique no botão abaixo para abrir o QR Code e conectar seu WhatsApp."}
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm text-muted-foreground">
-              O QR será exibido nesta tela e ficará válido por{" "}
-              <strong className="text-foreground">10 minutos</strong>.
+              {planoFree
+                ? "O botão de conexão fica disponível após a migração de plano, apenas na sua conta."
+                : "O QR será exibido nesta tela e ficará válido por "}
+              {!planoFree ? (
+                <>
+                  <strong className="text-foreground">10 minutos</strong>.
+                </>
+              ) : null}
             </p>
-            <Button
-              type="button"
-              className="shrink-0 bg-[#FF6600] text-white hover:bg-[#FF6600]/90"
-              onClick={() => void handleConectarAgora()}
-              disabled={busyQr || loading}
-            >
-              {busyQr ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Smartphone className="mr-2 h-4 w-4" />}
-              CONECTAR O QR CODE
-            </Button>
+            <div className="flex shrink-0 flex-wrap gap-2">
+              {planoFree ? (
+                <Button type="button" variant="outline" onClick={() => setUpgradeOpen(true)}>
+                  Migrar para PRÓ
+                </Button>
+              ) : null}
+              <Button
+                type="button"
+                className="bg-[#FF6600] text-white hover:bg-[#FF6600]/90"
+                onClick={() => void handleConectarAgora()}
+                disabled={busyQr || loading || planoFree}
+              >
+                {busyQr ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Smartphone className="mr-2 h-4 w-4" />}
+                CONECTAR O QR CODE
+              </Button>
+            </div>
           </CardContent>
         </Card>
       )}
+      <UpgradePlanDialog open={upgradeOpen} onOpenChange={setUpgradeOpen} />
     </div>
   );
 }

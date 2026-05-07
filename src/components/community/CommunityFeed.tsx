@@ -10,6 +10,7 @@ import {
   type SetStateAction,
 } from "react";
 import SlideCarousel from "@/components/SlideCarousel";
+import CommunityStories from "@/components/community/CommunityStories";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -20,7 +21,19 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Heart, MessageCircle, Pencil, Trash2, RefreshCw, ImagePlus, Video, Tags, MoreHorizontal, MoreVertical } from "lucide-react";
+import {
+  Heart,
+  MessageCircle,
+  Pencil,
+  Trash2,
+  RefreshCw,
+  ImagePlus,
+  Video,
+  Tags,
+  MoreHorizontal,
+  MoreVertical,
+  Plus,
+} from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import {
   AlertDialog,
@@ -103,6 +116,49 @@ function initialsFromName(name: string) {
 
 /** Tamanho da página de posts (Supabase `.range` inclusivo). */
 const COMMUNITY_POSTS_PAGE_SIZE = 20;
+
+/** Largura e altura publicadas para imagens no feed (recorte central se o ficheiro tiver outras dimensões). */
+const COMMUNITY_IMAGE_TARGET_W = 1220;
+const COMMUNITY_IMAGE_TARGET_H = 880;
+
+async function cropRasterImageFileToCommunityDimensions(file: File): Promise<File> {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const el = new Image();
+      el.onload = () => resolve(el);
+      el.onerror = () => reject(new Error("Não foi possível ler a imagem"));
+      el.src = url;
+    });
+    const iw = img.naturalWidth;
+    const ih = img.naturalHeight;
+    if (!iw || !ih) throw new Error("Dimensões inválidas");
+
+    const W = COMMUNITY_IMAGE_TARGET_W;
+    const H = COMMUNITY_IMAGE_TARGET_H;
+    const canvas = document.createElement("canvas");
+    canvas.width = W;
+    canvas.height = H;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Canvas indisponível");
+
+    const scale = Math.max(W / iw, H / ih);
+    const sw = W / scale;
+    const sh = H / scale;
+    const sx = Math.max(0, (iw - sw) / 2);
+    const sy = Math.max(0, (ih - sh) / 2);
+    ctx.drawImage(img, sx, sy, sw, sh, 0, 0, W, H);
+
+    const blob = await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob((b) => resolve(b), "image/jpeg", 0.92),
+    );
+    if (!blob) throw new Error("Não foi possível processar a imagem");
+    const base = file.name.replace(/\.[^.]+$/, "") || "imagem";
+    return new File([blob], `${base}.jpg`, { type: "image/jpeg" });
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
 
 function sortPostsByCreatedAtDesc(list: CommunityPost[]): CommunityPost[] {
   return [...list].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
@@ -567,6 +623,8 @@ export default function CommunityFeed({ panel = "motorista" }: CommunityFeedProp
   const [newPostCategoryId, setNewPostCategoryId] = useState<string>("");
   const [selectedMentions, setSelectedMentions] = useState<string[]>([]);
   const [publishing, setPublishing] = useState(false);
+  /** No painel do utilizador o formulário de nova publicação fica oculto até clicar em «Criar publicação». */
+  const [composerOpen, setComposerOpen] = useState(() => panel === "admin");
   const [activeCategoryId, setActiveCategoryId] = useState<string>("all");
 
   const [editingPostId, setEditingPostId] = useState<string | null>(null);
@@ -620,15 +678,31 @@ export default function CommunityFeed({ panel = "motorista" }: CommunityFeedProp
 
   const handleFilesPicked = async (files: File[]) => {
     const validFiles: File[] = [];
+    let anyImageResized = false;
     for (const file of files) {
-      if (file.type.startsWith("image/")) {
-        const dims = await getImageDimensions(file);
-        if (dims.width !== 1536 || dims.height !== 1024) {
-          toast.error(`A imagem "${file.name}" precisa ter exatamente 1536x1024px.`);
-          continue;
-        }
+      if (file.type.startsWith("video/")) {
+        validFiles.push(file);
+        continue;
       }
-      validFiles.push(file);
+      if (file.type.startsWith("image/")) {
+        try {
+          const dims = await getImageDimensions(file);
+          const exact =
+            dims.width === COMMUNITY_IMAGE_TARGET_W && dims.height === COMMUNITY_IMAGE_TARGET_H;
+          const next = exact ? file : await cropRasterImageFileToCommunityDimensions(file);
+          if (!exact) anyImageResized = true;
+          validFiles.push(next);
+        } catch {
+          toast.error(`Não foi possível processar a imagem "${file.name}".`);
+        }
+      } else {
+        validFiles.push(file);
+      }
+    }
+    if (anyImageResized) {
+      toast.message(
+        `Imagens com dimensões diferentes foram recortadas para ${COMMUNITY_IMAGE_TARGET_W}×${COMMUNITY_IMAGE_TARGET_H}px (área central).`,
+      );
     }
     setNewPostFiles(validFiles);
   };
@@ -1015,6 +1089,7 @@ export default function CommunityFeed({ panel = "motorista" }: CommunityFeedProp
       setNewPostFiles([]);
       setSelectedMentions([]);
       setNewPostCategoryId(categories[0]?.id || "");
+      if (!isAdminPanel) setComposerOpen(false);
       toast.success("Publicação criada");
       void fetchAll({ silent: true });
     } catch (error: unknown) {
@@ -1178,6 +1253,8 @@ export default function CommunityFeed({ panel = "motorista" }: CommunityFeedProp
         <SlideCarousel pagina="comunidade" variant="banner" />
       )}
 
+      <CommunityStories panel={isAdminPanel ? "admin" : "motorista"} />
+
       <div
         className={cn(
           "flex flex-col gap-6 xl:flex-row xl:items-start",
@@ -1186,12 +1263,37 @@ export default function CommunityFeed({ panel = "motorista" }: CommunityFeedProp
       >
         <div className="flex min-w-0 flex-1 justify-center xl:min-h-0">
           <div className="mx-auto w-full max-w-3xl space-y-6">
+          {!isAdminPanel && !composerOpen ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                className="bg-[#FF6600] text-white hover:bg-[#FF6600]/90"
+                onClick={() => setComposerOpen(true)}
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Criar publicação
+              </Button>
+              <Button type="button" variant="outline" size="sm" onClick={() => void fetchAll({ silent: true })}>
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Atualizar feed
+              </Button>
+            </div>
+          ) : null}
+
+          {(isAdminPanel || composerOpen) && (
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <p className="font-semibold text-foreground">Nova publicação</p>
-              <Button variant="outline" size="icon" onClick={() => void fetchAll({ silent: true })} title="Atualizar feed">
-                <RefreshCw className="h-4 w-4" />
-              </Button>
+              <div className="flex items-center gap-2">
+                {!isAdminPanel ? (
+                  <Button type="button" variant="ghost" size="sm" onClick={() => setComposerOpen(false)}>
+                    Fechar
+                  </Button>
+                ) : null}
+                <Button variant="outline" size="icon" onClick={() => void fetchAll({ silent: true })} title="Atualizar feed">
+                  <RefreshCw className="h-4 w-4" />
+                </Button>
+              </div>
             </CardHeader>
             <CardContent className="space-y-4">
               <Textarea
@@ -1225,7 +1327,10 @@ export default function CommunityFeed({ panel = "motorista" }: CommunityFeedProp
                     onChange={(e) => void handleFilesPicked(Array.from(e.target.files || []))}
                   />
                   <p className="text-[11px] text-muted-foreground">
-                    Imagens obrigatoriamente em 1536x1024px. Vídeos seguem formato livre.
+                    As imagens devem ter <strong className="text-foreground">largura de {COMMUNITY_IMAGE_TARGET_W}px</strong>{" "}
+                    e <strong className="text-foreground">altura de {COMMUNITY_IMAGE_TARGET_H}px</strong>. Se enviar outro
+                    tamanho, o sistema <strong className="text-foreground">recorta automaticamente</strong> para esse
+                    formato (área central). Vídeos seguem formato livre.
                   </p>
                   {newPostFiles.length > 0 && (
                     <p className="text-xs text-muted-foreground">{newPostFiles.length} arquivo(s) selecionado(s)</p>
@@ -1262,6 +1367,7 @@ export default function CommunityFeed({ panel = "motorista" }: CommunityFeedProp
               </Button>
             </CardContent>
           </Card>
+          )}
 
           <div className="space-y-4">
             {visiblePosts.map((post) => {

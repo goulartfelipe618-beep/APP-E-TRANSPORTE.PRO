@@ -60,8 +60,8 @@ function readNetworkSpotlightHighlight() {
 
 type MenuGroup = {
   label: string;
-  /** Legenda em destaque amarelo (ex.: BETA), alinhada a Principal / Ferramentas. */
-  labelTone?: "beta";
+  /** Legenda em destaque (BETA âmbar; MARKETING laranja). */
+  labelTone?: "beta" | "marketing";
   items: Array<
     | { title: string; icon: LucideIcon; children: Array<{ title: string; page: string; icon: LucideIcon }> }
     | { title: string; page: string; icon: LucideIcon }
@@ -122,13 +122,12 @@ const getMenuStructure = (showNetwork: boolean, exibirComunicadorMotorista: bool
       },
       { title: "Clientes", page: "clientes", icon: ContactRound },
       { title: "Veículos", page: "veiculos", icon: Car },
-      { title: "Mentoria", page: "mentoria", icon: GraduationCap },
     ],
   },
   {
-    label: "Ferramentas",
+    label: "Marketing",
+    labelTone: "marketing",
     items: [
-      { title: "Geolocalização", page: "transfer/geolocalizacao", icon: Map },
       {
         title: "Campanhas",
         icon: Megaphone,
@@ -137,13 +136,19 @@ const getMenuStructure = (showNetwork: boolean, exibirComunicadorMotorista: bool
           { title: "Leads", page: "campanhas/leads", icon: UserCheck },
         ],
       },
-      { title: "Receptivos", page: "marketing/receptivos", icon: Globe },
-      { title: "QR Codes", page: "marketing/qrcode", icon: Search },
-      ...(showNetwork ? [{ title: "Network", page: "network", icon: Globe }] : []),
-      { title: "Comunidade", page: "comunidade", icon: Users },
       { title: "E-mail Business", page: "email-business", icon: Mail },
       { title: "Website", page: "website", icon: Monitor },
       { title: "Domínios", page: "dominios", icon: Link2 },
+      { title: "Comunidade", page: "comunidade", icon: Users },
+      ...(showNetwork ? [{ title: "Network", page: "network", icon: Globe }] : []),
+    ],
+  },
+  {
+    label: "Ferramentas",
+    items: [
+      { title: "Geolocalização", page: "transfer/geolocalizacao", icon: Map },
+      { title: "Receptivos", page: "marketing/receptivos", icon: Globe },
+      { title: "QR Codes", page: "marketing/qrcode", icon: Search },
     ],
   },
   {
@@ -152,6 +157,7 @@ const getMenuStructure = (showNetwork: boolean, exibirComunicadorMotorista: bool
     items: [
       { title: "Disparador", page: "disparador", icon: Megaphone },
       { title: "Empty Legs", page: "empty-legs", icon: Plane },
+      { title: "Mentoria", page: "mentoria", icon: GraduationCap },
     ],
   },
   {
@@ -169,7 +175,7 @@ const getMenuStructure = (showNetwork: boolean, exibirComunicadorMotorista: bool
         ],
       },
       { title: "Anotações", page: "anotacoes", icon: StickyNote },
-      { title: "Tickets", page: "tickets", icon: ClipboardList },
+      { title: "Suporte", page: "tickets", icon: ClipboardList },
     ],
   },
 ];
@@ -270,6 +276,8 @@ export function AppSidebar() {
               className={cn(
                 group.labelTone === "beta" &&
                   "font-semibold uppercase tracking-wide text-amber-600 dark:text-amber-400",
+                group.labelTone === "marketing" &&
+                  "font-semibold uppercase tracking-wide text-[#FF6600] dark:text-[#FF6600]",
               )}
             >
               {group.label}
