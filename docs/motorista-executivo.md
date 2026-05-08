@@ -38,12 +38,11 @@ O **painel do motorista executivo** é a aplicação de **gestão de frota** E-T
 
 ### 1.2 Quem utiliza
 
-Utilizadores cujo destino após login **não** é `/admin` (`admin_master`) nem `/taxi` (`admin_taxi`). A decisão faz-se em `getPostLoginPath` → RPC `get_session_primary_role`, com fallback em `user_roles`.
+Utilizadores cujo destino após login **não** é `/admin` (`admin_master`). A decisão faz-se em `getPostLoginPath` → RPC `get_session_primary_role`, com fallback em `user_roles`.
 
 ### 1.3 O que **não** é este painel
 
-- **`/taxi`:** painel do perfil **admin taxi** / operação taxista (outro layout, `TaxiSidebar`).  
-- **`/admin`:** administração global **admin master**.
+- **`/admin`:** administração global **admin master** (único).
 
 ---
 
@@ -669,7 +668,7 @@ Cada subsecção segue o modelo: **objetivo**, **fontes de dados**, **ações da
 
 ## 8. Regras de negócio e permissões
 
-- **Encaminhamento de painel:** `admin_master` → `/admin`; `admin_taxi` → `/taxi`; restantes → `/dashboard`.  
+- **Encaminhamento de painel:** `admin_master` → `/admin`; restantes (`admin_transfer`) → `/dashboard`.  
 - **Abrangência:** visibilidade de reserva conforme `motorista_id` / `user_id` (ver secção 6.4).  
 - **Network feed:** delete apenas próprio post no painel motorista; admin master teria poder extra noutro contexto.  
 - **Comunidade:** moderador admin pode apagar posts de terceiros; autor apaga o seu (regra no `CommunityFeed`).  

@@ -23,7 +23,6 @@ interface UserItem {
 
 const roleLabels: Record<string, string> = {
   admin_transfer: "Motorista Executivo",
-  admin_taxi: "Taxista",
   admin_master: "Administrador Master",
 };
 
@@ -91,7 +90,7 @@ export default function AdminUsuariosCadastrados() {
     return () => window.removeEventListener("admin-master-cadastrados-refresh", onCadastradosRefresh);
   }, [fetchUsers]);
 
-  const showPlanField = formRole === "admin_transfer" || formRole === "admin_taxi";
+  const showPlanField = formRole === "admin_transfer";
 
   const handleCreate = async () => {
     if (!formEmail.trim() || !formPassword || !formRole) {
@@ -227,7 +226,7 @@ export default function AdminUsuariosCadastrados() {
           </h1>
           <p className="text-muted-foreground text-sm max-w-xl">
             Crie contas com e-mail e senha, e altere o plano entre <strong className="text-foreground">FREE</strong> e{" "}
-            <strong className="text-foreground">PRÓ</strong> para motoristas e taxistas (ícone da coroa na tabela). Apenas o administrador master acede a esta página.
+            <strong className="text-foreground">PRÓ</strong> para motoristas executivos (ícone da coroa na tabela). Apenas o administrador master acede a esta página.
           </p>
         </div>
         <div className="flex gap-2">
@@ -247,7 +246,6 @@ export default function AdminUsuariosCadastrados() {
           <SelectContent>
             <SelectItem value="todos">Todos</SelectItem>
             <SelectItem value="admin_transfer">Motorista Executivo</SelectItem>
-            <SelectItem value="admin_taxi">Taxista</SelectItem>
             <SelectItem value="admin_master">Administrador Master</SelectItem>
           </SelectContent>
         </Select>
@@ -355,12 +353,11 @@ export default function AdminUsuariosCadastrados() {
               <Select value={formRole} onValueChange={(v) => {
                 setFormRole(v);
                 if (v === "admin_master") setFormPlano("free");
-                if (v === "admin_transfer" || v === "admin_taxi") setFormPlano("pro");
+                if (v === "admin_transfer") setFormPlano("pro");
               }}>
                 <SelectTrigger><SelectValue placeholder="Selecione o tipo" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="admin_transfer">Motorista Executivo</SelectItem>
-                  <SelectItem value="admin_taxi">Taxista</SelectItem>
                   <SelectItem value="admin_master">Administrador Master</SelectItem>
                 </SelectContent>
               </Select>

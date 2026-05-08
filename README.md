@@ -1,6 +1,6 @@
 # Cheerful Bond Builder — E-Transporte.pro
 
-Painel web **React + Vite + TypeScript** com **Supabase** (Auth, Postgres, Storage, Edge Functions), áreas **Dashboard**, **Taxi** e **Admin**, integrações (mapas, PDF, QR Code, Evolution/WhatsApp, webhooks).
+Painel web **React + Vite + TypeScript** com **Supabase** (Auth, Postgres, Storage, Edge Functions), áreas **Dashboard** (Motorista Executivo / `admin_transfer`) e **Admin** (`admin_master`, único), integrações (mapas, PDF, QR Code, Evolution/WhatsApp, webhooks).
 
 ## Requisitos
 

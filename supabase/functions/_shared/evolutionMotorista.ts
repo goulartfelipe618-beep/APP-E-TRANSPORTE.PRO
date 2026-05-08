@@ -64,14 +64,14 @@ export async function getAuthorizedUserAndCreds(
   }
 
   const allowed = (roleRows || []).some((r: { role: string }) =>
-    ["admin_transfer", "admin_master", "motorista_executivo", "admin_taxi"].includes(r.role),
+    ["admin_transfer", "admin_master", "motorista_executivo"].includes(r.role),
   );
   if (!allowed) {
     return {
       ok: false,
       status: 403,
       body: JSON.stringify({
-        error: "Apenas motorista executivo, táxi (painel próprio) ou administrador pode usar esta ação.",
+        error: "Apenas motorista executivo ou administrador pode usar esta ação.",
       }),
     };
   }

@@ -1,7 +1,7 @@
 import { getPersistedSupabaseUserId } from "@/lib/supabaseSessionUser";
 
 /** Painéis com preferência de tema isolada (não partilham a mesma chave). */
-export type PanelThemeKind = "frota" | "taxi" | "admin";
+export type PanelThemeKind = "frota" | "admin";
 
 /**
  * Última classe aplicada ao <html>. Lida pelo script bloqueante em `index.html`
@@ -109,18 +109,16 @@ export function syncPanelThemeForCurrentUser(panel: PanelThemeKind) {
 export function applyThemeForRoute(path: string, userId: string | null) {
   const panel: PanelThemeKind = path.startsWith("/admin")
     ? "admin"
-    : path.startsWith("/taxi")
-      ? "taxi"
-      : path.startsWith("/frota") || path.startsWith("/verificar-motorista")
-        ? "frota"
-        : "frota";
+    : path.startsWith("/frota") || path.startsWith("/verificar-motorista")
+      ? "frota"
+      : "frota";
   applyPanelThemeFromStorage(panel, userId);
 }
 
 /** Remove preferências de tema guardadas para este utilizador (ex.: após exclusão da conta). */
 export function clearPanelThemePrefsForUser(userId: string) {
   if (typeof window === "undefined" || !userId) return;
-  const panels: PanelThemeKind[] = ["frota", "taxi", "admin"];
+  const panels: PanelThemeKind[] = ["frota", "admin"];
   for (const panel of panels) {
     const prefs = readThemePrefsByUser(panel);
     if (!(userId in prefs)) continue;

@@ -20,9 +20,7 @@ type AvisoRow = {
   cor: "verde" | "amarelo" | "vermelho";
   escopo_global: boolean;
   incluir_motorista: boolean;
-  incluir_taxi: boolean;
   paginas_motorista: string[] | null;
-  paginas_taxi: string[] | null;
   fonte: string;
 };
 
@@ -34,18 +32,12 @@ const COR_CLASS: Record<AvisoRow["cor"], string> = {
 
 function shouldShowAviso(
   row: AvisoRow,
-  painel: PainelTipo,
+  _painel: PainelTipo,
   activePage: string,
 ): boolean {
-  if (painel === "motorista") {
-    if (!row.incluir_motorista) return false;
-    if (row.escopo_global) return true;
-    const pages = row.paginas_motorista || [];
-    return pages.includes(activePage);
-  }
-  if (!row.incluir_taxi) return false;
+  if (!row.incluir_motorista) return false;
   if (row.escopo_global) return true;
-  const pages = row.paginas_taxi || [];
+  const pages = row.paginas_motorista || [];
   return pages.includes(activePage);
 }
 

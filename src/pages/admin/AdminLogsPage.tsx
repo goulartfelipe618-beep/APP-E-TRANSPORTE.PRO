@@ -38,7 +38,6 @@ const QUERY_KEY = ["admin-painel-client-error-logs"] as const;
 const PAINEL_LABEL: Record<string, string> = {
   motorista_executivo: "Motorista executivo",
   admin_master: "Admin Master",
-  taxi: "Táxi",
 };
 
 const KIND_LABEL: Record<string, string> = {
@@ -174,7 +173,7 @@ export default function AdminLogsPage() {
       <div>
         <h1 className="text-2xl font-bold text-foreground">Logs do painel</h1>
         <p className="mt-1 text-sm text-muted-foreground max-w-3xl">
-          Erros e rejeições capturados nos browsers (motorista executivo, táxi e Admin Master). Consulta
+          Erros e rejeições capturados nos browsers (motorista executivo e Admin Master). Consulta
           exclusiva do administrador master; a tabela <code className="text-xs">painel_client_error_logs</code>{" "}
           aplica RLS no Supabase.
         </p>
@@ -190,7 +189,6 @@ export default function AdminLogsPage() {
             <SelectContent>
               <SelectItem value="all">Todos os painéis</SelectItem>
               <SelectItem value="motorista_executivo">Motorista executivo</SelectItem>
-              <SelectItem value="taxi">Táxi</SelectItem>
               <SelectItem value="admin_master">Admin Master</SelectItem>
             </SelectContent>
           </Select>

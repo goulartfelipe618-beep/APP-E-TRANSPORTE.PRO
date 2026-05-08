@@ -123,8 +123,26 @@ Deno.serve(async (req) => {
         return new Response(JSON.stringify({ error: "A senha deve ter pelo menos 6 caracteres" }), { status: 400, headers: corsHeaders });
       }
 
-      if (!["admin_transfer", "admin_taxi", "admin_master"].includes(role)) {
+      if (!["admin_transfer", "admin_master"].includes(role)) {
         return new Response(JSON.stringify({ error: "Função inválida" }), { status: 400, headers: corsHeaders });
+      }
+
+      // Blindagem: só permite criar admin_master se ainda não existe nenhum (limite duro de 1).
+      if (role === "admin_master") {
+        const { data: existingMaster } = await supabaseAdmin
+          .from("user_roles")
+          .select("user_id")
+          .eq("role", "admin_master")
+          .limit(1)
+          .maybeSingle();
+        if (existingMaster) {
+          return new Response(
+            JSON.stringify({
+              error: "Já existe uma conta admin_master ativa. Esta plataforma só permite UM administrador master.",
+            }),
+            { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+          );
+        }
       }
 
       const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
@@ -248,7 +266,7 @@ Deno.serve(async (req) => {
           .select("role")
           .eq("user_id", leadUserId);
         const r = (leadRoles || []).map((x: { role: string }) => x.role);
-        if (r.includes("admin_master") || r.includes("admin_taxi")) {
+        if (r.includes("admin_master")) {
           return new Response(
             JSON.stringify({
               error:

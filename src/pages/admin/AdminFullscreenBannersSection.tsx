@@ -19,7 +19,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { assertUploadMagicBytes, extensionForDetectedMime } from "@/lib/validateUploadMagicBytes";
-import { PAGINAS_MOTORISTA, PAGINAS_TAXI } from "@/lib/painelAvisosPages";
+import { PAGINAS_MOTORISTA } from "@/lib/painelAvisosPages";
 import { ConfirmDeleteDialog } from "@/components/ConfirmDeleteDialog";
 
 type Row = Tables<"admin_fullscreen_banners">;
@@ -40,9 +40,7 @@ function isInFullscreenDateRange(inicio: string, fim: string): boolean {
 const emptyForm = () => ({
   imagem_url: "",
   incluir_motorista: true,
-  incluir_taxi: false,
   paginas_motorista: [] as string[],
-  paginas_taxi: [] as string[],
   data_inicio: "",
   data_fim: "",
   ativo: true,
@@ -91,9 +89,7 @@ export default function AdminFullscreenBannersSection() {
     setForm({
       imagem_url: row.imagem_url,
       incluir_motorista: row.incluir_motorista,
-      incluir_taxi: row.incluir_taxi,
       paginas_motorista: [...(row.paginas_motorista || [])],
-      paginas_taxi: [...(row.paginas_taxi || [])],
       data_inicio: row.data_inicio,
       data_fim: row.data_fim,
       ativo: row.ativo,
@@ -102,14 +98,13 @@ export default function AdminFullscreenBannersSection() {
     setDialogOpen(true);
   };
 
-  const togglePage = (kind: "motorista" | "taxi", value: string) => {
-    const key = kind === "motorista" ? "paginas_motorista" : "paginas_taxi";
+  const togglePage = (value: string) => {
     setForm((f) => {
-      const arr = f[key];
+      const arr = f.paginas_motorista;
       const has = arr.includes(value);
       return {
         ...f,
-        [key]: has ? arr.filter((x) => x !== value) : [...arr, value],
+        paginas_motorista: has ? arr.filter((x) => x !== value) : [...arr, value],
       };
     });
   };
@@ -138,14 +133,11 @@ export default function AdminFullscreenBannersSection() {
 
   const validate = (): string | null => {
     if (!editing && !file && !form.imagem_url.trim()) return "Envie uma imagem obrigatória.";
-    if (!form.incluir_motorista && !form.incluir_taxi) {
-      return "Selecione pelo menos um tipo de utilizador (Motorista ou Taxista).";
+    if (!form.incluir_motorista) {
+      return "Marque o público Motorista executivo.";
     }
-    if (form.incluir_motorista && form.paginas_motorista.length === 0) {
+    if (form.paginas_motorista.length === 0) {
       return "Selecione ao menos uma página do painel motorista.";
-    }
-    if (form.incluir_taxi && form.paginas_taxi.length === 0) {
-      return "Selecione ao menos uma página do painel táxi.";
     }
     if (!form.data_inicio || !form.data_fim) return "Informe data inicial e final.";
     if (form.data_fim < form.data_inicio) return "A data final não pode ser anterior à inicial.";
@@ -174,9 +166,7 @@ export default function AdminFullscreenBannersSection() {
     const payload = {
       imagem_url: imagemUrl,
       incluir_motorista: form.incluir_motorista,
-      incluir_taxi: form.incluir_taxi,
       paginas_motorista: form.paginas_motorista,
-      paginas_taxi: form.paginas_taxi,
       data_inicio: form.data_inicio,
       data_fim: form.data_fim,
       ativo: form.ativo,
@@ -269,7 +259,6 @@ export default function AdminFullscreenBannersSection() {
                   {r.incluir_motorista && (
                     <span className="rounded border border-border px-2 py-0.5">Motorista</span>
                   )}
-                  {r.incluir_taxi && <span className="rounded border border-border px-2 py-0.5">Táxi</span>}
                 </div>
                 <p className="text-xs text-muted-foreground">
                   {r.data_inicio} → {r.data_fim}
@@ -320,16 +309,6 @@ export default function AdminFullscreenBannersSection() {
                     Motorista executivo
                   </Label>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Checkbox
-                    id="fs-pub-t"
-                    checked={form.incluir_taxi}
-                    onCheckedChange={(v) => setForm((f) => ({ ...f, incluir_taxi: v === true }))}
-                  />
-                  <Label htmlFor="fs-pub-t" className="font-normal cursor-pointer">
-                    Taxista
-                  </Label>
-                </div>
               </div>
 
               {form.incluir_motorista && (
@@ -341,29 +320,9 @@ export default function AdminFullscreenBannersSection() {
                         <Checkbox
                           id={`fs-m-${p.value}`}
                           checked={form.paginas_motorista.includes(p.value)}
-                          onCheckedChange={() => togglePage("motorista", p.value)}
+                          onCheckedChange={() => togglePage(p.value)}
                         />
                         <Label htmlFor={`fs-m-${p.value}`} className="font-normal text-sm cursor-pointer leading-tight">
-                          {p.label}
-                        </Label>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {form.incluir_taxi && (
-                <div className="space-y-2">
-                  <Label>Páginas — Táxi</Label>
-                  <div className="rounded-md border border-border p-3 max-h-40 overflow-y-auto space-y-2">
-                    {PAGINAS_TAXI.map((p) => (
-                      <div key={p.value} className="flex items-center gap-2">
-                        <Checkbox
-                          id={`fs-t-${p.value}`}
-                          checked={form.paginas_taxi.includes(p.value)}
-                          onCheckedChange={() => togglePage("taxi", p.value)}
-                        />
-                        <Label htmlFor={`fs-t-${p.value}`} className="font-normal text-sm cursor-pointer leading-tight">
                           {p.label}
                         </Label>
                       </div>

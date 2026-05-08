@@ -20,9 +20,7 @@ type BannerRow = {
   id: string;
   imagem_url: string;
   incluir_motorista: boolean;
-  incluir_taxi: boolean;
   paginas_motorista: string[] | null;
-  paginas_taxi: string[] | null;
   data_inicio: string;
   data_fim: string;
   ativo: boolean;
@@ -41,16 +39,10 @@ function isInDateRange(inicio: string, fim: string, today: string): boolean {
   return today >= inicio && today <= fim;
 }
 
-function matchesPage(row: BannerRow, painel: PainelTipo, activePage: string): boolean {
-  if (painel === "motorista") {
-    if (!row.incluir_motorista) return false;
-    const pages = row.paginas_motorista || [];
-    // Lista vazia = todas as páginas do painel (compatível com dados antigos / migrações)
-    if (pages.length === 0) return true;
-    return pages.includes(activePage);
-  }
-  if (!row.incluir_taxi) return false;
-  const pages = row.paginas_taxi || [];
+function matchesPage(row: BannerRow, _painel: PainelTipo, activePage: string): boolean {
+  if (!row.incluir_motorista) return false;
+  const pages = row.paginas_motorista || [];
+  // Lista vazia = todas as páginas do painel (compatível com dados antigos / migrações).
   if (pages.length === 0) return true;
   return pages.includes(activePage);
 }

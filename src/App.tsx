@@ -14,7 +14,6 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import Login from "./pages/Login";
 import ProtectedRoute from "./components/ProtectedRoute";
-import ProtectedTaxiRoute from "./components/ProtectedTaxiRoute";
 import ProtectedAdminRoute from "./components/ProtectedAdminRoute";
 import ProtectedFrotaRoute from "./components/ProtectedFrotaRoute";
 import { ConfiguracoesProvider } from "./contexts/ConfiguracoesContext";
@@ -23,7 +22,6 @@ import ClientSessionRevocationGuard from "./components/ClientSessionRevocationGu
 
 const NotFound = lazy(() => import("./pages/NotFound"));
 const DashboardLayout = lazy(() => import("./components/DashboardLayout"));
-const TaxiDashboardLayout = lazy(() => import("./components/TaxiDashboardLayout"));
 const AdminLayout = lazy(() => import("./components/AdminLayout"));
 const MfaChallengePage = lazy(() => import("./pages/MfaChallenge"));
 const RastreioPublico = lazy(() => import("./pages/RastreioPublico"));
@@ -62,7 +60,6 @@ const App = () => (
             <Route path="/verificar-motorista/:token?" element={<VerificarMotoristaPage />} />
             <Route path="/frota" element={<ProtectedFrotaRoute><FrotaMotoristaLayout /></ProtectedFrotaRoute>} />
             <Route path="/dashboard" element={<ProtectedRoute><DashboardLayout /></ProtectedRoute>} />
-            <Route path="/taxi" element={<ProtectedTaxiRoute><TaxiDashboardLayout /></ProtectedTaxiRoute>} />
             <Route path="/admin" element={<ProtectedAdminRoute><AdminLayout /></ProtectedAdminRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>

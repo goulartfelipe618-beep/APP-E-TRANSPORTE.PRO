@@ -1,7 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { TablesInsert } from "@/integrations/supabase/types";
 
-export type PainelKind = "motorista_executivo" | "admin_master" | "taxi";
+export type PainelKind = "motorista_executivo" | "admin_master";
 
 type LogKind = "error" | "unhandledrejection" | "react_boundary";
 

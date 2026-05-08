@@ -40,22 +40,7 @@ export const PAGINAS_MOTORISTA: { value: string; label: string }[] = [
   { value: "tickets", label: "Suporte" },
 ];
 
-/** Chaves `activePage` do painel táxi. */
-export const PAGINAS_TAXI: { value: string; label: string }[] = [
-  { value: "home", label: "Home" },
-  { value: "metricas", label: "Métricas" },
-  { value: "abrangencia", label: "Abrangência" },
-  { value: "chamadas", label: "Chamadas" },
-  { value: "atendimentos", label: "Atendimentos" },
-  { value: "clientes", label: "Clientes" },
-  { value: "comunidade", label: "Comunidade" },
-  { value: "anotacoes", label: "Anotações" },
-  { value: "sistema/configuracoes", label: "Sistema — Configurações" },
-  { value: "sistema/automacoes", label: "Sistema — Automações" },
-  { value: "tickets", label: "Suporte" },
-];
-
-export type PainelTipo = "motorista" | "taxi";
+export type PainelTipo = "motorista";
 
 export function storageKeyAvisoDismiss(avisoId: string): string {
   return `etp_aviso_dismissed:${avisoId}`;

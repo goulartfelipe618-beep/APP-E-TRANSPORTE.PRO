@@ -477,7 +477,7 @@ Deno.serve(async (req) => {
           .select("role")
           .eq("user_id", existingUserId);
         const roles = (existingRoles || []).map((r: { role: string }) => r.role);
-        if (roles.includes("admin_master") || roles.includes("admin_taxi")) {
+        if (roles.includes("admin_master")) {
           return new Response(
             JSON.stringify({
               success: false,

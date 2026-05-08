@@ -18,7 +18,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { PAGINAS_MOTORISTA, PAGINAS_TAXI } from "@/lib/painelAvisosPages";
+import { PAGINAS_MOTORISTA } from "@/lib/painelAvisosPages";
 import {
   AVISO_FONTE_LABELS,
   AVISO_FONTE_VALUES,
@@ -53,10 +53,8 @@ const emptyForm = () => ({
   fonte: "padrao" as AvisoFonte,
   escopo_global: false,
   incluir_motorista: true,
-  incluir_taxi: true,
   incluir_login: false,
   paginas_motorista: [] as string[],
-  paginas_taxi: [] as string[],
   ativo: true,
 });
 
@@ -103,39 +101,31 @@ export default function AdminAvisosPage() {
       fonte: isAvisoFonte(row.fonte ?? "") ? row.fonte : "padrao",
       escopo_global: row.escopo_global,
       incluir_motorista: row.incluir_motorista,
-      incluir_taxi: row.incluir_taxi,
       incluir_login: row.incluir_login ?? false,
       paginas_motorista: [...(row.paginas_motorista || [])],
-      paginas_taxi: [...(row.paginas_taxi || [])],
       ativo: row.ativo,
     });
     setDialogOpen(true);
   };
 
-  const togglePage = (kind: "motorista" | "taxi", value: string) => {
-    const key = kind === "motorista" ? "paginas_motorista" : "paginas_taxi";
+  const togglePage = (value: string) => {
     setForm((f) => {
-      const arr = f[key];
+      const arr = f.paginas_motorista;
       const has = arr.includes(value);
       return {
         ...f,
-        [key]: has ? arr.filter((x) => x !== value) : [...arr, value],
+        paginas_motorista: has ? arr.filter((x) => x !== value) : [...arr, value],
       };
     });
   };
 
   const validate = (): string | null => {
     if (!form.texto.trim()) return "Informe o texto do aviso.";
-    if (!form.incluir_motorista && !form.incluir_taxi && !form.incluir_login) {
-      return "Marque pelo menos um público: Motorista executivo, Taxista ou Tela de login.";
+    if (!form.incluir_motorista && !form.incluir_login) {
+      return "Marque pelo menos um público: Motorista executivo ou Tela de login.";
     }
-    if (!form.escopo_global) {
-      if (form.incluir_motorista && form.paginas_motorista.length === 0) {
-        return "Selecione ao menos uma página do painel motorista ou marque escopo global.";
-      }
-      if (form.incluir_taxi && form.paginas_taxi.length === 0) {
-        return "Selecione ao menos uma página do painel táxi ou marque escopo global.";
-      }
+    if (!form.escopo_global && form.incluir_motorista && form.paginas_motorista.length === 0) {
+      return "Selecione ao menos uma página do painel motorista ou marque escopo global.";
     }
     return null;
   };
@@ -152,10 +142,8 @@ export default function AdminAvisosPage() {
       cor: form.cor,
       escopo_global: form.escopo_global,
       incluir_motorista: form.incluir_motorista,
-      incluir_taxi: form.incluir_taxi,
       incluir_login: form.incluir_login,
       paginas_motorista: form.escopo_global ? [] : form.paginas_motorista,
-      paginas_taxi: form.escopo_global ? [] : form.paginas_taxi,
       ativo: form.ativo,
       updated_at: new Date().toISOString(),
     };
@@ -241,8 +229,8 @@ export default function AdminAvisosPage() {
             Avisos
           </h1>
           <p className="text-muted-foreground mt-1 text-sm max-w-xl">
-            Mensagens no topo da área de conteúdo dos painéis Motorista executivo e Táxi. Escopo global exibe em todas as
-            páginas do público selecionado; caso contrário, apenas nas páginas marcadas. O utilizador pode fechar com{" "}
+            Mensagens no topo da área de conteúdo do painel Motorista executivo. Escopo global exibe em todas as
+            páginas; caso contrário, apenas nas páginas marcadas. O utilizador pode fechar com{" "}
             <span className="font-medium text-foreground">×</span>.
           </p>
         </div>
@@ -288,7 +276,6 @@ export default function AdminAvisosPage() {
                   {r.incluir_motorista && (
                     <span className="text-xs rounded-md border border-border px-2 py-0.5">Motorista</span>
                   )}
-                  {r.incluir_taxi && <span className="text-xs rounded-md border border-border px-2 py-0.5">Táxi</span>}
                   {r.incluir_login && <span className="text-xs rounded-md border border-border px-2 py-0.5">Tela de login</span>}
                 </div>
                 <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
@@ -407,16 +394,6 @@ export default function AdminAvisosPage() {
                 </div>
                 <div className="flex items-center gap-2">
                   <Checkbox
-                    id="pub-t"
-                    checked={form.incluir_taxi}
-                    onCheckedChange={(v) => setForm((f) => ({ ...f, incluir_taxi: v === true }))}
-                  />
-                  <Label htmlFor="pub-t" className="font-normal cursor-pointer">
-                    Taxista (Gestão de Táxi)
-                  </Label>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Checkbox
                     id="pub-login"
                     checked={form.incluir_login}
                     onCheckedChange={(v) => setForm((f) => ({ ...f, incluir_login: v === true }))}
@@ -427,47 +404,24 @@ export default function AdminAvisosPage() {
                 </div>
               </div>
 
-              {!form.escopo_global && (
-                <>
-                  {form.incluir_motorista && (
-                    <div className="space-y-2">
-                      <Label>Páginas — Motorista executivo</Label>
-                      <div className="rounded-md border border-border p-3 max-h-48 overflow-y-auto space-y-2">
-                        {PAGINAS_MOTORISTA.map((p) => (
-                          <div key={p.value} className="flex items-center gap-2">
-                            <Checkbox
-                              id={`m-${p.value}`}
-                              checked={form.paginas_motorista.includes(p.value)}
-                              onCheckedChange={() => togglePage("motorista", p.value)}
-                            />
-                            <Label htmlFor={`m-${p.value}`} className="font-normal text-sm cursor-pointer leading-tight">
-                              {p.label}
-                            </Label>
-                          </div>
-                        ))}
+              {!form.escopo_global && form.incluir_motorista && (
+                <div className="space-y-2">
+                  <Label>Páginas — Motorista executivo</Label>
+                  <div className="rounded-md border border-border p-3 max-h-48 overflow-y-auto space-y-2">
+                    {PAGINAS_MOTORISTA.map((p) => (
+                      <div key={p.value} className="flex items-center gap-2">
+                        <Checkbox
+                          id={`m-${p.value}`}
+                          checked={form.paginas_motorista.includes(p.value)}
+                          onCheckedChange={() => togglePage(p.value)}
+                        />
+                        <Label htmlFor={`m-${p.value}`} className="font-normal text-sm cursor-pointer leading-tight">
+                          {p.label}
+                        </Label>
                       </div>
-                    </div>
-                  )}
-                  {form.incluir_taxi && (
-                    <div className="space-y-2">
-                      <Label>Páginas — Táxi</Label>
-                      <div className="rounded-md border border-border p-3 max-h-48 overflow-y-auto space-y-2">
-                        {PAGINAS_TAXI.map((p) => (
-                          <div key={p.value} className="flex items-center gap-2">
-                            <Checkbox
-                              id={`t-${p.value}`}
-                              checked={form.paginas_taxi.includes(p.value)}
-                              onCheckedChange={() => togglePage("taxi", p.value)}
-                            />
-                            <Label htmlFor={`t-${p.value}`} className="font-normal text-sm cursor-pointer leading-tight">
-                              {p.label}
-                            </Label>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </>
+                    ))}
+                  </div>
+                </div>
               )}
 
               <div className="flex items-center justify-between rounded-lg border border-border p-3">

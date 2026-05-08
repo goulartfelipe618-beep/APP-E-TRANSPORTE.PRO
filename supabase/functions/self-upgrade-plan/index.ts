@@ -68,8 +68,8 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    if (!roleList.includes("admin_transfer") && !roleList.includes("admin_taxi")) {
-      return new Response(JSON.stringify({ error: "Apenas motoristas e taxistas podem alterar o plano por aqui." }), {
+    if (!roleList.includes("admin_transfer")) {
+      return new Response(JSON.stringify({ error: "Apenas motoristas executivos podem alterar o plano por aqui." }), {
         status: 403,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });

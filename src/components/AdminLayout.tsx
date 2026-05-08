@@ -11,7 +11,6 @@ import AdminSlidesPage from "@/pages/admin/SlidesPage";
 import AdminMetricasPage from "@/pages/admin/AdminMetricas";
 import AdminAbrangenciaPage from "@/pages/admin/AdminAbrangencia";
 import AdminContratoTransferPage from "@/pages/admin/AdminContratoTransfer";
-import AdminContratoTaxiPage from "@/pages/admin/AdminContratoTaxi";
 import AdminUsuariosCadastradosPage from "@/pages/admin/AdminUsuariosCadastrados";
 import AdminUsuariosSolicitacoesPage from "@/pages/admin/AdminUsuariosSolicitacoes";
 import AdminNetworkPage from "@/pages/admin/AdminNetworkPage";
@@ -38,7 +37,6 @@ const PAGE_MAP: Record<string, React.ComponentType> = {
   slides: AdminSlidesPage,
   comunidade: AdminCommunityPage,
   "contrato/transfer": AdminContratoTransferPage,
-  "contrato/taxi": AdminContratoTaxiPage,
   "usuarios/cadastrados": AdminUsuariosCadastradosPage,
   "usuarios/solicitacoes": AdminUsuariosSolicitacoesPage,
   network: AdminNetworkPage,
