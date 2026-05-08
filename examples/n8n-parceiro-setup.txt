@@ -17,6 +17,7 @@ Exemplo: workflow n8n + webhook-solicitacao (login FREE motorista)
 4) Verificar chamada à função:
    - npm run verify:webhook-solicitacao
    - Requer .env com VITE_SUPABASE_URL e VITE_SUPABASE_PUBLISHABLE_KEY (anon).
+   - O script envia X-Frota-Motorista-Intake: true (obrigatório para aparecer em Motoristas → Solicitações).
 
 5) HMAC opcional: se WEBHOOK_INBOUND_HMAC_SECRET estiver definido no Supabase,
    o POST precisa do cabeçalho x-webhook-signature (ver README_SECURITY.md).

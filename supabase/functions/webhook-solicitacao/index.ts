@@ -161,12 +161,11 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Motorista: por defeito = fila do dono da automação (Motoristas → Solicitações).
-    // Landing global da plataforma: POST deve incluir X-Platform-Landing-Secret = PLATFORM_LANDING_REQUEST_SECRET.
+    // Motorista: fila da frota (Motoristas → Solicitações) só com cabeçalho explícito X-Frota-Motorista-Intake.
+    // Landing global / formulários sem esse cabeçalho → plataforma_landing (só Admin Master na fila).
     const platformLandingSecret = (Deno.env.get("PLATFORM_LANDING_REQUEST_SECRET") || "").trim();
     const platformLandingHeader = (req.headers.get("x-platform-landing-secret") || "").trim();
-    const isPlatformLandingIntake =
-      platformLandingSecret.length > 0 && platformLandingHeader === platformLandingSecret;
+    const platformMotoristaLandingAutomacaoId = (Deno.env.get("PLATFORM_MOTORISTA_LANDING_AUTOMACAO_ID") || "").trim();
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -450,11 +449,32 @@ Deno.serve(async (req) => {
         extrasMerged.especificacao_origem = leadEspecificacao;
       }
 
+      const isPlatformLandingByHeader =
+        platformLandingSecret.length > 0 && platformLandingHeader === platformLandingSecret;
+      const isPlatformLandingByAutomacao =
+        platformMotoristaLandingAutomacaoId.length > 0 &&
+        String(automacao.id) === platformMotoristaLandingAutomacaoId;
+      const isPlatformLandingIntake = isPlatformLandingByHeader || isPlatformLandingByAutomacao;
+
+      const frotaIntakeRaw = (req.headers.get("x-frota-motorista-intake") || "").trim().toLowerCase();
+      const isExplicitFrotaMotoristaIntake =
+        frotaIntakeRaw === "true" || frotaIntakeRaw === "1" || frotaIntakeRaw === "yes";
+
+      /** Sem cabeçalho de frota, nunca gravar em fila do dono do URL (evita leak da landing global). */
+      const intakeDestino: "plataforma_landing" | "frota_parceiros" = isPlatformLandingIntake
+        ? "plataforma_landing"
+        : isExplicitFrotaMotoristaIntake
+          ? "frota_parceiros"
+          : "plataforma_landing";
+
       // Marca de proveniência: Motoristas → Solicitações só lista leads com intake (lead_user_id) via webhook ativo.
       extrasMerged._frota_webhook_ingresso = true;
       extrasMerged._webhook_automacao_id = String(automacao.id);
       if (isPlatformLandingIntake) {
         extrasMerged._platform_landing_intake = true;
+      }
+      if (intakeDestino === "frota_parceiros") {
+        extrasMerged._intake_frota_header_ok = "true";
       }
 
       // Cadastro pelo site: solicitação sempre em FREE com login liberado (plano pago só no admin ou upgrade no painel).
@@ -568,8 +588,6 @@ Deno.serve(async (req) => {
           { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
-
-      const intakeDestino = isPlatformLandingIntake ? "plataforma_landing" : "frota_parceiros";
 
       // 6) Insert: plataforma_landing = fila Admin Master; frota_parceiros = Motoristas→Solicitações do dono do webhook
       const record: Record<string, any> = {

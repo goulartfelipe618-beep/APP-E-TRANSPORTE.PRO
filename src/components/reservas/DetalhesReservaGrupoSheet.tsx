@@ -5,6 +5,7 @@ import { Separator } from "@/components/ui/separator";
 import { MessageSquare, Download } from "lucide-react";
 import { Tables } from "@/integrations/supabase/types";
 import { badgeToneReservaStatus, labelReservaStatus } from "@/lib/reservaStatus";
+import { formatDbCalendarDatePtBr } from "@/lib/painelAgendaReservas";
 
 type ReservaGrupo = Tables<"reservas_grupos">;
 
@@ -26,7 +27,10 @@ export default function DetalhesReservaGrupoSheet({ reserva, open, onOpenChange,
   if (!reserva) return null;
 
   const r = reserva;
-  const formatDate = (d: string | null) => d ? new Date(d).toLocaleDateString("pt-BR") : null;
+  const formatDate = (d: string | null) => {
+    const t = formatDbCalendarDatePtBr(d);
+    return t === "—" ? null : t;
+  };
   const formatCurrency = (v: number) => Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
   return (

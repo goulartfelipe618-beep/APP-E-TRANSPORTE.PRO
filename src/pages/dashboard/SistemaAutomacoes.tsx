@@ -614,10 +614,18 @@ export default function SistemaAutomacoesPage() {
                   <code className="text-xs">apikey</code> com a chave anon do Supabase — requisito do gateway, não do JSON do formulário.
                 </p>
                 <p>
-                  A fila de cadastro na plataforma (landing global) é outro fluxo: o servidor da landing envia{" "}
+                  Para os POSTs aparecerem em <strong className="text-foreground">Motoristas → Solicitações</strong>, o integrador
+                  (n8n, Make, servidor do site) deve enviar o cabeçalho{" "}
+                  <code className="rounded bg-muted px-1 text-foreground">X-Frota-Motorista-Intake: true</code>. Sem este cabeçalho,
+                  o lead fica na fila da plataforma (apenas Admin Master), mesmo que o URL use o <code className="text-xs">automacao_id</code>{" "}
+                  da sua frota — evita que o formulário público da plataforma apareça no painel dos operadores.
+                </p>
+                <p>
+                  Landing global / cadastro na plataforma: o backend pode usar{" "}
                   <code className="rounded bg-muted px-1 text-foreground">X-Platform-Landing-Secret</code> (secret{" "}
-                  <code className="rounded bg-muted px-1 text-foreground">PLATFORM_LANDING_REQUEST_SECRET</code> na função{" "}
-                  <code className="rounded bg-muted px-1 text-foreground">webhook-solicitacao</code>) — não se aplica ao «seja nosso motorista» da sua frota.
+                  <code className="rounded bg-muted px-1 text-foreground">PLATFORM_LANDING_REQUEST_SECRET</code>) ou a variável{" "}
+                  <code className="rounded bg-muted px-1 text-foreground">PLATFORM_MOTORISTA_LANDING_AUTOMACAO_ID</code> na Edge — não envie{" "}
+                  <code className="text-xs">X-Frota-Motorista-Intake</code> nesse fluxo.
                 </p>
               </AlertDescription>
             </Alert>

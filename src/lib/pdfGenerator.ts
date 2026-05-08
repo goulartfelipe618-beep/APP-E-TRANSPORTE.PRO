@@ -1,6 +1,9 @@
 import jsPDF from "jspdf";
 import { supabase } from "@/integrations/supabase/client";
 import { mergeCabecalhoComPerfilSeNecessario } from "@/lib/cabecalhoContratualResolve";
+import { formatDbCalendarDatePtBr, formatDbCalendarDatePtBrShortMonth } from "@/lib/painelAgendaReservas";
+import { fetchRouteMapImageDataUrl } from "@/lib/pdfRouteMapMapbox";
+import { isMapboxConfigured } from "@/lib/mapboxGeocode";
 
 // ─── Layout Constants ───────────────────────────────────────
 const PAGE_W = 210;
@@ -532,6 +535,75 @@ function addTimeRow(doc: jsPDF, entries: { label: string; value: string }[], y: 
   return y + SP.sectionGap;
 }
 
+function drawRouteMapPlaceholder(doc: jsPDF, x: number, yTop: number, w: number, h: number, msg: string) {
+  doc.setFillColor(244, 245, 247);
+  doc.roundedRect(x, yTop, w, h, 1.5, 1.5, "F");
+  doc.setFontSize(FS.small);
+  doc.setFont("helvetica", "normal");
+  setColor(doc, CLR.muted);
+  const lines = doc.splitTextToSize(msg, w - 6);
+  let ty = yTop + h / 2 - ((lines.length - 1) * 3.1) / 2;
+  for (const line of lines) {
+    doc.text(line, x + 3, ty);
+    ty += 3.1;
+  }
+  setColor(doc, CLR.black);
+}
+
+/** Mapa retangular (rota) entre dois endereços; não altera largura da página. */
+async function addRouteMapSection(
+  doc: jsPDF,
+  y: number,
+  title: string,
+  origin: string | null | undefined,
+  dest: string | null | undefined,
+): Promise<number> {
+  const mapW = CONTENT_W;
+  const mapH = 46;
+  const innerPad = 1.5;
+  const titleGap = 6;
+  y = checkPage(doc, y, titleGap + mapH + SP.sectionGap + 2);
+
+  doc.setFontSize(FS.subtitle);
+  doc.setFont("helvetica", "bold");
+  setColor(doc, CLR.dark);
+  doc.text(title, MARGIN, y);
+  y += titleGap;
+
+  const boxTop = y;
+  doc.setDrawColor(CLR.line);
+  doc.setLineWidth(0.35);
+  doc.roundedRect(MARGIN, boxTop, mapW, mapH, 2, 2, "S");
+
+  const innerX = MARGIN + innerPad;
+  const innerY = boxTop + innerPad;
+  const innerW = mapW - innerPad * 2;
+  const innerH = mapH - innerPad * 2;
+
+  const img = await fetchRouteMapImageDataUrl(origin, dest);
+  if (img) {
+    try {
+      doc.addImage(img.dataUrl, img.format, innerX, innerY, innerW, innerH);
+    } catch {
+      drawRouteMapPlaceholder(
+        doc,
+        innerX,
+        innerY,
+        innerW,
+        innerH,
+        "Mapa indisponível neste formato.",
+      );
+    }
+  } else {
+    const msg = isMapboxConfigured()
+      ? "Não foi possível gerar o mapa. Verifique os endereços ou tente mais tarde."
+      : "Defina VITE_MAPBOX_ACCESS_TOKEN no .env para incluir mapas da rota no PDF.";
+    drawRouteMapPlaceholder(doc, innerX, innerY, innerW, innerH, msg);
+  }
+
+  return boxTop + mapH + SP.sectionGap;
+}
+
 // ═══════════════════════════════════════════════════════════
 //  TRANSFER PDF
 // ═══════════════════════════════════════════════════════════
@@ -568,7 +640,7 @@ async function buildTransferReservaPdfDocument(reservaId: string): Promise<{ doc
   const serviceFields: { l: string; v: string }[] = [];
   if (r.ida_embarque) serviceFields.push({ l: "Embarque:", v: r.ida_embarque });
   if (r.ida_desembarque) serviceFields.push({ l: "Destino:", v: r.ida_desembarque });
-  if (r.telefone) serviceFields.push({ l: "Tel. Suporte:", v: r.telefone });
+  if (r.telefone) serviceFields.push({ l: "Tel. Cliente:", v: r.telefone });
   if (r.observacoes) serviceFields.push({ l: "Observações:", v: r.observacoes });
 
   y = addFieldRows(doc, serviceFields, MARGIN, y, 34);
@@ -579,7 +651,7 @@ async function buildTransferReservaPdfDocument(reservaId: string): Promise<{ doc
   const cardW = (CONTENT_W - SP.cardGap * 2) / 3;
 
   if (r.tipo_viagem === "somente_ida" || r.tipo_viagem === "ida_volta") {
-    const fmtDate = (d: string | null) => d ? new Date(d).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }).toUpperCase() : "—";
+    const fmtDate = (d: string | null) => formatDbCalendarDatePtBrShortMonth(d);
     addInfoCard(doc, MARGIN, y, cardW, "DATA IDA", fmtDate(r.ida_data));
     if (r.tipo_viagem === "ida_volta") {
       addInfoCard(doc, MARGIN + cardW + SP.cardGap, y, cardW, "DATA VOLTA", fmtDate(r.volta_data));
@@ -587,7 +659,7 @@ async function buildTransferReservaPdfDocument(reservaId: string): Promise<{ doc
     const passCol = r.tipo_viagem === "ida_volta" ? 2 : 1;
     addInfoCard(doc, MARGIN + passCol * (cardW + SP.cardGap), y, cardW, "PASSAGEIROS", String(r.ida_passageiros || "—"));
   } else if (r.tipo_viagem === "por_hora") {
-    const fmtDate = (d: string | null) => d ? new Date(d).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }).toUpperCase() : "—";
+    const fmtDate = (d: string | null) => formatDbCalendarDatePtBrShortMonth(d);
     addInfoCard(doc, MARGIN, y, cardW, "DATA", fmtDate(r.por_hora_data));
     addInfoCard(doc, MARGIN + cardW + SP.cardGap, y, cardW, "HORAS", String(r.por_hora_qtd_horas || "—"));
     addInfoCard(doc, MARGIN + 2 * (cardW + SP.cardGap), y, cardW, "PASSAGEIROS", String(r.por_hora_passageiros || "—"));
@@ -602,6 +674,18 @@ async function buildTransferReservaPdfDocument(reservaId: string): Promise<{ doc
     if (timeEntries.length) y = addTimeRow(doc, timeEntries, y);
   } else {
     if (r.por_hora_hora) y = addTimeRow(doc, [{ label: "Horário:", value: r.por_hora_hora }], y);
+  }
+
+  if (r.tipo_viagem === "somente_ida" || r.tipo_viagem === "ida_volta") {
+    if (r.ida_embarque?.trim() && r.ida_desembarque?.trim()) {
+      y = await addRouteMapSection(doc, y, "Mapa da rota (ida)", r.ida_embarque, r.ida_desembarque);
+    }
+  } else if (r.tipo_viagem === "por_hora") {
+    const a = r.por_hora_endereco_inicio?.trim();
+    const b = r.por_hora_ponto_encerramento?.trim();
+    if (a && b) {
+      y = await addRouteMapSection(doc, y, "Mapa do percurso", a, b);
+    }
   }
 
   // Section: Price
@@ -631,7 +715,6 @@ async function buildTransferReservaPdfDocument(reservaId: string): Promise<{ doc
     { l: "CPF/CNPJ:", v: r.cpf_cnpj },
     { l: "Telefone:", v: r.telefone },
     { l: "Email:", v: r.email },
-    { l: "Quem viaja:", v: r.quem_viaja === "motorista" ? "Motorista" : "Eu mesmo" },
   ];
   const detailsRight = [
     { l: "Pagamento:", v: r.metodo_pagamento || "—" },
@@ -652,6 +735,11 @@ async function buildTransferReservaPdfDocument(reservaId: string): Promise<{ doc
     ];
     y = addFieldRows(doc, voltaFields, MARGIN, y, 34);
     y += 4;
+    const ve = (r.volta_embarque ?? "").trim();
+    const vd = (r.volta_desembarque ?? "").trim();
+    if (ve && vd) {
+      y = await addRouteMapSection(doc, y, "Mapa da rota (volta)", ve, vd);
+    }
   }
 
   // Por hora details
@@ -728,7 +816,7 @@ async function buildGrupoReservaPdfDocument(reservaId: string): Promise<{ doc: j
   const serviceFields: { l: string; v: string }[] = [];
   if (r.embarque) serviceFields.push({ l: "Embarque:", v: r.embarque });
   if (r.destino) serviceFields.push({ l: "Destino:", v: r.destino });
-  if (r.telefone_motorista) serviceFields.push({ l: "Tel. Suporte:", v: r.telefone_motorista });
+  if (r.whatsapp?.trim()) serviceFields.push({ l: "Tel. Cliente:", v: r.whatsapp });
   if (r.observacoes_viagem) serviceFields.push({ l: "Observações:", v: r.observacoes_viagem });
 
   y = addFieldRows(doc, serviceFields, MARGIN, y, 34);
@@ -737,7 +825,7 @@ async function buildGrupoReservaPdfDocument(reservaId: string): Promise<{ doc: j
   // Date cards
   y = checkPage(doc, y, 32);
   const cardW = (CONTENT_W - SP.cardGap * 2) / 3;
-  const fmtDate = (d: string | null) => d ? new Date(d).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }).toUpperCase() : "—";
+  const fmtDate = (d: string | null) => formatDbCalendarDatePtBrShortMonth(d);
 
   addInfoCard(doc, MARGIN, y, cardW, "DATA IDA", fmtDate(r.data_ida));
   if (r.data_retorno) {
@@ -751,6 +839,13 @@ async function buildGrupoReservaPdfDocument(reservaId: string): Promise<{ doc: j
   if (r.hora_ida) timeEntries.push({ label: "Horário Ida:", value: r.hora_ida });
   if (r.hora_retorno) timeEntries.push({ label: "Horário Retorno:", value: r.hora_retorno });
   if (timeEntries.length) y = addTimeRow(doc, timeEntries, y);
+
+  if (r.embarque?.trim() && r.destino?.trim()) {
+    y = await addRouteMapSection(doc, y, "Mapa da rota (ida)", r.embarque, r.destino);
+  }
+  if (r.data_retorno && r.embarque?.trim() && r.destino?.trim()) {
+    y = await addRouteMapSection(doc, y, "Mapa da rota (retorno)", r.destino, r.embarque);
+  }
 
   // Section: Price
   y = addSectionTitle(doc, "PREÇO", y);
@@ -868,7 +963,7 @@ export async function generateSolicitacaoTransferPDF(solicitacao: Record<string,
       { l: "Tipo:", v: tipoLabel[s.tipo] || s.tipo || "—" },
       { l: "Embarque:", v: s.embarque || "—" },
       { l: "Desembarque:", v: s.desembarque || "—" },
-      { l: "Data:", v: s.data_viagem ? new Date(s.data_viagem).toLocaleDateString("pt-BR") : "—" },
+      { l: "Data:", v: formatDbCalendarDatePtBr(s.data_viagem) },
       { l: "Hora:", v: s.hora_viagem || "—" },
       { l: "Passageiros:", v: s.num_passageiros?.toString() || "—" },
       { l: "Cupom:", v: s.cupom || "—" },
@@ -879,7 +974,7 @@ export async function generateSolicitacaoTransferPDF(solicitacao: Record<string,
       { l: "Tipo:", v: "Por Hora" },
       { l: "End. Início:", v: s.por_hora_endereco_inicio || "—" },
       { l: "Encerramento:", v: s.por_hora_ponto_encerramento || "—" },
-      { l: "Data:", v: s.por_hora_data ? new Date(s.por_hora_data).toLocaleDateString("pt-BR") : "—" },
+      { l: "Data:", v: formatDbCalendarDatePtBr(s.por_hora_data) },
       { l: "Hora:", v: s.por_hora_hora || "—" },
       { l: "Passageiros:", v: s.por_hora_passageiros?.toString() || "—" },
       { l: "Qtd. Horas:", v: s.por_hora_qtd_horas?.toString() || "—" },
@@ -895,7 +990,7 @@ export async function generateSolicitacaoTransferPDF(solicitacao: Record<string,
     const voltaFields = [
       { l: "Embarque:", v: s.volta_embarque || "—" },
       { l: "Desembarque:", v: s.volta_desembarque || "—" },
-      { l: "Data:", v: s.volta_data ? new Date(s.volta_data).toLocaleDateString("pt-BR") : "—" },
+      { l: "Data:", v: formatDbCalendarDatePtBr(s.volta_data) },
       { l: "Hora:", v: s.volta_hora || "—" },
       { l: "Passageiros:", v: s.volta_passageiros?.toString() || "—" },
       { l: "Cupom:", v: s.volta_cupom || "—" },
@@ -962,9 +1057,9 @@ export async function generateSolicitacaoGrupoPDF(solicitacao: Record<string, an
     { l: "Passageiros:", v: s.num_passageiros?.toString() || "—" },
     { l: "Embarque:", v: s.embarque || "—" },
     { l: "Destino:", v: s.destino || "—" },
-    { l: "Data Ida:", v: s.data_ida ? new Date(s.data_ida).toLocaleDateString("pt-BR") : "—" },
+    { l: "Data Ida:", v: formatDbCalendarDatePtBr(s.data_ida) },
     { l: "Hora Ida:", v: s.hora_ida || "—" },
-    { l: "Data Retorno:", v: s.data_retorno ? new Date(s.data_retorno).toLocaleDateString("pt-BR") : "—" },
+    { l: "Data Retorno:", v: formatDbCalendarDatePtBr(s.data_retorno) },
     { l: "Hora Retorno:", v: s.hora_retorno || "—" },
     { l: "Cupom:", v: s.cupom || "—" },
   ], MARGIN, y, 32);

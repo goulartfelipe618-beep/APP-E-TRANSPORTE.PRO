@@ -14,16 +14,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { Json, Tables } from "@/integrations/supabase/types";
 import { RESERVA_STATUS_OPTIONS } from "@/lib/reservaStatus";
+import { toAgendaDayKey } from "@/lib/painelAgendaReservas";
 
 const TIPOS_VEICULO = ["van", "micro_onibus", "onibus"] as const;
 
 function toDateInput(v: string | null | undefined): string {
-  if (!v) return "";
-  const s = String(v).trim();
-  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
-  const d = new Date(s);
-  if (Number.isNaN(d.getTime())) return "";
-  return d.toISOString().slice(0, 10);
+  return toAgendaDayKey(v) ?? "";
 }
 
 function toTimeInput(v: string | null | undefined): string {

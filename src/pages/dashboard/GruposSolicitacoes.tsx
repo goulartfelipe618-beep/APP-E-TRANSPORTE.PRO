@@ -11,6 +11,7 @@ import ComunicarDialog from "@/components/comunicar/ComunicarDialog";
 import { generateSolicitacaoGrupoPDF } from "@/lib/pdfGenerator";
 import { Tables } from "@/integrations/supabase/types";
 import { SolicitacoesCapturaExternaInfo } from "@/components/solicitacoes/SolicitacoesCapturaExternaInfo";
+import { formatDbCalendarDatePtBr } from "@/lib/painelAgendaReservas";
 
 type Solicitacao = Tables<"solicitacoes_grupos">;
 export default function GruposSolicitacoesPage() {
@@ -117,7 +118,7 @@ export default function GruposSolicitacoesPage() {
                   <TableCell>{s.tipo_veiculo ? <Badge variant="secondary">{s.tipo_veiculo}</Badge> : "—"}</TableCell>
                   <TableCell className="text-sm max-w-[150px] truncate">{s.embarque || "—"}</TableCell>
                   <TableCell className="text-sm max-w-[150px] truncate">{s.destino || "—"}</TableCell>
-                  <TableCell className="text-sm">{s.data_ida ? new Date(s.data_ida).toLocaleDateString("pt-BR") : "—"}</TableCell>
+                  <TableCell className="text-sm">{formatDbCalendarDatePtBr(s.data_ida)}</TableCell>
                   <TableCell>{s.num_passageiros ?? "—"}</TableCell>
                   <TableCell><Badge variant="outline">{s.status}</Badge></TableCell>
                   <TableCell>

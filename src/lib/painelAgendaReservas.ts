@@ -34,6 +34,25 @@ export function toAgendaDayKey(raw: string | null | undefined): string | null {
   return `${y}-${mo}-${da}`;
 }
 
+/** Data de calendário (YYYY-MM-DD vinda do Postgres / input type=date) em pt-BR — evita `new Date("YYYY-MM-DD")` (UTC). */
+export function formatDbCalendarDatePtBr(raw: string | null | undefined): string {
+  const key = toAgendaDayKey(raw);
+  if (!key) return "—";
+  const [y, mo, d] = key.split("-");
+  return `${d}/${mo}/${y}`;
+}
+
+/** Mesmo calendário, formato curto para PDF (ex.: 06 JUN). */
+export function formatDbCalendarDatePtBrShortMonth(raw: string | null | undefined): string {
+  const key = toAgendaDayKey(raw);
+  if (!key) return "—";
+  const parts = key.split("-").map((x) => Number(x));
+  if (parts.length !== 3 || parts.some((n) => !Number.isFinite(n))) return "—";
+  const [y, mo, d] = parts as [number, number, number];
+  const dt = new Date(y, mo - 1, d);
+  return dt.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }).toUpperCase();
+}
+
 export function formatHoraReserva(h: string | null | undefined): string {
   const t = (h ?? "").trim();
   if (!t) return "—";

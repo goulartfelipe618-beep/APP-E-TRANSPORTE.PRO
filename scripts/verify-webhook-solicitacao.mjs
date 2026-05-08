@@ -55,6 +55,8 @@ const res = await fetch(url, {
     "Content-Type": "application/json",
     apikey: anon,
     Authorization: `Bearer ${anon}`,
+    // Obrigatório para gravar em Motoristas → Solicitações da frota (ver webhook-solicitacao).
+    "X-Frota-Motorista-Intake": "true",
   },
   body: JSON.stringify(body),
 });

@@ -9,6 +9,7 @@ import { Tables } from "@/integrations/supabase/types";
 import { badgeToneReservaStatus, labelReservaStatus } from "@/lib/reservaStatus";
 import FrotaReservaDetalheSheet from "@/components/frota/FrotaReservaDetalheSheet";
 import { cn } from "@/lib/utils";
+import { formatDbCalendarDatePtBr } from "@/lib/painelAgendaReservas";
 
 const tipoLabel: Record<string, string> = {
   somente_ida: "Somente Ida",
@@ -129,7 +130,9 @@ export default function FrotaReservasPage() {
                       {r.ida_embarque && r.ida_desembarque ? `${r.ida_embarque} → ${r.ida_desembarque}` : "—"}
                     </TableCell>
                     <TableCell className="text-sm">
-                      {r.ida_data ? new Date(r.ida_data).toLocaleDateString("pt-BR") : "—"}
+                      {r.tipo_viagem === "por_hora"
+                        ? formatDbCalendarDatePtBr(r.por_hora_data)
+                        : formatDbCalendarDatePtBr(r.ida_data)}
                     </TableCell>
                     <TableCell>
                       <Badge variant={badgeToneReservaStatus(r.status)}>{labelReservaStatus(r.status)}</Badge>
@@ -177,9 +180,7 @@ export default function FrotaReservasPage() {
                     <TableCell className="max-w-[200px] truncate text-sm">
                       {r.embarque && r.destino ? `${r.embarque} → ${r.destino}` : "—"}
                     </TableCell>
-                    <TableCell className="text-sm">
-                      {r.data_ida ? new Date(r.data_ida).toLocaleDateString("pt-BR") : "—"}
-                    </TableCell>
+                    <TableCell className="text-sm">{formatDbCalendarDatePtBr(r.data_ida)}</TableCell>
                     <TableCell>
                       <Badge variant={badgeToneReservaStatus(r.status)}>{labelReservaStatus(r.status)}</Badge>
                     </TableCell>

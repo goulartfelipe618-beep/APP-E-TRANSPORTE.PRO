@@ -32,6 +32,7 @@ import {
 import AcompanharRastreioDialog from "@/components/geolocalizacao/AcompanharRastreioDialog";
 import DetalhesViagemRastreioSheet from "@/components/geolocalizacao/DetalhesViagemRastreioSheet";
 import { buildRastreioShareUrl } from "@/lib/appPublicUrl";
+import { formatDbCalendarDatePtBr, toAgendaDayKey } from "@/lib/painelAgendaReservas";
 
 type ReservaTransfer = Tables<"reservas_transfer">;
 type ReservaGrupo = Tables<"reservas_grupos">;
@@ -42,27 +43,21 @@ function labelTransfer(r: ReservaTransfer) {
     r.ida_embarque && r.ida_desembarque
       ? `${r.ida_embarque} → ${r.ida_desembarque}`
       : r.ida_embarque || r.ida_desembarque || "—";
-  const data = r.ida_data ? new Date(r.ida_data).toLocaleDateString("pt-BR") : "";
+  const dataFmt = formatDbCalendarDatePtBr(r.ida_data);
+  const data = dataFmt === "—" ? "" : dataFmt;
   return `#${r.numero_reserva} · ${r.nome_completo}${data ? ` · ${data}` : ""} · ${trajeto}`;
 }
 
 function labelGrupo(r: ReservaGrupo) {
   const rota = r.destino || r.embarque || "—";
-  const data = r.data_ida ? new Date(r.data_ida).toLocaleDateString("pt-BR") : "";
+  const dataFmt = formatDbCalendarDatePtBr(r.data_ida);
+  const data = dataFmt === "—" ? "" : dataFmt;
   return `#${r.numero_reserva} · ${r.nome_completo}${data ? ` · ${data}` : ""} · ${rota}`;
 }
 
-/** Normaliza valor da BD para YYYY-MM-DD (fuso local ao comparar com o relógio do utilizador). */
+/** Normaliza valor da BD para YYYY-MM-DD (calendário; evita interpretação UTC em strings só-data). */
 function parseYmdFromDb(v: string | null | undefined): string | null {
-  if (!v) return null;
-  const s = String(v).trim();
-  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
-  const d = new Date(s);
-  if (Number.isNaN(d.getTime())) return null;
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
+  return toAgendaDayKey(v);
 }
 
 function parseHm(hora: string | null | undefined): { h: number; m: number } | null {
