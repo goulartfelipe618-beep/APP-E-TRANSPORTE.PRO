@@ -15,6 +15,8 @@ import { toast } from "sonner";
 import type { Json, Tables } from "@/integrations/supabase/types";
 import { RESERVA_STATUS_OPTIONS } from "@/lib/reservaStatus";
 import { toAgendaDayKey } from "@/lib/painelAgendaReservas";
+import MapboxNormalizeAddressField from "@/components/mapbox/MapboxNormalizeAddressField";
+import { isMapboxConfigured } from "@/lib/mapboxGeocode";
 
 const TIPOS_VEICULO = ["van", "micro_onibus", "onibus"] as const;
 
@@ -431,6 +433,11 @@ export default function CriarReservaGrupoDialog({
 
           <div>
             <h3 className="font-semibold text-foreground mb-3">Detalhes da Viagem</h3>
+            {isMapboxConfigured() ? (
+              <p className="text-xs text-muted-foreground mb-3 -mt-1">
+                Após escrever embarque e destino, clique no pin laranja para confirmar no Mapbox — o PDF traça a rota com endereços normalizados.
+              </p>
+            ) : null}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label>Tipo de Veículo *</Label>
@@ -444,8 +451,24 @@ export default function CriarReservaGrupoDialog({
                 </Select>
               </div>
               <div className="space-y-1.5"><Label>Número de Passageiros *</Label><Input type="number" min="1" required value={numPassageiros} onChange={(e) => setNumPassageiros(e.target.value)} /></div>
-              <div className="space-y-1.5"><Label>Endereço de Embarque *</Label><Input placeholder="Digite o endereço..." required value={embarque} onChange={(e) => setEmbarque(e.target.value)} /></div>
-              <div className="space-y-1.5"><Label>Destino *</Label><Input placeholder="Digite o endereço..." required value={destino} onChange={(e) => setDestino(e.target.value)} /></div>
+              <div className="space-y-1.5">
+                <Label>Endereço de Embarque *</Label>
+                <MapboxNormalizeAddressField
+                  placeholder="Digite o endereço…"
+                  required
+                  value={embarque}
+                  onChange={setEmbarque}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Destino *</Label>
+                <MapboxNormalizeAddressField
+                  placeholder="Digite o endereço…"
+                  required
+                  value={destino}
+                  onChange={setDestino}
+                />
+              </div>
               <div className="space-y-1.5"><Label>Data de Ida *</Label><Input type="date" required value={dataIda} onChange={(e) => setDataIda(e.target.value)} /></div>
               <div className="space-y-1.5"><Label>Hora de Ida *</Label><Input type="time" required value={horaIda} onChange={(e) => setHoraIda(e.target.value)} /></div>
               <div className="space-y-1.5"><Label>Data de Retorno (opcional)</Label><Input type="date" value={dataRetorno} onChange={(e) => setDataRetorno(e.target.value)} /></div>

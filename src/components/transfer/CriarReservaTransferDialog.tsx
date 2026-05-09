@@ -15,6 +15,8 @@ import { toast } from "sonner";
 import type { Json, Tables } from "@/integrations/supabase/types";
 import { RESERVA_STATUS_OPTIONS } from "@/lib/reservaStatus";
 import { toAgendaDayKey } from "@/lib/painelAgendaReservas";
+import MapboxNormalizeAddressField from "@/components/mapbox/MapboxNormalizeAddressField";
+import { isMapboxConfigured } from "@/lib/mapboxGeocode";
 
 function toDateInput(v: string | null | undefined): string {
   return toAgendaDayKey(v) ?? "";
@@ -521,6 +523,11 @@ export default function CriarReservaTransferDialog({
           {/* Detalhes da Viagem */}
           <div>
             <h3 className="font-semibold text-foreground mb-3">Detalhes da Viagem</h3>
+            {isMapboxConfigured() ? (
+              <p className="text-xs text-muted-foreground mb-3 -mt-1">
+                Após escrever cada endereço, clique no pin laranja para confirmar no Mapbox — o PDF traça a rota com estes endereços normalizados.
+              </p>
+            ) : null}
             <div className="space-y-4">
               <div className="w-1/2 space-y-1.5">
                 <Label>Tipo de Viagem *</Label>
@@ -538,8 +545,24 @@ export default function CriarReservaTransferDialog({
                 <div className="rounded-lg border border-border p-4 space-y-4">
                   <h4 className="text-sm font-semibold text-foreground">→ Ida</h4>
                   <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1.5"><Label>Local de Embarque (IDA) *</Label><Input placeholder="Digite o endereço..." required value={idaEmbarque} onChange={(e) => setIdaEmbarque(e.target.value)} /></div>
-                    <div className="space-y-1.5"><Label>Local de Desembarque (IDA) *</Label><Input placeholder="Digite o endereço..." required value={idaDesembarque} onChange={(e) => setIdaDesembarque(e.target.value)} /></div>
+                    <div className="space-y-1.5">
+                      <Label>Local de Embarque (IDA) *</Label>
+                      <MapboxNormalizeAddressField
+                        placeholder="Digite o endereço…"
+                        required
+                        value={idaEmbarque}
+                        onChange={setIdaEmbarque}
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Local de Desembarque (IDA) *</Label>
+                      <MapboxNormalizeAddressField
+                        placeholder="Digite o endereço…"
+                        required
+                        value={idaDesembarque}
+                        onChange={setIdaDesembarque}
+                      />
+                    </div>
                     <div className="space-y-1.5"><Label>Data do Embarque (IDA) *</Label><Input type="date" required value={idaData} onChange={(e) => setIdaData(e.target.value)} /></div>
                     <div className="space-y-1.5"><Label>Hora</Label><Input type="time" value={idaHora} onChange={(e) => setIdaHora(e.target.value)} /></div>
                     <div className="space-y-1.5"><Label>Número de Passageiros *</Label><Input type="number" min="1" required value={idaPassageiros} onChange={(e) => setIdaPassageiros(e.target.value)} /></div>
@@ -553,8 +576,22 @@ export default function CriarReservaTransferDialog({
                 <div className="rounded-lg border border-border p-4 space-y-4">
                   <h4 className="text-sm font-semibold text-foreground">⇆ Volta</h4>
                   <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1.5"><Label>Local de Embarque (Volta)</Label><Input placeholder="Digite o endereço..." value={voltaEmbarque} onChange={(e) => setVoltaEmbarque(e.target.value)} /></div>
-                    <div className="space-y-1.5"><Label>Local de Desembarque (Volta)</Label><Input placeholder="Digite o endereço..." value={voltaDesembarque} onChange={(e) => setVoltaDesembarque(e.target.value)} /></div>
+                    <div className="space-y-1.5">
+                      <Label>Local de Embarque (Volta)</Label>
+                      <MapboxNormalizeAddressField
+                        placeholder="Digite o endereço…"
+                        value={voltaEmbarque}
+                        onChange={setVoltaEmbarque}
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Local de Desembarque (Volta)</Label>
+                      <MapboxNormalizeAddressField
+                        placeholder="Digite o endereço…"
+                        value={voltaDesembarque}
+                        onChange={setVoltaDesembarque}
+                      />
+                    </div>
                     <div className="space-y-1.5"><Label>Data</Label><Input type="date" value={voltaData} onChange={(e) => setVoltaData(e.target.value)} /></div>
                     <div className="space-y-1.5"><Label>Hora</Label><Input type="time" value={voltaHora} onChange={(e) => setVoltaHora(e.target.value)} /></div>
                     <div className="space-y-1.5"><Label>Passageiros</Label><Input type="number" min="1" value={voltaPassageiros} onChange={(e) => setVoltaPassageiros(e.target.value)} /></div>
@@ -568,8 +605,22 @@ export default function CriarReservaTransferDialog({
                 <div className="rounded-lg border border-border p-4 space-y-4">
                   <h4 className="text-sm font-semibold text-foreground">⏱ Por Hora</h4>
                   <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1.5"><Label>Endereço de Início</Label><Input placeholder="Digite o endereço..." value={porHoraEnderecoInicio} onChange={(e) => setPorHoraEnderecoInicio(e.target.value)} /></div>
-                    <div className="space-y-1.5"><Label>Ponto de Encerramento</Label><Input placeholder="Digite o endereço..." value={porHoraPontoEncerramento} onChange={(e) => setPorHoraPontoEncerramento(e.target.value)} /></div>
+                    <div className="space-y-1.5">
+                      <Label>Endereço de Início</Label>
+                      <MapboxNormalizeAddressField
+                        placeholder="Digite o endereço…"
+                        value={porHoraEnderecoInicio}
+                        onChange={setPorHoraEnderecoInicio}
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Ponto de Encerramento</Label>
+                      <MapboxNormalizeAddressField
+                        placeholder="Digite o endereço…"
+                        value={porHoraPontoEncerramento}
+                        onChange={setPorHoraPontoEncerramento}
+                      />
+                    </div>
                     <div className="space-y-1.5"><Label>Data</Label><Input type="date" value={porHoraData} onChange={(e) => setPorHoraData(e.target.value)} /></div>
                     <div className="space-y-1.5"><Label>Hora</Label><Input type="time" value={porHoraHora} onChange={(e) => setPorHoraHora(e.target.value)} /></div>
                     <div className="space-y-1.5"><Label>Passageiros</Label><Input type="number" min="1" value={porHoraPassageiros} onChange={(e) => setPorHoraPassageiros(e.target.value)} /></div>
