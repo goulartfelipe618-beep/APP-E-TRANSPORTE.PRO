@@ -14,6 +14,8 @@ import { PurchasedDomainSelectStep } from "@/components/domain/PurchasedDomainSe
 import { usePurchasedDomains } from "@/hooks/usePurchasedDomains";
 import { useActivePage } from "@/contexts/ActivePageContext";
 import { useUserPlan } from "@/hooks/useUserPlan";
+import { minimumPlanForPage, pageAllowedForPlan } from "@/lib/painelPlanPolicy";
+import PlanTierOpaqueGate from "@/components/planos/PlanTierOpaqueGate";
 import UpgradePlanDialog from "@/components/planos/UpgradePlanDialog";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -94,9 +96,9 @@ export default function EmailBusinessPage() {
   const [submitting, setSubmitting] = useState(false);
   const [emailSolicitacoes, setEmailSolicitacoes] = useState<any[]>([]);
   const [listLoading, setListLoading] = useState(true);
-  const { plano, refetch: refetchPlano } = useUserPlan();
+  const { plano, loading: planLoading, refetch: refetchPlano } = useUserPlan();
   const [upgradeOpen, setUpgradeOpen] = useState(false);
-  const proMarketingLocked = plano !== "pro";
+  const proMarketingLocked = !planLoading && !pageAllowedForPlan(plano, "email-business");
 
   // wizard state
   const [wizardActive, setWizardActive] = useState(false);
@@ -250,7 +252,15 @@ export default function EmailBusinessPage() {
   /* ── Landing Page ── */
   if (!wizardActive) {
     return (
-      <div className="space-y-8">
+      <>
+        <UpgradePlanDialog open={upgradeOpen} onOpenChange={setUpgradeOpen} />
+        <PlanTierOpaqueGate
+          minimumPlan={minimumPlanForPage("email-business")}
+          blocked={proMarketingLocked}
+          title="E-mail Business (visualização)"
+          description="Contratação de caixas profissionais e integração com o seu domínio fazem parte do plano PRÓ."
+        >
+          <div className="space-y-8">
         <SlideCarousel
           pagina="email_business"
           breakoutTop
@@ -417,11 +427,6 @@ export default function EmailBusinessPage() {
               </div>
             </div>
 
-            {proMarketingLocked && (
-              <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-900 dark:text-amber-200">
-                Visualização FREE: você pode ver o módulo de E-mail Business, mas novos cadastros são exclusivos do plano PRÓ.
-              </div>
-            )}
             <div className="text-center">
               <Button size="lg" onClick={openWizardFirst}>
                 Contratar E-mail Business <ArrowRight className="h-4 w-4 ml-2" />
@@ -429,7 +434,9 @@ export default function EmailBusinessPage() {
             </div>
           </>
         )}
-      </div>
+          </div>
+        </PlanTierOpaqueGate>
+      </>
     );
   }
 
@@ -437,8 +444,15 @@ export default function EmailBusinessPage() {
   const isAdditionalWizard = wizardMode === "additional";
 
   return (
-    <div className="space-y-8">
+    <>
       <UpgradePlanDialog open={upgradeOpen} onOpenChange={setUpgradeOpen} />
+      <PlanTierOpaqueGate
+        minimumPlan={minimumPlanForPage("email-business")}
+        blocked={proMarketingLocked}
+        title="E-mail Business (visualização)"
+        description="O assistente de contratação de e-mail profissional requer o plano PRÓ."
+      >
+        <div className="space-y-8">
       {isAdditionalWizard && (
         <div className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-3">
           <p className="text-sm text-foreground">
@@ -661,5 +675,7 @@ export default function EmailBusinessPage() {
       </div>
       )}
     </div>
+      </PlanTierOpaqueGate>
+    </>
   );
 }

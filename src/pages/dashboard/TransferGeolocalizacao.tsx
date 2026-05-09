@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Plus, RefreshCw, Copy, Send, MapPin, Check,
-  StopCircle, ExternalLink, Loader2, User, Car, Eye,
+  StopCircle, ExternalLink, Loader2, User, Car, Eye, Lock,
 } from "lucide-react";
 import SlideCarousel from "@/components/SlideCarousel";
 import { Button } from "@/components/ui/button";
@@ -35,6 +35,8 @@ import { buildRastreioShareUrl } from "@/lib/appPublicUrl";
 import { formatDbCalendarDatePtBr, toAgendaDayKey } from "@/lib/painelAgendaReservas";
 import { normalizeUserPlano, FREE_MAX_LINKS_GEO_MES } from "@/lib/painelPlanPolicy";
 import { currentYearMonthKeySaoPaulo, yearMonthKeySaoPauloFromIso } from "@/lib/spCalendarBr";
+import { useUserPlan } from "@/hooks/useUserPlan";
+import { freePlanLockedRastreioIdsByCreationMonth } from "@/lib/freePlanLocks";
 
 type ReservaTransfer = Tables<"reservas_transfer">;
 type ReservaGrupo = Tables<"reservas_grupos">;
@@ -126,6 +128,7 @@ function statusLabel(status: string | null | undefined): { label: string; tone: 
 
 export default function TransferGeolocalizacaoPage() {
   const { sistema, own } = useComunicadoresEvolution();
+  const { plano, loading: planUserPlanLoading } = useUserPlan();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadingRastreios, setLoadingRastreios] = useState(true);
@@ -461,6 +464,18 @@ export default function TransferGeolocalizacaoPage() {
     [rastreios],
   );
 
+  const geoLockedIds = useMemo(
+    () => freePlanLockedRastreioIdsByCreationMonth(plano, rastreios.map((r) => ({ id: r.id, created_at: r.created_at }))),
+    [plano, rastreios],
+  );
+
+  const freeGeoMonthAtCap = useMemo(() => {
+    if (plano !== "free" || planUserPlanLoading) return false;
+    const ym = currentYearMonthKeySaoPaulo();
+    const n = rastreios.filter((r) => yearMonthKeySaoPauloFromIso(r.created_at) === ym).length;
+    return n >= FREE_MAX_LINKS_GEO_MES;
+  }, [plano, planUserPlanLoading, rastreios]);
+
   return (
     <div className="space-y-6">
       <SlideCarousel
@@ -479,6 +494,12 @@ export default function TransferGeolocalizacaoPage() {
           <h1 className="text-2xl font-bold text-foreground">Geolocalização de Clientes</h1>
           <p className="text-muted-foreground">
             Crie um link de rastreio, envie ao cliente via WhatsApp (webhook n8n) e acompanhe o trajeto em tempo real.
+            {!planUserPlanLoading && geoLockedIds.size > 0 ? (
+              <span className="ml-2 block pt-1 text-xs text-amber-700 dark:text-amber-400">
+                Alguns links excedem o limite mensal do plano FREE: continuam listados, mas só os primeiros três do mês
+                podem ser usados até renovar o plano. Os dados não são apagados.
+              </span>
+            ) : null}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -491,7 +512,7 @@ export default function TransferGeolocalizacaoPage() {
           >
             <RefreshCw className={`h-4 w-4 ${loadingRastreios ? "animate-spin" : ""}`} />
           </Button>
-          <Button onClick={() => setOpen(true)}>
+          <Button onClick={() => setOpen(true)} disabled={!planUserPlanLoading && freeGeoMonthAtCap} title={freeGeoMonthAtCap ? `Plano FREE: máximo de ${FREE_MAX_LINKS_GEO_MES} links no mês civil (SP).` : undefined}>
             <Plus className="h-4 w-4 mr-2" /> Novo Link
           </Button>
         </div>
@@ -528,13 +549,20 @@ export default function TransferGeolocalizacaoPage() {
               const st = statusLabel(r.status);
               const comunicandoAtual = comunicandoId === r.id;
               const encerrandoAtual = encerrandoId === r.id;
+              const rowLocked = !planUserPlanLoading && geoLockedIds.has(r.id);
               return (
-                <div key={r.id} className="py-3 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div key={r.id} className={cn("py-3 flex flex-col gap-3 md:flex-row md:items-center md:justify-between", rowLocked && "rounded-lg bg-muted/20 opacity-[0.55]")}>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-medium text-foreground truncate">
                         {r.cliente_nome?.trim() || "Cliente sem nome"}
                       </span>
+                      {rowLocked ? (
+                        <Badge variant="outline" className="gap-1 border-amber-600/40 text-[11px] text-amber-700 dark:text-amber-400">
+                          <Lock className="h-3 w-3" />
+                          FREE
+                        </Badge>
+                      ) : null}
                       <Badge
                         variant={st.tone === "on" ? "default" : "secondary"}
                         className={
@@ -585,6 +613,7 @@ export default function TransferGeolocalizacaoPage() {
                       type="button"
                       size="sm"
                       variant="outline"
+                      disabled={rowLocked}
                       onClick={() => void handleCopiar(r)}
                       title="Copiar URL"
                     >
@@ -600,6 +629,7 @@ export default function TransferGeolocalizacaoPage() {
                       type="button"
                       size="sm"
                       variant="outline"
+                      disabled={rowLocked}
                       onClick={() => window.open(url, "_blank", "noopener,noreferrer")}
                       title="Abrir página pública do cliente"
                     >
@@ -612,7 +642,7 @@ export default function TransferGeolocalizacaoPage() {
                       size="sm"
                       className="bg-[#FF6600] hover:bg-[#FF6600]/90 text-white"
                       onClick={() => void handleComunicar(r)}
-                      disabled={comunicandoAtual}
+                      disabled={comunicandoAtual || rowLocked}
                       title="Enviar link via webhook (n8n → WhatsApp)"
                     >
                       {comunicandoAtual ? (
@@ -627,6 +657,7 @@ export default function TransferGeolocalizacaoPage() {
                       type="button"
                       size="sm"
                       variant="secondary"
+                      disabled={rowLocked}
                       onClick={() => setRastreioAcompanhando(r)}
                       title="Acompanhar em tempo real (motorista/central)"
                     >
@@ -651,7 +682,7 @@ export default function TransferGeolocalizacaoPage() {
                       variant="outline"
                       className="text-destructive hover:text-destructive"
                       onClick={() => setRastreioEncerrando(r)}
-                      disabled={encerrandoAtual}
+                      disabled={encerrandoAtual || rowLocked}
                       title="Encerrar viagem e compactar GPS"
                     >
                       <StopCircle className="h-4 w-4 mr-1" />
@@ -674,8 +705,9 @@ export default function TransferGeolocalizacaoPage() {
           <div className="divide-y divide-border">
             {rastreiosHistorico.map((r) => {
               const dt = r.data_hora_fim || r.finalizado_em || r.updated_at;
+              const rowLocked = !planUserPlanLoading && geoLockedIds.has(r.id);
               return (
-                <div key={r.id} className="py-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div key={r.id} className={cn("py-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between", rowLocked && "opacity-50")}>
                   <div className="min-w-0 flex-1">
                     <div className="text-sm text-foreground truncate">
                       {r.cliente_nome?.trim() || "—"}

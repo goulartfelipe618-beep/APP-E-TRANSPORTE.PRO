@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, LayoutGrid, List, Link2, Copy, Eye, Pencil, KeyRound } from "lucide-react";
+import { Plus, Search, LayoutGrid, List, Link2, Copy, Eye, Pencil, KeyRound, Lock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import CadastrarMotoristaDialog from "@/components/motoristas/CadastrarMotoristaDialog";
 import DetalhesMotoristaFrotaSheet from "@/components/motoristas/DetalhesMotoristaFrotaSheet";
@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/tooltip";
 import { useUserPlan } from "@/hooks/useUserPlan";
 import { canUseMotoristaPortalLink } from "@/lib/painelPlanPolicy";
+import { freePlanLockedMotoristaCadastroIds } from "@/lib/freePlanLocks";
 import UpgradePlanDialog from "@/components/planos/UpgradePlanDialog";
 
 type MotoristaCadastroRow = {
@@ -131,6 +132,11 @@ export default function MotoristaCadastrosPage() {
     );
   });
 
+  const freeLockedMotoristaIds = useMemo(
+    () => freePlanLockedMotoristaCadastroIds(plano, motoristas.map((m) => ({ id: m.id, created_at: m.created_at }))),
+    [plano, motoristas],
+  );
+
   return (
     <TooltipProvider>
       <div className="space-y-6">
@@ -142,6 +148,15 @@ export default function MotoristaCadastrosPage() {
               pré-cadastros do site separadamente). A lista usa o mesmo critério de segurança na base de dados (RLS). Cada
               motorista recebe um <strong className="text-foreground">link fixo</strong> de portal; após definir a senha, só ele acede aos seus dados e
               documentos. <strong className="text-foreground">Só a sua conta</strong> pode redefinir a senha do mini painel do motorista.
+              {!planLoading && freeLockedMotoristaIds.size > 0 ? (
+                <>
+                  {" "}
+                  <span className="text-amber-700 dark:text-amber-400">
+                    No plano FREE, além dos primeiros três cadastros (por data), os restantes permanecem visíveis mas inativos até
+                    subscrever STANDART ou PRÓ — os dados não são apagados.
+                  </span>
+                </>
+              ) : null}
             </p>
           </div>
           <Button
@@ -217,8 +232,9 @@ export default function MotoristaCadastrosPage() {
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
             {filtered.map((m) => {
               const situacao = situacaoFrotaFromWebhook(m.dados_webhook);
+              const rowLocked = !planLoading && freeLockedMotoristaIds.has(m.id);
               return (
-                <div key={m.id} className="space-y-2 rounded-xl border border-border bg-card p-4">
+                <div key={m.id} className={cn("space-y-2 rounded-xl border border-border bg-card p-4", rowLocked && "border-amber-600/35 bg-muted/20 opacity-[0.58]")}>
                   <div className="flex items-center justify-between gap-2">
                     <h3 className="font-semibold text-foreground">{m.nome}</h3>
                     <div className="flex shrink-0 flex-wrap justify-end gap-1">
@@ -226,6 +242,12 @@ export default function MotoristaCadastrosPage() {
                       <Badge variant={situacao === "ativo" ? "default" : "secondary"}>
                         {situacao === "ativo" ? "Ativo" : "Inativo"}
                       </Badge>
+                      {rowLocked ? (
+                        <Badge variant="outline" className="gap-1 border-amber-600/40 text-[11px] text-amber-700 dark:text-amber-400">
+                          <Lock className="h-3 w-3" />
+                          FREE
+                        </Badge>
+                      ) : null}
                     </div>
                   </div>
                   <p className="text-sm text-muted-foreground">CPF: {m.cpf || "—"}</p>
@@ -244,6 +266,7 @@ export default function MotoristaCadastrosPage() {
                       variant="outline"
                       size="sm"
                       className="h-8 border-[#FF6600]/40 text-xs text-[#FF6600] hover:bg-[#FF6600]/10"
+                      disabled={rowLocked}
                       onClick={() => {
                         setCadastroInitial(rowToInitialData(m));
                         setCadastroDialogOpen(true);
@@ -258,7 +281,7 @@ export default function MotoristaCadastrosPage() {
                     <span className="text-xs text-muted-foreground">
                       Portal: {m.portal_auth_user_id ? "senha definida" : "enviar link para definir senha"}
                     </span>
-                    <Button type="button" variant="outline" size="sm" className="h-7 text-xs" onClick={() => copyPortalLink(m.portal_token)}>
+                    <Button type="button" variant="outline" size="sm" className="h-7 text-xs" disabled={rowLocked} onClick={() => copyPortalLink(m.portal_token)}>
                       <Copy className="mr-1 h-3 w-3" />
                       Copiar link
                     </Button>
@@ -270,8 +293,8 @@ export default function MotoristaCadastrosPage() {
                             variant="outline"
                             size="sm"
                             className="h-7 text-xs"
-                            disabled={!m.portal_auth_user_id}
-                            onClick={() => m.portal_auth_user_id && setResetSenhaMotorista(m)}
+                            disabled={!m.portal_auth_user_id || rowLocked}
+                            onClick={() => m.portal_auth_user_id && !rowLocked && setResetSenhaMotorista(m)}
                           >
                             <KeyRound className="mr-1 h-3 w-3" />
                             Redefinir senha
@@ -307,9 +330,20 @@ export default function MotoristaCadastrosPage() {
               <tbody>
                 {filtered.map((m) => {
                   const situacao = situacaoFrotaFromWebhook(m.dados_webhook);
+                  const rowLocked = !planLoading && freeLockedMotoristaIds.has(m.id);
                   return (
-                    <tr key={m.id} className="border-t border-border">
-                      <td className="p-3 font-medium text-foreground">{m.nome}</td>
+                    <tr key={m.id} className={cn("border-t border-border", rowLocked && "bg-muted/25 opacity-[0.58]")}>
+                      <td className="p-3 font-medium text-foreground">
+                        <div className="flex flex-wrap items-center gap-2">
+                          {m.nome}
+                          {rowLocked ? (
+                            <Badge variant="outline" className="h-5 gap-1 border-amber-600/40 px-1.5 text-[10px] text-amber-700 dark:text-amber-400">
+                              <Lock className="h-3 w-3" />
+                              FREE
+                            </Badge>
+                          ) : null}
+                        </div>
+                      </td>
                       <td className="p-3 whitespace-nowrap">{m.cpf || "—"}</td>
                       <td className="p-3 whitespace-nowrap">{m.telefone || "—"}</td>
                       <td className="p-3">
@@ -326,7 +360,7 @@ export default function MotoristaCadastrosPage() {
                       <td className="p-3 whitespace-nowrap">{new Date(m.created_at).toLocaleDateString("pt-BR")}</td>
                       <td className="p-3 text-right">
                         <div className="flex flex-wrap justify-end gap-1">
-                          <Button type="button" variant="outline" size="sm" className="h-8 px-2 text-xs" onClick={() => copyPortalLink(m.portal_token)}>
+                          <Button type="button" variant="outline" size="sm" className="h-8 px-2 text-xs" disabled={rowLocked} onClick={() => copyPortalLink(m.portal_token)}>
                             <Copy className="mr-1 h-3 w-3" />
                             Copiar link
                           </Button>
@@ -338,8 +372,8 @@ export default function MotoristaCadastrosPage() {
                                   variant="outline"
                                   size="sm"
                                   className="h-8 px-2 text-xs"
-                                  disabled={!m.portal_auth_user_id}
-                                  onClick={() => m.portal_auth_user_id && setResetSenhaMotorista(m)}
+                                  disabled={!m.portal_auth_user_id || rowLocked}
+                                  onClick={() => m.portal_auth_user_id && !rowLocked && setResetSenhaMotorista(m)}
                                 >
                                   <KeyRound className="mr-1 h-3 w-3" />
                                   Senha
@@ -361,6 +395,7 @@ export default function MotoristaCadastrosPage() {
                             variant="ghost"
                             size="sm"
                             className="h-8 px-2 text-xs text-[#FF6600]"
+                            disabled={rowLocked}
                             onClick={() => {
                               setCadastroInitial(rowToInitialData(m));
                               setCadastroDialogOpen(true);

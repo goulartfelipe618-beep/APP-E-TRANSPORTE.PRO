@@ -1,6 +1,9 @@
 /**
  * Regras de plano para o painel `admin_transfer` (FREE, STANDART, PRÓ).
  * Valores em `user_plans.plano`: `free` | `standart` | `pro`.
+ *
+ * O cliente só reflete preferência de UI — qualquer cobrança ou desbloqueio real (ex.: Stripe)
+ * deve ser confirmado no servidor (webhook assinado, `user_plans` atualizado pela API).
  */
 
 export type PlanType = "free" | "standart" | "pro";

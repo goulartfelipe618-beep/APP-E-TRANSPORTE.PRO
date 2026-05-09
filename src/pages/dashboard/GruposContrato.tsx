@@ -9,8 +9,8 @@ import { cn } from "@/lib/utils";
 import CabecalhoContratual from "@/components/contratos/CabecalhoContratual";
 import ContratoComoPdfPreview from "@/components/contratos/ContratoComoPdfPreview";
 import { useUserPlan } from "@/hooks/useUserPlan";
-import { pageAllowedForPlan } from "@/lib/painelPlanPolicy";
-import PlanLockedScreen from "@/components/planos/PlanLockedScreen";
+import { minimumPlanForPage, pageAllowedForPlan } from "@/lib/painelPlanPolicy";
+import PlanTierOpaqueGate from "@/components/planos/PlanTierOpaqueGate";
 
 const DEFAULT_MODELO = `1. DAS PARTES
 1.1. O presente contrato é celebrado entre as partes abaixo qualificadas.
@@ -122,18 +122,14 @@ export default function GruposContratoPage() {
   if (planLoading) {
     return <div className="flex justify-center py-20 text-sm text-muted-foreground">A carregar…</div>;
   }
-  if (!pageAllowedForPlan(plano, "grupos/contrato")) {
-    return (
-      <PlanLockedScreen
-        plano={plano}
-        required="standart"
-        title="Contrato — Grupos"
-        description="Modelos de contrato e políticas para PDF de confirmação de reservas de grupo."
-      />
-    );
-  }
 
   return (
+    <PlanTierOpaqueGate
+      minimumPlan={minimumPlanForPage("grupos/contrato")}
+      blocked={!pageAllowedForPlan(plano, "grupos/contrato")}
+      title="Contrato — Grupos (visualização)"
+      description="Modelos de contrato e políticas para PDF de confirmação de reservas de grupo."
+    >
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
@@ -208,5 +204,6 @@ export default function GruposContratoPage() {
         />
       </div>
     </div>
+    </PlanTierOpaqueGate>
   );
 }

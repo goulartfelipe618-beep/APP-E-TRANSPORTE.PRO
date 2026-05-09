@@ -12,8 +12,8 @@ import { toast } from "sonner";
 import { SolicitacoesCapturaExternaInfo } from "@/components/solicitacoes/SolicitacoesCapturaExternaInfo";
 import type { Json } from "@/integrations/supabase/types";
 import { useUserPlan } from "@/hooks/useUserPlan";
-import { pageAllowedForPlan } from "@/lib/painelPlanPolicy";
-import PlanLockedScreen from "@/components/planos/PlanLockedScreen";
+import { minimumPlanForPage, pageAllowedForPlan } from "@/lib/painelPlanPolicy";
+import PlanTierOpaqueGate from "@/components/planos/PlanTierOpaqueGate";
 
 type SolicitacaoRow = {
   id: string;
@@ -138,18 +138,14 @@ export default function MotoristaSolicitacoesPage() {
   if (planLoading) {
     return <div className="flex justify-center py-20 text-sm text-muted-foreground">A carregar…</div>;
   }
-  if (!pageAllowedForPlan(plano, "motoristas/solicitacoes")) {
-    return (
-      <PlanLockedScreen
-        plano={plano}
-        required="pro"
-        title="Solicitações — Motoristas"
-        description="Candidatos e leads do webhook de motoristas para completar cadastro na frota."
-      />
-    );
-  }
 
   return (
+    <PlanTierOpaqueGate
+      minimumPlan={minimumPlanForPage("motoristas/solicitacoes")}
+      blocked={!pageAllowedForPlan(plano, "motoristas/solicitacoes")}
+      title="Solicitações — Motoristas (visualização)"
+      description="Candidatos e leads do webhook de motoristas para completar cadastro na frota."
+    >
     <div className="space-y-6">
       <SolicitacoesCapturaExternaInfo />
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -320,5 +316,6 @@ export default function MotoristaSolicitacoesPage() {
         initialData={cadastroInitial}
       />
     </div>
+    </PlanTierOpaqueGate>
   );
 }

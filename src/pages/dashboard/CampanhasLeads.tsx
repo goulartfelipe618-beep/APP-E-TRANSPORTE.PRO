@@ -10,8 +10,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { SolicitacoesCapturaExternaInfo } from "@/components/solicitacoes/SolicitacoesCapturaExternaInfo";
 import { useUserPlan } from "@/hooks/useUserPlan";
-import { pageAllowedForPlan } from "@/lib/painelPlanPolicy";
-import PlanLockedScreen from "@/components/planos/PlanLockedScreen";
+import { minimumPlanForPage, pageAllowedForPlan } from "@/lib/painelPlanPolicy";
+import PlanTierOpaqueGate from "@/components/planos/PlanTierOpaqueGate";
 
 export default function CampanhasLeadsPage() {
   const { plano, loading: planLoading } = useUserPlan();
@@ -104,18 +104,14 @@ export default function CampanhasLeadsPage() {
   if (planLoading) {
     return <div className="flex justify-center py-20 text-sm text-muted-foreground">A carregar…</div>;
   }
-  if (!pageAllowedForPlan(plano, "campanhas/leads")) {
-    return (
-      <PlanLockedScreen
-        plano={plano}
-        required="standart"
-        title="Campanhas — Leads"
-        description="Leads captados pelos webhooks das suas campanhas ativas."
-      />
-    );
-  }
 
   return (
+    <PlanTierOpaqueGate
+      minimumPlan={minimumPlanForPage("campanhas/leads")}
+      blocked={!pageAllowedForPlan(plano, "campanhas/leads")}
+      title="Campanhas — Leads (visualização)"
+      description="Leads captados pelos webhooks das suas campanhas ativas."
+    >
     <div className="space-y-6">
       <SolicitacoesCapturaExternaInfo />
       <div className="flex items-center justify-between">
@@ -180,5 +176,6 @@ export default function CampanhasLeadsPage() {
         )}
       </div>
     </div>
+    </PlanTierOpaqueGate>
   );
 }

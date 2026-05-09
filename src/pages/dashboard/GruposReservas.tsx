@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { Button } from "@/components/ui/button";
-import { Plus, RefreshCw, Trash2, Eye, MessageSquare, Download, Pencil, Filter, X } from "lucide-react";
+import { Plus, RefreshCw, Trash2, Eye, MessageSquare, Download, Pencil, Filter, X, Lock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import CriarReservaGrupoDialog from "@/components/grupos/CriarReservaGrupoDialog";
@@ -16,6 +16,9 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatDbCalendarDatePtBr, toAgendaDayKey } from "@/lib/painelAgendaReservas";
+import { useUserPlan } from "@/hooks/useUserPlan";
+import { freePlanLockedReservaIdsByCreationDay } from "@/lib/freePlanLocks";
+import { cn } from "@/lib/utils";
 
 type ReservaGrupo = Tables<"reservas_grupos">;
 
@@ -26,6 +29,7 @@ const veiculoLabel: Record<string, string> = {
 };
 
 export default function GruposReservasPage() {
+  const { plano, loading: planLoading } = useUserPlan();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [reservaGrupoEdicao, setReservaGrupoEdicao] = useState<ReservaGrupo | null>(null);
   const [reservas, setReservas] = useState<ReservaGrupo[]>([]);
@@ -130,6 +134,11 @@ export default function GruposReservasPage() {
     });
   }, [reservas, filterDataDe, filterDataAte, filterStatus, filterMotorista, filterVeiculo, filterSearch]);
 
+  const freeLockedReservaIds = useMemo(
+    () => freePlanLockedReservaIdsByCreationDay(plano, reservas.map((r) => ({ id: r.id, created_at: r.created_at }))),
+    [plano, reservas],
+  );
+
   const limparFiltros = () => {
     setFilterDataDe("");
     setFilterDataAte("");
@@ -181,6 +190,11 @@ export default function GruposReservasPage() {
           <p className="text-muted-foreground">
             Reservas convertidas a partir de solicitações de grupos ({reservasFiltradas.length}
             {filtrosAtivos ? ` de ${reservas.length}` : ""})
+            {!planLoading && freeLockedReservaIds.size > 0 ? (
+              <span className="ml-2 text-xs text-muted-foreground">
+                · {freeLockedReservaIds.size} reserva(s) acima do limite diário do plano FREE (visíveis; ações limitadas)
+              </span>
+            ) : null}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -305,30 +319,39 @@ export default function GruposReservasPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {reservasFiltradas.map((r) => (
-                <TableRow key={r.id}>
-                  <TableCell className="font-mono text-sm text-muted-foreground">#{r.numero_reserva}</TableCell>
-                  <TableCell className="font-medium">{r.nome_completo}</TableCell>
-                  <TableCell>
+              {reservasFiltradas.map((r) => {
+                const rowLocked = !planLoading && freeLockedReservaIds.has(r.id);
+                return (
+                <TableRow key={r.id} className={cn(rowLocked && "bg-muted/30")}>
+                  <TableCell className={cn("font-mono text-sm text-muted-foreground", rowLocked && "opacity-60")}>#{r.numero_reserva}</TableCell>
+                  <TableCell className={cn("font-medium", rowLocked && "opacity-60")}>{r.nome_completo}</TableCell>
+                  <TableCell className={cn(rowLocked && "opacity-60")}>
                     <div className="text-sm">{r.whatsapp}</div>
                     <div className="text-xs text-muted-foreground">{r.email}</div>
                   </TableCell>
-                  <TableCell>{r.tipo_veiculo ? <Badge variant="secondary">{veiculoLabel[r.tipo_veiculo] || r.tipo_veiculo}</Badge> : "—"}</TableCell>
-                  <TableCell>{r.num_passageiros ?? "—"}</TableCell>
-                  <TableCell className="max-w-[200px] truncate text-sm">
+                  <TableCell className={cn(rowLocked && "opacity-60")}>{r.tipo_veiculo ? <Badge variant="secondary">{veiculoLabel[r.tipo_veiculo] || r.tipo_veiculo}</Badge> : "—"}</TableCell>
+                  <TableCell className={cn(rowLocked && "opacity-60")}>{r.num_passageiros ?? "—"}</TableCell>
+                  <TableCell className={cn("max-w-[200px] truncate text-sm", rowLocked && "opacity-60")}>
                     {r.embarque && r.destino ? `${r.embarque} → ${r.destino}` : "—"}
                   </TableCell>
-                  <TableCell className="text-sm">{formatDbCalendarDatePtBr(r.data_ida)}</TableCell>
-                  <TableCell className="max-w-[160px] truncate text-sm text-muted-foreground">{motoristaCell(r)}</TableCell>
-                  <TableCell className="font-semibold">{Number(r.valor_total).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</TableCell>
-                  <TableCell>
+                  <TableCell className={cn("text-sm", rowLocked && "opacity-60")}>{formatDbCalendarDatePtBr(r.data_ida)}</TableCell>
+                  <TableCell className={cn("max-w-[160px] truncate text-sm text-muted-foreground", rowLocked && "opacity-60")}>{motoristaCell(r)}</TableCell>
+                  <TableCell className={cn("font-semibold", rowLocked && "opacity-60")}>{Number(r.valor_total).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</TableCell>
+                  <TableCell className={cn(rowLocked && "opacity-60")}>
                     <Badge variant={badgeToneReservaStatus(r.status)}>{labelReservaStatus(r.status)}</Badge>
                   </TableCell>
                   <TableCell>
-                    <div className="flex gap-1">
+                    <div className="flex flex-wrap items-center gap-1">
+                      {rowLocked ? (
+                        <Badge variant="outline" className="mr-1 gap-1 border-amber-600/40 text-[11px] text-amber-700 dark:text-amber-400">
+                          <Lock className="h-3 w-3" />
+                          FREE
+                        </Badge>
+                      ) : null}
                       <Button
                         variant="ghost"
                         size="icon"
+                        disabled={rowLocked}
                         onClick={() => {
                           setReservaGrupoEdicao(r);
                           setDialogOpen(true);
@@ -340,19 +363,20 @@ export default function GruposReservasPage() {
                       <Button variant="ghost" size="icon" onClick={() => { setSelected(r); setSheetOpen(true); }} title="Ver detalhes">
                         <Eye className="h-4 w-4" />
                       </Button>
-                      <Button variant="ghost" size="icon" onClick={() => handleComunicar(r)} title="Comunicar">
+                      <Button variant="ghost" size="icon" disabled={rowLocked} onClick={() => handleComunicar(r)} title="Comunicar">
                         <MessageSquare className="h-4 w-4" />
                       </Button>
-                      <Button variant="ghost" size="icon" onClick={() => handleDownload(r)} title="Download">
+                      <Button variant="ghost" size="icon" disabled={rowLocked} onClick={() => handleDownload(r)} title="Download">
                         <Download className="h-4 w-4" />
                       </Button>
-                      <Button variant="ghost" size="icon" onClick={() => setDeleteId(r.id)} title="Excluir">
+                      <Button variant="ghost" size="icon" disabled={rowLocked} onClick={() => setDeleteId(r.id)} title="Excluir">
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>
                     </div>
                   </TableCell>
                 </TableRow>
-              ))}
+                );
+              })}
             </TableBody>
           </Table>
         )}

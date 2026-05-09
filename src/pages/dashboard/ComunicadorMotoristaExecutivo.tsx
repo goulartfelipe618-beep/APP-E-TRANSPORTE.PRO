@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { usePainelMotoristaEvolutionAtivo } from "@/hooks/usePainelMotoristaEvolutionAtivo";
 import { useUserPlan } from "@/hooks/useUserPlan";
 import UpgradePlanDialog from "@/components/planos/UpgradePlanDialog";
+import PlanTierOpaqueGate from "@/components/planos/PlanTierOpaqueGate";
 import { ComunicadorEvolutionSection } from "@/components/comunicador/ComunicadorEvolutionSection";
 import { useComunicadoresEvolution, qrSrc, type ComunicadorRow } from "@/hooks/useComunicadoresEvolution";
 import { WHATSAPP_OFICIAL_PLATAFORMA_EXIBICAO } from "@/lib/comunicadorOficial";
@@ -15,7 +16,7 @@ import {
 } from "@/lib/evolutionApi";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Info, Loader2, ShieldAlert, Smartphone, Sparkles } from "lucide-react";
+import { Info, Loader2, ShieldAlert, Smartphone } from "lucide-react";
 
 const QR_SESSION_MS = 10 * 60 * 1000;
 const POLL_MS = 3000;
@@ -294,27 +295,6 @@ export default function ComunicadorMotoristaExecutivoPage() {
         </Button>
       </div>
 
-      {planoSemPro ? (
-        <Alert className="border-[#FF6600]/45 bg-[#FF6600]/10 text-foreground">
-          <Sparkles className="h-4 w-4 text-[#FF6600]" />
-          <AlertTitle className="text-foreground">WhatsApp no seu número</AlertTitle>
-          <AlertDescription className="space-y-3 text-sm text-muted-foreground">
-            <p>
-              Deseja conectar o seu WhatsApp? Migre para o plano <strong className="text-foreground">PRÓ (Premium)</strong>{" "}
-              agora mesmo.
-            </p>
-            <Button
-              type="button"
-              size="sm"
-              className="bg-[#FF6600] text-white hover:bg-[#FF6600]/90"
-              onClick={() => setUpgradeOpen(true)}
-            >
-              Ver planos e migrar
-            </Button>
-          </AlertDescription>
-        </Alert>
-      ) : null}
-
       <Alert className="border-[#FF6600]/50 bg-[#FF6600]/10 text-foreground">
         <ShieldAlert className="h-4 w-4 text-[#FF6600]" />
         <AlertTitle className="text-foreground">Recomendação importante</AlertTitle>
@@ -357,6 +337,12 @@ export default function ComunicadorMotoristaExecutivoPage() {
         forcarDesconectado={ownConnected}
       />
 
+      <PlanTierOpaqueGate
+        minimumPlan="pro"
+        blocked={planoSemPro}
+        title="WhatsApp no seu número (PRÓ)"
+        description="Ligue o seu WhatsApp por QR Code para que os envios em Comunicar usem a sua linha. Os dados da ligação mantêm-se na conta; disponível no plano PRÓ."
+      >
       {ownConnected ? (
         <div className="space-y-3">
           <ComunicadorEvolutionSection
@@ -457,6 +443,7 @@ export default function ComunicadorMotoristaExecutivoPage() {
           </CardContent>
         </Card>
       )}
+      </PlanTierOpaqueGate>
       <UpgradePlanDialog open={upgradeOpen} onOpenChange={setUpgradeOpen} />
     </div>
   );

@@ -9,8 +9,8 @@ import { cn } from "@/lib/utils";
 import CabecalhoContratual from "@/components/contratos/CabecalhoContratual";
 import ContratoComoPdfPreview from "@/components/contratos/ContratoComoPdfPreview";
 import { useUserPlan } from "@/hooks/useUserPlan";
-import { pageAllowedForPlan } from "@/lib/painelPlanPolicy";
-import PlanLockedScreen from "@/components/planos/PlanLockedScreen";
+import { minimumPlanForPage, pageAllowedForPlan } from "@/lib/painelPlanPolicy";
+import PlanTierOpaqueGate from "@/components/planos/PlanTierOpaqueGate";
 
 const DEFAULT_MODELO = `1. DAS PARTES
 1.1. O presente contrato é celebrado entre as partes abaixo qualificadas.
@@ -122,18 +122,14 @@ export default function TransferContratoPage() {
   if (planLoading) {
     return <div className="flex justify-center py-20 text-sm text-muted-foreground">A carregar…</div>;
   }
-  if (!pageAllowedForPlan(plano, "transfer/contrato")) {
-    return (
-      <PlanLockedScreen
-        plano={plano}
-        required="standart"
-        title="Contrato — Transfer"
-        description="Modelos de contrato e políticas para PDF de confirmação de reservas de transfer."
-      />
-    );
-  }
 
   return (
+    <PlanTierOpaqueGate
+      minimumPlan={minimumPlanForPage("transfer/contrato")}
+      blocked={!pageAllowedForPlan(plano, "transfer/contrato")}
+      title="Contrato — Transfer (visualização)"
+      description="Modelos de contrato e políticas para PDF de confirmação de reservas de transfer."
+    >
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
@@ -208,5 +204,6 @@ export default function TransferContratoPage() {
         />
       </div>
     </div>
+    </PlanTierOpaqueGate>
   );
 }

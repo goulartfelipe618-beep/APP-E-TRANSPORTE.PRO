@@ -13,8 +13,8 @@ import { Tables } from "@/integrations/supabase/types";
 import { SolicitacoesCapturaExternaInfo } from "@/components/solicitacoes/SolicitacoesCapturaExternaInfo";
 import { formatDbCalendarDatePtBr } from "@/lib/painelAgendaReservas";
 import { useUserPlan } from "@/hooks/useUserPlan";
-import { pageAllowedForPlan } from "@/lib/painelPlanPolicy";
-import PlanLockedScreen from "@/components/planos/PlanLockedScreen";
+import { minimumPlanForPage, pageAllowedForPlan } from "@/lib/painelPlanPolicy";
+import PlanTierOpaqueGate from "@/components/planos/PlanTierOpaqueGate";
 
 type Solicitacao = Tables<"solicitacoes_grupos">;
 export default function GruposSolicitacoesPage() {
@@ -83,18 +83,14 @@ export default function GruposSolicitacoesPage() {
   if (planLoading) {
     return <div className="flex justify-center py-20 text-sm text-muted-foreground">A carregar…</div>;
   }
-  if (!pageAllowedForPlan(plano, "grupos/solicitacoes")) {
-    return (
-      <PlanLockedScreen
-        plano={plano}
-        required="pro"
-        title="Solicitações — Grupos"
-        description="Pedidos e orçamentos de transporte em grupo, com conversão em reservas."
-      />
-    );
-  }
 
   return (
+    <PlanTierOpaqueGate
+      minimumPlan={minimumPlanForPage("grupos/solicitacoes")}
+      blocked={!pageAllowedForPlan(plano, "grupos/solicitacoes")}
+      title="Solicitações — Grupos (visualização)"
+      description="Pedidos e orçamentos de transporte em grupo, com conversão em reservas."
+    >
     <div className="space-y-6">
       <SolicitacoesCapturaExternaInfo />
       <div className="flex items-center justify-between">
@@ -183,5 +179,6 @@ export default function GruposSolicitacoesPage() {
         />
       )}
     </div>
+    </PlanTierOpaqueGate>
   );
 }

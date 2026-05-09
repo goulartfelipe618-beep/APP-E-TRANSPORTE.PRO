@@ -20,6 +20,8 @@ import { ExternalLink, CheckCircle2, Info } from "lucide-react";
 import SlideCarousel from "@/components/SlideCarousel";
 import { useUserPlan } from "@/hooks/useUserPlan";
 import UpgradePlanDialog from "@/components/planos/UpgradePlanDialog";
+import PlanTierOpaqueGate from "@/components/planos/PlanTierOpaqueGate";
+import { minimumPlanForPage, pageAllowedForPlan } from "@/lib/painelPlanPolicy";
 import { useActivePage } from "@/contexts/ActivePageContext";
 import { usePurchasedDomains } from "@/hooks/usePurchasedDomains";
 import {
@@ -203,8 +205,12 @@ export default function WebsitePage() {
   const [submitting, setSubmitting] = useState(false);
   const [servicoAtivo, setServicoAtivo] = useState<any>(null);
   const [dbTemplates, setDbTemplates] = useState<TemplateDB[]>([]);
-  const { plano, refetch: refetchPlano } = useUserPlan();
+  const { plano, loading: planLoading, refetch: refetchPlano } = useUserPlan();
   const [upgradeOpen, setUpgradeOpen] = useState(false);
+
+  const WEBSITE_PAGE_ID = "website";
+  const websiteTierBlocked = !planLoading && !pageAllowedForPlan(plano, WEBSITE_PAGE_ID);
+  const websiteTierMinimum = minimumPlanForPage(WEBSITE_PAGE_ID);
 
   /** Domínio escolhido na etapa dedicada (lista de comprados ou fluxo legado). */
   const [domain, setDomain] = useState("");
@@ -668,6 +674,12 @@ export default function WebsitePage() {
     return (
       <>
         <UpgradePlanDialog open={upgradeOpen} onOpenChange={setUpgradeOpen} />
+        <PlanTierOpaqueGate
+          minimumPlan={websiteTierMinimum}
+          blocked={websiteTierBlocked}
+          title="Website (visualização)"
+          description="Pedidos de site, templates e integração com o seu domínio estão incluídos no plano PRÓ."
+        >
         <div className="space-y-8 max-w-lg">
           <PurchasedDomainSelectStep
             domains={purchasedDomains}
@@ -708,6 +720,7 @@ export default function WebsitePage() {
             </Button>
           </div>
         </div>
+        </PlanTierOpaqueGate>
       </>
     );
   }
@@ -717,6 +730,12 @@ export default function WebsitePage() {
     return (
       <>
         <UpgradePlanDialog open={upgradeOpen} onOpenChange={setUpgradeOpen} />
+        <PlanTierOpaqueGate
+          minimumPlan={websiteTierMinimum}
+          blocked={websiteTierBlocked}
+          title="Website (visualização)"
+          description="Pedidos de site, templates e integração com o seu domínio estão incluídos no plano PRÓ."
+        >
         <div className="space-y-6">
           <div>
             <h1 className="text-2xl font-bold text-foreground">Website — Briefing Completo</h1>
@@ -1139,12 +1158,21 @@ export default function WebsitePage() {
             </Button>
           </div>
         </div>
+        </PlanTierOpaqueGate>
       </>
     );
   }
 
   // ── Gallery view ───────────────────────────────────
   return (
+    <>
+      <UpgradePlanDialog open={upgradeOpen} onOpenChange={setUpgradeOpen} />
+      <PlanTierOpaqueGate
+        minimumPlan={websiteTierMinimum}
+        blocked={websiteTierBlocked}
+        title="Website (visualização)"
+        description="Pedidos de site, templates e integração com o seu domínio estão incluídos no plano PRÓ."
+      >
     <div className="space-y-6">
       <SlideCarousel pagina="website" breakoutTop fallbackSlides={[
         { titulo: "Crie Seu Site Profissional", subtitulo: "Design premium e responsivo para transporte executivo." },
@@ -1210,7 +1238,8 @@ export default function WebsitePage() {
       )}
 
       {dbTemplates.length === 0 && <div className="text-center py-12 text-muted-foreground">Nenhum template disponível no momento.</div>}
-      <UpgradePlanDialog open={upgradeOpen} onOpenChange={setUpgradeOpen} />
     </div>
+      </PlanTierOpaqueGate>
+    </>
   );
 }

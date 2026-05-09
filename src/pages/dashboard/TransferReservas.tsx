@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { Button } from "@/components/ui/button";
-import { Plus, RefreshCw, Trash2, Eye, MessageSquare, Download, Pencil, Filter, X } from "lucide-react";
+import { Plus, RefreshCw, Trash2, Eye, MessageSquare, Download, Pencil, Filter, X, Lock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import CriarReservaTransferDialog from "@/components/transfer/CriarReservaTransferDialog";
@@ -16,6 +16,9 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatDbCalendarDatePtBr, toAgendaDayKey } from "@/lib/painelAgendaReservas";
+import { useUserPlan } from "@/hooks/useUserPlan";
+import { freePlanLockedReservaIdsByCreationDay } from "@/lib/freePlanLocks";
+import { cn } from "@/lib/utils";
 
 type Reserva = Tables<"reservas_transfer">;
 
@@ -36,6 +39,7 @@ function transferDisplayDateCell(r: Reserva): string {
 }
 
 export default function TransferReservasPage() {
+  const { plano, loading: planLoading } = useUserPlan();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [reservaEdicao, setReservaEdicao] = useState<Reserva | null>(null);
   const [reservas, setReservas] = useState<Reserva[]>([]);
@@ -129,6 +133,11 @@ export default function TransferReservasPage() {
     });
   }, [reservas, filterDataDe, filterDataAte, filterStatus, filterMotorista, filterSearch]);
 
+  const freeLockedReservaIds = useMemo(
+    () => freePlanLockedReservaIdsByCreationDay(plano, reservas.map((r) => ({ id: r.id, created_at: r.created_at }))),
+    [plano, reservas],
+  );
+
   const limparFiltros = () => {
     setFilterDataDe("");
     setFilterDataAte("");
@@ -178,6 +187,11 @@ export default function TransferReservasPage() {
           <p className="text-muted-foreground">
             Transfer ({reservasFiltradas.length}
             {filtrosAtivos ? ` de ${reservas.length}` : ""})
+            {!planLoading && freeLockedReservaIds.size > 0 ? (
+              <span className="ml-2 text-xs text-muted-foreground">
+                · {freeLockedReservaIds.size} reserva(s) acima do limite diário do plano FREE (visíveis, só leitura nas ações)
+              </span>
+            ) : null}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -285,35 +299,44 @@ export default function TransferReservasPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {reservasFiltradas.map((r) => (
-                <TableRow key={r.id}>
-                  <TableCell className="font-mono text-sm text-muted-foreground">#{r.numero_reserva}</TableCell>
-                  <TableCell className="font-medium">{r.nome_completo}</TableCell>
-                  <TableCell>
+              {reservasFiltradas.map((r) => {
+                const rowLocked = !planLoading && freeLockedReservaIds.has(r.id);
+                return (
+                <TableRow key={r.id} className={cn(rowLocked && "bg-muted/30")}>
+                  <TableCell className={cn("font-mono text-sm text-muted-foreground", rowLocked && "opacity-60")}>#{r.numero_reserva}</TableCell>
+                  <TableCell className={cn("font-medium", rowLocked && "opacity-60")}>{r.nome_completo}</TableCell>
+                  <TableCell className={cn(rowLocked && "opacity-60")}>
                     <div className="text-sm">{r.telefone}</div>
                     <div className="text-xs text-muted-foreground">{r.email}</div>
                   </TableCell>
-                  <TableCell>
+                  <TableCell className={cn(rowLocked && "opacity-60")}>
                     <Badge variant="secondary">{tipoLabel[r.tipo_viagem] || r.tipo_viagem}</Badge>
                   </TableCell>
-                  <TableCell className="max-w-[200px] truncate text-sm">
+                  <TableCell className={cn("max-w-[200px] truncate text-sm", rowLocked && "opacity-60")}>
                     {r.ida_embarque && r.ida_desembarque ? `${r.ida_embarque} → ${r.ida_desembarque}` : "—"}
                   </TableCell>
-                  <TableCell className="text-sm">{transferDisplayDateCell(r)}</TableCell>
-                  <TableCell className="max-w-[140px] truncate text-sm text-muted-foreground">
+                  <TableCell className={cn("text-sm", rowLocked && "opacity-60")}>{transferDisplayDateCell(r)}</TableCell>
+                  <TableCell className={cn("max-w-[140px] truncate text-sm text-muted-foreground", rowLocked && "opacity-60")}>
                     {motoristaNome(r.motorista_id)}
                   </TableCell>
-                  <TableCell className="font-semibold">
+                  <TableCell className={cn("font-semibold", rowLocked && "opacity-60")}>
                     {Number(r.valor_total).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
                   </TableCell>
-                  <TableCell>
+                  <TableCell className={cn(rowLocked && "opacity-60")}>
                     <Badge variant={badgeToneReservaStatus(r.status)}>{labelReservaStatus(r.status)}</Badge>
                   </TableCell>
                   <TableCell>
-                    <div className="flex gap-1">
+                    <div className="flex flex-wrap items-center gap-1">
+                      {rowLocked ? (
+                        <Badge variant="outline" className="mr-1 gap-1 border-amber-600/40 text-[11px] text-amber-700 dark:text-amber-400">
+                          <Lock className="h-3 w-3" />
+                          FREE
+                        </Badge>
+                      ) : null}
                       <Button
                         variant="ghost"
                         size="icon"
+                        disabled={rowLocked}
                         onClick={() => {
                           setReservaEdicao(r);
                           setDialogOpen(true);
@@ -325,19 +348,20 @@ export default function TransferReservasPage() {
                       <Button variant="ghost" size="icon" onClick={() => { setSelected(r); setSheetOpen(true); }} title="Ver detalhes">
                         <Eye className="h-4 w-4" />
                       </Button>
-                      <Button variant="ghost" size="icon" onClick={() => handleComunicar(r)} title="Comunicar">
+                      <Button variant="ghost" size="icon" disabled={rowLocked} onClick={() => handleComunicar(r)} title="Comunicar">
                         <MessageSquare className="h-4 w-4" />
                       </Button>
-                      <Button variant="ghost" size="icon" onClick={() => handleDownload(r)} title="Download">
+                      <Button variant="ghost" size="icon" disabled={rowLocked} onClick={() => handleDownload(r)} title="Download">
                         <Download className="h-4 w-4" />
                       </Button>
-                      <Button variant="ghost" size="icon" onClick={() => setDeleteId(r.id)} title="Excluir">
+                      <Button variant="ghost" size="icon" disabled={rowLocked} onClick={() => setDeleteId(r.id)} title="Excluir">
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>
                     </div>
                   </TableCell>
                 </TableRow>
-              ))}
+                );
+              })}
             </TableBody>
           </Table>
         )}

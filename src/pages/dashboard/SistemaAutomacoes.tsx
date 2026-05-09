@@ -23,8 +23,8 @@ import { buildWebhookSolicitacaoUrl } from "@/lib/webhookSolicitacaoUrl";
 import FerramentasDevDialog from "@/components/automacoes/FerramentasDevDialog";
 import { ConfirmDeleteDialog } from "@/components/ConfirmDeleteDialog";
 import { useUserPlan } from "@/hooks/useUserPlan";
-import { pageAllowedForPlan } from "@/lib/painelPlanPolicy";
-import PlanLockedScreen from "@/components/planos/PlanLockedScreen";
+import { minimumPlanForPage, pageAllowedForPlan } from "@/lib/painelPlanPolicy";
+import PlanTierOpaqueGate from "@/components/planos/PlanTierOpaqueGate";
 
 type DeleteIntent =
   | { kind: "automacao"; id: string }
@@ -505,16 +505,6 @@ export default function SistemaAutomacoesPage() {
   if (planLoading) {
     return <div className="flex justify-center py-20 text-sm text-muted-foreground">A carregar…</div>;
   }
-  if (!pageAllowedForPlan(plano, "sistema/automacoes")) {
-    return (
-      <PlanLockedScreen
-        plano={plano}
-        required="pro"
-        title="Automações"
-        description="Webhooks, mapeamentos de campos e integrações com formulários e sistemas externos."
-      />
-    );
-  }
 
   // Detail view
   if (selected) {
@@ -523,6 +513,12 @@ export default function SistemaAutomacoesPage() {
     const isCampaign = selected.tipo === "campanha";
 
     return (
+      <PlanTierOpaqueGate
+        minimumPlan={minimumPlanForPage("sistema/automacoes")}
+        blocked={!pageAllowedForPlan(plano, "sistema/automacoes")}
+        title="Automações (visualização)"
+        description="Webhooks, mapeamentos de campos e integrações com formulários e sistemas externos."
+      >
       <div className="space-y-6">
         <button
           onClick={() => { setSelected(null); setMappings({}); setTestes([]); setSelectedTeste(null); setContainerTestes({}); setCollapsedContainers({}); setCampaignFields([]); setNewCampaignField(""); setCampaignFieldLocked(false); setCampaignMeta(null); }}
@@ -934,11 +930,18 @@ export default function SistemaAutomacoesPage() {
           loading={deleteBusy}
         />
       </div>
+      </PlanTierOpaqueGate>
     );
   }
 
   // List view — table format
   return (
+    <PlanTierOpaqueGate
+      minimumPlan={minimumPlanForPage("sistema/automacoes")}
+      blocked={!pageAllowedForPlan(plano, "sistema/automacoes")}
+      title="Automações (visualização)"
+      description="Webhooks, mapeamentos de campos e integrações com formulários e sistemas externos."
+    >
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
@@ -1165,5 +1168,6 @@ export default function SistemaAutomacoesPage() {
       />
 
     </div>
+    </PlanTierOpaqueGate>
   );
 }

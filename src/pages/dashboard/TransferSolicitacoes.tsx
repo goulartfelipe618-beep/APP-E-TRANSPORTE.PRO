@@ -12,8 +12,8 @@ import { generateSolicitacaoTransferPDF } from "@/lib/pdfGenerator";
 import { Tables } from "@/integrations/supabase/types";
 import { SolicitacoesCapturaExternaInfo } from "@/components/solicitacoes/SolicitacoesCapturaExternaInfo";
 import { useUserPlan } from "@/hooks/useUserPlan";
-import { pageAllowedForPlan } from "@/lib/painelPlanPolicy";
-import PlanLockedScreen from "@/components/planos/PlanLockedScreen";
+import { minimumPlanForPage, pageAllowedForPlan } from "@/lib/painelPlanPolicy";
+import PlanTierOpaqueGate from "@/components/planos/PlanTierOpaqueGate";
 
 type Solicitacao = Tables<"solicitacoes_transfer">;
 export default function TransferSolicitacoesPage() {
@@ -96,18 +96,14 @@ export default function TransferSolicitacoesPage() {
   if (planLoading) {
     return <div className="flex justify-center py-20 text-sm text-muted-foreground">A carregar…</div>;
   }
-  if (!pageAllowedForPlan(plano, "transfer/solicitacoes")) {
-    return (
-      <PlanLockedScreen
-        plano={plano}
-        required="pro"
-        title="Solicitações — Transfer"
-        description="Pipeline de pedidos, orçamentos e conversão em reservas."
-      />
-    );
-  }
 
   return (
+    <PlanTierOpaqueGate
+      minimumPlan={minimumPlanForPage("transfer/solicitacoes")}
+      blocked={!pageAllowedForPlan(plano, "transfer/solicitacoes")}
+      title="Solicitações — Transfer (visualização)"
+      description="Pipeline de pedidos, orçamentos e conversão em reservas."
+    >
     <div className="space-y-6">
       <SolicitacoesCapturaExternaInfo />
       <div className="flex items-center justify-between">
@@ -196,5 +192,6 @@ export default function TransferSolicitacoesPage() {
         />
       )}
     </div>
+    </PlanTierOpaqueGate>
   );
 }

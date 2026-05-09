@@ -40,6 +40,8 @@ import {
 } from "@/components/ui/table";
 import type { Tables } from "@/integrations/supabase/types";
 import { useUserPlan } from "@/hooks/useUserPlan";
+import { minimumPlanForPage, pageAllowedForPlan } from "@/lib/painelPlanPolicy";
+import PlanTierOpaqueGate from "@/components/planos/PlanTierOpaqueGate";
 import UpgradePlanDialog from "@/components/planos/UpgradePlanDialog";
 
 type DominioRow = Tables<"dominios_usuario">;
@@ -285,8 +287,8 @@ async function checkDomainAvailability(fqdn: string): Promise<{
 }
 
 export default function DominiosPage() {
-  const { plano, refetch: refetchPlano } = useUserPlan();
-  const proMarketingLocked = plano !== "pro";
+  const { plano, loading: planLoading, refetch: refetchPlano } = useUserPlan();
+  const dominiosProLocked = !planLoading && !pageAllowedForPlan(plano, "dominios");
   const [upgradeOpen, setUpgradeOpen] = useState(false);
   const [rows, setRows] = useState<DominioRowView[]>([]);
   const [loading, setLoading] = useState(true);
@@ -447,7 +449,7 @@ export default function DominiosPage() {
   };
 
   const openDialog = () => {
-    if (proMarketingLocked) {
+    if (dominiosProLocked) {
       setUpgradeOpen(true);
       return;
     }
@@ -623,6 +625,14 @@ export default function DominiosPage() {
     !checkingDomain;
 
   return (
+    <>
+      <UpgradePlanDialog open={upgradeOpen} onOpenChange={setUpgradeOpen} />
+      <PlanTierOpaqueGate
+        minimumPlan={minimumPlanForPage("dominios")}
+        blocked={roleResolved && !isAdminMaster && dominiosProLocked}
+        title="Domínios (visualização)"
+        description="Registar e gerir domínios próprios para o site e e-mail profissional faz parte do plano PRÓ."
+      >
     <div className="space-y-6">
       {isAdminMaster ? (
         <Alert className="border-border bg-muted/40 text-foreground">
@@ -680,7 +690,7 @@ export default function DominiosPage() {
         {roleResolved && !isAdminMaster && (
           <Button type="button" onClick={openDialog} className="shrink-0 gap-2">
             <Plus className="h-4 w-4" />
-            {proMarketingLocked ? "Cadastro de domínio" : "Registrar um novo domínio"}
+            {dominiosProLocked ? "Cadastro de domínio" : "Registrar um novo domínio"}
           </Button>
         )}
       </div>
@@ -1026,7 +1036,8 @@ export default function DominiosPage() {
       </>
       )}
 
-      <UpgradePlanDialog open={upgradeOpen} onOpenChange={setUpgradeOpen} />
     </div>
+      </PlanTierOpaqueGate>
+    </>
   );
 }

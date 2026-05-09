@@ -16,8 +16,8 @@ import { getLocalDateYmd } from "@/lib/localCalendarDate";
 import { toast } from "sonner";
 import { SolicitacoesCapturaExternaInfo } from "@/components/solicitacoes/SolicitacoesCapturaExternaInfo";
 import { useUserPlan } from "@/hooks/useUserPlan";
-import { pageAllowedForPlan } from "@/lib/painelPlanPolicy";
-import PlanLockedScreen from "@/components/planos/PlanLockedScreen";
+import { minimumPlanForPage, pageAllowedForPlan } from "@/lib/painelPlanPolicy";
+import PlanTierOpaqueGate from "@/components/planos/PlanTierOpaqueGate";
 
 const CAMPAIGN_COLORS = [
   "#3B82F6", "#10B981", "#F43F5E", "#F59E0B",
@@ -193,18 +193,14 @@ export default function CampanhasAtivosPage() {
   if (planLoading) {
     return <div className="flex justify-center py-20 text-sm text-muted-foreground">A carregar…</div>;
   }
-  if (!pageAllowedForPlan(plano, "campanhas/ativos")) {
-    return (
-      <PlanLockedScreen
-        plano={plano}
-        required="standart"
-        title="Campanhas — Ativos"
-        description="Crie e gira campanhas com webhooks dedicados e período de captação."
-      />
-    );
-  }
 
   return (
+    <PlanTierOpaqueGate
+      minimumPlan={minimumPlanForPage("campanhas/ativos")}
+      blocked={!pageAllowedForPlan(plano, "campanhas/ativos")}
+      title="Campanhas — Ativos (visualização)"
+      description="Crie e gira campanhas com webhooks dedicados e período de captação."
+    >
     <div className="space-y-6">
       <SolicitacoesCapturaExternaInfo variant="campanhas-ativos" />
       <div className="flex items-center justify-between">
@@ -326,5 +322,6 @@ export default function CampanhasAtivosPage() {
         </DialogContent>
       </Dialog>
     </div>
+    </PlanTierOpaqueGate>
   );
 }
