@@ -2,6 +2,73 @@ import { isMapboxConfigured, mapboxForwardGeocode } from "@/lib/mapboxGeocode";
 
 const STATIC_W = 640;
 const STATIC_H = 240;
+/** Limite da API Static Images (~8192); margem para overlay + token. */
+const MAX_URL_SAFE_LEN = 7200;
+
+const STATIC_PADDING = "28,28,32,28";
+
+/**
+ * Polilinha codificada (precision 5) — formato exigido pelo parâmetro `path` da Mapbox Static Images API.
+ * @see https://developers.google.com/maps/documentation/utilities/polylinealgorithm
+ */
+function encodePolylinePrecision5(coords: [number, number][]): string {
+  let lastLat = 0;
+  let lastLng = 0;
+  let out = "";
+  const factor = 1e5;
+  for (const [lng, lat] of coords) {
+    const latE5 = Math.round(lat * factor);
+    const lngE5 = Math.round(lng * factor);
+    const dLat = latE5 - lastLat;
+    const dLng = lngE5 - lastLng;
+    lastLat = latE5;
+    lastLng = lngE5;
+    out += encodeSignedChunk(dLat);
+    out += encodeSignedChunk(dLng);
+  }
+  return out;
+}
+
+function encodeSignedChunk(num: number): string {
+  let s = num << 1;
+  if (num < 0) s = ~s;
+  let chunk = "";
+  while (s >= 0x20) {
+    chunk += String.fromCharCode((0x20 | (s & 0x1f)) + 63);
+    s >>= 5;
+  }
+  chunk += String.fromCharCode(s + 63);
+  return chunk;
+}
+
+function decimateCoords(coords: [number, number][], maxPoints: number): [number, number][] {
+  if (coords.length <= maxPoints) return coords;
+  const out: [number, number][] = [];
+  for (let i = 0; i < maxPoints; i++) {
+    const idx = Math.round((i / (maxPoints - 1)) * (coords.length - 1));
+    const c = coords[idx];
+    if (c) out.push([c[0], c[1]]);
+  }
+  return out;
+}
+
+function bboxFromCoords(coords: [number, number][], padRatio: number): [number, number, number, number] {
+  let minLng = Infinity;
+  let maxLng = -Infinity;
+  let minLat = Infinity;
+  let maxLat = -Infinity;
+  for (const [lng, lat] of coords) {
+    minLng = Math.min(minLng, lng);
+    maxLng = Math.max(maxLng, lng);
+    minLat = Math.min(minLat, lat);
+    maxLat = Math.max(maxLat, lat);
+  }
+  const dLng = Math.max(maxLng - minLng, 1e-4);
+  const dLat = Math.max(maxLat - minLat, 1e-4);
+  const px = dLng * padRatio;
+  const py = dLat * padRatio;
+  return [minLng - px, minLat - py, maxLng + px, maxLat + py];
+}
 
 async function geocodeFirst(query: string | null | undefined): Promise<{ lng: number; lat: number } | null> {
   const q = (query ?? "").trim();
@@ -20,7 +87,7 @@ async function fetchDrivingCoordinates(
   const pair = `${from.lng},${from.lat};${to.lng},${to.lat}`;
   const url = new URL(`https://api.mapbox.com/directions/v5/mapbox/driving/${pair}`);
   url.searchParams.set("geometries", "geojson");
-  url.searchParams.set("overview", "simplified");
+  url.searchParams.set("overview", "full");
   url.searchParams.set("access_token", token);
   try {
     const res = await fetch(url.toString());
@@ -47,33 +114,36 @@ async function fetchDrivingCoordinates(
   }
 }
 
-function simplifyCoords(coords: [number, number][], maxPoints: number): [number, number][] {
-  if (coords.length <= maxPoints) return coords;
-  const out: [number, number][] = [];
-  for (let i = 0; i < maxPoints; i++) {
-    const idx = Math.round((i / (maxPoints - 1)) * (coords.length - 1));
-    const c = coords[idx];
-    if (c) out.push([Number(c[0].toFixed(5)), Number(c[1].toFixed(5))]);
-  }
-  return out;
-}
-
-function buildPathOverlay(coords: [number, number][]): string {
-  const flat = simplifyCoords(coords, 28).flatMap(([lng, lat]) => [`${lng}`, `${lat}`]);
-  return `path-5+FF6600-0.9(${flat.join(",")})`;
-}
-
-function buildStaticOverlay(
-  origin: { lng: number; lat: number },
-  dest: { lng: number; lat: number },
+function buildOverlayWithEncodedPath(
   pathCoords: [number, number][],
+  maxPoints: number,
+): { overlay: string; urlLengthApprox: number } | null {
+  const line = decimateCoords(pathCoords, maxPoints);
+  if (line.length < 2) return null;
+  const start = line[0]!;
+  const end = line[line.length - 1]!;
+  const encodedRaw = encodePolylinePrecision5(line);
+  const encodedPoly = encodeURIComponent(encodedRaw);
+  const pinA = `pin-s-a+FF6600(${start[0].toFixed(6)},${start[1].toFixed(6)})`;
+  const pinB = `pin-s-b+FF6600(${end[0].toFixed(6)},${end[1].toFixed(6)})`;
+  const pathPart = `path-6+FF6600-1(${encodedPoly})`;
+  const overlay = `${pinA},${pinB},${pathPart}`;
+  const approx = `https://api.mapbox.com/styles/v1/mapbox/streets-v12/static/${overlay}/auto/${STATIC_W}x${STATIC_H}@2x`.length + 120;
+  return { overlay, urlLengthApprox: approx };
+}
+
+function buildStaticRequestUrl(
+  overlay: string,
+  token: string,
+  bbox: [number, number, number, number] | null,
 ): string {
-  const pinA = `pin-s-a+FF6600(${origin.lng.toFixed(5)},${origin.lat.toFixed(5)})`;
-  const pinB = `pin-s-b+FF6600(${dest.lng.toFixed(5)},${dest.lat.toFixed(5)})`;
-  const same =
-    Math.abs(origin.lng - dest.lng) < 0.0002 && Math.abs(origin.lat - dest.lat) < 0.0002;
-  if (same) return pinA;
-  return `${pinA},${pinB},${buildPathOverlay(pathCoords)}`;
+  const size = `${STATIC_W}x${STATIC_H}@2x`;
+  const position = bbox
+    ? `[${bbox[0].toFixed(6)},${bbox[1].toFixed(6)},${bbox[2].toFixed(6)},${bbox[3].toFixed(6)}]`
+    : "auto";
+  const path = `https://api.mapbox.com/styles/v1/mapbox/streets-v12/static/${overlay}/${position}/${size}`;
+  const q = new URLSearchParams({ access_token: token, padding: STATIC_PADDING });
+  return `${path}?${q.toString()}`;
 }
 
 function blobToDataUrl(blob: Blob): Promise<string> {
@@ -86,8 +156,8 @@ function blobToDataUrl(blob: Blob): Promise<string> {
 }
 
 /**
- * Obtém imagem PNG/JPEG (data URL) com rota aproximada entre dois endereços (Mapbox Geocoding + Directions + Static Images).
- * Requer `VITE_MAPBOX_ACCESS_TOKEN`. Retorna null se não configurado, endereços vazios ou falha de rede/API.
+ * Imagem PNG com rota de condução (Directions) entre dois endereços.
+ * Usa polilinha codificada na Static API (obrigatório) + bbox para enquadrar só o trajeto.
  */
 export async function fetchRouteMapImageDataUrl(
   originAddress: string | null | undefined,
@@ -104,9 +174,28 @@ export async function fetchRouteMapImageDataUrl(
   if (!from || !to) return null;
 
   const pathCoords = await fetchDrivingCoordinates(from, to, token);
-  const overlay = buildStaticOverlay(from, to, pathCoords);
-  const encodedOverlay = encodeURIComponent(overlay);
-  const staticUrl = `https://api.mapbox.com/styles/v1/mapbox/light-v11/static/${encodedOverlay}/auto/${STATIC_W}x${STATIC_H}@2x?access_token=${encodeURIComponent(token)}`;
+
+  let overlay: string | null = null;
+  let bbox: [number, number, number, number] | null = null;
+
+  for (const maxPts of [120, 80, 50, 35, 25]) {
+    const built = buildOverlayWithEncodedPath(pathCoords, maxPts);
+    if (!built) continue;
+    if (built.urlLengthApprox <= MAX_URL_SAFE_LEN) {
+      overlay = built.overlay;
+      bbox = bboxFromCoords(decimateCoords(pathCoords, maxPts), 0.12);
+      break;
+    }
+  }
+
+  if (!overlay) {
+    const built = buildOverlayWithEncodedPath(pathCoords, 20);
+    if (!built) return null;
+    overlay = built.overlay;
+    bbox = bboxFromCoords(pathCoords, 0.12);
+  }
+
+  const staticUrl = buildStaticRequestUrl(overlay, token, bbox);
 
   try {
     const res = await fetch(staticUrl);
