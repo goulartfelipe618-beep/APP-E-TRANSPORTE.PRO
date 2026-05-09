@@ -104,9 +104,25 @@ export default function CriarReservaGrupoDialog({
   const [clientSearch, setClientSearch] = useState("");
 
   const clientesFiltrados = useMemo(() => {
-    const q = clientSearch.trim().toLowerCase();
+    const raw = clientSearch.trim();
+    const q = raw.toLowerCase();
     if (!q) return clientesReservaOpts;
-    return clientesReservaOpts.filter((c) => c.nome_exibicao.toLowerCase().includes(q));
+    const digits = raw.replace(/\D/g, "");
+    return clientesReservaOpts.filter((c) => {
+      const nome = (c.nome_exibicao ?? "").toLowerCase();
+      const mail = (c.email ?? "").toLowerCase();
+      const t1 = (c.telefone_1 ?? "").toLowerCase();
+      const t2 = (c.telefone_2 ?? "").toLowerCase();
+      const doc = (c.cpf_cnpj ?? "").toLowerCase();
+      if (nome.includes(q) || mail.includes(q) || t1.includes(q) || t2.includes(q) || doc.includes(q)) return true;
+      if (digits.length >= 3) {
+        const d1 = (c.telefone_1 ?? "").replace(/\D/g, "");
+        const d2 = (c.telefone_2 ?? "").replace(/\D/g, "");
+        const ddoc = (c.cpf_cnpj ?? "").replace(/\D/g, "");
+        if (d1.includes(digits) || d2.includes(digits) || ddoc.includes(digits)) return true;
+      }
+      return false;
+    });
   }, [clientSearch, clientesReservaOpts]);
 
   const valorTotalNum = useMemo(() => {
@@ -383,12 +399,27 @@ export default function CriarReservaGrupoDialog({
                 <div className="space-y-2 pt-1">
                   <Label className="text-xs">Buscar e selecionar</Label>
                   <Input
-                    placeholder="Digite as primeiras letras do nome…"
+                    placeholder="Nome, e-mail, telefone ou CPF…"
                     value={clientSearch}
                     onChange={(e) => setClientSearch(e.target.value)}
                     className="h-9"
+                    autoComplete="off"
                   />
-                  <div className="max-h-40 overflow-y-auto rounded-md border border-border bg-background">
+                  <p className="text-[11px] text-muted-foreground">
+                    Lista com rolagem (~10 visíveis). Digite para filtrar entre todos os clientes.
+                    {clientesReservaOpts.length > 0 ? (
+                      <span className="text-foreground/80">
+                        {" "}
+                        ({clientesFiltrados.length}
+                        {clientSearch.trim() ? ` de ${clientesReservaOpts.length}` : ""})
+                      </span>
+                    ) : null}
+                  </p>
+                  <div
+                    className="max-h-[min(22rem,45vh)] min-h-0 overflow-y-auto overscroll-y-contain rounded-md border border-border bg-background [scrollbar-gutter:stable]"
+                    role="listbox"
+                    aria-label="Clientes cadastrados"
+                  >
                     {clientesReservaOpts.length === 0 ? (
                       <p className="px-3 py-2 text-xs text-muted-foreground">Nenhum cliente — cadastre no menu Clientes.</p>
                     ) : clientesFiltrados.length === 0 ? (
