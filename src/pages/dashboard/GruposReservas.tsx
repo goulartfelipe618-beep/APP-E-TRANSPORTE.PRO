@@ -315,7 +315,7 @@ export default function GruposReservasPage() {
                 <TableHead>Motorista</TableHead>
                 <TableHead>Valor</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead className="w-[180px]">Ações</TableHead>
+                <TableHead className="min-w-[220px] whitespace-nowrap text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -340,17 +340,22 @@ export default function GruposReservasPage() {
                   <TableCell className={cn(rowLocked && "opacity-60")}>
                     <Badge variant={badgeToneReservaStatus(r.status)}>{labelReservaStatus(r.status)}</Badge>
                   </TableCell>
-                  <TableCell>
-                    <div className="flex flex-wrap items-center gap-1">
+                  <TableCell className="text-right align-middle whitespace-nowrap">
+                    <div className="inline-flex max-w-full flex-nowrap items-center justify-end gap-0.5">
                       {rowLocked ? (
-                        <Badge variant="outline" className="mr-1 gap-1 border-amber-600/40 text-[11px] text-amber-700 dark:text-amber-400">
-                          <Lock className="h-3 w-3" />
+                        <Badge
+                          variant="outline"
+                          title="Acima do limite diário do plano FREE — ações limitadas; os dados mantêm-se na conta."
+                          className="shrink-0 gap-0.5 border-amber-600/40 px-1.5 py-0 text-[10px] leading-tight text-amber-700 dark:text-amber-400"
+                        >
+                          <Lock className="h-3 w-3 shrink-0" aria-hidden />
                           FREE
                         </Badge>
                       ) : null}
                       <Button
                         variant="ghost"
                         size="icon"
+                        className="h-8 w-8 shrink-0"
                         disabled={rowLocked}
                         onClick={() => {
                           setReservaGrupoEdicao(r);
@@ -360,16 +365,46 @@ export default function GruposReservasPage() {
                       >
                         <Pencil className="h-4 w-4" />
                       </Button>
-                      <Button variant="ghost" size="icon" onClick={() => { setSelected(r); setSheetOpen(true); }} title="Ver detalhes">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 shrink-0"
+                        onClick={() => {
+                          setSelected(r);
+                          setSheetOpen(true);
+                        }}
+                        title="Ver detalhes"
+                      >
                         <Eye className="h-4 w-4" />
                       </Button>
-                      <Button variant="ghost" size="icon" disabled={rowLocked} onClick={() => handleComunicar(r)} title="Comunicar">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 shrink-0"
+                        disabled={rowLocked}
+                        onClick={() => handleComunicar(r)}
+                        title="Comunicar"
+                      >
                         <MessageSquare className="h-4 w-4" />
                       </Button>
-                      <Button variant="ghost" size="icon" disabled={rowLocked} onClick={() => handleDownload(r)} title="Download">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 shrink-0"
+                        disabled={rowLocked}
+                        onClick={() => handleDownload(r)}
+                        title="Download"
+                      >
                         <Download className="h-4 w-4" />
                       </Button>
-                      <Button variant="ghost" size="icon" disabled={rowLocked} onClick={() => setDeleteId(r.id)} title="Excluir">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 shrink-0"
+                        disabled={rowLocked}
+                        onClick={() => setDeleteId(r.id)}
+                        title="Excluir"
+                      >
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>
                     </div>

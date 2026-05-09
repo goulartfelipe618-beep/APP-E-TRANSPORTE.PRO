@@ -13,6 +13,8 @@ const MIGRAR_PLANO_WEBHOOK =
 interface UpgradePlanDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Quando true (ex.: gate de plano), destaca STANDART e PRÓ — pedido típico de upgrade. */
+  emphasizePaidTiers?: boolean;
 }
 
 const FREE_FEATURES = [
@@ -81,7 +83,11 @@ function PlanCard({
   );
 }
 
-export default function UpgradePlanDialog({ open, onOpenChange }: UpgradePlanDialogProps) {
+export default function UpgradePlanDialog({
+  open,
+  onOpenChange,
+  emphasizePaidTiers = false,
+}: UpgradePlanDialogProps) {
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -162,11 +168,24 @@ export default function UpgradePlanDialog({ open, onOpenChange }: UpgradePlanDia
         </DialogHeader>
 
         <div className="max-h-[min(70vh,680px)] overflow-y-auto border-b border-neutral-800 bg-neutral-950 px-4 py-5 sm:px-6">
-          <p className="mb-4 text-center text-sm text-neutral-300">
-            Escolha o plano que melhor encaixa na sua operação. O administrador confirma e ativa na sua conta.
-          </p>
-          <div className="grid gap-4 sm:grid-cols-3">
-            <PlanCard tier="free" features={FREE_FEATURES} />
+          {emphasizePaidTiers ? (
+            <p className="mb-4 text-center text-sm text-neutral-200">
+              Esta área não está incluída no plano <span className="font-semibold text-[#FF6600]">FREE</span>. Os seus dados
+              mantêm-se na conta — escolha <span className="font-medium text-foreground">STANDART</span> ou{" "}
+              <span className="font-medium text-foreground">PRÓ</span> para desbloquear.
+            </p>
+          ) : (
+            <p className="mb-4 text-center text-sm text-neutral-300">
+              Escolha o plano que melhor encaixa na sua operação. O administrador confirma e ativa na sua conta.
+            </p>
+          )}
+          <div
+            className={cn(
+              "grid gap-4",
+              emphasizePaidTiers ? "sm:grid-cols-2" : "sm:grid-cols-3",
+            )}
+          >
+            {!emphasizePaidTiers ? <PlanCard tier="free" features={FREE_FEATURES} /> : null}
             <PlanCard tier="standart" features={STANDART_FEATURES} />
             <PlanCard tier="pro" highlight features={PRO_FEATURES} />
           </div>

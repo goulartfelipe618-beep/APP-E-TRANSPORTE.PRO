@@ -74,7 +74,7 @@ export default function PlanTierOpaqueGate({
       >
         {children}
       </div>
-      {gated ? <UpgradePlanDialog open={upgradeOpen} onOpenChange={setUpgradeOpen} /> : null}
+      {gated ? <UpgradePlanDialog open={upgradeOpen} onOpenChange={setUpgradeOpen} emphasizePaidTiers /> : null}
     </div>
   );
 }

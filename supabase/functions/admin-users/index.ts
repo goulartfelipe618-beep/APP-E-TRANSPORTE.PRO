@@ -168,8 +168,9 @@ Deno.serve(async (req) => {
       if (role !== "admin_master") {
         const validPlans = ["free", "standart", "pro"] as const;
         const rawPlano = String(plano ?? "").toLowerCase().trim();
-        const userPlano = (validPlans as readonly string[]).includes(rawPlano)
-          ? rawPlano
+        const norm = rawPlano === "standard" ? "standart" : rawPlano;
+        const userPlano = (validPlans as readonly string[]).includes(norm)
+          ? norm
           : "free";
         await supabaseAdmin.from("user_plans").insert({
           user_id: newUser.user.id,
@@ -185,11 +186,13 @@ Deno.serve(async (req) => {
       const body = await req.json();
       const { user_id, plano } = body;
 
-      if (!user_id || !plano) {
+      if (!user_id || plano === undefined || plano === null || String(plano).trim() === "") {
         return new Response(JSON.stringify({ error: "user_id e plano são obrigatórios" }), { status: 400, headers: corsHeaders });
       }
 
-      if (!["free", "standart", "pro"].includes(plano)) {
+      const rawPlano = String(plano).toLowerCase().trim();
+      const planoNorm = rawPlano === "standard" ? "standart" : rawPlano;
+      if (!["free", "standart", "pro"].includes(planoNorm)) {
         return new Response(JSON.stringify({ error: "Plano inválido. Use free, standart ou pro." }), { status: 400, headers: corsHeaders });
       }
 
@@ -209,9 +212,9 @@ Deno.serve(async (req) => {
         return new Response(JSON.stringify({ error: "Utilizador sem função registada." }), { status: 400, headers: corsHeaders });
       }
 
-      // Upsert plan
+      // Upsert plan (persistir sempre standart, nunca o alias "standard")
       const { error } = await supabaseAdmin.from("user_plans").upsert(
-        { user_id, plano, updated_at: new Date().toISOString() },
+        { user_id, plano: planoNorm, updated_at: new Date().toISOString() },
         { onConflict: "user_id" }
       );
 
@@ -235,7 +238,8 @@ Deno.serve(async (req) => {
       }
 
       const paidPlans = ["standart", "pro"] as const;
-      const planoFinal = String(bodyPlano || "").toLowerCase().trim();
+      const planoRaw = String(bodyPlano || "").toLowerCase().trim();
+      const planoFinal = planoRaw === "standard" ? "standart" : planoRaw;
       if (!paidPlans.includes(planoFinal as (typeof paidPlans)[number])) {
         return new Response(
           JSON.stringify({ error: "plano é obrigatório: standart (STANDART) ou pro (PRÓ)" }),
