@@ -1,4 +1,5 @@
-import { isMapboxConfigured, mapboxForwardGeocode } from "@/lib/mapboxGeocode";
+import { isMapboxConfigured } from "@/lib/mapboxGeocode";
+import { geocodeAddressWithBias } from "@/lib/mapboxResolveAddress";
 
 const STATIC_W = 640;
 const STATIC_H = 240;
@@ -73,10 +74,9 @@ function bboxFromCoords(coords: [number, number][], padRatio: number): [number, 
 async function geocodeFirst(query: string | null | undefined): Promise<{ lng: number; lat: number } | null> {
   const q = (query ?? "").trim();
   if (q.length < 3) return null;
-  const hits = await mapboxForwardGeocode(q);
-  const h = hits[0];
-  if (!h) return null;
-  return { lng: h.lng, lat: h.lat };
+  const hit = await geocodeAddressWithBias(q);
+  if (!hit) return null;
+  return { lng: hit.lng, lat: hit.lat };
 }
 
 async function fetchDrivingCoordinates(

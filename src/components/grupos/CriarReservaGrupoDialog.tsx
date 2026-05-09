@@ -435,7 +435,7 @@ export default function CriarReservaGrupoDialog({
             <h3 className="font-semibold text-foreground mb-3">Detalhes da Viagem</h3>
             {isMapboxConfigured() ? (
               <p className="text-xs text-muted-foreground mb-3 -mt-1">
-                Após escrever embarque e destino, clique no pin laranja para confirmar no Mapbox — o PDF traça a rota com endereços normalizados.
+                Após escrever embarque e destino, use o pin laranja para confirmar no Mapbox. Inclua a <strong className="text-foreground">cidade após uma vírgula</strong> para não confundir com homónimos noutro estado. Opcional: <code className="text-xs">VITE_MAPBOX_DEFAULT_PROXIMITY=lng,lat</code> no .env.
               </p>
             ) : null}
             <div className="grid grid-cols-2 gap-4">

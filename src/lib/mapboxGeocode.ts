@@ -1,5 +1,14 @@
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN as string | undefined;
 
+/** Opcional: `lng,lat` (ex.: centro da operação) para enviesar todas as pesquisas Mapbox. */
+export function parseEnvMapboxDefaultProximity(): { lng: number; lat: number } | null {
+  const raw = import.meta.env.VITE_MAPBOX_DEFAULT_PROXIMITY as string | undefined;
+  if (!raw?.trim()) return null;
+  const parts = raw.split(",").map((s) => parseFloat(s.trim()));
+  if (parts.length !== 2 || !Number.isFinite(parts[0]) || !Number.isFinite(parts[1])) return null;
+  return { lng: parts[0]!, lat: parts[1]! };
+}
+
 export type MapboxSuggestion = {
   id: string;
   place_name: string;
@@ -7,6 +16,8 @@ export type MapboxSuggestion = {
   lng: number;
   cidade?: string;
   estado?: string;
+  /** Tipos Mapbox (ex. address, place) — usado para preferir morada vs cidade genérica. */
+  place_type?: string[];
 };
 
 function parseContext(context: { id: string; text: string; short_code?: string }[] | undefined) {
@@ -22,8 +33,22 @@ function parseContext(context: { id: string; text: string; short_code?: string }
   return { cidade, estado };
 }
 
+export type MapboxGeocodeOptions = {
+  proximity?: { lng: number; lat: number };
+  /** minLon,minLat,maxLon,maxLat — limita resultados à caixa (Mapbox Geocoding). */
+  bbox?: [number, number, number, number];
+  limit?: number;
+  /** Tipos permitidos (lista separada por vírgula). Evite `region` para moradas com rua + cidade. */
+  types?: string;
+  /**
+   * Quando `false`, não usa `VITE_MAPBOX_DEFAULT_PROXIMITY` se `proximity` não for passado
+   * (ex.: resolver só o nome da cidade no texto livre).
+   */
+  applyDefaultProximity?: boolean;
+};
+
 /** Geocodificação forward (Mapbox Places API). */
-export async function mapboxForwardGeocode(query: string): Promise<MapboxSuggestion[]> {
+export async function mapboxForwardGeocode(query: string, options?: MapboxGeocodeOptions): Promise<MapboxSuggestion[]> {
   const q = query.trim();
   if (!MAPBOX_TOKEN || q.length < 3) return [];
 
@@ -33,8 +58,21 @@ export async function mapboxForwardGeocode(query: string): Promise<MapboxSuggest
   url.searchParams.set("access_token", MAPBOX_TOKEN);
   url.searchParams.set("country", "BR");
   url.searchParams.set("language", "pt");
-  url.searchParams.set("limit", "6");
-  url.searchParams.set("types", "address,place,locality,neighborhood,region,postcode");
+  url.searchParams.set("limit", String(options?.limit ?? 6));
+  const types =
+    options?.types ?? "address,poi,place,locality,neighborhood,postcode";
+  url.searchParams.set("types", types);
+
+  const defaultProx =
+    options?.applyDefaultProximity === false ? null : parseEnvMapboxDefaultProximity();
+  const proximity = options?.proximity ?? defaultProx ?? undefined;
+  if (proximity) {
+    url.searchParams.set("proximity", `${proximity.lng},${proximity.lat}`);
+  }
+  if (options?.bbox) {
+    const [w, s, e, n] = options.bbox;
+    url.searchParams.set("bbox", `${w},${s},${e},${n}`);
+  }
 
   const res = await fetch(url.toString());
   if (!res.ok) return [];
@@ -43,6 +81,7 @@ export async function mapboxForwardGeocode(query: string): Promise<MapboxSuggest
       id: string;
       place_name: string;
       center?: [number, number];
+      place_type?: string[];
       context?: { id: string; text: string; short_code?: string }[];
     }>;
   };
@@ -60,6 +99,7 @@ export async function mapboxForwardGeocode(query: string): Promise<MapboxSuggest
       lng,
       cidade,
       estado,
+      place_type: f.place_type,
     });
   }
   return out;
@@ -78,6 +118,11 @@ export async function mapboxForwardGeocodeServiceAreas(query: string): Promise<M
   url.searchParams.set("language", "pt");
   url.searchParams.set("limit", "8");
   url.searchParams.set("types", "region,place,locality,neighborhood,district");
+
+  const proximity = parseEnvMapboxDefaultProximity();
+  if (proximity) {
+    url.searchParams.set("proximity", `${proximity.lng},${proximity.lat}`);
+  }
 
   const res = await fetch(url.toString());
   if (!res.ok) return [];

@@ -525,7 +525,7 @@ export default function CriarReservaTransferDialog({
             <h3 className="font-semibold text-foreground mb-3">Detalhes da Viagem</h3>
             {isMapboxConfigured() ? (
               <p className="text-xs text-muted-foreground mb-3 -mt-1">
-                Após escrever cada endereço, clique no pin laranja para confirmar no Mapbox — o PDF traça a rota com estes endereços normalizados.
+                Após escrever cada endereço, use o pin laranja para confirmar no Mapbox. Inclua a <strong className="text-foreground">cidade após uma vírgula</strong> (ex.: Rua, nº, Bairro, Curitiba) para fixar a região certa. Opcional no .env: <code className="text-xs">VITE_MAPBOX_DEFAULT_PROXIMITY=lng,lat</code> (centro da operação).
               </p>
             ) : null}
             <div className="space-y-4">

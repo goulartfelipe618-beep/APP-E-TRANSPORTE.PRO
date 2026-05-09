@@ -78,7 +78,7 @@ export default function MapboxNormalizeAddressField({
           className="shrink-0 border-[#FF6600]/40 text-[#FF6600] hover:bg-[#FF6600]/10"
           disabled={disabled || busy || !configured}
           onClick={() => void normalize()}
-          title="Confirmar endereço no Mapbox (melhora o mapa no PDF)"
+          title="Confirmar endereço no Mapbox (usa a cidade após a vírgula para não saltar para outro estado)"
           aria-label="Confirmar endereço no Mapbox"
         >
           {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <MapPin className="h-4 w-4" />}
