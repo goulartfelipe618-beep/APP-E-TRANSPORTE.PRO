@@ -13,6 +13,9 @@ import { usePainelMotoristaEvolutionAtivo } from "@/hooks/usePainelMotoristaEvol
 import { useMotoristaOnboarding } from "@/hooks/useMotoristaOnboarding";
 import { usePainelErrorReporter } from "@/hooks/usePainelErrorReporter";
 import { useScrollPanelToTop } from "@/hooks/useScrollPanelToTop";
+import { PainelContentZoomProvider } from "@/contexts/PainelContentZoomContext";
+import PainelZoomHeaderButton from "@/components/painel/PainelZoomHeaderButton";
+import { PainelScaledContent } from "@/components/painel/PainelScaledContent";
 
 // Import all page components
 import HomePage from "@/pages/dashboard/Home";
@@ -238,6 +241,7 @@ function DashboardContent() {
                 E-Transporte.pro — Gestão de Frota
               </span>
             </div>
+            <PainelZoomHeaderButton />
           </header>
           <PainelAvisoBanner painel="motorista" activePage={activePage} />
           <main
@@ -245,7 +249,9 @@ function DashboardContent() {
             className="relative z-0 min-h-0 flex-1 overflow-x-hidden overflow-y-auto scroll-smooth bg-background [--main-pad-x:1rem] [--main-pad-y:1rem] px-[var(--main-pad-x)] py-[var(--main-pad-y)] sm:[--main-pad-x:1.5rem] sm:[--main-pad-y:1.5rem]"
           >
             <PageLoader>
-              <PageComponent />
+              <PainelScaledContent>
+                <PageComponent />
+              </PainelScaledContent>
             </PageLoader>
           </main>
         </div>
@@ -259,9 +265,11 @@ function DashboardContent() {
 export default function DashboardLayout() {
   return (
     <ActivePageProvider defaultPage="home" storageKey="etp_nav_dashboard">
-      <SidebarProvider>
-        <DashboardContent />
-      </SidebarProvider>
+      <PainelContentZoomProvider>
+        <SidebarProvider>
+          <DashboardContent />
+        </SidebarProvider>
+      </PainelContentZoomProvider>
     </ActivePageProvider>
   );
 }

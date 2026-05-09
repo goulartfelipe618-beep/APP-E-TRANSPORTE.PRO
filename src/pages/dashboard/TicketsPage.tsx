@@ -9,6 +9,8 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { Plus, Ticket, Clock, CheckCircle, AlertCircle, MessageSquare } from "lucide-react";
+import { usePainelListPagination } from "@/hooks/usePainelListPagination";
+import { PainelPaginationBar } from "@/components/painel/PainelPaginationBar";
 
 interface TicketRow {
   id: string;
@@ -59,6 +61,8 @@ export default function TicketsPage() {
   };
 
   useEffect(() => { fetchTickets(); }, []);
+
+  const { slice: ticketsPage, page, setPage, totalPages, totalItems } = usePainelListPagination(tickets);
 
   const handleSubmit = async () => {
     if (!assunto.trim()) { toast.error("Informe o assunto"); return; }
@@ -139,43 +143,46 @@ export default function TicketsPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-4">
-          {tickets.map(t => {
-            const st = STATUS_MAP[t.status] || STATUS_MAP.aberto;
-            return (
-              <Card key={t.id}>
-                <CardHeader className="pb-2">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-2">
-                      {t.status === "aberto" && <AlertCircle className="h-4 w-4 text-destructive" />}
-                      {t.status === "em_andamento" && <Clock className="h-4 w-4 text-primary" />}
-                      {t.status === "respondido" && <MessageSquare className="h-4 w-4 text-muted-foreground" />}
-                      {t.status === "fechado" && <CheckCircle className="h-4 w-4 text-muted-foreground" />}
-                      <CardTitle className="text-base">{t.assunto}</CardTitle>
+        <>
+          <div className="grid gap-4">
+            {ticketsPage.map(t => {
+              const st = STATUS_MAP[t.status] || STATUS_MAP.aberto;
+              return (
+                <Card key={t.id}>
+                  <CardHeader className="pb-2">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-2">
+                        {t.status === "aberto" && <AlertCircle className="h-4 w-4 text-destructive" />}
+                        {t.status === "em_andamento" && <Clock className="h-4 w-4 text-primary" />}
+                        {t.status === "respondido" && <MessageSquare className="h-4 w-4 text-muted-foreground" />}
+                        {t.status === "fechado" && <CheckCircle className="h-4 w-4 text-muted-foreground" />}
+                        <CardTitle className="text-base">{t.assunto}</CardTitle>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="text-xs">#{t.codigo_ticket}</Badge>
+                        <Badge variant="outline" className="text-xs capitalize">{t.tipo}</Badge>
+                        <Badge variant={st.variant}>{st.label}</Badge>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Badge variant="outline" className="text-xs">#{t.codigo_ticket}</Badge>
-                      <Badge variant="outline" className="text-xs capitalize">{t.tipo}</Badge>
-                      <Badge variant={st.variant}>{st.label}</Badge>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  {t.descricao && <p className="text-sm text-muted-foreground">{t.descricao}</p>}
-                  {t.resposta_admin && (
-                    <div className="bg-muted rounded-lg p-3 mt-2">
-                      <p className="text-xs font-semibold text-foreground mb-1">Resposta do Administrador:</p>
-                      <p className="text-sm text-muted-foreground">{t.resposta_admin}</p>
-                    </div>
-                  )}
-                  <p className="text-xs text-muted-foreground">
-                    Criado em {new Date(t.created_at).toLocaleDateString("pt-BR")} às {new Date(t.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
-                  </p>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    {t.descricao && <p className="text-sm text-muted-foreground">{t.descricao}</p>}
+                    {t.resposta_admin && (
+                      <div className="bg-muted rounded-lg p-3 mt-2">
+                        <p className="text-xs font-semibold text-foreground mb-1">Resposta do Administrador:</p>
+                        <p className="text-sm text-muted-foreground">{t.resposta_admin}</p>
+                      </div>
+                    )}
+                    <p className="text-xs text-muted-foreground">
+                      Criado em {new Date(t.created_at).toLocaleDateString("pt-BR")} às {new Date(t.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                    </p>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+          <PainelPaginationBar page={page} totalPages={totalPages} totalItems={totalItems} onPageChange={setPage} />
+        </>
       )}
     </div>
   );

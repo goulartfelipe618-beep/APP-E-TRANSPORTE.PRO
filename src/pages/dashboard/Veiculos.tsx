@@ -7,6 +7,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import CadastrarVeiculoDialog from "@/components/veiculos/CadastrarVeiculoDialog";
 import { cn } from "@/lib/utils";
+import { usePainelListPagination } from "@/hooks/usePainelListPagination";
+import { PainelPaginationBar } from "@/components/painel/PainelPaginationBar";
 
 const VIEW_STORAGE_KEY = "etp_veiculos_view";
 
@@ -101,6 +103,8 @@ export default function VeiculosPage() {
     );
   }, [search, veiculos]);
 
+  const { slice: filteredPage, page, setPage, totalPages, totalItems } = usePainelListPagination(filtered, viewMode);
+
   const totalAtivos = veiculos.filter((v) => v.status === "ativo").length;
 
   return (
@@ -191,9 +195,11 @@ export default function VeiculosPage() {
         <div className="rounded-xl border border-border bg-card p-6 text-center text-sm text-muted-foreground">
           Nenhum veículo cadastrado. Use o botão <strong className="text-foreground">+ Novo veículo</strong>.
         </div>
-      ) : viewMode === "cards" ? (
+      ) : (
+        <>
+          {viewMode === "cards" ? (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {filtered.map((v) => (
+          {filteredPage.map((v) => (
             <article
               key={v.id}
               className="flex min-w-0 flex-col overflow-hidden rounded-xl border border-border bg-card shadow-sm"
@@ -259,7 +265,7 @@ export default function VeiculosPage() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((v) => (
+              {filteredPage.map((v) => (
                 <tr key={v.id} className="border-b border-border last:border-0">
                   <td className="p-2 sm:p-3">
                     <div className="relative h-14 w-20 overflow-hidden rounded-md border border-border bg-muted sm:h-16 sm:w-24">
@@ -315,6 +321,11 @@ export default function VeiculosPage() {
             Deslize horizontalmente para ver todas as colunas.
           </p>
         </div>
+          )}
+          <div className="pt-4">
+            <PainelPaginationBar page={page} totalPages={totalPages} totalItems={totalItems} onPageChange={setPage} />
+          </div>
+        </>
       )}
 
       <CadastrarVeiculoDialog

@@ -15,6 +15,8 @@ import { formatDbCalendarDatePtBr } from "@/lib/painelAgendaReservas";
 import { useUserPlan } from "@/hooks/useUserPlan";
 import { minimumPlanForPage, pageAllowedForPlan } from "@/lib/painelPlanPolicy";
 import PlanTierOpaqueGate from "@/components/planos/PlanTierOpaqueGate";
+import { usePainelListPagination } from "@/hooks/usePainelListPagination";
+import { PainelPaginationBar } from "@/components/painel/PainelPaginationBar";
 
 type Solicitacao = Tables<"solicitacoes_grupos">;
 export default function GruposSolicitacoesPage() {
@@ -27,6 +29,8 @@ export default function GruposSolicitacoesPage() {
   const [initialData, setInitialData] = useState<GrupoInitialData | null>(null);
   const [comunicarOpen, setComunicarOpen] = useState(false);
   const [comunicarDados, setComunicarDados] = useState<Solicitacao | null>(null);
+
+  const { slice: solicitacoesPage, page, setPage, totalPages, totalItems } = usePainelListPagination(solicitacoes);
 
   const fetchData = useCallback(async () => {
     const { data, error } = await supabase
@@ -96,7 +100,7 @@ export default function GruposSolicitacoesPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Solicitações de Grupos</h1>
-          <p className="text-muted-foreground">Registros recebidos via webhook ({solicitacoes.length})</p>
+          <p className="text-muted-foreground">Registros recebidos via webhook ({totalItems})</p>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="icon" onClick={fetchData}><RefreshCw className="h-4 w-4" /></Button>
@@ -110,45 +114,50 @@ export default function GruposSolicitacoesPage() {
         ) : solicitacoes.length === 0 ? (
           <p className="text-sm text-muted-foreground p-6 text-center">Nenhuma solicitação recebida.</p>
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Cliente</TableHead>
-                <TableHead>WhatsApp</TableHead>
-                <TableHead>Veículo</TableHead>
-                <TableHead>Embarque</TableHead>
-                <TableHead>Destino</TableHead>
-                <TableHead>Data Ida</TableHead>
-                <TableHead>Passageiros</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="w-[100px]">Ações</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {solicitacoes.map((s) => (
-                <TableRow key={s.id}>
-                  <TableCell className="font-medium">{s.nome_cliente}</TableCell>
-                  <TableCell className="text-sm">{s.whatsapp || "—"}</TableCell>
-                  <TableCell>{s.tipo_veiculo ? <Badge variant="secondary">{s.tipo_veiculo}</Badge> : "—"}</TableCell>
-                  <TableCell className="text-sm max-w-[150px] truncate">{s.embarque || "—"}</TableCell>
-                  <TableCell className="text-sm max-w-[150px] truncate">{s.destino || "—"}</TableCell>
-                  <TableCell className="text-sm">{formatDbCalendarDatePtBr(s.data_ida)}</TableCell>
-                  <TableCell>{s.num_passageiros ?? "—"}</TableCell>
-                  <TableCell><Badge variant="outline">{s.status}</Badge></TableCell>
-                  <TableCell>
-                    <div className="flex gap-1">
-                      <Button variant="ghost" size="icon" onClick={() => handleVisualizar(s)} title="Visualizar">
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon" onClick={() => handleComunicar(s)} title="Comunicar">
-                        <MessageSquare className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
+          <div className="p-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Cliente</TableHead>
+                  <TableHead>WhatsApp</TableHead>
+                  <TableHead>Veículo</TableHead>
+                  <TableHead>Embarque</TableHead>
+                  <TableHead>Destino</TableHead>
+                  <TableHead>Data Ida</TableHead>
+                  <TableHead>Passageiros</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="w-[100px]">Ações</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {solicitacoesPage.map((s) => (
+                  <TableRow key={s.id}>
+                    <TableCell className="font-medium">{s.nome_cliente}</TableCell>
+                    <TableCell className="text-sm">{s.whatsapp || "—"}</TableCell>
+                    <TableCell>{s.tipo_veiculo ? <Badge variant="secondary">{s.tipo_veiculo}</Badge> : "—"}</TableCell>
+                    <TableCell className="text-sm max-w-[150px] truncate">{s.embarque || "—"}</TableCell>
+                    <TableCell className="text-sm max-w-[150px] truncate">{s.destino || "—"}</TableCell>
+                    <TableCell className="text-sm">{formatDbCalendarDatePtBr(s.data_ida)}</TableCell>
+                    <TableCell>{s.num_passageiros ?? "—"}</TableCell>
+                    <TableCell><Badge variant="outline">{s.status}</Badge></TableCell>
+                    <TableCell>
+                      <div className="flex gap-1">
+                        <Button variant="ghost" size="icon" onClick={() => handleVisualizar(s)} title="Visualizar">
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => handleComunicar(s)} title="Comunicar">
+                          <MessageSquare className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+            <div className="px-4 pb-4">
+              <PainelPaginationBar page={page} totalPages={totalPages} totalItems={totalItems} onPageChange={setPage} />
+            </div>
+          </div>
         )}
       </div>
 

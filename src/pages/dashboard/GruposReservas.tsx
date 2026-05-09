@@ -19,6 +19,8 @@ import { formatDbCalendarDatePtBr, toAgendaDayKey } from "@/lib/painelAgendaRese
 import { useUserPlan } from "@/hooks/useUserPlan";
 import { freePlanLockedReservaIdsByCreationDay } from "@/lib/freePlanLocks";
 import { cn } from "@/lib/utils";
+import { usePainelListPagination } from "@/hooks/usePainelListPagination";
+import { PainelPaginationBar } from "@/components/painel/PainelPaginationBar";
 
 type ReservaGrupo = Tables<"reservas_grupos">;
 
@@ -133,6 +135,8 @@ export default function GruposReservasPage() {
       return true;
     });
   }, [reservas, filterDataDe, filterDataAte, filterStatus, filterMotorista, filterVeiculo, filterSearch]);
+
+  const { slice: reservasPage, page, setPage, totalPages, totalItems } = usePainelListPagination(reservasFiltradas);
 
   const freeLockedReservaIds = useMemo(
     () => freePlanLockedReservaIdsByCreationDay(plano, reservas.map((r) => ({ id: r.id, created_at: r.created_at }))),
@@ -302,24 +306,25 @@ export default function GruposReservasPage() {
             {reservas.length === 0 ? "Nenhuma reserva encontrada." : "Nenhuma reserva corresponde aos filtros."}
           </p>
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Nº</TableHead>
-                <TableHead>Cliente</TableHead>
-                <TableHead>Contato</TableHead>
-                <TableHead>Veículo</TableHead>
-                <TableHead>Passageiros</TableHead>
-                <TableHead>Trajeto</TableHead>
-                <TableHead>Data Ida</TableHead>
-                <TableHead>Motorista</TableHead>
-                <TableHead>Valor</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="min-w-[220px] whitespace-nowrap text-right">Ações</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {reservasFiltradas.map((r) => {
+          <div className="p-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Nº</TableHead>
+                  <TableHead>Cliente</TableHead>
+                  <TableHead>Contato</TableHead>
+                  <TableHead>Veículo</TableHead>
+                  <TableHead>Passageiros</TableHead>
+                  <TableHead>Trajeto</TableHead>
+                  <TableHead>Data Ida</TableHead>
+                  <TableHead>Motorista</TableHead>
+                  <TableHead>Valor</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="min-w-[220px] whitespace-nowrap text-right">Ações</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+              {reservasPage.map((r) => {
                 const rowLocked = !planLoading && freeLockedReservaIds.has(r.id);
                 return (
                 <TableRow key={r.id} className={cn(rowLocked && "bg-muted/30")}>
@@ -414,6 +419,10 @@ export default function GruposReservasPage() {
               })}
             </TableBody>
           </Table>
+          <div className="px-4 pb-4">
+            <PainelPaginationBar page={page} totalPages={totalPages} totalItems={totalItems} onPageChange={setPage} />
+          </div>
+        </div>
         )}
       </div>
 

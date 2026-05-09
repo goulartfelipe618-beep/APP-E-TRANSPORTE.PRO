@@ -14,6 +14,8 @@ import type { Json } from "@/integrations/supabase/types";
 import { useUserPlan } from "@/hooks/useUserPlan";
 import { minimumPlanForPage, pageAllowedForPlan } from "@/lib/painelPlanPolicy";
 import PlanTierOpaqueGate from "@/components/planos/PlanTierOpaqueGate";
+import { usePainelListPagination } from "@/hooks/usePainelListPagination";
+import { PainelPaginationBar } from "@/components/painel/PainelPaginationBar";
 
 type SolicitacaoRow = {
   id: string;
@@ -130,6 +132,8 @@ export default function MotoristaSolicitacoesPage() {
     );
   }, [rows, search]);
 
+  const { slice: filteredPage, page, setPage, totalPages, totalItems } = usePainelListPagination(filtered, viewMode);
+
   const abrirCompletarCadastro = (m: SolicitacaoRow) => {
     setCadastroInitial(leadToCompletarInitialData(m));
     setCadastroOpen(true);
@@ -208,9 +212,11 @@ export default function MotoristaSolicitacoesPage() {
             na frota ficam em <strong className="text-foreground">Motoristas → Cadastros</strong>.
           </p>
         </div>
-      ) : viewMode === "grid" ? (
+      ) : (
+        <>
+          {viewMode === "grid" ? (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {filtered.map((m) => (
+          {filteredPage.map((m) => (
             <div key={m.id} className="space-y-3 rounded-xl border border-border bg-card p-4">
               <div className="flex items-start justify-between gap-2">
                 <h3 className="font-semibold text-foreground">{m.nome}</h3>
@@ -254,7 +260,7 @@ export default function MotoristaSolicitacoesPage() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((m) => (
+              {filteredPage.map((m) => (
                 <tr key={m.id} className="border-t border-border">
                   <td className="p-3 font-medium">{m.nome}</td>
                   <td className="p-3 text-muted-foreground">
@@ -292,6 +298,11 @@ export default function MotoristaSolicitacoesPage() {
             </tbody>
           </table>
         </div>
+          )}
+          <div className="pt-4">
+            <PainelPaginationBar page={page} totalPages={totalPages} totalItems={totalItems} onPageChange={setPage} />
+          </div>
+        </>
       )}
 
       <DetalhesSolicitacaoMotoristaSheet

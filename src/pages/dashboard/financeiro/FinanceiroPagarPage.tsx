@@ -5,6 +5,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useActivePage } from "@/contexts/ActivePageContext";
 import { useFinancialTransactions } from "@/hooks/useFinancialTransactions";
 import { FINANCEIRO_STATUS_LABEL, financeiroListagemRangePadrao, formatBRL } from "@/lib/financeiroFrota";
+import { usePainelListPagination } from "@/hooks/usePainelListPagination";
+import { PainelPaginationBar } from "@/components/painel/PainelPaginationBar";
 
 export default function FinanceiroPagarPage() {
   const { setActivePage } = useActivePage();
@@ -12,6 +14,8 @@ export default function FinanceiroPagarPage() {
   const { rows, loading, error } = useFinancialTransactions(from, to, { limit: 1500, offset: 0 });
 
   const despesas = useMemo(() => rows.filter((r) => r.kind === "despesa"), [rows]);
+
+  const { slice: despesasPage, page, setPage, totalPages, totalItems } = usePainelListPagination(despesas);
 
   return (
     <div className="space-y-6 pb-8">
@@ -50,7 +54,7 @@ export default function FinanceiroPagarPage() {
                 </TableCell>
               </TableRow>
             ) : (
-              despesas.map((r) => (
+              despesasPage.map((r) => (
                 <TableRow key={r.id}>
                   <TableCell className="whitespace-nowrap text-sm">
                     {new Date(r.occurred_on + "T12:00:00").toLocaleDateString("pt-BR")}
@@ -66,6 +70,11 @@ export default function FinanceiroPagarPage() {
             )}
           </TableBody>
         </Table>
+        {!loading && despesas.length > 0 ? (
+          <div className="border-t border-border px-4 py-4">
+            <PainelPaginationBar page={page} totalPages={totalPages} totalItems={totalItems} onPageChange={setPage} />
+          </div>
+        ) : null}
       </div>
     </div>
   );

@@ -10,6 +10,8 @@ import type { Json } from "@/integrations/supabase/types";
 import { computeClienteProfilePercent } from "@/lib/clienteCompleteness";
 import { getCadastroClienteSignedUrl, getFotoPerfilPathFromDocumentos } from "@/lib/cadastroClienteStorage";
 import { cn } from "@/lib/utils";
+import { usePainelListPagination } from "@/hooks/usePainelListPagination";
+import { PainelPaginationBar } from "@/components/painel/PainelPaginationBar";
 
 function rowFromDb(r: Record<string, unknown>): CadastroClienteRow {
   return {
@@ -100,6 +102,8 @@ export default function ClientesPage() {
     void fetchRows();
   }, [fetchRows]);
 
+  const { slice: rowsPage, page, setPage, totalPages, totalItems } = usePainelListPagination(rows, viewMode);
+
   const openCreate = () => {
     setEditRow(null);
     setDialogOpen(true);
@@ -178,9 +182,11 @@ export default function ClientesPage() {
             Criar o primeiro
           </Button>
         </div>
-      ) : viewMode === "cards" ? (
+      ) : (
+        <>
+          {viewMode === "cards" ? (
         <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {rows.map((r) => {
+          {rowsPage.map((r) => {
             const pct = computeClienteProfilePercent(r);
             return (
               <li
@@ -242,7 +248,7 @@ export default function ClientesPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {rows.map((r) => {
+              {rowsPage.map((r) => {
                 const pct = computeClienteProfilePercent(r);
                 return (
                   <TableRow key={r.id} className="border-border">
@@ -295,6 +301,11 @@ export default function ClientesPage() {
             </TableBody>
           </Table>
         </div>
+          )}
+          <div className="pt-4">
+            <PainelPaginationBar page={page} totalPages={totalPages} totalItems={totalItems} onPageChange={setPage} />
+          </div>
+        </>
       )}
 
       <CadastrarClienteDialog

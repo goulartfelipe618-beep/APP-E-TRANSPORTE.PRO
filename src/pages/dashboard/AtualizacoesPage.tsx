@@ -7,6 +7,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useActivePage } from "@/contexts/ActivePageContext";
 import { Tables } from "@/integrations/supabase/types";
+import { usePainelListPagination } from "@/hooks/usePainelListPagination";
+import { PainelPaginationBar } from "@/components/painel/PainelPaginationBar";
 
 type SolicitacaoTransfer = Tables<"solicitacoes_transfer">;
 type SolicitacaoGrupo = Tables<"solicitacoes_grupos">;
@@ -77,8 +79,10 @@ export default function AtualizacoesPage() {
       transfer: items.filter((item) => item.origem === "transfer").length,
       grupos: items.filter((item) => item.origem === "grupos").length,
     }),
-    [items]
+    [items],
   );
+
+  const { slice: itemsPage, page, setPage, totalPages, totalItems } = usePainelListPagination(items);
 
   return (
     <div className="space-y-6">
@@ -106,45 +110,50 @@ export default function AtualizacoesPage() {
         ) : items.length === 0 ? (
           <p className="text-sm text-muted-foreground p-6 text-center">Nenhuma solicitação encontrada.</p>
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Origem</TableHead>
-                <TableHead>Nome</TableHead>
-                <TableHead>Contato</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Data</TableHead>
-                <TableHead className="w-[180px]">Ações</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {items.map((item) => (
-                <TableRow key={`${item.origem}-${item.id}`}>
-                  <TableCell>
-                    <Badge variant="secondary" className="capitalize">
-                      {item.origem}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="font-medium">{item.titulo}</TableCell>
-                  <TableCell className="text-sm">{item.contato}</TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className="capitalize">
-                      {item.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-sm">
-                    {new Date(item.createdAt).toLocaleDateString("pt-BR")}{" "}
-                    {new Date(item.createdAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
-                  </TableCell>
-                  <TableCell>
-                    <Button variant="ghost" size="sm" onClick={() => setActivePage(item.paginaDestino)}>
-                      Abrir página de origem
-                    </Button>
-                  </TableCell>
+          <div className="p-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Origem</TableHead>
+                  <TableHead>Nome</TableHead>
+                  <TableHead>Contato</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Data</TableHead>
+                  <TableHead className="w-[180px]">Ações</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {itemsPage.map((item) => (
+                  <TableRow key={`${item.origem}-${item.id}`}>
+                    <TableCell>
+                      <Badge variant="secondary" className="capitalize">
+                        {item.origem}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="font-medium">{item.titulo}</TableCell>
+                    <TableCell className="text-sm">{item.contato}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className="capitalize">
+                        {item.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-sm">
+                      {new Date(item.createdAt).toLocaleDateString("pt-BR")}{" "}
+                      {new Date(item.createdAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                    </TableCell>
+                    <TableCell>
+                      <Button variant="ghost" size="sm" onClick={() => setActivePage(item.paginaDestino)}>
+                        Abrir página de origem
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+            <div className="px-4 pb-4">
+              <PainelPaginationBar page={page} totalPages={totalPages} totalItems={totalItems} onPageChange={setPage} />
+            </div>
+          </div>
         )}
       </div>
     </div>

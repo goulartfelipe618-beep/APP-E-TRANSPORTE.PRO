@@ -12,6 +12,8 @@ import { SolicitacoesCapturaExternaInfo } from "@/components/solicitacoes/Solici
 import { useUserPlan } from "@/hooks/useUserPlan";
 import { minimumPlanForPage, pageAllowedForPlan } from "@/lib/painelPlanPolicy";
 import PlanTierOpaqueGate from "@/components/planos/PlanTierOpaqueGate";
+import { usePainelListPagination } from "@/hooks/usePainelListPagination";
+import { PainelPaginationBar } from "@/components/painel/PainelPaginationBar";
 
 export default function CampanhasLeadsPage() {
   const { plano, loading: planLoading } = useUserPlan();
@@ -101,6 +103,11 @@ export default function CampanhasLeadsPage() {
     URL.revokeObjectURL(url);
   };
 
+  const { slice: leadsPage, page, setPage, totalPages, totalItems } = usePainelListPagination(
+    filteredLeads,
+    `${campaignFilter}:${search}`,
+  );
+
   if (planLoading) {
     return <div className="flex justify-center py-20 text-sm text-muted-foreground">A carregar…</div>;
   }
@@ -155,24 +162,27 @@ export default function CampanhasLeadsPage() {
         ) : filteredLeads.length === 0 ? (
           <p className="text-sm text-muted-foreground">Nenhum lead encontrado para os filtros atuais.</p>
         ) : (
-          <div className="space-y-3">
-            {filteredLeads.map((lead) => (
-              <div key={lead.id} className="rounded-lg border border-border p-4 space-y-2">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className="font-medium text-foreground">{lead.campanhas?.nome || "Campanha removida"}</p>
-                    <p className="text-xs text-muted-foreground">
-                      Recebido em {new Date(lead.created_at).toLocaleString("pt-BR")}
-                    </p>
+          <>
+            <div className="space-y-3">
+              {leadsPage.map((lead) => (
+                <div key={lead.id} className="rounded-lg border border-border p-4 space-y-2">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="font-medium text-foreground">{lead.campanhas?.nome || "Campanha removida"}</p>
+                      <p className="text-xs text-muted-foreground">
+                        Recebido em {new Date(lead.created_at).toLocaleString("pt-BR")}
+                      </p>
+                    </div>
+                    <Badge variant="outline">{lead.campanhas?.slug || "sem-slug"}</Badge>
                   </div>
-                  <Badge variant="outline">{lead.campanhas?.slug || "sem-slug"}</Badge>
+                  <pre className="text-xs bg-muted/40 p-3 rounded-md overflow-auto">
+                    {JSON.stringify(lead.payload || {}, null, 2)}
+                  </pre>
                 </div>
-                <pre className="text-xs bg-muted/40 p-3 rounded-md overflow-auto">
-                  {JSON.stringify(lead.payload || {}, null, 2)}
-                </pre>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+            <PainelPaginationBar page={page} totalPages={totalPages} totalItems={totalItems} onPageChange={setPage} />
+          </>
         )}
       </div>
     </div>

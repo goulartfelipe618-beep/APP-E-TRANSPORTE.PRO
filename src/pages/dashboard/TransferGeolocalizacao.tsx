@@ -37,6 +37,8 @@ import { normalizeUserPlano, FREE_MAX_LINKS_GEO_MES } from "@/lib/painelPlanPoli
 import { currentYearMonthKeySaoPaulo, yearMonthKeySaoPauloFromIso } from "@/lib/spCalendarBr";
 import { useUserPlan } from "@/hooks/useUserPlan";
 import { freePlanLockedRastreioIdsByCreationMonth } from "@/lib/freePlanLocks";
+import { usePainelListPagination } from "@/hooks/usePainelListPagination";
+import { PainelPaginationBar } from "@/components/painel/PainelPaginationBar";
 
 type ReservaTransfer = Tables<"reservas_transfer">;
 type ReservaGrupo = Tables<"reservas_grupos">;
@@ -460,9 +462,19 @@ export default function TransferGeolocalizacaoPage() {
     [rastreios],
   );
   const rastreiosHistorico = useMemo(
-    () => rastreios.filter((r) => r.status === "concluida" || r.status === "finalizado").slice(0, 10),
+    () => rastreios.filter((r) => r.status === "concluida" || r.status === "finalizado"),
     [rastreios],
   );
+
+  const { slice: rastreiosAtivosPage, page: pageAtivos, setPage: setPageAtivos, totalPages: tpAtivos, totalItems: tiAtivos } =
+    usePainelListPagination(rastreiosAtivos);
+  const {
+    slice: rastreiosHistoricoPage,
+    page: pageHistorico,
+    setPage: setPageHistorico,
+    totalPages: tpHistorico,
+    totalItems: tiHistorico,
+  } = usePainelListPagination(rastreiosHistorico);
 
   const geoLockedIds = useMemo(
     () => freePlanLockedRastreioIdsByCreationMonth(plano, rastreios.map((r) => ({ id: r.id, created_at: r.created_at }))),
@@ -544,7 +556,7 @@ export default function TransferGeolocalizacaoPage() {
 
         {!loadingRastreios && rastreiosAtivos.length > 0 && (
           <div className="divide-y divide-border">
-            {rastreiosAtivos.map((r) => {
+            {rastreiosAtivosPage.map((r) => {
               const url = buildRastreioShareUrl(r.token);
               const st = statusLabel(r.status);
               const comunicandoAtual = comunicandoId === r.id;
@@ -694,6 +706,16 @@ export default function TransferGeolocalizacaoPage() {
             })}
           </div>
         )}
+        {!loadingRastreios && rastreiosAtivos.length > 0 ? (
+          <div className="border-t border-border px-4 pb-4 pt-3">
+            <PainelPaginationBar
+              page={pageAtivos}
+              totalPages={tpAtivos}
+              totalItems={tiAtivos}
+              onPageChange={setPageAtivos}
+            />
+          </div>
+        ) : null}
       </div>
 
       {/* ======================================================= */}
@@ -701,9 +723,9 @@ export default function TransferGeolocalizacaoPage() {
       {/* ======================================================= */}
       {rastreiosHistorico.length > 0 && (
         <div className="rounded-xl border border-border bg-card p-6">
-          <h3 className="font-semibold text-foreground mb-3">Histórico (últimos 10)</h3>
+          <h3 className="font-semibold text-foreground mb-3">Histórico</h3>
           <div className="divide-y divide-border">
-            {rastreiosHistorico.map((r) => {
+            {rastreiosHistoricoPage.map((r) => {
               const dt = r.data_hora_fim || r.finalizado_em || r.updated_at;
               const rowLocked = !planUserPlanLoading && geoLockedIds.has(r.id);
               return (
@@ -738,6 +760,14 @@ export default function TransferGeolocalizacaoPage() {
                 </div>
               );
             })}
+          </div>
+          <div className="border-t border-border pt-3">
+            <PainelPaginationBar
+              page={pageHistorico}
+              totalPages={tpHistorico}
+              totalItems={tiHistorico}
+              onPageChange={setPageHistorico}
+            />
           </div>
         </div>
       )}

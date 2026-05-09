@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { RefreshCw, Plus, CalendarDays } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -18,6 +18,8 @@ import { SolicitacoesCapturaExternaInfo } from "@/components/solicitacoes/Solici
 import { useUserPlan } from "@/hooks/useUserPlan";
 import { minimumPlanForPage, pageAllowedForPlan } from "@/lib/painelPlanPolicy";
 import PlanTierOpaqueGate from "@/components/planos/PlanTierOpaqueGate";
+import { usePainelListPagination } from "@/hooks/usePainelListPagination";
+import { PainelPaginationBar } from "@/components/painel/PainelPaginationBar";
 
 const CAMPAIGN_COLORS = [
   "#3B82F6", "#10B981", "#F43F5E", "#F59E0B",
@@ -187,8 +189,13 @@ export default function CampanhasAtivosPage() {
     fetchCampanhas();
   };
 
-  const campanhasAtivas = campanhas.filter((c) => c.status !== "encerrada");
-  const campanhasEncerradas = campanhas.filter((c) => c.status === "encerrada");
+  const campanhasAtivas = useMemo(() => campanhas.filter((c) => c.status !== "encerrada"), [campanhas]);
+  const campanhasEncerradas = useMemo(() => campanhas.filter((c) => c.status === "encerrada"), [campanhas]);
+
+  const { slice: ativasPage, page: pageA, setPage: setPageA, totalPages: tpA, totalItems: tiA } =
+    usePainelListPagination(campanhasAtivas);
+  const { slice: encerradasPage, page: pageE, setPage: setPageE, totalPages: tpE, totalItems: tiE } =
+    usePainelListPagination(campanhasEncerradas);
 
   if (planLoading) {
     return <div className="flex justify-center py-20 text-sm text-muted-foreground">A carregar…</div>;
@@ -225,26 +232,31 @@ export default function CampanhasAtivosPage() {
         ) : campanhasAtivas.length === 0 ? (
           <p className="text-sm text-muted-foreground">Nenhuma campanha ativa encontrada.</p>
         ) : (
-          <div className="space-y-3">
-            {campanhasAtivas.map((campanha) => (
-              <div key={campanha.id} className="rounded-lg border border-border p-4 space-y-3">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className="inline-block w-3 h-3 rounded-full" style={{ backgroundColor: campanha.cor || "#3B82F6" }} />
-                    <h4 className="font-semibold text-foreground">{campanha.nome}</h4>
-                    <Badge variant={campanha.status === "ativa" ? "default" : "outline"}>{campanha.status}</Badge>
+          <>
+            <div className="space-y-3">
+              {ativasPage.map((campanha) => (
+                <div key={campanha.id} className="rounded-lg border border-border p-4 space-y-3">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="inline-block w-3 h-3 rounded-full" style={{ backgroundColor: campanha.cor || "#3B82F6" }} />
+                      <h4 className="font-semibold text-foreground">{campanha.nome}</h4>
+                      <Badge variant={campanha.status === "ativa" ? "default" : "outline"}>{campanha.status}</Badge>
+                    </div>
+                    <p className="text-sm text-muted-foreground">{campanha.descricao || "Sem descrição."}</p>
                   </div>
-                  <p className="text-sm text-muted-foreground">{campanha.descricao || "Sem descrição."}</p>
+                  <div className="rounded-md bg-muted/40 p-3 text-xs text-foreground flex flex-wrap items-center gap-2">
+                    <CalendarDays className="h-3.5 w-3.5 text-primary shrink-0" />
+                    <span>Início: <strong>{new Date(`${campanha.data_inicio}T00:00:00`).toLocaleDateString("pt-BR")}</strong></span>
+                    <span>|</span>
+                    <span>Término: <strong>{new Date(`${campanha.data_fim}T00:00:00`).toLocaleDateString("pt-BR")}</strong></span>
+                  </div>
                 </div>
-                <div className="rounded-md bg-muted/40 p-3 text-xs text-foreground flex flex-wrap items-center gap-2">
-                  <CalendarDays className="h-3.5 w-3.5 text-primary shrink-0" />
-                  <span>Início: <strong>{new Date(`${campanha.data_inicio}T00:00:00`).toLocaleDateString("pt-BR")}</strong></span>
-                  <span>|</span>
-                  <span>Término: <strong>{new Date(`${campanha.data_fim}T00:00:00`).toLocaleDateString("pt-BR")}</strong></span>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+            <div className="mt-4 border-t border-border pt-4">
+              <PainelPaginationBar page={pageA} totalPages={tpA} totalItems={tiA} onPageChange={setPageA} />
+            </div>
+          </>
         )}
       </div>
 
@@ -255,19 +267,24 @@ export default function CampanhasAtivosPage() {
         ) : campanhasEncerradas.length === 0 ? (
           <p className="text-sm text-muted-foreground">Nenhuma campanha encerrada.</p>
         ) : (
-          <div className="space-y-2">
-            {campanhasEncerradas.map((campanha) => (
-              <div key={campanha.id} className="rounded-lg border border-border p-3 flex items-center justify-between">
-                <div>
-                  <p className="font-medium text-foreground">{campanha.nome}</p>
-                  <p className="text-xs text-muted-foreground">
-                    Período: {new Date(`${campanha.data_inicio}T00:00:00`).toLocaleDateString("pt-BR")} - {new Date(`${campanha.data_fim}T00:00:00`).toLocaleDateString("pt-BR")}
-                  </p>
+          <>
+            <div className="space-y-2">
+              {encerradasPage.map((campanha) => (
+                <div key={campanha.id} className="rounded-lg border border-border p-3 flex items-center justify-between">
+                  <div>
+                    <p className="font-medium text-foreground">{campanha.nome}</p>
+                    <p className="text-xs text-muted-foreground">
+                      Período: {new Date(`${campanha.data_inicio}T00:00:00`).toLocaleDateString("pt-BR")} - {new Date(`${campanha.data_fim}T00:00:00`).toLocaleDateString("pt-BR")}
+                    </p>
+                  </div>
+                  <Badge variant="secondary">Encerrada</Badge>
                 </div>
-                <Badge variant="secondary">Encerrada</Badge>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+            <div className="mt-4 border-t border-border pt-4">
+              <PainelPaginationBar page={pageE} totalPages={tpE} totalItems={tiE} onPageChange={setPageE} />
+            </div>
+          </>
         )}
       </div>
 

@@ -34,7 +34,8 @@ function isoFromDate(d: Date): string {
 export default function FinanceiroLancamentosPage() {
   const { setActivePage } = useActivePage();
   const { from: fromDefault, to: toDefault } = useMemo(() => financeiroListagemRangePadrao(), []);
-  const { rows, loading, error, reload, hasMore, loadMore } = useFinancialTransactionsPaginated(fromDefault, toDefault, 50);
+  const { rows, loading, error, reload, hasNextPage, hasPrevPage, goNextPage, goPrevPage, pageDisplay } =
+    useFinancialTransactionsPaginated(fromDefault, toDefault, 10);
 
   const [dialogOpen, setDialogOpen] = useState(false);
   /** null = criar novo; definido = editar lançamento manual existente */
@@ -385,10 +386,26 @@ export default function FinanceiroLancamentosPage() {
           </TableBody>
         </Table>
       </div>
-      {hasMore ? (
-        <Button type="button" variant="outline" className="self-center" disabled={loading} onClick={() => void loadMore()}>
-          {loading ? "A carregar…" : "Carregar mais"}
-        </Button>
+      {hasPrevPage || hasNextPage ? (
+        <div className="flex flex-col gap-3 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-muted-foreground">
+            Página <span className="font-medium text-foreground">{pageDisplay}</span>
+            {rows.length > 0 ? (
+              <>
+                {" "}
+                · <span className="font-medium text-foreground">{rows.length}</span> lançamentos nesta página
+              </>
+            ) : null}
+          </p>
+          <div className="flex items-center gap-2">
+            <Button type="button" variant="outline" size="sm" disabled={loading || !hasPrevPage} onClick={goPrevPage}>
+              Anterior
+            </Button>
+            <Button type="button" variant="outline" size="sm" disabled={loading || !hasNextPage} onClick={goNextPage}>
+              Próxima
+            </Button>
+          </div>
+        </div>
       ) : null}
       </div>
 

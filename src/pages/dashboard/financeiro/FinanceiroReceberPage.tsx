@@ -11,6 +11,8 @@ import {
   formatBRL,
   type FinanceiroPaymentMethod,
 } from "@/lib/financeiroFrota";
+import { usePainelListPagination } from "@/hooks/usePainelListPagination";
+import { PainelPaginationBar } from "@/components/painel/PainelPaginationBar";
 
 export default function FinanceiroReceberPage() {
   const { setActivePage } = useActivePage();
@@ -21,6 +23,8 @@ export default function FinanceiroReceberPage() {
     () => rows.filter((r) => r.kind === "receita" && (r.origin === "reserva_transfer" || r.origin === "reserva_grupo")),
     [rows],
   );
+
+  const { slice: receitasPage, page, setPage, totalPages, totalItems } = usePainelListPagination(receitasReserva);
 
   return (
     <div className="space-y-6 pb-8">
@@ -64,7 +68,7 @@ export default function FinanceiroReceberPage() {
                 </TableCell>
               </TableRow>
             ) : (
-              receitasReserva.map((r) => (
+              receitasPage.map((r) => (
                 <TableRow key={r.id}>
                   <TableCell className="whitespace-nowrap text-sm">
                     {new Date(r.occurred_on + "T12:00:00").toLocaleDateString("pt-BR")}
@@ -101,6 +105,11 @@ export default function FinanceiroReceberPage() {
             )}
           </TableBody>
         </Table>
+        {!loading && receitasReserva.length > 0 ? (
+          <div className="border-t border-border px-4 py-4">
+            <PainelPaginationBar page={page} totalPages={totalPages} totalItems={totalItems} onPageChange={setPage} />
+          </div>
+        ) : null}
       </div>
       <p className="text-xs text-muted-foreground">Para marcar como pago, use a página Lançamentos (ações por linha).</p>
     </div>

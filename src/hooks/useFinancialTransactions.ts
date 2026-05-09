@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { FINANCIAL_TRANSACTION_COLUMNS, type FinancialTransaction } from "@/lib/financeiroFrota";
 
@@ -63,20 +63,19 @@ export function useFinancialTransactions(
 }
 
 /**
- * Lista financeira com paginação por offset (ex.: Lançamentos).
- * Acrescenta páginas com `loadMore`; `reload` repõe do início.
+ * Lista financeira com paginação por página (ex.: Lançamentos), `pageSize` linhas por pedido ao servidor.
  */
 export function useFinancialTransactionsPaginated(
   from: string | undefined,
   to: string | undefined,
-  pageSize = 50,
+  pageSize = 10,
 ) {
   const [page, setPage] = useState(0);
   const [tick, setTick] = useState(0);
   const [rows, setRows] = useState<FinancialTransaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [hasMore, setHasMore] = useState(false);
+  const [hasNextPage, setHasNextPage] = useState(false);
 
   const runFetch = useCallback(async () => {
     setLoading(true);
@@ -94,24 +93,16 @@ export function useFinancialTransactionsPaginated(
       if (qErr) {
         setError(qErr.message);
         setRows([]);
-        setHasMore(false);
+        setHasNextPage(false);
         return;
       }
       const chunk = (data as FinancialTransaction[]) ?? [];
-      if (offset === 0) {
-        setRows(chunk);
-      } else {
-        setRows((prev) => {
-          const seen = new Set(prev.map((r) => r.id));
-          const extra = chunk.filter((r) => !seen.has(r.id));
-          return [...prev, ...extra];
-        });
-      }
-      setHasMore(chunk.length === pageSize);
+      setRows(chunk);
+      setHasNextPage(chunk.length === pageSize);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erro ao carregar");
       setRows([]);
-      setHasMore(false);
+      setHasNextPage(false);
     } finally {
       setLoading(false);
     }
@@ -121,15 +112,38 @@ export function useFinancialTransactionsPaginated(
     void runFetch();
   }, [runFetch]);
 
-  const loadMore = useCallback(() => {
-    if (!hasMore || loading) return;
+  /** Ao mudar o intervalo de datas, volta à primeira página antes do fetch. */
+  useLayoutEffect(() => {
+    setPage(0);
+  }, [from, to]);
+
+  const goNextPage = useCallback(() => {
+    if (!hasNextPage || loading) return;
     setPage((p) => p + 1);
-  }, [hasMore, loading]);
+  }, [hasNextPage, loading]);
+
+  const goPrevPage = useCallback(() => {
+    if (page <= 0 || loading) return;
+    setPage((p) => p - 1);
+  }, [page, loading]);
 
   const reload = useCallback(() => {
     setPage(0);
     setTick((t) => t + 1);
   }, []);
 
-  return { rows, loading, error, reload, hasMore, loadMore };
+  const hasPrevPage = page > 0;
+  const pageDisplay = page + 1;
+
+  return {
+    rows,
+    loading,
+    error,
+    reload,
+    hasNextPage,
+    hasPrevPage,
+    goNextPage,
+    goPrevPage,
+    pageDisplay,
+  };
 }

@@ -21,6 +21,8 @@ import { useUserPlan } from "@/hooks/useUserPlan";
 import { canUseMotoristaPortalLink } from "@/lib/painelPlanPolicy";
 import { freePlanLockedMotoristaCadastroIds } from "@/lib/freePlanLocks";
 import UpgradePlanDialog from "@/components/planos/UpgradePlanDialog";
+import { usePainelListPagination } from "@/hooks/usePainelListPagination";
+import { PainelPaginationBar } from "@/components/painel/PainelPaginationBar";
 
 type MotoristaCadastroRow = {
   id: string;
@@ -123,14 +125,21 @@ export default function MotoristaCadastrosPage() {
     void navigator.clipboard.writeText(u).then(() => toast.success("Link copiado."));
   };
 
-  const filtered = motoristas.filter((m) => {
-    const term = search.trim().toLowerCase();
-    if (!term) return true;
-    return (
-      (m.nome || "").toLowerCase().includes(term) ||
-      (m.cpf || "").toLowerCase().includes(term)
-    );
-  });
+  const filtered = useMemo(() => {
+    return motoristas.filter((m) => {
+      const term = search.trim().toLowerCase();
+      if (!term) return true;
+      return (
+        (m.nome || "").toLowerCase().includes(term) ||
+        (m.cpf || "").toLowerCase().includes(term)
+      );
+    });
+  }, [motoristas, search]);
+
+  const { slice: pageSlice, page, setPage, totalPages, totalItems } = usePainelListPagination(
+    filtered,
+    viewMode,
+  );
 
   const freeLockedMotoristaIds = useMemo(
     () => freePlanLockedMotoristaCadastroIds(plano, motoristas.map((m) => ({ id: m.id, created_at: m.created_at }))),
@@ -228,9 +237,11 @@ export default function MotoristaCadastrosPage() {
           <div className="flex items-center justify-center py-20 text-muted-foreground">A carregar…</div>
         ) : filtered.length === 0 ? (
           <div className="flex items-center justify-center py-20 text-muted-foreground">Nenhum motorista cadastrado.</div>
-        ) : viewMode === "grid" ? (
+        ) : (
+          <>
+            {viewMode === "grid" ? (
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {filtered.map((m) => {
+            {pageSlice.map((m) => {
               const situacao = situacaoFrotaFromWebhook(m.dados_webhook);
               const rowLocked = !planLoading && freeLockedMotoristaIds.has(m.id);
               return (
@@ -312,7 +323,7 @@ export default function MotoristaCadastrosPage() {
               );
             })}
           </div>
-        ) : (
+            ) : (
           <div className="overflow-x-auto rounded-xl border border-border bg-card">
             <table className="w-full min-w-[720px] text-sm">
               <thead className="bg-muted/40">
@@ -328,7 +339,7 @@ export default function MotoristaCadastrosPage() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((m) => {
+                {pageSlice.map((m) => {
                   const situacao = situacaoFrotaFromWebhook(m.dados_webhook);
                   const rowLocked = !planLoading && freeLockedMotoristaIds.has(m.id);
                   return (
@@ -412,6 +423,15 @@ export default function MotoristaCadastrosPage() {
               </tbody>
             </table>
           </div>
+            )}
+            <PainelPaginationBar
+              className="mt-4"
+              page={page}
+              totalPages={totalPages}
+              totalItems={totalItems}
+              onPageChange={setPage}
+            />
+          </>
         )}
 
         <CadastrarMotoristaDialog
