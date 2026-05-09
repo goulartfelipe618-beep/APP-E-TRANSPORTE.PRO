@@ -16,6 +16,7 @@ import { cn } from "@/lib/utils";
 import { useActivePage } from "@/contexts/ActivePageContext";
 import { useConfiguracoes } from "@/contexts/ConfiguracoesContext";
 import { usePanelTheme } from "@/hooks/usePanelTheme";
+import PainelZoomHeaderButton from "@/components/painel/PainelZoomHeaderButton";
 
 const simpleItems = [
   { title: "Abrangência", page: "abrangencia", icon: MapPin },
@@ -212,6 +213,7 @@ export function AdminSidebar() {
               )}
             </SidebarMenuButton>
           </SidebarMenuItem>
+          <PainelZoomHeaderButton />
           <SidebarMenuItem>
             <SidebarMenuButton className="w-full min-w-0" onClick={handleLogout}>
               <LogOut className="mr-2 h-4 w-4 shrink-0" />

@@ -32,6 +32,7 @@ import { persistNetworkHighlightDismissed } from "@/lib/networkNacionalPrefs";
 import { usePainelMotoristaEvolutionAtivo } from "@/hooks/usePainelMotoristaEvolutionAtivo";
 import { useUserPlan } from "@/hooks/useUserPlan";
 import { sidebarPlanBadgeLabel } from "@/lib/painelPlanPolicy";
+import PainelZoomHeaderButton from "@/components/painel/PainelZoomHeaderButton";
 
 function PlanMenuBadge({ label }: { label: "PRÓ" | "ST+" }) {
   const isPro = label === "PRÓ";
@@ -444,6 +445,7 @@ export function AppSidebar() {
               )}
             </SidebarMenuButton>
           </SidebarMenuItem>
+          <PainelZoomHeaderButton />
           <SidebarMenuItem>
             <SidebarMenuButton className="w-full min-w-0" onClick={handleLogout}>
               <LogOut className="mr-2 h-4 w-4 shrink-0" />

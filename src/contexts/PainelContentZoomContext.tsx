@@ -138,7 +138,7 @@ export function PainelContentZoomProvider({ children }: { children: ReactNode })
           /* ignore */
         }
         setZoomPercent(z);
-        toast.message("Zoom guardado neste dispositivo", {
+        toast.message("Zoom salvo neste dispositivo", {
           description: "Não foi possível sincronizar com o servidor; tente de novo mais tarde.",
         });
       } else {
@@ -148,7 +148,7 @@ export function PainelContentZoomProvider({ children }: { children: ReactNode })
         } catch {
           /* ignore */
         }
-        toast.success("Zoom da área principal guardado.");
+        toast.success("Zoom da área principal salvo.");
       }
       setDialogOpen(false);
     } finally {

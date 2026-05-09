@@ -31,7 +31,6 @@ import AdminVeiculosPage from "@/pages/admin/AdminVeiculosPage";
 import { usePainelErrorReporter } from "@/hooks/usePainelErrorReporter";
 import { useScrollPanelToTop } from "@/hooks/useScrollPanelToTop";
 import { PainelContentZoomProvider } from "@/contexts/PainelContentZoomContext";
-import PainelZoomHeaderButton from "@/components/painel/PainelZoomHeaderButton";
 import { PainelScaledContent } from "@/components/painel/PainelScaledContent";
 
 const PAGE_MAP: Record<string, React.ComponentType> = {
@@ -80,7 +79,6 @@ function AdminContent() {
           <span className="min-w-0 flex-1 truncate text-sm font-semibold text-foreground sm:ml-1">
             {config.nome_projeto || "Painel Admin Master"}
           </span>
-          <PainelZoomHeaderButton />
         </header>
         <main
           ref={mainRef}

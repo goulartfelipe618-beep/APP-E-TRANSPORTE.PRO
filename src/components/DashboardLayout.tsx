@@ -14,7 +14,6 @@ import { useMotoristaOnboarding } from "@/hooks/useMotoristaOnboarding";
 import { usePainelErrorReporter } from "@/hooks/usePainelErrorReporter";
 import { useScrollPanelToTop } from "@/hooks/useScrollPanelToTop";
 import { PainelContentZoomProvider } from "@/contexts/PainelContentZoomContext";
-import PainelZoomHeaderButton from "@/components/painel/PainelZoomHeaderButton";
 import { PainelScaledContent } from "@/components/painel/PainelScaledContent";
 
 // Import all page components
@@ -241,7 +240,6 @@ function DashboardContent() {
                 E-Transporte.pro — Gestão de Frota
               </span>
             </div>
-            <PainelZoomHeaderButton />
           </header>
           <PainelAvisoBanner painel="motorista" activePage={activePage} />
           <main

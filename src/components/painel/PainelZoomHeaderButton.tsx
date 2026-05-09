@@ -9,36 +9,44 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { SidebarMenuButton, SidebarMenuItem, useSidebar } from "@/components/ui/sidebar";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { clampPainelZoomPercent, usePainelContentZoom } from "@/contexts/PainelContentZoomContext";
+import { cn } from "@/lib/utils";
 
 /**
- * Controlo de zoom da área principal (desktop). Em telemóvel/tablet compacto não aparece.
+ * Zoom da área principal à direita (desktop). Fica no menu lateral, abaixo do tema claro/escuro.
+ * Em telemóvel não aparece (viewport do painel mantém-se fixo).
  */
 export default function PainelZoomHeaderButton() {
   const isMobile = useIsMobile();
+  const { state } = useSidebar();
+  const collapsed = state === "collapsed";
   const { dialogOpen, setDialogOpen, draftZoom, setDraftZoom, saveZoom, saving, zoomPercent } = usePainelContentZoom();
 
   if (isMobile) return null;
 
   return (
     <>
-      <div className="flex shrink-0 items-center gap-1.5">
-        <ZoomIn className="h-4 w-4 text-muted-foreground" aria-hidden />
-        <span className="hidden text-xs text-muted-foreground sm:inline">Zoom</span>
-        <Button
+      <SidebarMenuItem>
+        <SidebarMenuButton
           type="button"
-          variant="outline"
-          size="icon"
-          className="h-8 w-8 border-[#FF6600]/40 text-foreground hover:bg-[#FF6600]/10"
-          title="Ajustar zoom da área de conteúdo (portátil / desktop)"
+          className="w-full min-w-0"
           onClick={() => setDialogOpen(true)}
+          tooltip="Zoom da área principal (conteúdo à direita)"
         >
-          <PenLine className="h-4 w-4" />
-          <span className="sr-only">Editar zoom do painel</span>
-        </Button>
-        <span className="hidden text-xs tabular-nums text-muted-foreground md:inline">{zoomPercent}%</span>
-      </div>
+          <ZoomIn className="mr-2 h-4 w-4 shrink-0" />
+          {!collapsed ? (
+            <span className="flex min-w-0 flex-1 items-center justify-between gap-2">
+              <span className="min-w-0 truncate">Zoom</span>
+              <span className="flex shrink-0 items-center gap-1.5">
+                <span className="text-xs tabular-nums text-muted-foreground">{zoomPercent}%</span>
+                <PenLine className="h-4 w-4 shrink-0 text-[#FF6600]" aria-hidden />
+              </span>
+            </span>
+          ) : null}
+        </SidebarMenuButton>
+      </SidebarMenuItem>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-md border-border bg-card">
@@ -48,8 +56,8 @@ export default function PainelZoomHeaderButton() {
               Zoom da área principal
             </DialogTitle>
             <DialogDescription>
-              Reduzir a percentagem mostra mais colunas nas tabelas (efeito visual no painel à direita). O valor fica
-              guardado na sua conta até alterar novamente.
+              A percentagem aplica-se a todo o conteúdo à direita do menu. Após salvar, o valor permanece até você
+              alterar de novo.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
@@ -66,7 +74,7 @@ export default function PainelZoomHeaderButton() {
                 step={1}
                 value={draftZoom}
                 onChange={(e) => setDraftZoom(clampPainelZoomPercent(Number(e.target.value)))}
-                className="h-2 w-full cursor-pointer accent-[#FF6600]"
+                className={cn("h-2 w-full cursor-pointer accent-[#FF6600]")}
               />
               <p className="text-xs text-muted-foreground">Entre 70 % (mais conteúdo visível) e 100 % (tamanho normal).</p>
             </div>
@@ -81,7 +89,7 @@ export default function PainelZoomHeaderButton() {
               disabled={saving}
               onClick={() => void saveZoom()}
             >
-              {saving ? "A guardar…" : "Guardar"}
+              {saving ? "A salvar…" : "Salvar"}
             </Button>
           </DialogFooter>
         </DialogContent>
