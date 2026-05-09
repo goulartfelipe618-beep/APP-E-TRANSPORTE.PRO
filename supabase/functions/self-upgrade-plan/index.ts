@@ -5,7 +5,16 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const PAID = ["pro"] as const;
+const PAID = ["standart", "pro"] as const;
+
+function normalizePlano(raw: string | null | undefined): "free" | "standart" | "pro" {
+  if (!raw) return "free";
+  const p = String(raw).toLowerCase().trim();
+  if (p === "free") return "free";
+  if (p === "standart" || p === "standard") return "standart";
+  if (p === "pro" || ["seed", "grow", "rise", "apex", "premium"].includes(p)) return "pro";
+  return "free";
+}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -47,10 +56,13 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const raw = String(body.plano || "").toLowerCase().trim();
     if (!PAID.includes(raw as (typeof PAID)[number])) {
-      return new Response(JSON.stringify({ error: "Plano inválido. Utilize pro (plano PRÓ)." }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return new Response(
+        JSON.stringify({ error: "Plano inválido. Utilize standart ou pro (plano STANDART ou PRÓ)." }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
     }
     const plano = raw as (typeof PAID)[number];
 
@@ -81,16 +93,26 @@ Deno.serve(async (req) => {
       .eq("user_id", user.id)
       .maybeSingle();
 
-    if (planRow?.plano !== "free") {
+    const current = normalizePlano(planRow?.plano as string | undefined);
+
+    if (current === "pro") {
       return new Response(
         JSON.stringify({
-          error: "Alteração automática disponível apenas para o plano FREE. Use o suporte para outros casos.",
+          error: "A sua conta já está no plano PRÓ.",
         }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
-    const { error: upErr } = await supabaseAdmin.from("user_plans").upsert(
+    if (current === "standart" && plano !== "pro") {
+      return new Response(
+        JSON.stringify({
+          error: "Com plano STANDART, só pode migrar para PRÓ por este fluxo. Contacte o suporte para voltar ao FREE.",
+        }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
       { user_id: user.id, plano, updated_at: new Date().toISOString() },
       { onConflict: "user_id" },
     );

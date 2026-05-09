@@ -11,9 +11,13 @@ import ComunicarDialog from "@/components/comunicar/ComunicarDialog";
 import { generateSolicitacaoTransferPDF } from "@/lib/pdfGenerator";
 import { Tables } from "@/integrations/supabase/types";
 import { SolicitacoesCapturaExternaInfo } from "@/components/solicitacoes/SolicitacoesCapturaExternaInfo";
+import { useUserPlan } from "@/hooks/useUserPlan";
+import { pageAllowedForPlan } from "@/lib/painelPlanPolicy";
+import PlanLockedScreen from "@/components/planos/PlanLockedScreen";
 
 type Solicitacao = Tables<"solicitacoes_transfer">;
 export default function TransferSolicitacoesPage() {
+  const { plano, loading: planLoading } = useUserPlan();
   const [solicitacoes, setSolicitacoes] = useState<Solicitacao[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Solicitacao | null>(null);
@@ -88,6 +92,20 @@ export default function TransferSolicitacoesPage() {
     setComunicarDados(s);
     setComunicarOpen(true);
   };
+
+  if (planLoading) {
+    return <div className="flex justify-center py-20 text-sm text-muted-foreground">A carregar…</div>;
+  }
+  if (!pageAllowedForPlan(plano, "transfer/solicitacoes")) {
+    return (
+      <PlanLockedScreen
+        plano={plano}
+        required="pro"
+        title="Solicitações — Transfer"
+        description="Pipeline de pedidos, orçamentos e conversão em reservas."
+      />
+    );
+  }
 
   return (
     <div className="space-y-6">

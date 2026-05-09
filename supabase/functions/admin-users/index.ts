@@ -166,8 +166,11 @@ Deno.serve(async (req) => {
 
       // Create plan record (only for non-admin_master)
       if (role !== "admin_master") {
-        const validPlans = ["free", "pro"];
-        const userPlano = validPlans.includes(plano) ? plano : "pro";
+        const validPlans = ["free", "standart", "pro"] as const;
+        const rawPlano = String(plano ?? "").toLowerCase().trim();
+        const userPlano = (validPlans as readonly string[]).includes(rawPlano)
+          ? rawPlano
+          : "free";
         await supabaseAdmin.from("user_plans").insert({
           user_id: newUser.user.id,
           plano: userPlano,
@@ -186,8 +189,8 @@ Deno.serve(async (req) => {
         return new Response(JSON.stringify({ error: "user_id e plano são obrigatórios" }), { status: 400, headers: corsHeaders });
       }
 
-      if (!["free", "pro"].includes(plano)) {
-        return new Response(JSON.stringify({ error: "Plano inválido. Use free ou pro." }), { status: 400, headers: corsHeaders });
+      if (!["free", "standart", "pro"].includes(plano)) {
+        return new Response(JSON.stringify({ error: "Plano inválido. Use free, standart ou pro." }), { status: 400, headers: corsHeaders });
       }
 
       const { data: targetRoles } = await supabaseAdmin
@@ -198,7 +201,7 @@ Deno.serve(async (req) => {
       const roles = (targetRoles || []).map((r: { role: string }) => r.role);
       if (roles.includes("admin_master")) {
         return new Response(
-          JSON.stringify({ error: "Não é possível definir plano FREE/PRÓ para a conta de administrador master." }),
+          JSON.stringify({ error: "Não é possível definir plano de assinatura para a conta de administrador master." }),
           { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } },
         );
       }
@@ -231,11 +234,11 @@ Deno.serve(async (req) => {
         });
       }
 
-      const paidPlans = ["pro"] as const;
+      const paidPlans = ["standart", "pro"] as const;
       const planoFinal = String(bodyPlano || "").toLowerCase().trim();
       if (!paidPlans.includes(planoFinal as (typeof paidPlans)[number])) {
         return new Response(
-          JSON.stringify({ error: "plano é obrigatório: pro (plano PRÓ)" }),
+          JSON.stringify({ error: "plano é obrigatório: standart (STANDART) ou pro (PRÓ)" }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
         );
       }

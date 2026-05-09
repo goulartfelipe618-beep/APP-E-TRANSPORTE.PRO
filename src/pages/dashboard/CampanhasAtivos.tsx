@@ -15,6 +15,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { getLocalDateYmd } from "@/lib/localCalendarDate";
 import { toast } from "sonner";
 import { SolicitacoesCapturaExternaInfo } from "@/components/solicitacoes/SolicitacoesCapturaExternaInfo";
+import { useUserPlan } from "@/hooks/useUserPlan";
+import { pageAllowedForPlan } from "@/lib/painelPlanPolicy";
+import PlanLockedScreen from "@/components/planos/PlanLockedScreen";
 
 const CAMPAIGN_COLORS = [
   "#3B82F6", "#10B981", "#F43F5E", "#F59E0B",
@@ -22,6 +25,7 @@ const CAMPAIGN_COLORS = [
 ];
 
 export default function CampanhasAtivosPage() {
+  const { plano, loading: planLoading } = useUserPlan();
   const [open, setOpen] = useState(false);
   const [selectedColor, setSelectedColor] = useState(CAMPAIGN_COLORS[0]);
   const [nome, setNome] = useState("");
@@ -185,6 +189,20 @@ export default function CampanhasAtivosPage() {
 
   const campanhasAtivas = campanhas.filter((c) => c.status !== "encerrada");
   const campanhasEncerradas = campanhas.filter((c) => c.status === "encerrada");
+
+  if (planLoading) {
+    return <div className="flex justify-center py-20 text-sm text-muted-foreground">A carregar…</div>;
+  }
+  if (!pageAllowedForPlan(plano, "campanhas/ativos")) {
+    return (
+      <PlanLockedScreen
+        plano={plano}
+        required="standart"
+        title="Campanhas — Ativos"
+        description="Crie e gira campanhas com webhooks dedicados e período de captação."
+      />
+    );
+  }
 
   return (
     <div className="space-y-6">

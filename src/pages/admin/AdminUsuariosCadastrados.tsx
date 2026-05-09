@@ -46,7 +46,7 @@ export default function AdminUsuariosCadastrados() {
   const [formEmail, setFormEmail] = useState("");
   const [formPassword, setFormPassword] = useState("");
   const [formRole, setFormRole] = useState("");
-  const [formPlano, setFormPlano] = useState<PlanType>("pro");
+  const [formPlano, setFormPlano] = useState<PlanType>("free");
   const [creating, setCreating] = useState(false);
   const [updatingPlan, setUpdatingPlan] = useState(false);
   const [deleteUserId, setDeleteUserId] = useState<string | null>(null);
@@ -134,7 +134,7 @@ export default function AdminUsuariosCadastrados() {
       setFormEmail("");
       setFormPassword("");
       setFormRole("");
-      setFormPlano("pro");
+      setFormPlano("free");
       fetchUsers();
     }
     setCreating(false);
@@ -353,7 +353,7 @@ export default function AdminUsuariosCadastrados() {
               <Select value={formRole} onValueChange={(v) => {
                 setFormRole(v);
                 if (v === "admin_master") setFormPlano("free");
-                if (v === "admin_transfer") setFormPlano("pro");
+                if (v === "admin_transfer") setFormPlano("free");
               }}>
                 <SelectTrigger><SelectValue placeholder="Selecione o tipo" /></SelectTrigger>
                 <SelectContent>
@@ -388,7 +388,7 @@ export default function AdminUsuariosCadastrados() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Crown className="h-5 w-5 text-primary" />
-              Alterar plano (FREE ↔ PRÓ)
+              Alterar plano (FREE, STANDART ou PRÓ)
             </DialogTitle>
             <DialogDescription>
               Atualiza o plano deste utilizador na plataforma. Não está disponível para a conta de administrador master.
@@ -409,7 +409,7 @@ export default function AdminUsuariosCadastrados() {
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground mt-1">
-                Pode alternar entre FREE (limitado) e PRÓ (painel completo) quando necessário. Alterar o plano não apaga dados do utilizador — apenas restringe ou liberta o acesso às funções.
+                Pode atribuir FREE, STANDART ou PRÓ. Alterar o plano não apaga dados — apenas restringe ou liberta o acesso às funções.
               </p>
             </div>
             <Button onClick={handleUpdatePlan} disabled={updatingPlan} className="w-full">

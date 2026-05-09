@@ -33,6 +33,8 @@ import AcompanharRastreioDialog from "@/components/geolocalizacao/AcompanharRast
 import DetalhesViagemRastreioSheet from "@/components/geolocalizacao/DetalhesViagemRastreioSheet";
 import { buildRastreioShareUrl } from "@/lib/appPublicUrl";
 import { formatDbCalendarDatePtBr, toAgendaDayKey } from "@/lib/painelAgendaReservas";
+import { normalizeUserPlano, FREE_MAX_LINKS_GEO_MES } from "@/lib/painelPlanPolicy";
+import { currentYearMonthKeySaoPaulo, yearMonthKeySaoPauloFromIso } from "@/lib/spCalendarBr";
 
 type ReservaTransfer = Tables<"reservas_transfer">;
 type ReservaGrupo = Tables<"reservas_grupos">;
@@ -262,6 +264,27 @@ export default function TransferGeolocalizacaoPage() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Sessão expirada.");
+
+      const { data: up } = await supabase.from("user_plans").select("plano").eq("user_id", user.id).maybeSingle();
+      const p = normalizeUserPlano(up?.plano);
+      if (p === "free") {
+        const since = new Date(Date.now() - 62 * 24 * 60 * 60 * 1000).toISOString();
+        const { data: geoRows, error: geoErr } = await supabase
+          .from("rastreios_ao_vivo")
+          .select("created_at")
+          .eq("user_id", user.id)
+          .gte("created_at", since);
+        if (geoErr) {
+          throw new Error("Não foi possível validar o limite mensal de links.");
+        }
+        const ym = currentYearMonthKeySaoPaulo();
+        const countMes = (geoRows ?? []).filter((r) => yearMonthKeySaoPauloFromIso(r.created_at) === ym).length;
+        if (countMes >= FREE_MAX_LINKS_GEO_MES) {
+          throw new Error(
+            `Plano FREE: no máximo ${FREE_MAX_LINKS_GEO_MES} links de rastreamento por mês. Faça upgrade para STANDART ou PRÓ.`,
+          );
+        }
+      }
 
       const nomeCliente =
         nomeOpcional.trim() ||

@@ -405,7 +405,7 @@ export default function WebsitePage() {
       toast.error("Selecione um modelo primeiro.");
       return;
     }
-    if (plano === "free") {
+    if (plano !== "pro") {
       setUpgradeOpen(true);
       return;
     }
@@ -696,7 +696,7 @@ export default function WebsitePage() {
                   toast.error("Selecione um domínio já cadastrado ou registre um novo no menu Domínios.");
                   return;
                 }
-                if (plano === "free") {
+                if (plano !== "pro") {
                   setUpgradeOpen(true);
                   return;
                 }
@@ -1103,7 +1103,7 @@ export default function WebsitePage() {
                   toast.error("Volte à etapa anterior e selecione um domínio.");
                   return;
                 }
-                if (plano === "free") {
+                if (plano !== "pro") {
                   setUpgradeOpen(true);
                   return;
                 }

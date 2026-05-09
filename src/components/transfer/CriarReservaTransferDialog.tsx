@@ -17,6 +17,8 @@ import { RESERVA_STATUS_OPTIONS } from "@/lib/reservaStatus";
 import { toAgendaDayKey } from "@/lib/painelAgendaReservas";
 import MapboxNormalizeAddressField from "@/components/mapbox/MapboxNormalizeAddressField";
 import { isMapboxConfigured } from "@/lib/mapboxGeocode";
+import { normalizeUserPlano, FREE_MAX_RESERVAS_DIA } from "@/lib/painelPlanPolicy";
+import { calendarDayKeySaoPauloFromIso, todayKeySaoPaulo } from "@/lib/spCalendarBr";
 
 function toDateInput(v: string | null | undefined): string {
   return toAgendaDayKey(v) ?? "";
@@ -325,6 +327,31 @@ export default function CriarReservaTransferDialog({
       toast.error("Selecione um cliente cadastrado ou mude para NOVO CLIENTE.");
       setSaving(false);
       return;
+    }
+
+    if (!reservaEdicao?.id) {
+      const { data: up } = await supabase.from("user_plans").select("plano").eq("user_id", user.id).maybeSingle();
+      const p = normalizeUserPlano(up?.plano);
+      if (p === "free") {
+        const since = new Date(Date.now() - 72 * 60 * 60 * 1000).toISOString();
+        const { data: recent, error: cErr } = await supabase
+          .from("reservas_transfer")
+          .select("created_at")
+          .eq("user_id", user.id)
+          .gte("created_at", since);
+        if (cErr) {
+          toast.error("Não foi possível validar o limite diário de reservas.");
+          setSaving(false);
+          return;
+        }
+        const today = todayKeySaoPaulo();
+        const countDay = (recent ?? []).filter((r) => calendarDayKeySaoPauloFromIso(r.created_at) === today).length;
+        if (countDay >= FREE_MAX_RESERVAS_DIA) {
+          toast.error(`Plano FREE: no máximo ${FREE_MAX_RESERVAS_DIA} reservas de transfer por dia.`);
+          setSaving(false);
+          return;
+        }
+      }
     }
 
     let cadastroClienteIdOut: string | null = null;

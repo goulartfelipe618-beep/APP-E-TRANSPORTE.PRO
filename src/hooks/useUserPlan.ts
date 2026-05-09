@@ -1,37 +1,42 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  normalizeUserPlano as normalizePlano,
+  planMeetsMinimum,
+  type PlanType,
+} from "@/lib/painelPlanPolicy";
+
+export type { PlanType };
 
 /**
- * Plano do utilizador (`user_plans.plano`). Alterar entre FREE e PRÓ não deve apagar dados —
- * apenas UI e permissões de escrita em áreas PRÓ; ver README «Plano FREE e PRÓ (retenção de dados)».
+ * Plano do utilizador (`user_plans.plano`). Alterar o plano não apaga dados —
+ * apenas UI e permissões; ver README «Plano FREE e PRÓ (retenção de dados)».
  */
-export type PlanType = "free" | "pro";
+export const PLAN_ORDER: PlanType[] = ["free", "standart", "pro"];
 
-export const PLAN_ORDER: PlanType[] = ["free", "pro"];
-
-/** Único plano pago (PRÓ) — usado no admin ao finalizar leads e criar utilizadores. */
-export const PLANS_PAID_ORDER: PlanType[] = ["pro"];
+/** Planos pagos (admin: finalizar lead, fluxos comerciais). */
+export const PLANS_PAID_ORDER: PlanType[] = ["standart", "pro"];
 
 export const PLAN_LABELS: Record<PlanType, string> = {
   free: "FREE",
+  standart: "STANDART",
   pro: "PRÓ",
 };
 
 export const PLAN_COLORS: Record<PlanType, string> = {
   free: "bg-muted text-muted-foreground",
+  standart: "bg-sky-500/10 text-sky-800 border-sky-500/30 dark:text-sky-300",
   pro: "bg-amber-500/10 text-amber-700 border-amber-500/30 dark:text-amber-400",
 };
 
-const LEGACY_PAID = new Set(["seed", "grow", "rise", "apex"]);
+export const PLAN_PRICE_LABELS: Record<PlanType, string> = {
+  free: "R$ 0,00",
+  standart: "R$ 69,90",
+  pro: "R$ 89,90",
+};
 
-/** Normaliza valores em `user_plans` (inclui legado seed/grow/rise/apex → pro). */
 export function normalizeUserPlano(raw: string | null | undefined): PlanType {
-  if (!raw) return "free";
-  const p = String(raw).toLowerCase().trim();
-  if (p === "free") return "free";
-  if (p === "pro") return "pro";
-  if (LEGACY_PAID.has(p)) return "pro";
-  return "free";
+  return normalizePlano(raw);
 }
 
 export function useUserPlan() {
@@ -48,7 +53,7 @@ export function useUserPlan() {
       return;
     }
     const { data } = await supabase.from("user_plans").select("plano").eq("user_id", user.id).maybeSingle();
-    setPlano(normalizeUserPlano(data?.plano));
+    setPlano(normalizePlano(data?.plano));
     setLoading(false);
   }, []);
 
@@ -57,11 +62,14 @@ export function useUserPlan() {
     void refetch();
   }, [refetch]);
 
-  /** `free` — qualquer utilizador; `pro` — apenas plano PRÓ. */
+  /**
+   * `hasPlan("free")` — sempre true.
+   * `hasPlan("standart")` — STANDART ou PRÓ.
+   * `hasPlan("pro")` — apenas PRÓ.
+   */
   const hasPlan = (required: PlanType) => {
     if (required === "free") return true;
-    if (required === "pro") return plano === "pro";
-    return false;
+    return planMeetsMinimum(plano, required);
   };
 
   return { plano, loading, hasPlan, refetch };

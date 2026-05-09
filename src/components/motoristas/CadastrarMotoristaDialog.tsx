@@ -20,6 +20,7 @@ import {
 } from "@/lib/ibgeLocalidades";
 import { fetchViaCep } from "@/lib/viaCep";
 import { uploadMotoristaFrotaDocs, type MotoristaFrotaDocSlug } from "@/lib/motoristaFrotaStorage";
+import { normalizeUserPlano, FREE_MAX_MOTORISTAS_CADASTRADOS } from "@/lib/painelPlanPolicy";
 
 const CNH_CATEGORIAS = ["A", "ACC", "B", "C", "D", "E", "AB", "AD", "AE"] as const;
 
@@ -404,6 +405,26 @@ export default function CadastrarMotoristaDialog({ open, onOpenChange, onCreated
       return;
     }
 
+    const assertFreeMotoristaSlot = async (): Promise<boolean> => {
+      const { data: up } = await supabase.from("user_plans").select("plano").eq("user_id", user.id).maybeSingle();
+      const p = normalizeUserPlano(up?.plano);
+      if (p !== "free") return true;
+      const { count, error } = await supabase
+        .from("solicitacoes_motoristas")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", user.id)
+        .eq("status", "cadastrado");
+      if (error) {
+        toast.error("Não foi possível validar o limite de motoristas.");
+        return false;
+      }
+      if ((count ?? 0) >= FREE_MAX_MOTORISTAS_CADASTRADOS) {
+        toast.error(`Plano FREE: no máximo ${FREE_MAX_MOTORISTAS_CADASTRADOS} motoristas cadastrados.`);
+        return false;
+      }
+      return true;
+    };
+
     if (isEditExisting && initialData?.cadastro_row_id) {
       let dadosWebhookFinal: Json = dadosWebhookObj as unknown as Json;
       const uploads: Partial<Record<MotoristaFrotaDocSlug, File>> = {};
@@ -452,6 +473,10 @@ export default function CadastrarMotoristaDialog({ open, onOpenChange, onCreated
     }
 
     if (isCompletarLead && initialData?.completar_lead_id) {
+      if (!(await assertFreeMotoristaSlot())) {
+        setSaving(false);
+        return;
+      }
       const updatePayload: MotoristaUpdate = {
         nome: nome.trim(),
         cpf: cpf.replace(/\D/g, "") || null,
@@ -513,6 +538,11 @@ export default function CadastrarMotoristaDialog({ open, onOpenChange, onCreated
       setSaving(false);
       onOpenChange(false);
       onCreated?.();
+      return;
+    }
+
+    if (!(await assertFreeMotoristaSlot())) {
+      setSaving(false);
       return;
     }
 

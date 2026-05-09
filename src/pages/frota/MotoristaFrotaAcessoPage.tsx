@@ -18,10 +18,40 @@ function mapAuthError(message: string): string {
   return message;
 }
 
+function parsePortalProOnlyFromFunctionsError(
+  error: unknown,
+  data: unknown,
+): string | null {
+  const d = data as { error?: string; message?: string } | null | undefined;
+  if (d?.error === "portal_pro_only") {
+    return d.message || "Este link só está ativo com o plano PRÓ na conta da frota.";
+  }
+  const errObj = error as { context?: { body?: unknown } } | null;
+  const body = errObj?.context?.body;
+  if (typeof body === "string") {
+    try {
+      const j = JSON.parse(body) as { error?: string; message?: string };
+      if (j.error === "portal_pro_only") {
+        return j.message || "Este link só está ativo com o plano PRÓ na conta da frota.";
+      }
+    } catch {
+      /* noop */
+    }
+  }
+  if (body && typeof body === "object" && body !== null && "error" in body) {
+    const j = body as { error?: string; message?: string };
+    if (j.error === "portal_pro_only") {
+      return j.message || "Este link só está ativo com o plano PRÓ na conta da frota.";
+    }
+  }
+  return null;
+}
+
 export default function MotoristaFrotaAcessoPage() {
   const { token } = useParams<{ token: string }>();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
+  const [planBlockedMessage, setPlanBlockedMessage] = useState<string | null>(null);
   const [nome, setNome] = useState("");
   const [registered, setRegistered] = useState(false);
   const [loginEmail, setLoginEmail] = useState<string | null>(null);
@@ -43,6 +73,7 @@ export default function MotoristaFrotaAcessoPage() {
 
   useEffect(() => {
     void (async () => {
+      setPlanBlockedMessage(null);
       if (!token) {
         setLoading(false);
         return;
@@ -52,11 +83,19 @@ export default function MotoristaFrotaAcessoPage() {
         registered?: boolean;
         login_email?: string | null;
         error?: string;
+        message?: string;
       }>("motorista-frota-portal", {
         method: "POST",
         body: { action: "status", token },
       });
       setLoading(false);
+
+      const blocked = parsePortalProOnlyFromFunctionsError(error, data);
+      if (blocked) {
+        setPlanBlockedMessage(blocked);
+        return;
+      }
+
       if (error || data?.error) {
         toast.error(data?.error || error?.message || "Link inválido.");
         return;
@@ -80,10 +119,18 @@ export default function MotoristaFrotaAcessoPage() {
     }
     setBusy(true);
     try {
-      const { data, error } = await supabase.functions.invoke<{ email?: string; error?: string }>("motorista-frota-portal", {
-        method: "POST",
-        body: { action: "bootstrap", token, password },
-      });
+      const { data, error } = await supabase.functions.invoke<{ email?: string; error?: string; message?: string }>(
+        "motorista-frota-portal",
+        {
+          method: "POST",
+          body: { action: "bootstrap", token, password },
+        },
+      );
+      const blocked = parsePortalProOnlyFromFunctionsError(error, data);
+      if (blocked) {
+        setPlanBlockedMessage(blocked);
+        return;
+      }
       if (error || data?.error) {
         toast.error(data?.error || error?.message || "Erro ao criar conta.");
         return;
@@ -146,6 +193,24 @@ export default function MotoristaFrotaAcessoPage() {
     return (
       <div className="flex min-h-screen min-h-[100dvh] items-center justify-center bg-background p-4">
         <p className="text-sm text-muted-foreground">Link inválido.</p>
+      </div>
+    );
+  }
+
+  if (planBlockedMessage) {
+    return (
+      <div className="flex min-h-screen min-h-[100dvh] items-center justify-center bg-muted/30 p-4">
+        <Card className="w-full max-w-md border-border shadow-lg">
+          <CardHeader>
+            <CardTitle className="text-xl">Acesso temporariamente indisponível</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4 text-sm text-muted-foreground">
+            <p>{planBlockedMessage}</p>
+            <p className="text-xs">
+              O dono da frota precisa do plano <strong className="text-foreground">PRÓ</strong> para ativar o mini painel do motorista neste link.
+            </p>
+          </CardContent>
+        </Card>
       </div>
     );
   }

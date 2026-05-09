@@ -9,8 +9,12 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { SolicitacoesCapturaExternaInfo } from "@/components/solicitacoes/SolicitacoesCapturaExternaInfo";
+import { useUserPlan } from "@/hooks/useUserPlan";
+import { pageAllowedForPlan } from "@/lib/painelPlanPolicy";
+import PlanLockedScreen from "@/components/planos/PlanLockedScreen";
 
 export default function CampanhasLeadsPage() {
+  const { plano, loading: planLoading } = useUserPlan();
   const [loading, setLoading] = useState(true);
   const [campaignFilter, setCampaignFilter] = useState("all");
   const [search, setSearch] = useState("");
@@ -96,6 +100,20 @@ export default function CampanhasLeadsPage() {
     link.remove();
     URL.revokeObjectURL(url);
   };
+
+  if (planLoading) {
+    return <div className="flex justify-center py-20 text-sm text-muted-foreground">A carregar…</div>;
+  }
+  if (!pageAllowedForPlan(plano, "campanhas/leads")) {
+    return (
+      <PlanLockedScreen
+        plano={plano}
+        required="standart"
+        title="Campanhas — Leads"
+        description="Leads captados pelos webhooks das suas campanhas ativas."
+      />
+    );
+  }
 
   return (
     <div className="space-y-6">

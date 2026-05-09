@@ -15,6 +15,9 @@ import {
 import { downloadMotoristaDossierPdf } from "@/lib/motoristaDossierPdf";
 import { getMotoristaVerificacaoAppOrigin } from "@/lib/appPublicUrl";
 import { toast } from "sonner";
+import { useUserPlan } from "@/hooks/useUserPlan";
+import { canUseMotoristaPortalLink } from "@/lib/painelPlanPolicy";
+import UpgradePlanDialog from "@/components/planos/UpgradePlanDialog";
 
 export interface MotoristaFrotaDetalheRow {
   id: string;
@@ -84,6 +87,9 @@ export default function DetalhesMotoristaFrotaSheet({
   onRequestResetSenhaPortal,
 }: Props) {
   const [docBundle, setDocBundle] = useState<MotoristaFrotaDocUrlBundle>(emptyDocBundle);
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
+  const { plano, loading: planLoading } = useUserPlan();
+  const portalLinkPermitido = !planLoading && canUseMotoristaPortalLink(plano);
 
   useEffect(() => {
     if (!open || !motorista) {
@@ -206,8 +212,9 @@ export default function DetalhesMotoristaFrotaSheet({
   };
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="flex w-full flex-col overflow-hidden border-l border-border p-0 sm:max-w-xl">
+    <>
+      <Sheet open={open} onOpenChange={onOpenChange}>
+        <SheetContent className="flex w-full flex-col overflow-hidden border-l border-border p-0 sm:max-w-xl">
         <div className="border-b border-border bg-card px-6 pb-4 pt-6">
           <SheetHeader className="space-y-3 text-left">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -400,43 +407,67 @@ export default function DetalhesMotoristaFrotaSheet({
 
             <div className="space-y-3 border-t border-border pt-3 text-xs text-muted-foreground">
               <p>Cadastrado em {new Date(motorista.created_at).toLocaleString("pt-BR")}</p>
-              <div className="rounded-lg border border-border bg-muted/20 p-3 text-foreground">
-                <p className="mb-2 flex items-center gap-2 font-medium text-foreground">
-                  <Link2 className="h-3.5 w-3.5 text-[#FF6600]" />
-                  Portal do motorista
-                </p>
-                <p className="mb-3 text-muted-foreground">
-                  {motorista.portal_auth_user_id ? "Senha já definida — pode redefinir abaixo se necessário." : "Partilhe o link para o motorista definir a primeira senha."}
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  <Button type="button" variant="outline" size="sm" className="h-8 text-xs" onClick={copyPortalLink}>
-                    <Copy className="mr-1 h-3 w-3" />
-                    Copiar link
-                  </Button>
-                  {onRequestResetSenhaPortal ? (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="h-8 border-[#FF6600]/40 text-xs text-[#FF6600] hover:bg-[#FF6600]/10"
-                      disabled={!motorista.portal_auth_user_id}
-                      onClick={() => motorista.portal_auth_user_id && onRequestResetSenhaPortal(motorista)}
-                      title={
-                        motorista.portal_auth_user_id
-                          ? "Redefinir senha do mini painel (só o dono da frota)"
-                          : "Disponível após o motorista ativar o link"
-                      }
-                    >
-                      <KeyRound className="mr-1 h-3 w-3" />
-                      Redefinir senha
+              {planLoading ? (
+                <div className="rounded-lg border border-border bg-muted/20 p-3 text-foreground">A carregar plano…</div>
+              ) : portalLinkPermitido ? (
+                <div className="rounded-lg border border-border bg-muted/20 p-3 text-foreground">
+                  <p className="mb-2 flex items-center gap-2 font-medium text-foreground">
+                    <Link2 className="h-3.5 w-3.5 text-[#FF6600]" />
+                    Portal do motorista
+                  </p>
+                  <p className="mb-3 text-muted-foreground">
+                    {motorista.portal_auth_user_id ? "Senha já definida — pode redefinir abaixo se necessário." : "Partilhe o link para o motorista definir a primeira senha."}
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <Button type="button" variant="outline" size="sm" className="h-8 text-xs" onClick={copyPortalLink}>
+                      <Copy className="mr-1 h-3 w-3" />
+                      Copiar link
                     </Button>
-                  ) : null}
+                    {onRequestResetSenhaPortal ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-8 border-[#FF6600]/40 text-xs text-[#FF6600] hover:bg-[#FF6600]/10"
+                        disabled={!motorista.portal_auth_user_id}
+                        onClick={() => motorista.portal_auth_user_id && onRequestResetSenhaPortal(motorista)}
+                        title={
+                          motorista.portal_auth_user_id
+                            ? "Redefinir senha do mini painel (só o dono da frota)"
+                            : "Disponível após o motorista ativar o link"
+                        }
+                      >
+                        <KeyRound className="mr-1 h-3 w-3" />
+                        Redefinir senha
+                      </Button>
+                    ) : null}
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="rounded-lg border border-border bg-muted/20 p-3 text-foreground">
+                  <p className="mb-2 flex items-center gap-2 font-medium text-foreground">
+                    <Link2 className="h-3.5 w-3.5 text-[#FF6600]" />
+                    Mini painel do motorista
+                  </p>
+                  <p className="mb-3 text-muted-foreground">
+                    O link e o acesso ao portal do motorista estão disponíveis no plano PRÓ. No STANDART pode cadastrar motoristas à vontade; ative o PRÓ para partilhar o link com segurança.
+                  </p>
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="h-8 bg-[#FF6600] text-xs text-white hover:bg-[#e65c00]"
+                    onClick={() => setUpgradeOpen(true)}
+                  >
+                    Ver planos
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
         </div>
       </SheetContent>
     </Sheet>
+    <UpgradePlanDialog open={upgradeOpen} onOpenChange={setUpgradeOpen} />
+    </>
   );
 }

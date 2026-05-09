@@ -22,6 +22,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { buildWebhookSolicitacaoUrl } from "@/lib/webhookSolicitacaoUrl";
 import FerramentasDevDialog from "@/components/automacoes/FerramentasDevDialog";
 import { ConfirmDeleteDialog } from "@/components/ConfirmDeleteDialog";
+import { useUserPlan } from "@/hooks/useUserPlan";
+import { pageAllowedForPlan } from "@/lib/painelPlanPolicy";
+import PlanLockedScreen from "@/components/planos/PlanLockedScreen";
 
 type DeleteIntent =
   | { kind: "automacao"; id: string }
@@ -181,6 +184,7 @@ function FieldMappingList({
 }
 
 export default function SistemaAutomacoesPage() {
+  const { plano, loading: planLoading } = useUserPlan();
   const { getFields, loaded: camposLoaded } = useCamposConfig();
   const [open, setOpen] = useState(false);
   const [devToolsOpen, setDevToolsOpen] = useState(false);
@@ -497,6 +501,20 @@ export default function SistemaAutomacoesPage() {
     toast.success("Mapeamento salvo com sucesso!");
     setCampaignFieldLocked(true);
   };
+
+  if (planLoading) {
+    return <div className="flex justify-center py-20 text-sm text-muted-foreground">A carregar…</div>;
+  }
+  if (!pageAllowedForPlan(plano, "sistema/automacoes")) {
+    return (
+      <PlanLockedScreen
+        plano={plano}
+        required="pro"
+        title="Automações"
+        description="Webhooks, mapeamentos de campos e integrações com formulários e sistemas externos."
+      />
+    );
+  }
 
   // Detail view
   if (selected) {

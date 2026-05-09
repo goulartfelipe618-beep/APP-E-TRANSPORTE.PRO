@@ -1,20 +1,84 @@
 import { useEffect, useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Loader2 } from "lucide-react";
+import { Loader2, Check } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { PLAN_LABELS, PLAN_PRICE_LABELS, type PlanType } from "@/hooks/useUserPlan";
 
-/** Arte oficial FREE vs PRÓ (ficheiro em `public/planos/plano-pro-comparacao.png`). */
-const PLANO_COMPARACAO_SRC = "/planos/plano-pro-comparacao.png";
-
-const MIGRAR_PLANO_PRO_WEBHOOK =
+const MIGRAR_PLANO_WEBHOOK =
   "https://n8n.e-transporte.pro/webhook/961260a3-709a-4aba-a810-dbd255875fb3";
 
 interface UpgradePlanDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+}
+
+const FREE_FEATURES = [
+  "Painel completo e Financeiro",
+  "Transfer e Grupos — Reservas (até 3 por dia)",
+  "Motoristas — até 3 cadastros",
+  "Clientes ilimitados",
+  "Geolocalização — até 3 links/mês",
+  "Receptivos e QR Codes ilimitados",
+  "Network, Comunidade, Disparador e Empty Legs (beta)",
+  "Anotações e Suporte",
+];
+
+const STANDART_FEATURES = [
+  "Tudo do FREE, com reservas e motoristas ilimitados",
+  "Contratos Transfer e Grupos",
+  "Campanhas (Ativos e Leads)",
+  "Link do mini painel do motorista continua a exigir PRÓ",
+];
+
+const PRO_FEATURES = [
+  "Tudo do STANDART",
+  "Solicitações (Transfer, Grupos e Motoristas)",
+  "Link do mini painel do motorista ativo",
+  "E-mail Business, Website, Domínios",
+  "Automações",
+  "Prioridade nas integrações premium",
+];
+
+function PlanCard({
+  tier,
+  highlight,
+  features,
+}: {
+  tier: PlanType;
+  highlight?: boolean;
+  features: string[];
+}) {
+  return (
+    <div
+      className={cn(
+        "flex flex-col rounded-xl border p-4 sm:p-5",
+        highlight
+          ? "border-[#FF6600]/60 bg-[#FF6600]/10 shadow-[0_0_0_1px_rgba(255,102,0,0.15)]"
+          : "border-neutral-700 bg-neutral-900/80",
+      )}
+    >
+      <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+        <h3 className="text-lg font-bold tracking-tight text-white">{PLAN_LABELS[tier]}</h3>
+        <p className="text-xl font-semibold text-[#FF6600]">{PLAN_PRICE_LABELS[tier]}</p>
+      </div>
+      <p className="mb-3 text-xs text-neutral-400">
+        {tier === "free" && "Entrada na plataforma com limites claros para operação diária."}
+        {tier === "standart" && "Operação completa com contratos e marketing de campanhas."}
+        {tier === "pro" && "Suite premium: solicitações, portal do motorista e canais digitais."}
+      </p>
+      <ul className="flex-1 space-y-2">
+        {features.map((f) => (
+          <li key={f} className="flex gap-2 text-sm text-neutral-200">
+            <Check className="mt-0.5 h-4 w-4 shrink-0 text-[#FF6600]" aria-hidden />
+            <span>{f}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
 }
 
 export default function UpgradePlanDialog({ open, onOpenChange }: UpgradePlanDialogProps) {
@@ -58,9 +122,10 @@ export default function UpgradePlanDialog({ open, onOpenChange }: UpgradePlanDia
         endereco_completo: cfg?.endereco_completo ?? "",
         origem: "upgrade_plan_dialog",
         enviado_em: new Date().toISOString(),
+        mensagem: "Pedido de upgrade / informação sobre planos FREE, STANDART ou PRÓ.",
       };
 
-      const res = await fetch(MIGRAR_PLANO_PRO_WEBHOOK, {
+      const res = await fetch(MIGRAR_PLANO_WEBHOOK, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -72,7 +137,7 @@ export default function UpgradePlanDialog({ open, onOpenChange }: UpgradePlanDia
         return;
       }
 
-      toast.success("Em breve um dos administradores entrará em contato para alterar o seu plano.");
+      toast.success("Em breve um dos administradores entrará em contacto para o plano pretendido.");
       onOpenChange(false);
     } catch (e) {
       console.error(e);
@@ -87,30 +152,29 @@ export default function UpgradePlanDialog({ open, onOpenChange }: UpgradePlanDia
       <DialogContent
         showCloseButton={false}
         className={cn(
-          "max-h-[min(94vh,920px)] w-[min(100vw-1rem,min(92vw,560px))] max-w-[min(100vw-1rem,min(92vw,560px))] gap-0 overflow-hidden p-0 sm:rounded-xl",
+          "max-h-[min(94vh,920px)] w-[min(100vw-1rem,min(92vw,720px))] max-w-[min(100vw-1rem,min(92vw,720px))] gap-0 overflow-hidden p-0 sm:rounded-xl",
           "border-neutral-800 bg-neutral-950",
         )}
       >
         <DialogHeader className="sr-only">
-          <DialogTitle>Plano PRÓ — comparação FREE e PRÓ</DialogTitle>
-          <DialogDescription>
-            Funcionalidade disponível no plano PRÓ. Imagem comparativa dos benefícios FREE e PRÓ.
-          </DialogDescription>
+          <DialogTitle>Planos FREE, STANDART e PRÓ</DialogTitle>
+          <DialogDescription>Comparativo de funcionalidades e preços mensais.</DialogDescription>
         </DialogHeader>
 
-        <div className="max-h-[min(72vh,720px)] overflow-y-auto overflow-x-hidden bg-neutral-950">
-          <img
-            src={PLANO_COMPARACAO_SRC}
-            alt="Comparação Plano FREE e Plano PRÓ: benefícios, preços R$ 0,00 e R$ 49,90, e nota sobre ferramentas BETA."
-            className="block h-auto w-full max-w-full object-top object-contain"
-            loading="eager"
-            decoding="async"
-          />
+        <div className="max-h-[min(70vh,680px)] overflow-y-auto border-b border-neutral-800 bg-neutral-950 px-4 py-5 sm:px-6">
+          <p className="mb-4 text-center text-sm text-neutral-300">
+            Escolha o plano que melhor encaixa na sua operação. O administrador confirma e ativa na sua conta.
+          </p>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <PlanCard tier="free" features={FREE_FEATURES} />
+            <PlanCard tier="standart" features={STANDART_FEATURES} />
+            <PlanCard tier="pro" highlight features={PRO_FEATURES} />
+          </div>
         </div>
 
-        <div className="space-y-3 border-t border-neutral-800 bg-neutral-950 px-4 py-4 sm:px-6 sm:py-5">
+        <div className="space-y-3 bg-neutral-950 px-4 py-4 sm:px-6 sm:py-5">
           <p className="text-center text-xs text-neutral-400">
-            Se o PRÓ terminar, os seus dados na plataforma não são apagados — apenas o acesso às funções premium fica suspenso até renovar.
+            Se o plano pago terminar, os seus dados não são apagados — o acesso às funções premium fica suspenso até renovar.
           </p>
           <div className="flex flex-col gap-2 sm:flex-row sm:justify-center sm:gap-3">
             <Button
@@ -124,7 +188,7 @@ export default function UpgradePlanDialog({ open, onOpenChange }: UpgradePlanDia
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" /> A enviar…
                 </>
               ) : (
-                "MIGRAR PARA PLANO PRÓ"
+                "Pedir STANDART ou PRÓ"
               )}
             </Button>
             <Button
@@ -134,7 +198,7 @@ export default function UpgradePlanDialog({ open, onOpenChange }: UpgradePlanDia
               disabled={submitting}
               onClick={() => onOpenChange(false)}
             >
-              FECHAR
+              Fechar
             </Button>
           </div>
         </div>

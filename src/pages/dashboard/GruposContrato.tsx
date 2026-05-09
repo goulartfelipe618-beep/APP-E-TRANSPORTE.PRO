@@ -8,6 +8,9 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import CabecalhoContratual from "@/components/contratos/CabecalhoContratual";
 import ContratoComoPdfPreview from "@/components/contratos/ContratoComoPdfPreview";
+import { useUserPlan } from "@/hooks/useUserPlan";
+import { pageAllowedForPlan } from "@/lib/painelPlanPolicy";
+import PlanLockedScreen from "@/components/planos/PlanLockedScreen";
 
 const DEFAULT_MODELO = `1. DAS PARTES
 1.1. O presente contrato é celebrado entre as partes abaixo qualificadas.
@@ -40,6 +43,7 @@ const DEFAULT_CLAUSULAS = `CLÁUSULAS ADICIONAIS
 8.5. É proibido o consumo de bebidas alcoólicas e alimentos que possam danificar o veículo.`;
 
 export default function GruposContratoPage() {
+  const { plano, loading: planLoading } = useUserPlan();
   const [modelo, setModelo] = useState(DEFAULT_MODELO);
   const [politica, setPolitica] = useState(DEFAULT_POLITICA);
   const [clausulas, setClausulas] = useState(DEFAULT_CLAUSULAS);
@@ -114,6 +118,20 @@ export default function GruposContratoPage() {
       toast.success(next ? "Contrato incluído no PDF de confirmação." : "Contrato removido do PDF de confirmação.");
     }
   };
+
+  if (planLoading) {
+    return <div className="flex justify-center py-20 text-sm text-muted-foreground">A carregar…</div>;
+  }
+  if (!pageAllowedForPlan(plano, "grupos/contrato")) {
+    return (
+      <PlanLockedScreen
+        plano={plano}
+        required="standart"
+        title="Contrato — Grupos"
+        description="Modelos de contrato e políticas para PDF de confirmação de reservas de grupo."
+      />
+    );
+  }
 
   return (
     <div className="space-y-6">

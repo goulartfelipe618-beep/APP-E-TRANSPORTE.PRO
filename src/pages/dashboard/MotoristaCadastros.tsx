@@ -17,6 +17,9 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { useUserPlan } from "@/hooks/useUserPlan";
+import { canUseMotoristaPortalLink } from "@/lib/painelPlanPolicy";
+import UpgradePlanDialog from "@/components/planos/UpgradePlanDialog";
 
 type MotoristaCadastroRow = {
   id: string;
@@ -62,6 +65,8 @@ function situacaoFrotaFromWebhook(dw: Json | null): "ativo" | "inativo" {
 
 export default function MotoristaCadastrosPage() {
   /** `list` = tabela (predefinido); `grid` = cards */
+  const { plano, loading: planLoading } = useUserPlan();
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
   const [viewMode, setViewMode] = useState<"grid" | "list">("list");
   const [cadastroDialogOpen, setCadastroDialogOpen] = useState(false);
   const [cadastroInitial, setCadastroInitial] = useState<MotoristaInitialData | null>(null);
@@ -107,6 +112,11 @@ export default function MotoristaCadastrosPage() {
     typeof window !== "undefined" ? `${window.location.origin}/frota/acesso/${token}` : "";
 
   const copyPortalLink = (token: string) => {
+    if (!planLoading && !canUseMotoristaPortalLink(plano)) {
+      toast.message("O link do mini painel do motorista está disponível no plano PRÓ.");
+      setUpgradeOpen(true);
+      return;
+    }
     const u = portalUrl(token);
     if (!u) return;
     void navigator.clipboard.writeText(u).then(() => toast.success("Link copiado."));
@@ -136,9 +146,14 @@ export default function MotoristaCadastrosPage() {
           </div>
           <Button
             onClick={() => {
+              if (!planLoading && plano === "free" && motoristas.length >= 3) {
+                toast.error("Plano FREE: no máximo 3 motoristas cadastrados.");
+                return;
+              }
               setCadastroInitial(null);
               setCadastroDialogOpen(true);
             }}
+            disabled={!planLoading && plano === "free" && motoristas.length >= 3}
           >
             <Plus className="mr-2 h-4 w-4" /> Novo motorista
           </Button>
@@ -394,6 +409,8 @@ export default function MotoristaCadastrosPage() {
           motoristaId={resetSenhaMotorista?.id ?? null}
           motoristaNome={resetSenhaMotorista?.nome}
         />
+
+        <UpgradePlanDialog open={upgradeOpen} onOpenChange={setUpgradeOpen} />
       </div>
     </TooltipProvider>
   );

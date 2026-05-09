@@ -48,7 +48,7 @@ export default function ComunicadorMotoristaExecutivoPage() {
   const { plano, loading: planLoading } = useUserPlan();
   const { sistema, own, loading, reload, setOwn } = useComunicadoresEvolution();
   const [upgradeOpen, setUpgradeOpen] = useState(false);
-  const planoFree = !planLoading && plano === "free";
+  const planoSemPro = !planLoading && plano !== "pro";
 
   const [qrSession, setQrSession] = useState(false);
   const [sessionDeadline, setSessionDeadline] = useState<number | null>(null);
@@ -185,7 +185,7 @@ export default function ComunicadorMotoristaExecutivoPage() {
   }, [qrSession, sessionDeadline, clearTimers]);
 
   const handleConectarAgora = useCallback(async () => {
-    if (plano === "free") {
+    if (plano !== "pro") {
       toast.message("Conectar o seu WhatsApp próprio está disponível no plano PRÓ (Premium).");
       setUpgradeOpen(true);
       return;
@@ -294,7 +294,7 @@ export default function ComunicadorMotoristaExecutivoPage() {
         </Button>
       </div>
 
-      {planoFree ? (
+      {planoSemPro ? (
         <Alert className="border-[#FF6600]/45 bg-[#FF6600]/10 text-foreground">
           <Sparkles className="h-4 w-4 text-[#FF6600]" />
           <AlertTitle className="text-foreground">WhatsApp no seu número</AlertTitle>
@@ -422,24 +422,24 @@ export default function ComunicadorMotoristaExecutivoPage() {
           <CardHeader>
             <CardTitle className="text-lg">WhatsApp próprio</CardTitle>
             <CardDescription>
-              {planoFree
+              {planoSemPro
                 ? "No plano FREE pode consultar a linha oficial acima. Para ligar o seu próprio WhatsApp por QR Code, migre para o plano PRÓ (Premium)."
                 : "Clique no botão abaixo para abrir o QR Code e conectar seu WhatsApp."}
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm text-muted-foreground">
-              {planoFree
+              {planoSemPro
                 ? "O botão de conexão fica disponível após a migração de plano, apenas na sua conta."
                 : "O QR será exibido nesta tela e ficará válido por "}
-              {!planoFree ? (
+              {!planoSemPro ? (
                 <>
                   <strong className="text-foreground">10 minutos</strong>.
                 </>
               ) : null}
             </p>
             <div className="flex shrink-0 flex-wrap gap-2">
-              {planoFree ? (
+              {planoSemPro ? (
                 <Button type="button" variant="outline" onClick={() => setUpgradeOpen(true)}>
                   Migrar para PRÓ
                 </Button>
@@ -448,7 +448,7 @@ export default function ComunicadorMotoristaExecutivoPage() {
                 type="button"
                 className="bg-[#FF6600] text-white hover:bg-[#FF6600]/90"
                 onClick={() => void handleConectarAgora()}
-                disabled={busyQr || loading || planoFree}
+                disabled={busyQr || loading || planoSemPro}
               >
                 {busyQr ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Smartphone className="mr-2 h-4 w-4" />}
                 CONECTAR O QR CODE

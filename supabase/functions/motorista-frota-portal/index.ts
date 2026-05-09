@@ -29,6 +29,38 @@ function validatePortalPassword(password: string): string | null {
   return null;
 }
 
+function normalizePlanoForEdge(raw: string | null | undefined): "free" | "standart" | "pro" {
+  if (!raw) return "free";
+  const p = String(raw).toLowerCase().trim();
+  if (p === "free") return "free";
+  if (p === "standart" || p === "standard") return "standart";
+  if (p === "pro" || ["seed", "grow", "rise", "apex", "premium"].includes(p)) return "pro";
+  return "free";
+}
+
+async function assertFrotaOwnerProPlan(
+  supabaseAdmin: ReturnType<typeof createClient>,
+  ownerUserId: string,
+): Promise<Response | null> {
+  const { data: planRow } = await supabaseAdmin
+    .from("user_plans")
+    .select("plano")
+    .eq("user_id", ownerUserId)
+    .maybeSingle();
+  const tier = normalizePlanoForEdge(planRow?.plano as string | undefined);
+  if (tier !== "pro") {
+    return new Response(
+      JSON.stringify({
+        error: "portal_pro_only",
+        message:
+          "O mini painel do motorista só está disponível com o plano PRÓ ativo na conta da frota. Contacte o administrador.",
+      }),
+      { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
+  }
+  return null;
+}
+
 type BodyBootstrap = {
   token: string;
   password: string;
@@ -66,7 +98,7 @@ Deno.serve(async (req) => {
 
         const { data: row, error } = await supabaseAdmin
           .from("solicitacoes_motoristas")
-          .select("id, nome, portal_auth_user_id, portal_login_email, status")
+          .select("id, nome, portal_auth_user_id, portal_login_email, status, user_id")
           .eq("portal_token", token)
           .eq("status", "cadastrado")
           .maybeSingle();
@@ -77,6 +109,9 @@ Deno.serve(async (req) => {
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
         }
+
+        const blocked = await assertFrotaOwnerProPlan(supabaseAdmin, row.user_id as string);
+        if (blocked) return blocked;
 
         const syntheticEmail = `frota.${String(row.id).replace(/-/g, "")}@motorista-frota.local`;
         const loginEmailResolved =
@@ -125,6 +160,9 @@ Deno.serve(async (req) => {
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
         }
+
+        const blockedBoot = await assertFrotaOwnerProPlan(supabaseAdmin, row.user_id as string);
+        if (blockedBoot) return blockedBoot;
 
         if (row.portal_auth_user_id) {
           return new Response(JSON.stringify({ error: "Este cadastro já tem senha definida. Use o login." }), {

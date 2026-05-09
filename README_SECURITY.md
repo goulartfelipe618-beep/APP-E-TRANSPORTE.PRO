@@ -94,9 +94,9 @@ Isto reduz uploads maliciosos disfarçados de imagem e alinha-se às boas práti
 ## Planos (`user_plans`)
 
 - Valores persistidos: **`free`** e **`pro`** (legados `seed` / `grow` / `rise` / `apex` são normalizados no cliente e migrados no Postgres para `pro`; ver `supabase/migrations/20260430220000_user_plans_free_pro.sql`).
-- **FREE → PRÓ** pelo utilizador: Edge Function `self-upgrade-plan` com JWT; só a partir de `free`; escrita em `user_plans` no servidor com **service role** (não confiar só no menu do browser).
-- **Admin:** `admin-users` (`update_plan`, `finalize_landing_lead`) valida `free` | `pro`; FREE não é atribuído manualmente a utilizadores já em Cadastrados (regra de negócio).
-- O menu do motorista executivo restringe páginas no cliente (`frotaPlanFreePages`); **não substitui RLS** — dados sensíveis seguem protegidos por políticas nas tabelas.
+- **Upgrade de plano** pelo utilizador: Edge Function `self-upgrade-plan` com JWT; a partir de `free` para `standart` ou `pro`, ou de `standart` para `pro`; escrita em `user_plans` no servidor com **service role** (não confiar só no menu do browser).
+- **Admin:** `admin-users` (`update_plan`, `finalize_landing_lead`) valida `free` | `standart` | `pro`; FREE não é atribuído manualmente a utilizadores já em Cadastrados (regra de negócio).
+- O menu do motorista executivo restringe páginas no cliente (`painelPlanPolicy`); **não substitui RLS** — dados sensíveis seguem protegidos por políticas nas tabelas.
 
 ---
 

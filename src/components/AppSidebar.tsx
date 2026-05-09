@@ -31,25 +31,23 @@ import { useActivePage } from "@/contexts/ActivePageContext";
 import { persistNetworkHighlightDismissed } from "@/lib/networkNacionalPrefs";
 import { usePainelMotoristaEvolutionAtivo } from "@/hooks/usePainelMotoristaEvolutionAtivo";
 import { useUserPlan } from "@/hooks/useUserPlan";
-import { isFrotaFreePage } from "@/lib/frotaPlanFreePages";
+import { sidebarPlanBadgeLabel } from "@/lib/painelPlanPolicy";
 
-function ProBadge() {
+function PlanMenuBadge({ label }: { label: "PRÓ" | "ST+" }) {
+  const isPro = label === "PRÓ";
   return (
-    <span className="inline-flex shrink-0 items-center rounded bg-amber-500/20 px-1.5 py-0.5 text-[10px] font-bold uppercase leading-none tracking-wide text-amber-800 dark:text-amber-300">
-      PRÓ
+    <span
+      className={cn(
+        "inline-flex shrink-0 items-center rounded px-1.5 py-0.5 text-[10px] font-bold uppercase leading-none tracking-wide",
+        isPro
+          ? "bg-amber-500/20 text-amber-800 dark:text-amber-300"
+          : "bg-sky-500/20 text-sky-900 dark:text-sky-200",
+      )}
+    >
+      {label}
     </span>
   );
 }
-
-/** Páginas onde não exibimos o badge PRÓ ao lado do item (plano FREE). */
-const PAGINAS_SEM_BADGE_PRO = new Set<string>([
-  "transfer/geolocalizacao",
-  "disparador",
-  "sistema/comunicador",
-  "network",
-  "campanhas/ativos",
-  "campanhas/leads",
-]);
 
 function readNetworkSpotlightHighlight() {
   if (typeof window === "undefined") return false;
@@ -192,12 +190,21 @@ export function AppSidebar() {
   const { painelMotoristaEvolutionAtivo, ready: painelComunicadorReady } = usePainelMotoristaEvolutionAtivo();
   const exibirComunicadorMotorista = !painelComunicadorReady || painelMotoristaEvolutionAtivo;
   const { plano, loading: planLoading } = useUserPlan();
-  const freeRestricted = !planLoading && plano === "free";
-  const proOnly = (page: string) => !isFrotaFreePage(page);
-  const mostrarBadgePro = (page: string) =>
-    freeRestricted && proOnly(page) && !PAGINAS_SEM_BADGE_PRO.has(page);
-  const groupHasProOnlyChild = (children: { page: string }[]) =>
-    children.some((c) => proOnly(c.page) && !PAGINAS_SEM_BADGE_PRO.has(c.page));
+  const badgeForPage = (page: string) => (planLoading ? null : sidebarPlanBadgeLabel(plano, page));
+  const mostrarBadgePlano = (page: string) => badgeForPage(page) !== null;
+  const groupMenuBadge = (children: { page: string }[]): "PRÓ" | "ST+" | null => {
+    if (planLoading) return null;
+    let hasPro = false;
+    let hasSt = false;
+    for (const c of children) {
+      const b = sidebarPlanBadgeLabel(plano, c.page);
+      if (b === "PRÓ") hasPro = true;
+      if (b === "ST+") hasSt = true;
+    }
+    if (hasPro) return "PRÓ";
+    if (hasSt) return "ST+";
+    return null;
+  };
 
   useEffect(() => {
     const handler = () => {
@@ -301,11 +308,14 @@ export function AppSidebar() {
                               <div className="flex w-full min-w-0 items-center justify-between gap-1">
                                 <span className="flex min-w-0 flex-1 items-center gap-2">
                                   <item.icon className="h-4 w-4 shrink-0" />
-                                  {freeRestricted && groupHasProOnlyChild(item.children) ? (
-                                    <span className="shrink-0">
-                                      <ProBadge />
-                                    </span>
-                                  ) : null}
+                                  {(() => {
+                                    const gb = groupMenuBadge(item.children);
+                                    return gb ? (
+                                      <span className="shrink-0">
+                                        <PlanMenuBadge label={gb} />
+                                      </span>
+                                    ) : null;
+                                  })()}
                                   {!collapsed && (
                                     <span className="truncate text-left">{item.title}</span>
                                   )}
@@ -329,9 +339,9 @@ export function AppSidebar() {
                                       isActive(child.page) && "text-primary font-medium"
                                     )}
                                   >
-                                    {mostrarBadgePro(child.page) ? (
+                                    {mostrarBadgePlano(child.page) ? (
                                       <span className="mr-1.5 shrink-0">
-                                        <ProBadge />
+                                        <PlanMenuBadge label={badgeForPage(child.page)!} />
                                       </span>
                                     ) : null}
                                     <child.icon className="mr-2 h-3.5 w-3.5 shrink-0" />
@@ -368,9 +378,9 @@ export function AppSidebar() {
                             "bg-sidebar text-foreground ring-2 ring-primary shadow-md rounded-md",
                         )}
                       >
-                        {mostrarBadgePro(page) ? (
+                        {mostrarBadgePlano(page) ? (
                           <span className="mr-1.5 shrink-0">
-                            <ProBadge />
+                            <PlanMenuBadge label={badgeForPage(page)!} />
                           </span>
                         ) : null}
                         <item.icon className="mr-2 h-4 w-4 shrink-0" />

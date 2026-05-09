@@ -286,7 +286,7 @@ async function checkDomainAvailability(fqdn: string): Promise<{
 
 export default function DominiosPage() {
   const { plano, refetch: refetchPlano } = useUserPlan();
-  const freePlanReadOnly = plano === "free";
+  const proMarketingLocked = plano !== "pro";
   const [upgradeOpen, setUpgradeOpen] = useState(false);
   const [rows, setRows] = useState<DominioRowView[]>([]);
   const [loading, setLoading] = useState(true);
@@ -447,7 +447,7 @@ export default function DominiosPage() {
   };
 
   const openDialog = () => {
-    if (freePlanReadOnly) {
+    if (proMarketingLocked) {
       setUpgradeOpen(true);
       return;
     }
@@ -680,7 +680,7 @@ export default function DominiosPage() {
         {roleResolved && !isAdminMaster && (
           <Button type="button" onClick={openDialog} className="shrink-0 gap-2">
             <Plus className="h-4 w-4" />
-            {freePlanReadOnly ? "Cadastro de domínio" : "Registrar um novo domínio"}
+            {proMarketingLocked ? "Cadastro de domínio" : "Registrar um novo domínio"}
           </Button>
         )}
       </div>

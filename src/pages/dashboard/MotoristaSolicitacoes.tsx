@@ -11,6 +11,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { SolicitacoesCapturaExternaInfo } from "@/components/solicitacoes/SolicitacoesCapturaExternaInfo";
 import type { Json } from "@/integrations/supabase/types";
+import { useUserPlan } from "@/hooks/useUserPlan";
+import { pageAllowedForPlan } from "@/lib/painelPlanPolicy";
+import PlanLockedScreen from "@/components/planos/PlanLockedScreen";
 
 type SolicitacaoRow = {
   id: string;
@@ -73,6 +76,7 @@ function leadToCompletarInitialData(m: SolicitacaoRow): MotoristaInitialData {
 }
 
 export default function MotoristaSolicitacoesPage() {
+  const { plano, loading: planLoading } = useUserPlan();
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [rows, setRows] = useState<SolicitacaoRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -130,6 +134,20 @@ export default function MotoristaSolicitacoesPage() {
     setCadastroInitial(leadToCompletarInitialData(m));
     setCadastroOpen(true);
   };
+
+  if (planLoading) {
+    return <div className="flex justify-center py-20 text-sm text-muted-foreground">A carregar…</div>;
+  }
+  if (!pageAllowedForPlan(plano, "motoristas/solicitacoes")) {
+    return (
+      <PlanLockedScreen
+        plano={plano}
+        required="pro"
+        title="Solicitações — Motoristas"
+        description="Candidatos e leads do webhook de motoristas para completar cadastro na frota."
+      />
+    );
+  }
 
   return (
     <div className="space-y-6">
