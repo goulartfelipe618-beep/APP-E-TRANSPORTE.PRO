@@ -15,8 +15,11 @@ export function PainelScaledContent({ children, className }: { children: ReactNo
     return <div className={cn("min-w-0", className)}>{children}</div>;
   }
 
+  // O filho usa width > 100 % + scale() para caber visualmente na coluna; isso alarga a caixa de layout.
+  // overflow-x-auto aqui gerava scroll horizontal “fantasma” (área vazia). Escondemos o excesso de layout;
+  // tabelas largas mantêm scroll nos respetivos wrappers (overflow-x-auto) dentro da página.
   return (
-    <div className={cn("min-w-0 overflow-x-auto", className)}>
+    <div className={cn("min-w-0 w-full max-w-full overflow-x-hidden", className)}>
       <div
         className="origin-top-left will-change-transform"
         style={{
