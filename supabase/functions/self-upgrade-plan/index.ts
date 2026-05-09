@@ -113,6 +113,7 @@ Deno.serve(async (req) => {
       );
     }
 
+    const { error: upErr } = await supabaseAdmin.from("user_plans").upsert(
       { user_id: user.id, plano, updated_at: new Date().toISOString() },
       { onConflict: "user_id" },
     );
