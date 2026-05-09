@@ -12,7 +12,6 @@ import { Label } from "@/components/ui/label";
 import { SidebarMenuButton, SidebarMenuItem, useSidebar } from "@/components/ui/sidebar";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { clampPainelZoomPercent, usePainelContentZoom } from "@/contexts/PainelContentZoomContext";
-import { cn } from "@/lib/utils";
 
 /**
  * Zoom da área principal à direita (desktop). Fica no menu lateral, abaixo do tema claro/escuro.
@@ -74,7 +73,7 @@ export default function PainelZoomHeaderButton() {
                 step={1}
                 value={draftZoom}
                 onChange={(e) => setDraftZoom(clampPainelZoomPercent(Number(e.target.value)))}
-                className={cn("h-2 w-full cursor-pointer accent-[#FF6600]")}
+                className="h-2 w-full cursor-pointer accent-[#FF6600]"
               />
               <p className="text-xs text-muted-foreground">Entre 70 % (mais conteúdo visível) e 100 % (tamanho normal).</p>
             </div>
