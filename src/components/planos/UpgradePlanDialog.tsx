@@ -6,9 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { PLAN_LABELS, PLAN_PRICE_LABELS, type PlanType } from "@/hooks/useUserPlan";
-
-const MIGRAR_PLANO_WEBHOOK =
-  "https://n8n.e-transporte.pro/webhook/961260a3-709a-4aba-a810-dbd255875fb3";
+import { buildUpgradePlanWebhookPayload, getMigrarPlanoWebhookUrl } from "@/lib/migrarPlanoWebhook";
 
 interface UpgradePlanDialogProps {
   open: boolean;
@@ -118,23 +116,16 @@ export default function UpgradePlanDialog({
         return;
       }
 
-      const payload = {
-        user_id: user.id,
-        nome_completo: cfg?.nome_completo ?? "",
-        email: cfg?.email ?? user.email ?? "",
-        telefone: cfg?.telefone ?? "",
-        nome_empresa: cfg?.nome_empresa ?? "",
-        cnpj: cfg?.cnpj ?? "",
-        endereco_completo: cfg?.endereco_completo ?? "",
-        origem: "upgrade_plan_dialog",
-        enviado_em: new Date().toISOString(),
-        mensagem: "Pedido de upgrade / informação sobre planos FREE, STANDART ou PRÓ.",
-      };
+      const built = buildUpgradePlanWebhookPayload(user.id, user.email ?? undefined, cfg);
+      if (!built.ok) {
+        toast.error(built.error);
+        return;
+      }
 
-      const res = await fetch(MIGRAR_PLANO_WEBHOOK, {
+      const res = await fetch(getMigrarPlanoWebhookUrl(), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(built.payload),
       });
 
       if (!res.ok) {
