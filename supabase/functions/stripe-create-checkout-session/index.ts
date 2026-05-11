@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { z } from "https://esm.sh/zod@3.23.8";
 import {
   normalizeBillingCycle,
   resolvePriceId,
@@ -10,6 +11,23 @@ const corsHeaders = {
 };
 
 const PAID = ["standart", "pro"] as const;
+
+const checkoutBodySchema = z.object({
+  plano: z.preprocess(
+    (v) => String(v ?? "").toLowerCase().trim(),
+    z.enum(PAID),
+  ),
+  ciclo: z.string().min(1).max(64),
+});
+
+/** Garante placeholder Stripe para correlacionar o retorno ao Checkout Session (recomendado pela Stripe). */
+function withCheckoutSessionIdInSuccessUrl(successUrl: string): string {
+  const u = successUrl.trim();
+  if (!u) return u;
+  if (u.includes("{CHECKOUT_SESSION_ID}")) return u;
+  const join = u.includes("?") ? "&" : "?";
+  return `${u}${join}session_id={CHECKOUT_SESSION_ID}`;
+}
 
 function normalizePlano(raw: string | null | undefined): "free" | "standart" | "pro" {
   if (!raw) return "free";
@@ -95,17 +113,17 @@ Deno.serve(async (req) => {
       });
     }
 
-    const body = await req.json().catch(() => ({}));
-    const raw = String(body.plano || "").toLowerCase().trim();
-    if (!PAID.includes(raw as (typeof PAID)[number])) {
+    const rawBody = await req.json().catch(() => ({}));
+    const parsed = checkoutBodySchema.safeParse(rawBody);
+    if (!parsed.success) {
       return new Response(
-        JSON.stringify({ error: "Plano inválido. Utilize standart ou pro." }),
+        JSON.stringify({ error: "Pedido inválido. Envie plano (standart | pro) e ciclo de faturação." }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
-    const plano = raw as (typeof PAID)[number];
+    const plano = parsed.data.plano;
 
-    const cicloRaw = normalizeBillingCycle(body.ciclo);
+    const cicloRaw = normalizeBillingCycle(parsed.data.ciclo);
     if (!cicloRaw) {
       return new Response(
         JSON.stringify({
@@ -116,9 +134,10 @@ Deno.serve(async (req) => {
     }
     const ciclo = cicloRaw;
 
-    const successUrl = Deno.env.get("STRIPE_CHECKOUT_SUCCESS_URL")?.trim();
+    const baseSuccessUrl = Deno.env.get("STRIPE_CHECKOUT_SUCCESS_URL")?.trim() ?? "";
+    const successUrl = withCheckoutSessionIdInSuccessUrl(baseSuccessUrl);
     const cancelUrl = Deno.env.get("STRIPE_CHECKOUT_CANCEL_URL")?.trim();
-    if (!successUrl || !cancelUrl) {
+    if (!baseSuccessUrl || !cancelUrl) {
       return new Response(
         JSON.stringify({
           error: "Pagamentos não configurados no servidor (URLs de retorno STRIPE_CHECKOUT_*).",

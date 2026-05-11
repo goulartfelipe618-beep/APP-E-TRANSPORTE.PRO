@@ -22,7 +22,7 @@ Qualquer variável `VITE_*` vai parar ao bundle público: **proibido** para segr
 |------|--------|
 | Migração SQL | Colunas `billing_manual_override`, `stripe_customer_id`, `stripe_subscription_id` em `user_plans`; tabela `stripe_webhook_events` (idempotência). |
 | `stripe-create-checkout-session` | POST com JWT; corpo `{ plano, ciclo }` (`monthly` \| `quarterly` \| `semiannual` \| `annual`); metadata com `supabase_user_id` e `billing_cycle`. |
-| `stripe-webhook` | Valida `Stripe-Signature`; processa `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`. |
+| `stripe-webhook` | Valida `Stripe-Signature`; processa `checkout.session.completed`, `checkout.session.async_payment_succeeded` / `async_payment_failed`, `customer.subscription.updated`, `customer.subscription.deleted`. |
 | `admin-users` (`update_plan`) | `allow_stripe_billing`: se `false`, activa `billing_manual_override` — **admin_master** tem controlo total; webhooks ignoram esse utilizador. |
 | `self-upgrade-plan` | Se `STRIPE_SECRET_KEY` + preços estão definidos, **bloqueia** upgrade pago sem checkout. |
 | Painel | `VITE_STRIPE_BILLING_ENABLED=true` mostra botões «Subscrever»; retorno `?billing=success` actualiza o plano no ecrã. |
@@ -77,6 +77,8 @@ O webhook é configurado **no site da Stripe**, não no Supabase. A Stripe envia
 3. **Description** (opcional): `Supabase stripe-webhook`.
 4. **Events to send** → **Select events** e marque:
    - `checkout.session.completed`
+   - `checkout.session.async_payment_succeeded` (métodos com confirmação diferida; ex.: alguns débitos)
+   - `checkout.session.async_payment_failed`
    - `customer.subscription.updated`
    - `customer.subscription.deleted`
 5. **Add endpoint**.
@@ -90,7 +92,7 @@ O webhook é configurado **no site da Stripe**, não no Supabase. A Stripe envia
 Defina URLs **HTTPS** reais da sua app (substitua o domínio):
 
 - **Success:** `https://app.seudominio.com/dashboard?billing=success`  
-  (a app remove o parâmetro e mostra toast; o plano vem do webhook, não deste URL sozinho.)
+  (a Edge acrescenta `session_id={CHECKOUT_SESSION_ID}` se ainda não existir — a Stripe substitui ao redireccionar; a app remove `billing=success` e mostra toast; o plano efectivo vem do **webhook**, não deste URL sozinho.)
 - **Cancel:** `https://app.seudominio.com/dashboard`
 
 Estas vão para `STRIPE_CHECKOUT_SUCCESS_URL` e `STRIPE_CHECKOUT_CANCEL_URL`.

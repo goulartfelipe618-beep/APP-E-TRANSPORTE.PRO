@@ -116,6 +116,12 @@ async function handleCheckoutCompleted(
 ) {
   if (session.mode !== "subscription") return;
 
+  const ps = session.payment_status;
+  if (ps !== "paid" && ps !== "no_payment_required") {
+    console.log("stripe: checkout session aguarda pagamento (ex.: método diferido)", ps, session.id);
+    return;
+  }
+
   const userId =
     (session.metadata?.supabase_user_id?.trim() || session.client_reference_id?.trim()) ?? "";
   if (!userId) {
@@ -251,9 +257,17 @@ Deno.serve(async (req) => {
 
   try {
     switch (event.type) {
-      case "checkout.session.completed": {
+      case "checkout.session.completed":
+      case "checkout.session.async_payment_succeeded": {
         const session = event.data.object as Stripe.Checkout.Session;
         await handleCheckoutCompleted(admin, stripe, session);
+        break;
+      }
+      case "checkout.session.async_payment_failed": {
+        const session = event.data.object as Stripe.Checkout.Session;
+        const uid =
+          (session.metadata?.supabase_user_id?.trim() || session.client_reference_id?.trim()) ?? "";
+        console.error("stripe: pagamento assíncrono falhou", session.id, uid || "(sem user)");
         break;
       }
       case "customer.subscription.updated": {
