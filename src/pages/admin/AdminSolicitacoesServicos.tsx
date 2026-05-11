@@ -17,6 +17,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { downloadSolicitacaoBriefingPdf } from "@/lib/solicitacaoServicoBriefingPdf";
 import { googleBriefingRows } from "@/lib/googleBriefingDisplay";
+import { assertSafeHref } from "@/lib/safeExternalUrl";
 
 interface Solicitacao {
   id: string;
@@ -214,10 +215,16 @@ export default function AdminSolicitacoesServicos() {
 
   const handleSave = async () => {
     if (!selected) return;
+    const linkTrim = editLink.trim();
+    const linkSafe = linkTrim ? assertSafeHref(editLink) : null;
+    if (linkTrim && !linkSafe) {
+      toast.error("Link de acesso inválido: use https:// ou mailto:.");
+      return;
+    }
     setSaving(true);
     const { error } = await (supabase.from("solicitacoes_servicos" as any).update({
       status: editStatus,
-      link_acesso: editLink || null,
+      link_acesso: linkSafe,
       data_expiracao: editExpiracao || null,
       instrucoes_acesso: editInstrucoes || null,
       como_usar: editComoUsar || null,

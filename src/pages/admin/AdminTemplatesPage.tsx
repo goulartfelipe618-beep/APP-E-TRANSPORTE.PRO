@@ -12,6 +12,7 @@ import {
 import { Plus, Pencil, Trash2, Eye, ImageIcon, Upload, X } from "lucide-react";
 import { ConfirmDeleteDialog } from "@/components/ConfirmDeleteDialog";
 import { assertUploadMagicBytes, extensionForDetectedMime } from "@/lib/validateUploadMagicBytes";
+import { assertHttpsUrlForHref, isSafeMediaSrcUrl, safeMediaSrc } from "@/lib/safeExternalUrl";
 
 interface Template {
   id: string;
@@ -146,15 +147,28 @@ export default function AdminTemplatesPage() {
       finalImageUrl = url;
     }
 
+    if (!isSafeMediaSrcUrl(finalImageUrl)) {
+      toast.error("URL da imagem inválida: use o upload ou um URL HTTPS do armazenamento do projeto.");
+      setUploading(false);
+      return;
+    }
+    const linkModeloTrim = linkModelo.trim();
+    const linkModeloSafe = linkModeloTrim ? assertHttpsUrlForHref(linkModeloTrim) : "";
+    if (linkModeloTrim && !linkModeloSafe) {
+      toast.error("Link do modelo inválido: use um endereço https:// completo.");
+      setUploading(false);
+      return;
+    }
+
     if (editingId) {
       const { error } = await (supabase.from("templates_website" as any).update({
-        nome, imagem_url: finalImageUrl, link_modelo: linkModelo, ordem, ativo, updated_at: new Date().toISOString(),
+        nome, imagem_url: finalImageUrl, link_modelo: linkModeloSafe ?? "", ordem, ativo, updated_at: new Date().toISOString(),
       } as any).eq("id", editingId) as any);
       if (error) { toast.error("Erro: " + error.message); setUploading(false); return; }
       toast.success("Template atualizado!");
     } else {
       const { error } = await (supabase.from("templates_website" as any).insert({
-        nome, imagem_url: finalImageUrl, link_modelo: linkModelo, ordem, ativo,
+        nome, imagem_url: finalImageUrl, link_modelo: linkModeloSafe ?? "", ordem, ativo,
       } as any) as any);
       if (error) { toast.error("Erro: " + error.message); setUploading(false); return; }
       toast.success("Template criado!");
@@ -209,13 +223,16 @@ export default function AdminTemplatesPage() {
 
       {/* Preview cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {templates.map((t) => (
+        {templates.map((t) => {
+          const imgSrc = safeMediaSrc(t.imagem_url);
+          const linkModeloHref = assertHttpsUrlForHref(t.link_modelo);
+          return (
           <Card key={t.id} className="overflow-hidden group relative">
             <div className="relative h-48 overflow-hidden bg-muted">
-              {t.imagem_url ? (
+              {imgSrc ? (
                 <div className="h-48 overflow-hidden">
                   <img
-                    src={t.imagem_url}
+                    src={imgSrc}
                     alt={t.nome}
                     className="w-full object-cover object-top transition-transform duration-[28s] ease-[cubic-bezier(0.25,0.1,0.25,1)] group-hover:translate-y-[calc(-100%+12rem)]"
                     style={{ minHeight: "200%" }}
@@ -238,8 +255,8 @@ export default function AdminTemplatesPage() {
                 <Badge variant="outline" className="text-xs">#{t.ordem}</Badge>
               </div>
               <div className="flex items-center gap-2">
-                {t.link_modelo && (
-                  <a href={t.link_modelo} target="_blank" rel="noopener noreferrer">
+                {linkModeloHref && (
+                  <a href={linkModeloHref} target="_blank" rel="noopener noreferrer">
                     <Button variant="outline" size="sm" className="gap-1 text-xs">
                       <Eye className="h-3 w-3" /> Ver modelo
                     </Button>
@@ -254,7 +271,8 @@ export default function AdminTemplatesPage() {
               </div>
             </div>
           </Card>
-        ))}
+          );
+        })}
       </div>
 
       {!loading && templates.length === 0 && (

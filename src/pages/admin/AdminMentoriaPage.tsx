@@ -12,6 +12,7 @@ import { Plus, Trash2, GraduationCap, Pencil, Upload, Video, Image as ImageIcon,
 import { toast } from "sonner";
 import { ConfirmDeleteDialog } from "@/components/ConfirmDeleteDialog";
 import { assertUploadMagicBytes, extensionForDetectedMime } from "@/lib/validateUploadMagicBytes";
+import { assertHttpsUrlForHref, isSafeMediaSrcUrl, safeMediaSrc } from "@/lib/safeExternalUrl";
 
 interface MentoriaCard {
   id: string;
@@ -86,7 +87,28 @@ export default function AdminMentoriaPage() {
       toast.error("Título e imagem de capa são obrigatórios");
       return;
     }
-    const payload = { ...form, link_url: form.link_url || null };
+    const imgTrim = form.imagem_url.trim();
+    if (!isSafeMediaSrcUrl(imgTrim)) {
+      toast.error("URL da imagem inválida: use o upload ou um URL HTTPS permitido.");
+      return;
+    }
+    const videoTrim = form.video_url.trim();
+    if (videoTrim && !isSafeMediaSrcUrl(videoTrim)) {
+      toast.error("URL do vídeo inválido: use o upload ou um URL HTTPS permitido.");
+      return;
+    }
+    const linkTrim = form.link_url.trim();
+    const linkSafe = linkTrim ? assertHttpsUrlForHref(linkTrim) : null;
+    if (linkTrim && !linkSafe) {
+      toast.error("Link opcional inválido: use https:// sem credenciais na URL.");
+      return;
+    }
+    const payload = {
+      ...form,
+      imagem_url: imgTrim,
+      video_url: videoTrim,
+      link_url: linkSafe,
+    };
 
     if (editingId) {
       const { error } = await (supabase.from("mentoria_cards" as any).update(payload).eq("id", editingId) as any);
@@ -194,9 +216,12 @@ export default function AdminMentoriaPage() {
                   {uploadingImage ? <><Loader2 className="h-4 w-4 animate-spin" /> Enviando...</> : <><Upload className="h-4 w-4" /> {form.imagem_url ? "Trocar Imagem" : "Fazer Upload da Imagem"}</>}
                 </Button>
                 <input ref={imageInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
-                {form.imagem_url && (
-                  <img src={form.imagem_url} alt="Preview" className="mt-2 rounded-lg max-h-32 object-cover border border-border" />
-                )}
+                {form.imagem_url && (() => {
+                  const prev = safeMediaSrc(form.imagem_url);
+                  return prev ? (
+                  <img src={prev} alt="Preview" className="mt-2 rounded-lg max-h-32 object-cover border border-border" />
+                  ) : null;
+                })()}
               </div>
 
               {/* Vídeo (upload) */}
@@ -235,11 +260,17 @@ export default function AdminMentoriaPage() {
       <section className="space-y-3">
         <h2 className="text-lg font-semibold text-foreground">Sobre o Sistema <Badge variant="secondary">{sobreCards.length}</Badge></h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {sobreCards.map((card) => (
+          {sobreCards.map((card) => {
+            const capa = safeMediaSrc(card.imagem_url);
+            return (
             <Card key={card.id} className={!card.ativo ? "opacity-50" : ""}>
               <div className="relative" style={{ aspectRatio: "1080/760" }}>
-                <img src={card.imagem_url} alt={card.titulo} className="w-full h-full object-cover rounded-t-lg" />
-                {card.video_url && (
+                {capa ? (
+                <img src={capa} alt={card.titulo} className="w-full h-full object-cover rounded-t-lg" />
+                ) : (
+                <div className="flex h-full min-h-[120px] w-full items-center justify-center rounded-t-lg bg-muted text-xs text-muted-foreground">Sem imagem</div>
+                )}
+                {card.video_url && isSafeMediaSrcUrl(card.video_url) && (
                   <Badge className="absolute top-2 right-2 bg-primary/90 text-primary-foreground text-[10px] gap-1">
                     <Video className="h-3 w-3" /> Vídeo
                   </Badge>
@@ -256,7 +287,8 @@ export default function AdminMentoriaPage() {
                 </div>
               </CardContent>
             </Card>
-          ))}
+            );
+          })}
         </div>
       </section>
 
@@ -264,11 +296,17 @@ export default function AdminMentoriaPage() {
       <section className="space-y-3">
         <h2 className="text-lg font-semibold text-foreground">Conteúdos <Badge variant="secondary">{conteudoCards.length}</Badge></h2>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
-          {conteudoCards.map((card) => (
+          {conteudoCards.map((card) => {
+            const capa = safeMediaSrc(card.imagem_url);
+            return (
             <Card key={card.id} className={!card.ativo ? "opacity-50" : ""}>
               <div className="relative" style={{ aspectRatio: "1080/1350" }}>
-                <img src={card.imagem_url} alt={card.titulo} className="w-full h-full object-cover rounded-t-lg" />
-                {card.video_url && (
+                {capa ? (
+                <img src={capa} alt={card.titulo} className="w-full h-full object-cover rounded-t-lg" />
+                ) : (
+                <div className="flex h-full min-h-[140px] w-full items-center justify-center rounded-t-lg bg-muted text-xs text-muted-foreground">Sem imagem</div>
+                )}
+                {card.video_url && isSafeMediaSrcUrl(card.video_url) && (
                   <Badge className="absolute top-2 right-2 bg-primary/90 text-primary-foreground text-[10px] gap-1">
                     <Video className="h-3 w-3" /> Vídeo
                   </Badge>
@@ -285,7 +323,8 @@ export default function AdminMentoriaPage() {
                 </div>
               </CardContent>
             </Card>
-          ))}
+            );
+          })}
         </div>
       </section>
 

@@ -7,11 +7,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Trash2, Users, Search, RefreshCw, Crown } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { PLAN_LABELS, PLAN_COLORS, PlanType, PLAN_ORDER, normalizeUserPlano } from "@/hooks/useUserPlan";
 import { ConfirmDeleteDialog } from "@/components/ConfirmDeleteDialog";
 import { purgeStoredStateForUserId } from "@/lib/hardDelete";
+import { validatePainelStrongPassword } from "@/lib/motoristaPortalPassword";
 
 interface UserItem {
   id: string;
@@ -19,6 +21,8 @@ interface UserItem {
   created_at: string;
   role: string;
   plano: string;
+  /** true = `billing_manual_override`; webhooks Stripe não alteram o plano. */
+  plano_bloqueado_stripe?: boolean;
 }
 
 const roleLabels: Record<string, string> = {
@@ -49,6 +53,7 @@ export default function AdminUsuariosCadastrados() {
   const [formPlano, setFormPlano] = useState<PlanType>("free");
   const [creating, setCreating] = useState(false);
   const [updatingPlan, setUpdatingPlan] = useState(false);
+  const [allowStripeSync, setAllowStripeSync] = useState(true);
   const [deleteUserId, setDeleteUserId] = useState<string | null>(null);
   const [deleteUserLoading, setDeleteUserLoading] = useState(false);
 
@@ -97,8 +102,9 @@ export default function AdminUsuariosCadastrados() {
       toast.error("Preencha e-mail, senha e tipo de utilizador.");
       return;
     }
-    if (formPassword.length < 6) {
-      toast.error("A senha deve ter pelo menos 6 caracteres.");
+    const pwErr = validatePainelStrongPassword(formPassword);
+    if (pwErr) {
+      toast.error(pwErr);
       return;
     }
     setCreating(true);
@@ -179,6 +185,7 @@ export default function AdminUsuariosCadastrados() {
     setSelectedUser(user);
     const p = normalizeUserPlano(user.plano);
     setSelectedPlan(p);
+    setAllowStripeSync(user.plano_bloqueado_stripe !== true);
     setPlanDialogOpen(true);
   };
 
@@ -196,7 +203,11 @@ export default function AdminUsuariosCadastrados() {
           ...edgeFunctionHeaders(session.access_token),
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ user_id: selectedUser.id, plano: selectedPlan }),
+        body: JSON.stringify({
+          user_id: selectedUser.id,
+          plano: selectedPlan,
+          allow_stripe_billing: allowStripeSync,
+        }),
       }
     );
     const data = await res.json().catch(() => ({}));
@@ -288,9 +299,16 @@ export default function AdminUsuariosCadastrados() {
                   {u.role === "admin_master" || u.plano === "n/a" ? (
                     <span className="text-sm text-muted-foreground">—</span>
                   ) : (
-                    <Badge variant="outline" className={PLAN_COLORS[normalizeUserPlano(u.plano)]}>
-                      {PLAN_LABELS[normalizeUserPlano(u.plano)]}
-                    </Badge>
+                    <div className="flex flex-col gap-1 items-start">
+                      <Badge variant="outline" className={PLAN_COLORS[normalizeUserPlano(u.plano)]}>
+                        {PLAN_LABELS[normalizeUserPlano(u.plano)]}
+                      </Badge>
+                      {u.plano_bloqueado_stripe ? (
+                        <span className="text-[10px] text-muted-foreground uppercase tracking-wide">
+                          Plano manual (Stripe off)
+                        </span>
+                      ) : null}
+                    </div>
                   )}
                 </TableCell>
                 <TableCell className="text-muted-foreground text-sm">
@@ -392,6 +410,7 @@ export default function AdminUsuariosCadastrados() {
             </DialogTitle>
             <DialogDescription>
               Atualiza o plano deste utilizador na plataforma. Não está disponível para a conta de administrador master.
+              Com Stripe activo, desligue a sincronização para impedir que pagamentos alterem o plano deste utilizador.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -411,6 +430,21 @@ export default function AdminUsuariosCadastrados() {
               <p className="text-xs text-muted-foreground mt-1">
                 Pode atribuir FREE, STANDART ou PRÓ. Alterar o plano não apaga dados — apenas restringe ou liberta o acesso às funções.
               </p>
+            </div>
+            <div className="flex items-start gap-3 rounded-lg border border-border bg-muted/30 p-3">
+              <Checkbox
+                id="admin-allow-stripe"
+                checked={allowStripeSync}
+                onCheckedChange={(c) => setAllowStripeSync(c === true)}
+              />
+              <div className="grid gap-1">
+                <Label htmlFor="admin-allow-stripe" className="text-sm font-medium leading-none cursor-pointer">
+                  Permitir sincronização Stripe
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Se desmarcar, o plano fica sob controlo exclusivo do admin — webhooks de pagamento não alteram esta conta.
+                </p>
+              </div>
             </div>
             <Button onClick={handleUpdatePlan} disabled={updatingPlan} className="w-full">
               {updatingPlan ? "A guardar…" : "Guardar plano"}

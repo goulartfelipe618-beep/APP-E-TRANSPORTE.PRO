@@ -5,6 +5,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { safeMediaSrc } from "@/lib/safeExternalUrl";
 
 const STORIES_WINDOW_MS = 3 * 24 * 60 * 60 * 1000;
 const SEGMENT_MS = 10_000;
@@ -514,25 +515,27 @@ export default function CommunityStories({ panel = "motorista" }: CommunityStori
                       </div>
                     ) : (
                       <div className="space-y-2">
-                        {currentMedia.map((m) =>
-                          m.media_type === "image" ? (
+                        {currentMedia.map((m) => {
+                          const src = safeMediaSrc(m.media_url);
+                          if (!src) return null;
+                          return m.media_type === "image" ? (
                             <img
                               key={m.id}
-                              src={m.media_url}
+                              src={src}
                               alt=""
                               className="mx-auto max-h-[min(55dvh,480px)] w-full max-w-full object-contain"
                             />
                           ) : (
                             <video
                               key={m.id}
-                              src={m.media_url}
+                              src={src}
                               className="mx-auto max-h-[min(55dvh,480px)] w-full max-w-full bg-black object-contain"
                               controls
                               playsInline
                               muted
                             />
-                          ),
-                        )}
+                          );
+                        })}
                         {currentPost.content.trim() ? (
                           <p className="whitespace-pre-wrap px-1 pt-2 text-center text-sm text-white/85">{currentPost.content}</p>
                         ) : null}

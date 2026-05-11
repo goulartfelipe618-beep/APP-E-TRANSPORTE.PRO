@@ -42,3 +42,6 @@ supabase/.temp/
 *.sln
 *.sw?
 .vercel
+
+# Payloads locais para deploy (não versionar)
+.tmp-mcp-*.json

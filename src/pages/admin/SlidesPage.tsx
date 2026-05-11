@@ -11,6 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { ConfirmDeleteDialog } from "@/components/ConfirmDeleteDialog";
 import { assertUploadMagicBytes, extensionForDetectedMime } from "@/lib/validateUploadMagicBytes";
+import { assertHttpsUrlForHref, isSafeMediaSrcUrl, safeMediaSrc } from "@/lib/safeExternalUrl";
 
 interface Slide {
   id: string;
@@ -142,13 +143,25 @@ export default function SlidesPage() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
+    const imgTrim = form.imagem_url.trim();
+    if (!imgTrim || !isSafeMediaSrcUrl(imgTrim)) {
+      toast.error("Imagem inválida: envie um ficheiro ou use um URL HTTPS do armazenamento do projeto.");
+      return;
+    }
+    const linkTrim = form.link_url.trim();
+    const linkSafe = linkTrim ? assertHttpsUrlForHref(linkTrim) : null;
+    if (linkTrim && !linkSafe) {
+      toast.error("Link do slide inválido: use https:// sem credenciais na URL.");
+      return;
+    }
+
     if (editing) {
       const { error } = await supabase.from("slides").update({
         titulo: form.titulo,
         subtitulo: form.subtitulo,
-        imagem_url: form.imagem_url,
+        imagem_url: imgTrim,
         mostrar_texto: form.mostrar_texto,
-        link_url: form.link_url,
+        link_url: linkSafe,
         updated_at: new Date().toISOString(),
       }).eq("id", editing.id);
       if (error) { toast.error("Erro ao atualizar"); return; }
@@ -159,9 +172,9 @@ export default function SlidesPage() {
         user_id: user.id,
         titulo: form.titulo,
         subtitulo: form.subtitulo,
-        imagem_url: form.imagem_url,
+        imagem_url: imgTrim,
         mostrar_texto: form.mostrar_texto,
-        link_url: form.link_url,
+        link_url: linkSafe,
         ordem: maxOrdem,
         pagina: paginaSelecionada,
       });
@@ -251,7 +264,9 @@ export default function SlidesPage() {
               <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">Carregando...</TableCell></TableRow>
             ) : slides.length === 0 ? (
               <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">Nenhum slide cadastrado para "{paginaAtual?.label}". Clique em "Novo Slide" para começar.</TableCell></TableRow>
-            ) : slides.map((s, i) => (
+            ) : slides.map((s, i) => {
+              const thumb = safeMediaSrc(s.imagem_url);
+              return (
               <TableRow key={s.id}>
                 <TableCell>
                   <div className="flex gap-1">
@@ -260,8 +275,8 @@ export default function SlidesPage() {
                   </div>
                 </TableCell>
                 <TableCell>
-                  {s.imagem_url ? (
-                    <img src={s.imagem_url} alt={s.titulo} className="h-10 w-16 rounded object-cover" />
+                  {thumb ? (
+                    <img src={thumb} alt={s.titulo} className="h-10 w-16 rounded object-cover" />
                   ) : (
                     <div className="h-10 w-16 rounded bg-muted flex items-center justify-center"><ImageIcon className="h-4 w-4 text-muted-foreground" /></div>
                   )}
@@ -276,7 +291,8 @@ export default function SlidesPage() {
                   </div>
                 </TableCell>
               </TableRow>
-            ))}
+              );
+            })}
           </TableBody>
         </Table>
       </div>
@@ -314,16 +330,19 @@ export default function SlidesPage() {
                   . Outras medidas serão recusadas.
                 </p>
               )}
-              {form.imagem_url && (
+              {(() => {
+                const previewSrc = safeMediaSrc(form.imagem_url);
+                return previewSrc ? (
                 <img
-                  src={form.imagem_url}
+                  src={previewSrc}
                   alt="Preview"
                   className={cn(
                     "mb-2 w-full rounded-lg object-cover",
                     paginaSelecionada === "comunidade" ? "aspect-[1922/330] max-h-40" : "h-32",
                   )}
                 />
-              )}
+                ) : null;
+              })()}
               <Input type="file" accept="image/*" onChange={handleImageUpload} disabled={uploading} />
               {uploading && <p className="text-xs text-muted-foreground mt-1">Enviando...</p>}
               <p className="mt-1 text-xs text-muted-foreground">

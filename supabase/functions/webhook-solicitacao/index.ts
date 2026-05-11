@@ -665,7 +665,7 @@ Deno.serve(async (req) => {
     }
 
     if (insertError) {
-      console.error("Insert error:", insertError);
+      console.error("Insert error:", insertError.message ?? "unknown");
       return new Response(
         JSON.stringify({ error: "Erro ao salvar solicitação", details: insertError.message }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -677,9 +677,10 @@ Deno.serve(async (req) => {
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (err) {
-    console.error("Webhook error:", err);
+    const msg = err instanceof Error ? err.message : "unknown";
+    console.error("Webhook error:", msg);
     return new Response(
-      JSON.stringify({ error: "Internal server error", details: String(err) }),
+      JSON.stringify({ error: "Internal server error", details: msg }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }

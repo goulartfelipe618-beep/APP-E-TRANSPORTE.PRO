@@ -1,4 +1,6 @@
 import { useState, useEffect, useRef, useLayoutEffect } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import { syncPanelThemeForCurrentUser } from "@/lib/panelTheme";
 import { useSlowScrollContainer } from "@/hooks/useSlowScrollContainer";
 import PageLoader from "@/components/PageLoader";
@@ -110,6 +112,8 @@ function readNetworkSpotlightActive() {
 
 function DashboardContent() {
   usePainelErrorReporter("motorista_executivo", "etp_nav_dashboard");
+  const location = useLocation();
+  const navigate = useNavigate();
   const { activePage, setActivePage } = useActivePage();
   const onboarding = useMotoristaOnboarding();
   const { painelMotoristaEvolutionAtivo, ready: painelComunicadorReady } = usePainelMotoristaEvolutionAtivo();
@@ -121,6 +125,16 @@ function DashboardContent() {
   useLayoutEffect(() => {
     syncPanelThemeForCurrentUser("frota");
   }, []);
+
+  useEffect(() => {
+    const sp = new URLSearchParams(location.search);
+    if (sp.get("billing") !== "success") return;
+    sp.delete("billing");
+    const q = sp.toString();
+    navigate({ pathname: location.pathname, search: q ? `?${q}` : "" }, { replace: true });
+    toast.success("Pagamento concluído. A actualizar o seu plano…");
+    window.dispatchEvent(new Event("etp-user-plan-refetch"));
+  }, [location.pathname, location.search, navigate]);
 
   useEffect(() => {
     let cancelled = false;

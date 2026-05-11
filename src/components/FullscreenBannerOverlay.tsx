@@ -15,6 +15,7 @@ import type { PainelTipo } from "@/lib/painelAvisosPages";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { isSafeMediaSrcUrl, safeMediaSrc } from "@/lib/safeExternalUrl";
 
 type BannerRow = {
   id: string;
@@ -59,6 +60,7 @@ function pickEligibleBanner(
 
   const eligible = rows
     .filter((r) => r.ativo && isInDateRange(r.data_inicio, r.data_fim, today))
+    .filter((r) => isSafeMediaSrcUrl(r.imagem_url))
     .filter((r) => matchesPage(r, painel, activePage))
     .filter((r) => {
       const st = userMap[r.id] ?? { closeCount: 0, permanent: false };
@@ -192,7 +194,7 @@ export default function FullscreenBannerOverlay({ painel, activePage }: Props) {
         className="relative mx-auto h-[min(400px,calc(100dvh-6rem))] w-full max-w-[min(560px,calc(100vw-1.5rem))] shrink-0 overflow-hidden rounded-lg border border-white/10 shadow-2xl sm:rounded-none"
       >
         <img
-          src={current.imagem_url}
+          src={safeMediaSrc(current.imagem_url) ?? ""}
           alt=""
           className="absolute inset-0 h-full w-full bg-black object-contain"
         />

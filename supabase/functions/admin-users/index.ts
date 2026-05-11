@@ -5,6 +5,18 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+/** Alinhado a `validatePainelStrongPassword` no cliente / motorista-frota-portal. */
+function validateStrongPassword(password: string): string | null {
+  const p = String(password);
+  if (p.length < 12) return "A senha deve ter pelo menos 12 caracteres.";
+  if (p.length > 128) return "Senha demasiado longa.";
+  if (!/[a-z]/.test(p)) return "Inclua pelo menos uma letra minúscula.";
+  if (!/[A-Z]/.test(p)) return "Inclua pelo menos uma letra maiúscula.";
+  if (!/[0-9]/.test(p)) return "Inclua pelo menos um número.";
+  if (!/[^A-Za-z0-9]/.test(p)) return "Inclua pelo menos um símbolo (ex.: ! @ # ?).";
+  return null;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -81,24 +93,33 @@ Deno.serve(async (req) => {
       const userIds = roles.map((r: any) => r.user_id);
       const { data: plans } = await supabaseAdmin
         .from("user_plans")
-        .select("user_id, plano")
+        .select("user_id, plano, billing_manual_override")
         .in("user_id", userIds);
 
       const roleMap = new Map(roles.map((r: any) => [r.user_id, r.role]));
-      const planMap = new Map((plans || []).map((p: any) => [p.user_id, p.plano]));
+      const planMap = new Map(
+        (plans || []).map((p: any) => [
+          p.user_id,
+          { plano: p.plano, billing_manual_override: p.billing_manual_override === true },
+        ]),
+      );
 
       const users = authUsers
         .filter((u: any) => roleMap.has(u.id))
         .map((u: any) => {
           const role = roleMap.get(u.id) || "sem_role";
+          const planEntry = planMap.get(u.id) as { plano: string; billing_manual_override: boolean } | undefined;
           const plano =
-            role === "admin_master" ? "n/a" : (planMap.get(u.id) || "free");
+            role === "admin_master" ? "n/a" : (planEntry?.plano || "free");
+          const plano_bloqueado_stripe =
+            role === "admin_master" ? false : Boolean(planEntry?.billing_manual_override);
           return {
             id: u.id,
             email: u.email,
             created_at: u.created_at,
             role,
             plano,
+            plano_bloqueado_stripe,
           };
         });
 
@@ -119,8 +140,9 @@ Deno.serve(async (req) => {
         return new Response(JSON.stringify({ error: "E-mail inválido" }), { status: 400, headers: corsHeaders });
       }
 
-      if (String(password).length < 6) {
-        return new Response(JSON.stringify({ error: "A senha deve ter pelo menos 6 caracteres" }), { status: 400, headers: corsHeaders });
+      const pwErr = validateStrongPassword(String(password));
+      if (pwErr) {
+        return new Response(JSON.stringify({ error: pwErr }), { status: 400, headers: corsHeaders });
       }
 
       if (!["admin_transfer", "admin_master"].includes(role)) {
@@ -175,6 +197,7 @@ Deno.serve(async (req) => {
         await supabaseAdmin.from("user_plans").insert({
           user_id: newUser.user.id,
           plano: userPlano,
+          billing_manual_override: userPlano !== "free",
         });
       }
 
@@ -184,11 +207,21 @@ Deno.serve(async (req) => {
     // UPDATE PLAN: FREE ↔ PRÓ (apenas contas com plano — não admin_master)
     if (req.method === "POST" && action === "update_plan") {
       const body = await req.json();
-      const { user_id, plano } = body;
+      const { user_id, plano, allow_stripe_billing } = body as {
+        user_id?: string;
+        plano?: unknown;
+        allow_stripe_billing?: unknown;
+      };
 
       if (!user_id || plano === undefined || plano === null || String(plano).trim() === "") {
         return new Response(JSON.stringify({ error: "user_id e plano são obrigatórios" }), { status: 400, headers: corsHeaders });
       }
+
+      const allowStripe =
+        allow_stripe_billing === true ||
+        allow_stripe_billing === "true" ||
+        allow_stripe_billing === 1 ||
+        allow_stripe_billing === "1";
 
       const rawPlano = String(plano).toLowerCase().trim();
       const planoNorm = rawPlano === "standard" ? "standart" : rawPlano;
@@ -212,10 +245,16 @@ Deno.serve(async (req) => {
         return new Response(JSON.stringify({ error: "Utilizador sem função registada." }), { status: 400, headers: corsHeaders });
       }
 
-      // Upsert plan (persistir sempre standart, nunca o alias "standard")
+      // Upsert plan (persistir sempre standart, nunca o alias "standard").
+      // admin_master: allow_stripe_billing=true → Stripe volta a sincronizar; caso contrário bloqueia webhooks.
       const { error } = await supabaseAdmin.from("user_plans").upsert(
-        { user_id, plano: planoNorm, updated_at: new Date().toISOString() },
-        { onConflict: "user_id" }
+        {
+          user_id,
+          plano: planoNorm,
+          updated_at: new Date().toISOString(),
+          billing_manual_override: !allowStripe,
+        },
+        { onConflict: "user_id" },
       );
 
       if (error) {
@@ -295,7 +334,12 @@ Deno.serve(async (req) => {
         }
 
         const { error: planErr } = await supabaseAdmin.from("user_plans").upsert(
-          { user_id: leadUserId, plano: planoFinal, updated_at: new Date().toISOString() },
+          {
+            user_id: leadUserId,
+            plano: planoFinal,
+            updated_at: new Date().toISOString(),
+            billing_manual_override: true,
+          },
           { onConflict: "user_id" },
         );
         if (planErr) {

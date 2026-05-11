@@ -31,8 +31,8 @@ export const PLAN_COLORS: Record<PlanType, string> = {
 
 export const PLAN_PRICE_LABELS: Record<PlanType, string> = {
   free: "R$ 0,00",
-  standart: "R$ 69,90",
-  pro: "R$ 89,90",
+  standart: "R$ 89,90 / mês",
+  pro: "R$ 109,90 / mês",
 };
 
 export function normalizeUserPlano(raw: string | null | undefined): PlanType {
@@ -60,6 +60,14 @@ export function useUserPlan() {
   useEffect(() => {
     setLoading(true);
     void refetch();
+  }, [refetch]);
+
+  useEffect(() => {
+    const onRefetch = () => {
+      void refetch();
+    };
+    window.addEventListener("etp-user-plan-refetch", onRefetch);
+    return () => window.removeEventListener("etp-user-plan-refetch", onRefetch);
   }, [refetch]);
 
   /**

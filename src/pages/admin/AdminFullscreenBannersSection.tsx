@@ -19,6 +19,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { assertUploadMagicBytes, extensionForDetectedMime } from "@/lib/validateUploadMagicBytes";
+import { isSafeMediaSrcUrl, safeMediaSrc } from "@/lib/safeExternalUrl";
 import { PAGINAS_MOTORISTA } from "@/lib/painelAvisosPages";
 import { ConfirmDeleteDialog } from "@/components/ConfirmDeleteDialog";
 
@@ -163,6 +164,12 @@ export default function AdminFullscreenBannersSection() {
       imagemUrl = up;
     }
 
+    if (!isSafeMediaSrcUrl(imagemUrl)) {
+      toast.error("URL da imagem inválida: use o upload ou um URL HTTPS do armazenamento do projeto.");
+      setSaving(false);
+      return;
+    }
+
     const payload = {
       imagem_url: imagemUrl,
       incluir_motorista: form.incluir_motorista,
@@ -239,11 +246,12 @@ export default function AdminFullscreenBannersSection() {
         <div className="space-y-3">
           {rows.map((r) => {
             const inPeriod = isInFullscreenDateRange(r.data_inicio, r.data_fim);
+            const thumb = safeMediaSrc(r.imagem_url);
             return (
             <Card key={r.id} className="p-4 flex flex-wrap items-start gap-4">
               <div className="h-20 w-28 shrink-0 overflow-hidden rounded-md border bg-muted">
-                {r.imagem_url ? (
-                  <img src={r.imagem_url} alt="" className="h-full w-full object-cover" />
+                {thumb ? (
+                  <img src={thumb} alt="" className="h-full w-full object-cover" />
                 ) : null}
               </div>
               <div className="min-w-0 flex-1 space-y-1">

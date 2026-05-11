@@ -24,6 +24,7 @@ import { isMapboxConfigured } from "@/lib/mapboxGeocode";
 import { persistNetworkRetornoSolicitado, persistNetworkSair } from "@/lib/networkNacionalPrefs";
 import LoginConfiguracoesSection from "@/pages/dashboard/LoginConfiguracoesSection";
 import { assertUploadMagicBytes, extensionForDetectedMime } from "@/lib/validateUploadMagicBytes";
+import { validatePainelStrongPassword } from "@/lib/motoristaPortalPassword";
 import { FONTES_GLOBAIS, FONTE_GLOBAL_PADRAO, resolveFonteCss } from "@/lib/fontesGlobais";
 
 const COOLDOWN_DAYS = 60;
@@ -672,8 +673,9 @@ export default function SistemaConfiguracoesPage() {
   };
 
   const handleChangePassword = async () => {
-    if (newPassword.length < 6) {
-      toast.error("A nova senha deve ter no mínimo 6 caracteres.");
+    const pwErr = validatePainelStrongPassword(newPassword);
+    if (pwErr) {
+      toast.error(pwErr);
       return;
     }
     if (newPassword !== confirmPassword) {

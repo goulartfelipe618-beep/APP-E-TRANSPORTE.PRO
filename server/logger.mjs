@@ -1,11 +1,18 @@
 import winston from "winston";
+import { sanitizeLogMeta, SENSITIVE_LOG_KEYS } from "./logMeta.mjs";
 
 const redact = winston.format((info) => {
-  if (info.authorization) info.authorization = "[redacted]";
+  const authHeader = info.authorization ?? info.Authorization;
+  if (authHeader) {
+    info.authorization = "[redacted]";
+    delete info.Authorization;
+  }
   if (info.body && typeof info.body === "object") {
     const b = { ...info.body };
-    for (const k of ["password", "senha", "token", "access_token", "refresh_token", "secret", "apikey", "api_key"]) {
-      if (b[k] != null) b[k] = "[redacted]";
+    for (const k of Object.keys(b)) {
+      if (SENSITIVE_LOG_KEYS.has(k.toLowerCase())) {
+        b[k] = "[redacted]";
+      }
     }
     info.body = b;
   }
@@ -18,7 +25,8 @@ export const logger = winston.createLogger({
     redact(),
     winston.format.timestamp(),
     winston.format.printf(({ level, message, timestamp, ...meta }) => {
-      const rest = Object.keys(meta).length ? ` ${JSON.stringify(meta)}` : "";
+      const safeMeta = sanitizeLogMeta(meta);
+      const rest = Object.keys(safeMeta).length ? ` ${JSON.stringify(safeMeta)}` : "";
       return `${timestamp} [${level}] ${message}${rest}`;
     }),
   ),

@@ -21,6 +21,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { safeMediaSrc } from "@/lib/safeExternalUrl";
 import {
   Heart,
   MessageCircle,
@@ -452,17 +453,19 @@ const CommunityFeedPostCard = memo(function CommunityFeedPostCard({
 
         {postMedia.length > 0 && (
           <div className="-mx-6 space-y-0">
-            {postMedia.map((item) =>
-              item.media_type === "image" ? (
+            {postMedia.map((item) => {
+              const src = safeMediaSrc(item.media_url);
+              if (!src) return null;
+              return item.media_type === "image" ? (
                 <div key={item.id} className="overflow-hidden border-y border-border bg-black">
-                  <img src={item.media_url} alt="Mídia da publicação" className="block h-auto w-full object-contain" />
+                  <img src={src} alt="Mídia da publicação" className="block h-auto w-full object-contain" />
                 </div>
               ) : (
                 <div key={item.id} className="overflow-hidden border-y border-border">
-                  <video src={item.media_url} controls className="h-56 w-full bg-black object-contain" />
+                  <video src={src} controls className="h-56 w-full bg-black object-contain" />
                 </div>
-              ),
-            )}
+              );
+            })}
           </div>
         )}
 

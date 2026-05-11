@@ -11,8 +11,17 @@ Este projeto combina **React (Vite)**, **Supabase** (Auth + Postgres + Storage),
 - **Fonte de verdade** para “quem vê o quê” é o **Row Level Security (RLS)** no Postgres, não o menu do React nem flags só no browser.
 - A maioria das tabelas de negócio inclui **`user_id`** (dono do tenant). As políticas devem garantir `auth.uid() = user_id` para leituras/escritas do painel motorista/táxi, exceto onde **`is_platform_staff()`** ou **`is_admin_master()`** permite operações administrativas explícitas.
 - **Nunca** confie em `user_id` vindo só do corpo JSON do cliente sem validar contra `auth.uid()` nas políticas ou em RPCs `SECURITY DEFINER` bem revistas.
-- **Injeção SQL:** o cliente usa o SDK PostgREST (`supabase.from().select/insert/...`) com parâmetros; RPCs em SQL devem usar **funções com argumentos tipados** e evitar concatenar strings SQL com input do utilizador.
+- **Injeção SQL:** o cliente usa o SDK PostgREST (`supabase.from().select/insert/...`) com parâmetros; RPCs em SQL devem usar **funções com argumentos tipados** e **nunca** interpolar input do utilizador em texto SQL. Se for inevitável compor SQL dinâmico no servidor, usar `format(..., %L)` (Postgres) com literais escapados — preferir sempre argumentos posicionais / `EXECUTE ... USING`.
+- **Webhooks:** o corpo bruto serve só para HMAC e mapeamento validado; **não** passar campos do payload a `rpc()`/`query()` como fragmentos SQL. Em logs Edge/Node, evitar `console.error(payload)` completo — preferir códigos, `message` curtas e IDs.
 - Após criar ou alterar tabelas: correr **`supabase/scripts/audit_rls_gaps.sql`** no SQL Editor e corrigir lacunas antes de produção.
+
+---
+
+## URLs persistidas e renderização (XSS)
+
+- **`assertHttpsUrlForHref` / `assertSafeHref` / `isSafeMediaSrcUrl`** (`src/lib/safeExternalUrl.ts`): validar **antes** de gravar `link_acesso`, `link_modelo`, `link_url` e usar variantes seguras em `<a href>` / `<img src>` / `<video src>`.
+- **Imagens e vídeos:** por defeito só **HTTPS** para o host do projeto (`VITE_SUPABASE_URL`) com path **`/storage/v1/object/`**, mais hosts opcionais em **`VITE_MEDIA_HOST_ALLOWLIST`** (lista separada por vírgulas, só hostname). **`blob:`** é aceite para pré-visualização local após upload.
+- **Links de acesso:** `assertSafeHref` permite **`https:`** ou **`mailto:`**; rejeita `javascript:` e URLs com credenciais embutidas.
 
 ---
 
@@ -31,15 +40,15 @@ Este projeto combina **React (Vite)**, **Supabase** (Auth + Postgres + Storage),
 
 | Peça | Função |
 |------|--------|
-| **Helmet** (`server/app.mjs`) | Define cabeçalhos HTTP seguros por defeito (CSP está desativado na API porque não serve HTML; o CSP do site está no `vercel.json` em modo *report-only*). |
-| **express-rate-limit** | Limite global de pedidos por IP e janela de tempo; rota modelo `POST /auth/login-attempt` usa limite mais apertado para brute-force. |
+| **Helmet** (`server/app.mjs`) | Define cabeçalhos HTTP seguros por defeito (CSP está desativado na API porque não serve HTML; o CSP do site está no `vercel.json` como **`Content-Security-Policy`** aplicado ao HTML estático — rever relatórios do browser após alterar integrações de terceiros). |
+| **express-rate-limit** | Limite global de pedidos por IP e janela de tempo; `POST /auth/login-attempt` (limite `RATE_LIMIT_LOGIN_MAX`) grava falhas com fingerprint SHA-256 se `SUPABASE_SERVICE_ROLE_KEY` estiver definido. |
 | **authSupabaseMiddleware** (`server/middleware/authSupabase.mjs`) | Valida o JWT do Supabase (`Authorization: Bearer`) com `auth.getUser` e anexa `req.supabaseUser` às rotas protegidas. |
 | **originAllowlistMiddleware** | Em produção, para métodos mutadores com cabeçalho `Origin`, exige correspondência com `ALLOWED_ORIGINS` (mitigação CSRF para APIs que possam vir a usar cookies). |
 | **CORS (`cors`)** | Em **produção**, se `ALLOWED_ORIGINS` estiver vazio, **`origin: false`** — nenhuma origem cross-browser é aceite até configurar explicitamente. Em desenvolvimento mantém-se permissivo. |
 
-Arranque: `npm run server` (variáveis `SUPABASE_URL`, `SUPABASE_ANON_KEY`, **`ALLOWED_ORIGINS`** em produção).
+Arranque: `npm run server` (variáveis `SUPABASE_URL`, `SUPABASE_ANON_KEY`, **`ALLOWED_ORIGINS`** em produção; opcional **`SUPABASE_SERVICE_ROLE_KEY`** para `POST /auth/login-attempt`).
 
-**Validação Zod (corpo JSON):** todas as rotas `POST` da API usam esquema Zod (`EmptyJsonBodySchema` ou `EchoBodySchema` em `server/app.mjs`). `GET /health` não tem corpo — não requer Zod.
+**Validação Zod (corpo JSON):** rotas `POST` usam esquema Zod (ex.: `EchoBodySchema`, `LoginAttemptBodySchema` em `server/app.mjs`). `GET /health` não tem corpo — não requer Zod.
 
 ---
 
@@ -71,6 +80,17 @@ Isto reduz uploads maliciosos disfarçados de imagem e alinha-se às boas práti
 - **SELECT / DELETE:** só **`is_admin_master`** — logs podem conter dados sensíveis; trate como PII interno.
 - O campo `extra.href` é gravado **sem query string nem hash** para evitar vazamento de tokens OAuth/PKCE nos relatórios.
 
+### Tabela `auth_login_failure_events`
+
+- **INSERT:** apenas via **service role** (Edge `log-auth-login-failure` ou API Node `POST /auth/login-attempt` com `SUPABASE_SERVICE_ROLE_KEY`). Sem política INSERT para `authenticated` — o browser não grava diretamente.
+- **SELECT:** só **`is_admin_master`** — contém impressão digital SHA-256 do e-mail (minúsculas), prefixo de IP e resumo de User-Agent; **nunca** password.
+- O cliente chama a Edge após `signInWithPassword` falhar (`src/lib/authLoginFailureReporter.ts`).
+
+### Tabela `admin_audit_log`
+
+- **INSERT:** triggers `admin_audit_staff_row` em `admin_fullscreen_banners`, `user_plans`, `templates_website` (se existir) e `solicitacoes_servicos` quando o actor é **`is_platform_staff()`** ou **`is_admin_master()`**; falhas no trigger **não** abortam a transação de negócio.
+- **SELECT:** `is_platform_staff()` **ou** `is_admin_master()` — consulta no Admin → Logs → separador «Auditoria staff».
+
 ---
 
 ## Armazenamento no browser (tokens vs preferências)
@@ -94,7 +114,8 @@ Isto reduz uploads maliciosos disfarçados de imagem e alinha-se às boas práti
 ## Planos (`user_plans`)
 
 - Valores persistidos: **`free`** e **`pro`** (legados `seed` / `grow` / `rise` / `apex` são normalizados no cliente e migrados no Postgres para `pro`; ver `supabase/migrations/20260430220000_user_plans_free_pro.sql`).
-- **Upgrade de plano** pelo utilizador: Edge Function `self-upgrade-plan` com JWT; a partir de `free` para `standart` ou `pro`, ou de `standart` para `pro`; escrita em `user_plans` no servidor com **service role** (não confiar só no menu do browser).
+- **Stripe (subscrição):** com segredos `STRIPE_*` configurados no Supabase, o checkout (`stripe-create-checkout-session`) e os webhooks (`stripe-webhook`) actualizam `user_plans`; `billing_manual_override` impede que a Stripe altere contas que o **admin_master** marcou como só manuais. Passo a passo: **`STRIPE_SETUP.md`**.
+- **Upgrade de plano** sem Stripe (fallback): Edge Function `self-upgrade-plan` com JWT — **desactivada para tiers pagos** quando `STRIPE_SECRET_KEY` e preços estão definidos (evita upgrade sem pagamento).
 - **Admin:** `admin-users` (`update_plan`, `finalize_landing_lead`) valida `free` | `standart` | `pro`; FREE não é atribuído manualmente a utilizadores já em Cadastrados (regra de negócio).
 - O menu do motorista executivo restringe páginas no cliente (`painelPlanPolicy`); **não substitui RLS** — dados sensíveis seguem protegidos por políticas nas tabelas.
 
@@ -115,6 +136,32 @@ Isto reduz uploads maliciosos disfarçados de imagem e alinha-se às boas práti
 | Após migrações | `audit_rls_gaps.sql` no projeto Supabase |
 | Trimestral | Rever Secrets no Supabase, URLs de webhook, chaves Evolution/Mapbox com **URLs restritas** onde o fornecedor permitir |
 | Incidente | Rodar credenciais, rever `painel_client_error_logs` (Admin → Logs), logs Vercel/Edge |
+
+---
+
+## Logging (Node, Edge, cliente)
+
+- **Login falhado (tabela):** Edge **`log-auth-login-failure`** (rate limit por IP no isolate) + cliente `reportAuthLoginFailure` após `signInWithPassword` falhar. Opcionalmente **Node** `POST /auth/login-attempt` com o mesmo payload Zod.
+- **Login (volume):** sucesso e falhas agregadas continuam visíveis no **Supabase Auth** (Dashboard → Authentication → Logs).
+- **API Node (`server/logger.mjs` + `server/logMeta.mjs`):** Winston com redacção de chaves sensíveis e **serialização recursiva** do `meta` (JWT e blobs longos tipo segredo → `[redacted]`).
+- **Cliente (`painel_client_error_logs`):** só utilizadores autenticados; `extra.href` sem query/hash; evitar `extra` com PII desnecessário.
+- **Edge Functions:** preferir `message`/`code` e identificadores curtos em `console.error`, não objetos com payload completo de webhook.
+
+---
+
+## CSP (após enforce no `vercel.json`)
+
+- Após cada deploy que altere scripts externos (Chatwoot, Mapbox, etc.), abrir DevTools → **Console** / **Issues** e confirmar ausência de violações bloqueantes.
+- `style-src 'unsafe-inline'` mantém-se por compatibilidade com Tailwind e estilos inline; mitigação futura: **nonce** ou **hash** por build (exige pipeline de tags no HTML — planear em roadmap, não obrigatório enquanto o bundle for estático seguro).
+- Pode acrescentar um endpoint dedicado a relatórios CSP (`report-to` / `report-uri`) noutra iteração; hoje o foco é revisão manual pós-release.
+
+---
+
+## Senhas (Supabase Auth + validação no cliente)
+
+- **Armazenamento e hash:** o projeto **não** persiste senhas em tabelas próprias; **Supabase Auth (GoTrue)** gere hashing (algoritmo interno do fornecedor, evoluindo com a versão da plataforma — equivalente a boas práticas modernas) e **salt por utilizador** no serviço de autenticação. A aplicação só envia a senha em claro sobre **HTTPS** para os endpoints oficiais `auth.signInWithPassword` / `updateUser` / `resetPasswordForEmail`.
+- **Política forte no painel:** `validatePainelStrongPassword` / `validateMotoristaPortalPassword` (`src/lib/motoristaPortalPassword.ts`) — mínimo **12** caracteres, maiúsculas, minúsculas, número e símbolo; usado em recuperação de senha no login, alteração em Configurações, criação de utilizador admin e portal motorista.
+- **Recuperação:** `resetPasswordForEmail` com `redirectTo` para `/login` (preserva hash PKCE no `App.tsx`). Mensagens genéricas para não enumerar contas.
 
 ---
 

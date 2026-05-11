@@ -8,3 +8,6 @@ export function validateMotoristaPortalPassword(password: string): string | null
   if (!/[^A-Za-z0-9]/.test(password)) return "Inclua pelo menos um símbolo (ex.: ! @ # ?).";
   return null;
 }
+
+/** Mesma política forte para troca de senha Supabase no painel (login, configurações, admin). */
+export const validatePainelStrongPassword = validateMotoristaPortalPassword;

@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { GraduationCap, BookOpen, ArrowLeft, CheckCircle2, FileText, X } from "lucide-react";
 import SlideCarousel from "@/components/SlideCarousel";
 import { toast } from "sonner";
+import { isSafeMediaSrcUrl, safeMediaSrc } from "@/lib/safeExternalUrl";
 
 interface MentoriaCard {
   id: string;
@@ -96,6 +97,10 @@ export default function MentoriaPage() {
 
   // Video detail view
   if (selectedCard) {
+    const videoSrc =
+      selectedCard.video_url?.trim() && isSafeMediaSrcUrl(selectedCard.video_url)
+        ? safeMediaSrc(selectedCard.video_url)
+        : undefined;
     return (
       <div className="space-y-6">
         <Button variant="ghost" onClick={() => setSelectedCard(null)} className="gap-2 text-muted-foreground hover:text-foreground">
@@ -103,10 +108,10 @@ export default function MentoriaPage() {
         </Button>
 
         <div className="w-full rounded-xl overflow-hidden bg-black shadow-2xl">
-          {selectedCard.video_url ? (
+          {videoSrc ? (
             <video
               ref={videoRef}
-              src={selectedCard.video_url}
+              src={videoSrc}
               controls
               autoPlay
               onEnded={handleVideoEnded}
@@ -175,7 +180,9 @@ export default function MentoriaPage() {
             <BookOpen className="h-5 w-5 text-primary" /> Sobre o Sistema
           </h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-5">
-            {(showAllSobre ? sobreCards : sobreCards.slice(0, 4)).map((card, index) => (
+            {(showAllSobre ? sobreCards : sobreCards.slice(0, 4)).map((card, index) => {
+              const capa = safeMediaSrc(card.imagem_url);
+              return (
               <button key={card.id} onClick={() => openCard(card)} className="group block text-left w-full">
                 <Card className="overflow-hidden border-border hover:border-primary/50 transition-all duration-300 hover:-translate-y-1 relative">
                   {progresso[card.id] && (
@@ -186,7 +193,11 @@ export default function MentoriaPage() {
                     </div>
                   )}
                   <div style={{ aspectRatio: "16/10" }}>
-                    <img src={card.imagem_url} alt={card.titulo} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                    {capa ? (
+                    <img src={capa} alt={card.titulo} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                    ) : (
+                    <div className="flex h-full min-h-[100px] w-full items-center justify-center bg-muted text-[10px] text-muted-foreground">Sem imagem</div>
+                    )}
                   </div>
                   <div className="p-3 space-y-1">
                     <p className="text-[10px] text-primary font-semibold">Vídeo {index + 1}</p>
@@ -195,7 +206,8 @@ export default function MentoriaPage() {
                   </div>
                 </Card>
               </button>
-            ))}
+            );
+            })}
           </div>
           {sobreCards.length > 4 && (
             <div className="flex justify-center">
@@ -214,7 +226,9 @@ export default function MentoriaPage() {
             <GraduationCap className="h-5 w-5 text-primary" /> Conteúdos
           </h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-5">
-            {(showAllConteudo ? conteudoCards : conteudoCards.slice(0, 4)).map((card, index) => (
+            {(showAllConteudo ? conteudoCards : conteudoCards.slice(0, 4)).map((card, index) => {
+              const capa = safeMediaSrc(card.imagem_url);
+              return (
               <button key={card.id} onClick={() => openCard(card)} className="group block text-left w-full">
                 <Card className="overflow-hidden border-border hover:border-primary/50 transition-all duration-300 hover:-translate-y-1 relative">
                   {progresso[card.id] && (
@@ -225,7 +239,11 @@ export default function MentoriaPage() {
                     </div>
                   )}
                   <div style={{ aspectRatio: "1080/1350" }}>
-                    <img src={card.imagem_url} alt={card.titulo} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                    {capa ? (
+                    <img src={capa} alt={card.titulo} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                    ) : (
+                    <div className="flex h-full min-h-[120px] w-full items-center justify-center bg-muted text-[10px] text-muted-foreground">Sem imagem</div>
+                    )}
                   </div>
                   <div className="p-3 space-y-1">
                     <p className="text-[10px] text-primary font-semibold">Vídeo {index + 1}</p>
@@ -234,7 +252,8 @@ export default function MentoriaPage() {
                   </div>
                 </Card>
               </button>
-            ))}
+            );
+            })}
           </div>
           {conteudoCards.length > 4 && (
             <div className="flex justify-center">

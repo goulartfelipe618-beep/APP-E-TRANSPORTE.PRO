@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo, type CSSProperties } from "r
 import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
+import { assertHttpsUrlForHref, safeMediaSrc } from "@/lib/safeExternalUrl";
 
 interface SlideCarouselSlide {
   id: string;
@@ -174,15 +175,16 @@ export default function SlideCarousel({
     variant !== "banner" &&
     currentSlideData?.mostrar_texto &&
     (currentSlideData.titulo || currentSlideData.subtitulo);
-  const linkUrl = currentSlideData?.link_url;
 
   const renderSlide = (slide: (typeof displaySlides)[0], index: number) => {
     const isActive = index === currentSlide;
-    const hasImage = !!slide?.imagem_url;
+    const imgSrc = safeMediaSrc(slide.imagem_url);
+    const hasImage = !!imgSrc;
+    const slideLink = assertHttpsUrlForHref(slide.link_url ?? undefined);
 
     const imageEl = hasImage ? (
       <img
-        src={slide.imagem_url}
+        src={imgSrc}
         alt={slide.titulo || "Slide"}
         className="h-full w-full min-h-0 object-contain object-center sm:object-cover"
       />
@@ -196,9 +198,9 @@ export default function SlideCarousel({
       />
     );
 
-    const inner = linkUrl && isActive ? (
+    const inner = slideLink && isActive ? (
       <a
-        href={linkUrl}
+        href={slideLink}
         target="_blank"
         rel="noopener noreferrer"
         className="block h-full w-full min-h-0"

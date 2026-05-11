@@ -28,6 +28,8 @@ import { clearAuthStartedAt, isAuthExpired, readAuthStartedAt, setAuthStartedAt 
 import type { Session } from "@supabase/supabase-js";
 import { sessionRequiresMfaTotpChallenge } from "@/lib/mfaGate";
 import { formatAuthSignInError } from "@/lib/authSignInErrors";
+import { reportAuthLoginFailure } from "@/lib/authLoginFailureReporter";
+import { validatePainelStrongPassword } from "@/lib/motoristaPortalPassword";
 
 /** Persistência opcional; não ler na montagem — evita exibir URL antiga da imagem antes do fetch. */
 const LOGIN_CONFIG_CACHE_KEY = "etp_login_painel_config_v1";
@@ -182,8 +184,9 @@ const Login = () => {
   const handleRecoverySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setRecoveryError("");
-    if (recoveryPass.length < 6) {
-      setRecoveryError("A nova senha deve ter no mínimo 6 caracteres.");
+    const pwErr = validatePainelStrongPassword(recoveryPass);
+    if (pwErr) {
+      setRecoveryError(pwErr);
       return;
     }
     if (recoveryPass !== recoveryPass2) {
@@ -326,8 +329,9 @@ const Login = () => {
     if (authError) {
       if (import.meta.env.DEV) {
         // eslint-disable-next-line no-console
-        console.warn("[login] signInWithPassword", authError.message, authError);
+        console.warn("[login] signInWithPassword", authError.message, authError.name);
       }
+      void reportAuthLoginFailure(emailNorm);
       setError(formatAuthSignInError(authError));
       setLoading(false);
       refreshCaptcha();

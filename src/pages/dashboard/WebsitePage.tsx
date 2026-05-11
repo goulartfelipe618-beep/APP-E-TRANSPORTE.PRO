@@ -28,6 +28,7 @@ import {
   PurchasedDomainSelectStep,
   REGISTER_NEW_DOMAIN_VALUE,
 } from "@/components/domain/PurchasedDomainSelectStep";
+import { safeHrefForRender, safeMediaSrc, assertHttpsUrlForHref } from "@/lib/safeExternalUrl";
 
 interface TemplateDB {
   id: string;
@@ -535,15 +536,21 @@ export default function WebsitePage() {
   // ── Pós-briefing: resumo + mockup (galeria de modelos bloqueada) ──
   if (step === "acompanhamento" && servicoAtivo) {
     const dados = (servicoAtivo.dados_solicitacao || {}) as Record<string, unknown>;
-    const previewUrl = resolveWebsiteTemplatePreviewUrl(dados, dbTemplates);
-    const { headline, description } = websiteMotoristaStatusPresentation(servicoAtivo.status, servicoAtivo.link_acesso);
+    const previewUrlRaw = resolveWebsiteTemplatePreviewUrl(dados, dbTemplates);
+    const previewUrl = safeMediaSrc(previewUrlRaw) ?? null;
+    const linkPublicadoHref = safeHrefForRender(
+      typeof servicoAtivo.link_acesso === "string" ? servicoAtivo.link_acesso.trim() : "",
+    );
+    const { headline, description } = websiteMotoristaStatusPresentation(
+      servicoAtivo.status,
+      linkPublicadoHref ?? null,
+    );
     const emailProf =
       dados.email_profissional_opcao === "cadastrar_depois"
         ? "Vou cadastrar depois"
         : (typeof dados.email === "string" && dados.email.trim() ? dados.email : "—");
-    const linkPublicado = typeof servicoAtivo.link_acesso === "string" ? servicoAtivo.link_acesso.trim() : "";
     const exibirBotaoSitePublicado =
-      linkPublicado.length > 0 &&
+      Boolean(linkPublicadoHref) &&
       (servicoAtivo.status === "publicado" || servicoAtivo.status === "concluido");
 
     return (
@@ -602,14 +609,14 @@ export default function WebsitePage() {
                   variant="outline"
                   className={cn(
                     "text-base px-3 py-1",
-                    servicoAtivo.status === "publicado" || (servicoAtivo.status === "concluido" && linkPublicado)
+                    servicoAtivo.status === "publicado" || (servicoAtivo.status === "concluido" && linkPublicadoHref)
                       ? "border-green-500/40 bg-green-500/10 text-green-900 dark:text-green-100"
                       : servicoAtivo.status === "em_andamento"
                         ? "border-blue-500/40 bg-blue-500/10 text-blue-900 dark:text-blue-100"
                         : "border-amber-500/40 bg-amber-500/10 text-amber-950 dark:text-amber-100",
                   )}
                 >
-                  {servicoAtivo.status === "publicado" || (servicoAtivo.status === "concluido" && linkPublicado) ? (
+                  {servicoAtivo.status === "publicado" || (servicoAtivo.status === "concluido" && linkPublicadoHref) ? (
                     <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
                   ) : (
                     <Clock className="h-3.5 w-3.5 mr-1.5" />
@@ -642,7 +649,7 @@ export default function WebsitePage() {
 
             {exibirBotaoSitePublicado ? (
               <Button type="button" size="lg" className="w-full gap-2" asChild>
-                <a href={linkPublicado} target="_blank" rel="noopener noreferrer">
+                <a href={linkPublicadoHref!} target="_blank" rel="noopener noreferrer">
                   <ExternalLink className="h-4 w-4" /> Visualizar site publicado
                 </a>
               </Button>
@@ -1183,8 +1190,10 @@ export default function WebsitePage() {
         <p className="text-muted-foreground">Escolha o modelo ideal para o seu site profissional.</p>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-        {dbTemplates.map(t => {
+        {dbTemplates.map((t) => {
           const isSelected = selectedTemplate === t.id;
+          const tmplImg = safeMediaSrc(t.imagem_url);
+          const modeloHref = assertHttpsUrlForHref(t.link_modelo);
           return (
             <div key={t.id} className="flex flex-col">
               <div
@@ -1193,16 +1202,16 @@ export default function WebsitePage() {
                   isSelected ? "ring-2 ring-primary" : "border-border",
                 )}
               >
-                {t.imagem_url ? (
-                  <img src={t.imagem_url} alt={t.nome} className="w-full object-cover object-top transition-transform duration-[120s] ease-linear group-hover:translate-y-[calc(-100%+12rem)]" style={{ minHeight: "200%" }} />
+                {tmplImg ? (
+                  <img src={tmplImg} alt={t.nome} className="w-full object-cover object-top transition-transform duration-[120s] ease-linear group-hover:translate-y-[calc(-100%+12rem)]" style={{ minHeight: "200%" }} />
                 ) : (
                   <div className="h-full flex items-center justify-center text-muted-foreground">Sem imagem</div>
                 )}
                 {isSelected && <div className="absolute top-3 right-3 w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center z-10"><Check className="h-3.5 w-3.5" /></div>}
               </div>
               <p className="font-semibold text-foreground mt-3 text-sm">{t.nome}</p>
-              {t.link_modelo && (
-                <a href={t.link_modelo} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
+              {modeloHref && (
+                <a href={modeloHref} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
                   <Button variant="outline" size="sm" className="mt-2 w-full gap-2"><Eye className="h-4 w-4" /> Ver Modelo</Button>
                 </a>
               )}

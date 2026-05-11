@@ -3,6 +3,7 @@ import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import cors from "cors";
 import { z } from "zod";
+import { createClient } from "@supabase/supabase-js";
 import { logger } from "./logger.mjs";
 import { authSupabaseMiddleware } from "./middleware/authSupabase.mjs";
 import { originAllowlistMiddleware } from "./middleware/originAllowlist.mjs";
@@ -12,8 +13,38 @@ const EchoBodySchema = z.object({
   message: z.string().trim().min(1).max(2000),
 });
 
-/** Corpo vazio ou estritamente vazio (sem campos extra) — modelo para rotas POST sem payload. */
-const EmptyJsonBodySchema = z.object({}).strict();
+/** Payload de tentativa de login falhada (sem password; fingerprint SHA-256 do e-mail normalizado). */
+const LoginAttemptBodySchema = z
+  .object({
+    outcome: z.literal("failure"),
+    emailFingerprint: z
+      .string()
+      .regex(/^[a-f0-9]{64}$/i)
+      .transform((s) => s.toLowerCase()),
+  })
+  .strict();
+
+function ipPrefixFromExpress(req) {
+  const xf = req.headers["x-forwarded-for"];
+  const first =
+    typeof xf === "string" && xf.trim()
+      ? xf.split(",")[0]?.trim()
+      : "";
+  const raw = first || req.ip || "";
+  if (!raw) return null;
+  if (raw.includes(":")) {
+    const p = raw.split(":");
+    return p.length >= 4 ? `${p.slice(0, 4).join(":")}::/64` : null;
+  }
+  const oct = raw.split(".");
+  return oct.length === 4 ? `${oct[0]}.${oct[1]}.${oct[2]}.x` : null;
+}
+
+function uaShortFromExpress(req) {
+  const ua = req.get("User-Agent");
+  if (!ua) return null;
+  return ua.length > 160 ? `${ua.slice(0, 157)}...` : ua;
+}
 
 /** Payload genérico de webhook (n8n / Evolution); aceita objeto ou array na raiz. */
 const WebhookInboundBodySchema = z.union([z.record(z.unknown()), z.array(z.unknown())]);
@@ -115,13 +146,35 @@ export function createApp() {
     res.json({ ok: true, service: "cheerful-bond-builder-api" });
   });
 
-  /** Rota de exemplo com limite reforçado (substitua por POST /auth/login real se migrar login para aqui). */
-  app.post("/auth/login-attempt", loginLimiter, (req, res) => {
-    const parsed = EmptyJsonBodySchema.safeParse(req.body ?? {});
+  /** Login falhado: grava em `auth_login_failure_events` com service role (opcional). */
+  app.post("/auth/login-attempt", loginLimiter, async (req, res) => {
+    const parsed = LoginAttemptBodySchema.safeParse(req.body ?? {});
     if (!parsed.success) {
       return res.status(400).json({ error: "Payload inválido", details: parsed.error.flatten() });
     }
-    res.status(501).json({ error: "Login continua no Supabase Auth no cliente; use esta rota como modelo de rate limit." });
+    const url = process.env.SUPABASE_URL?.trim();
+    const sk = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
+    if (!url || !sk) {
+      logger.info("auth_login_failure_events skipped (SUPABASE_SERVICE_ROLE_KEY ausente)");
+      return res.status(204).end();
+    }
+    try {
+      const admin = createClient(url, sk);
+      const { error } = await admin.from("auth_login_failure_events").insert({
+        outcome: "failure",
+        email_fingerprint: parsed.data.emailFingerprint,
+        ip_prefix: ipPrefixFromExpress(req),
+        user_agent_short: uaShortFromExpress(req),
+      });
+      if (error) {
+        logger.error("auth login attempt insert", { message: error.message });
+        return res.status(500).json({ error: "Falha ao registar" });
+      }
+      return res.status(201).json({ ok: true });
+    } catch (e) {
+      logger.error("auth login attempt unexpected", { message: e instanceof Error ? e.message : "unknown" });
+      return res.status(500).json({ error: "Erro interno" });
+    }
   });
 
   app.post("/v1/echo", authSupabaseMiddleware({ optional: false }), (req, res) => {

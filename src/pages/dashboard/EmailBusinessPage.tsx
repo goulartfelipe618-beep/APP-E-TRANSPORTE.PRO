@@ -20,6 +20,7 @@ import UpgradePlanDialog from "@/components/planos/UpgradePlanDialog";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
+import { safeHrefForRender } from "@/lib/safeExternalUrl";
 
 const benefits = [
   "Mais autoridade no WhatsApp",
@@ -322,9 +323,11 @@ export default function EmailBusinessPage() {
                           {new Date(row.created_at).toLocaleDateString("pt-BR")}
                         </TableCell>
                         <TableCell className="text-right">
-                          {row.link_acesso ? (
+                          {(() => {
+                            const href = safeHrefForRender(row.link_acesso);
+                            return href ? (
                             <a
-                              href={row.link_acesso}
+                              href={href}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="inline-flex items-center gap-1 text-primary text-sm font-medium hover:underline"
@@ -332,9 +335,10 @@ export default function EmailBusinessPage() {
                               <ExternalLink className="h-3.5 w-3.5" />
                               Abrir
                             </a>
-                          ) : (
+                            ) : (
                             <span className="text-muted-foreground text-xs">—</span>
-                          )}
+                            );
+                          })()}
                         </TableCell>
                       </TableRow>
                     );
@@ -364,14 +368,17 @@ export default function EmailBusinessPage() {
                       return (
                         <div key={`detail-${row.id}`} className="rounded-lg border border-border p-4 space-y-3">
                           <p className="text-sm font-medium text-foreground break-all">{email}</p>
-                          {row.link_acesso && (
+                          {(() => {
+                            const href = safeHrefForRender(row.link_acesso);
+                            return href ? (
                             <div className="space-y-1">
                               <p className="text-xs text-muted-foreground">Link de acesso</p>
-                              <a href={row.link_acesso} target="_blank" rel="noopener noreferrer" className="text-primary text-sm flex items-center gap-1 hover:underline break-all">
-                                <ExternalLink className="h-4 w-4 shrink-0" /> {row.link_acesso}
+                              <a href={href} target="_blank" rel="noopener noreferrer" className="text-primary text-sm flex items-center gap-1 hover:underline break-all">
+                                <ExternalLink className="h-4 w-4 shrink-0" /> {href}
                               </a>
                             </div>
-                          )}
+                            ) : null;
+                          })()}
                           {row.data_expiracao && (
                             <div className="space-y-1">
                               <p className="text-xs text-muted-foreground">Válido até</p>

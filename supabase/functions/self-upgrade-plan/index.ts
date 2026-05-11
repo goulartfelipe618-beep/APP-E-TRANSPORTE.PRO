@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { stripeMonthlyCheckoutConfigured } from "../_shared/stripePlanPrices.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -51,6 +52,16 @@ Deno.serve(async (req) => {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+
+    if (stripeMonthlyCheckoutConfigured()) {
+      return new Response(
+        JSON.stringify({
+          error:
+            "O upgrade pago é feito pelo checkout seguro (Stripe). Abra o diálogo de planos no painel e utilize «Subscrever».",
+        }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
     }
 
     const body = await req.json().catch(() => ({}));
