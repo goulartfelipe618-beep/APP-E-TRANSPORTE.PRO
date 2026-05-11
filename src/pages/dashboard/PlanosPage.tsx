@@ -21,8 +21,8 @@ import {
   BILLING_CYCLE_LABELS,
   formatBrlParts,
   getBillingCycleDisplay,
-  type StripeBillingCycle,
-} from "@/lib/stripeBillingCycles";
+  type BillingCycle,
+} from "@/lib/billingCycles";
 
 type PaidPlan = Extract<PlanType, "standart" | "pro">;
 
@@ -43,7 +43,7 @@ type PlanCardInfo = {
   restrictions: string[];
 };
 
-const PAID_CYCLE: StripeBillingCycle = "monthly";
+const PAID_CYCLE: BillingCycle = "monthly";
 
 const PLAN_CARDS: PlanCardInfo[] = [
   {
@@ -454,7 +454,7 @@ export default function PlanosPage() {
               </div>
             )}
             <div className="text-xs text-muted-foreground">
-              Preços do checkout usam a tabela oficial da Stripe. Referência mensal: STANDART{" "}
+              Preços do checkout usam a tabela oficial do Mercado Pago. Referência mensal: STANDART{" "}
               <span className="text-foreground">{monthlyPriceLabel("standart")}</span> · PRÓ{" "}
               <span className="text-foreground">{monthlyPriceLabel("pro")}</span>. O ciclo selecionado no checkout pode
               alterar o total cobrado. Rótulo atual: {BILLING_CYCLE_LABELS[PAID_CYCLE]}.

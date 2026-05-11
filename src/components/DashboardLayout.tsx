@@ -120,7 +120,7 @@ function DashboardContent() {
   const onboarding = useMotoristaOnboarding();
   const { painelMotoristaEvolutionAtivo, ready: painelComunicadorReady } = usePainelMotoristaEvolutionAtivo();
   const mainRef = useRef<HTMLElement>(null);
-  /** Re-fetch do plano após Stripe: o webhook pode chegar alguns segundos depois do redirect. */
+  /** Re-fetch do plano após pagamento: o webhook pode chegar alguns segundos depois da confirmação. */
   const billingPlanRetryTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   useScrollPanelToTop(activePage, mainRef);
   useSlowScrollContainer(mainRef, activePage === "website");

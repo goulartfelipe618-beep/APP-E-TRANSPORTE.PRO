@@ -21,13 +21,10 @@ import {
   BILLING_CYCLE_LABELS,
   formatBrlParts,
   getBillingCycleDisplay,
-  type StripeBillingCycle,
-} from "@/lib/stripeBillingCycles";
-import {
-  fetchStripeCheckoutConfigured,
-  isStripeBillingEnabled,
-  startStripeSubscriptionCheckout,
-} from "@/lib/stripeBilling";
+  type BillingCycle,
+} from "@/lib/billingCycles";
+import { getMercadoPagoPublicKey, isMercadoPagoBillingEnabled } from "@/lib/mercadoPagoBilling";
+import MercadoPagoCardPaymentBrick from "@/components/planos/MercadoPagoCardPaymentBrick";
 
 interface UpgradePlanDialogProps {
   open: boolean;
@@ -107,8 +104,8 @@ function CycleSegmentedControl({
   onChange,
   disabled,
 }: {
-  value: StripeBillingCycle;
-  onChange: (c: StripeBillingCycle) => void;
+  value: BillingCycle;
+  onChange: (c: BillingCycle) => void;
   disabled?: boolean;
 }) {
   return (
@@ -203,7 +200,7 @@ function PlanPriceBlock({
   isPro,
 }: {
   tier: "standart" | "pro";
-  cycle: StripeBillingCycle;
+  cycle: BillingCycle;
   isPro: boolean;
 }) {
   const d = getBillingCycleDisplay(cycle);
@@ -247,14 +244,10 @@ export default function UpgradePlanDialog({
   emphasizePaidTiers = false,
 }: UpgradePlanDialogProps) {
   const [submitting, setSubmitting] = useState(false);
-  const [stripeTier, setStripeTier] = useState<null | "standart" | "pro">(null);
-  const [billingCycle, setBillingCycle] = useState<StripeBillingCycle>("monthly");
-  const viteStripe = isStripeBillingEnabled();
-  const [serverStripeConfigured, setServerStripeConfigured] = useState<boolean | null>(() =>
-    viteStripe ? true : null,
-  );
-  const stripeOn = viteStripe || serverStripeConfigured === true;
-  const stripeChecking = !viteStripe && serverStripeConfigured === null;
+  const [paymentTier, setPaymentTier] = useState<null | "standart" | "pro">(null);
+  const [billingCycle, setBillingCycle] = useState<BillingCycle>("monthly");
+  const mercadoPagoOn = isMercadoPagoBillingEnabled();
+  const mercadoPagoPublicKey = getMercadoPagoPublicKey();
   const { plano: currentPlano, refetch: refetchPlano } = useUserPlan();
 
   const isFree = currentPlano === "free";
@@ -271,32 +264,12 @@ export default function UpgradePlanDialog({
     if (open) void refetchPlano();
   }, [open, refetchPlano]);
 
-  useEffect(() => {
-    if (!open) return;
-    if (viteStripe) {
-      setServerStripeConfigured(true);
+  const openMercadoPagoCheckout = (tier: "standart" | "pro") => {
+    if (!mercadoPagoOn || !mercadoPagoPublicKey) {
+      toast.error("Mercado Pago não está configurado. Use o contacto comercial ou configure MP_PUBLIC_KEY.");
       return;
     }
-    setServerStripeConfigured(null);
-    let cancelled = false;
-    void fetchStripeCheckoutConfigured().then((ok) => {
-      if (!cancelled) setServerStripeConfigured(ok);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [open, viteStripe]);
-
-  const handleStripe = async (tier: "standart" | "pro") => {
-    setStripeTier(tier);
-    try {
-      await startStripeSubscriptionCheckout(tier, billingCycle);
-    } catch (e) {
-      console.error(e);
-      toast.error(e instanceof Error ? e.message : "Não foi possível iniciar o pagamento.");
-    } finally {
-      setStripeTier(null);
-    }
+    setPaymentTier((current) => (current === tier ? null : tier));
   };
 
   const handleMigrar = async (preferPro?: boolean) => {
@@ -442,7 +415,7 @@ export default function UpgradePlanDialog({
                 <CycleSegmentedControl
                   value={billingCycle}
                   onChange={setBillingCycle}
-                  disabled={stripeTier !== null}
+                  disabled={paymentTier !== null}
                 />
               </div>
 
@@ -504,24 +477,19 @@ export default function UpgradePlanDialog({
             </div>
           ) : null}
 
-          {stripeChecking ? (
-            <div className="flex flex-col items-center gap-2 py-4">
-              <Loader2 className="h-8 w-8 animate-spin text-[#FF6600]" aria-hidden />
-              <p className="text-center text-sm text-neutral-400">A carregar opções de pagamento…</p>
-            </div>
-          ) : stripeOn && !isPro ? (
+          {mercadoPagoOn && !isPro ? (
             <div className="flex flex-col gap-3">
               {isFree ? (
                 <>
                   <Button
                     type="button"
                     className="h-12 w-full gap-2 bg-[#FF6600] text-xs font-bold uppercase tracking-wider text-white shadow-lg shadow-[#FF6600]/20 hover:bg-[#e65c00]"
-                    disabled={stripeTier !== null}
-                    onClick={() => void handleStripe("pro")}
+                    disabled={paymentTier === "standart"}
+                    onClick={() => openMercadoPagoCheckout("pro")}
                   >
-                    {stripeTier === "pro" ? (
+                    {paymentTier === "pro" ? (
                       <>
-                        <Loader2 className="h-4 w-4 animate-spin" /> A redirecionar…
+                        <CreditCard className="h-4 w-4" /> Formulário PRÓ aberto
                       </>
                     ) : (
                       <>
@@ -534,12 +502,12 @@ export default function UpgradePlanDialog({
                     type="button"
                     variant="outline"
                     className="h-11 w-full border-2 border-neutral-600 bg-transparent text-xs font-semibold uppercase tracking-wider text-neutral-100 hover:border-[#FF6600] hover:bg-[#FF6600]/10 hover:text-white"
-                    disabled={stripeTier !== null || currentPlano === "standart"}
-                    onClick={() => void handleStripe("standart")}
+                    disabled={paymentTier === "pro" || currentPlano === "standart"}
+                    onClick={() => openMercadoPagoCheckout("standart")}
                   >
-                    {stripeTier === "standart" ? (
+                    {paymentTier === "standart" ? (
                       <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" /> A redirecionar…
+                        <CreditCard className="mr-2 h-4 w-4" /> Formulário STANDART aberto
                       </>
                     ) : (
                       <>
@@ -553,12 +521,11 @@ export default function UpgradePlanDialog({
                 <Button
                   type="button"
                   className="h-12 w-full gap-2 bg-[#FF6600] text-xs font-bold uppercase tracking-wider text-white shadow-lg shadow-[#FF6600]/20 hover:bg-[#e65c00]"
-                  disabled={stripeTier !== null}
-                  onClick={() => void handleStripe("pro")}
+                  onClick={() => openMercadoPagoCheckout("pro")}
                 >
-                  {stripeTier === "pro" ? (
+                  {paymentTier === "pro" ? (
                     <>
-                      <Loader2 className="h-4 w-4 animate-spin" /> A redirecionar…
+                      <CreditCard className="h-4 w-4" /> Formulário PRÓ aberto
                     </>
                   ) : (
                     <>
@@ -570,8 +537,19 @@ export default function UpgradePlanDialog({
               )}
               <p className="flex items-center justify-center gap-1.5 text-center text-[10px] text-neutral-500 sm:text-[11px]">
                 <Lock className="h-3 w-3 shrink-0" aria-hidden />
-                Pagamento seguro via Stripe · Plano activo após confirmação
+                Pagamento seguro via Mercado Pago · Parcelamento nativo até 12x
               </p>
+              {paymentTier ? (
+                <MercadoPagoCardPaymentBrick
+                  key={`${paymentTier}-${billingCycle}`}
+                  plano={paymentTier}
+                  ciclo={billingCycle}
+                  onApproved={() => {
+                    void refetchPlano();
+                    onOpenChange(false);
+                  }}
+                />
+              ) : null}
               <div className="relative py-1 text-center text-[10px] text-neutral-600 sm:text-[11px]">
                 <span className="relative z-10 bg-neutral-950 px-2">ou</span>
                 <span className="absolute left-0 right-0 top-1/2 -z-0 h-px bg-neutral-800" aria-hidden />
@@ -580,7 +558,7 @@ export default function UpgradePlanDialog({
                 type="button"
                 variant="outline"
                 className="h-10 w-full border-neutral-600 bg-transparent text-xs font-semibold text-neutral-200 hover:bg-white/5"
-                disabled={submitting || stripeTier !== null}
+                disabled={submitting}
                 onClick={() => void handleMigrar(!isFree)}
               >
                 {submitting ? (
@@ -620,7 +598,7 @@ export default function UpgradePlanDialog({
               type="button"
               variant="outline"
               className="h-10 w-full border-neutral-600 bg-transparent text-xs font-semibold uppercase tracking-wide text-white hover:bg-white/10 sm:min-w-[140px]"
-              disabled={submitting || stripeTier !== null}
+              disabled={submitting}
               onClick={() => onOpenChange(false)}
             >
               Fechar

@@ -21,8 +21,8 @@ interface UserItem {
   created_at: string;
   role: string;
   plano: string;
-  /** true = `billing_manual_override`; webhooks Stripe não alteram o plano. */
-  plano_bloqueado_stripe?: boolean;
+  /** true = `billing_manual_override`; webhooks Mercado Pago não alteram o plano. */
+  plano_bloqueado_mp?: boolean;
 }
 
 const roleLabels: Record<string, string> = {
@@ -53,7 +53,7 @@ export default function AdminUsuariosCadastrados() {
   const [formPlano, setFormPlano] = useState<PlanType>("free");
   const [creating, setCreating] = useState(false);
   const [updatingPlan, setUpdatingPlan] = useState(false);
-  const [allowStripeSync, setAllowStripeSync] = useState(true);
+  const [allowMercadoPagoSync, setAllowMercadoPagoSync] = useState(true);
   const [deleteUserId, setDeleteUserId] = useState<string | null>(null);
   const [deleteUserLoading, setDeleteUserLoading] = useState(false);
 
@@ -185,7 +185,7 @@ export default function AdminUsuariosCadastrados() {
     setSelectedUser(user);
     const p = normalizeUserPlano(user.plano);
     setSelectedPlan(p);
-    setAllowStripeSync(user.plano_bloqueado_stripe !== true);
+    setAllowMercadoPagoSync(user.plano_bloqueado_mp !== true);
     setPlanDialogOpen(true);
   };
 
@@ -206,7 +206,7 @@ export default function AdminUsuariosCadastrados() {
         body: JSON.stringify({
           user_id: selectedUser.id,
           plano: selectedPlan,
-          allow_stripe_billing: allowStripeSync,
+          allow_mp_billing: allowMercadoPagoSync,
         }),
       }
     );
@@ -303,9 +303,9 @@ export default function AdminUsuariosCadastrados() {
                       <Badge variant="outline" className={PLAN_COLORS[normalizeUserPlano(u.plano)]}>
                         {PLAN_LABELS[normalizeUserPlano(u.plano)]}
                       </Badge>
-                      {u.plano_bloqueado_stripe ? (
+                      {u.plano_bloqueado_mp ? (
                         <span className="text-[10px] text-muted-foreground uppercase tracking-wide">
-                          Plano manual (Stripe off)
+                          Plano manual (MP off)
                         </span>
                       ) : null}
                     </div>
@@ -410,7 +410,7 @@ export default function AdminUsuariosCadastrados() {
             </DialogTitle>
             <DialogDescription>
               Atualiza o plano deste utilizador na plataforma. Não está disponível para a conta de administrador master.
-              Com Stripe activo, desligue a sincronização para impedir que pagamentos alterem o plano deste utilizador.
+              Com Mercado Pago ativo, desligue a sincronização para impedir que pagamentos alterem o plano deste utilizador.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -433,13 +433,13 @@ export default function AdminUsuariosCadastrados() {
             </div>
             <div className="flex items-start gap-3 rounded-lg border border-border bg-muted/30 p-3">
               <Checkbox
-                id="admin-allow-stripe"
-                checked={allowStripeSync}
-                onCheckedChange={(c) => setAllowStripeSync(c === true)}
+                id="admin-allow-mp"
+                checked={allowMercadoPagoSync}
+                onCheckedChange={(c) => setAllowMercadoPagoSync(c === true)}
               />
               <div className="grid gap-1">
-                <Label htmlFor="admin-allow-stripe" className="text-sm font-medium leading-none cursor-pointer">
-                  Permitir sincronização Stripe
+                <Label htmlFor="admin-allow-mp" className="text-sm font-medium leading-none cursor-pointer">
+                  Permitir sincronização Mercado Pago
                 </Label>
                 <p className="text-xs text-muted-foreground">
                   Se desmarcar, o plano fica sob controlo exclusivo do admin — webhooks de pagamento não alteram esta conta.

@@ -94,7 +94,6 @@ const getMenuStructure = (showNetwork: boolean, exibirComunicadorMotorista: bool
           { title: "Relatórios", page: "financeiro/relatorios", icon: BarChart3 },
         ],
       },
-      { title: "Planos", page: "planos", icon: CreditCard },
       {
         title: "Transfer",
         icon: ArrowLeftRight,
@@ -177,6 +176,7 @@ const getMenuStructure = (showNetwork: boolean, exibirComunicadorMotorista: bool
       },
       { title: "Anotações", page: "anotacoes", icon: StickyNote },
       { title: "Suporte", page: "tickets", icon: ClipboardList },
+      { title: "Planos", page: "planos", icon: CreditCard },
     ],
   },
 ];

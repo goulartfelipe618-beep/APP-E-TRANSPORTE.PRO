@@ -52,15 +52,3 @@ verify_jwt = false
 # Registo de login falhado (fingerprint SHA-256 do e-mail; sem JWT de sessão).
 [functions.log-auth-login-failure]
 verify_jwt = false
-
-# Checkout Stripe: exige JWT; segredo Stripe só no servidor.
-[functions.stripe-create-checkout-session]
-verify_jwt = true
-
-# Webhook Stripe: corpo bruto + assinatura; sem JWT de utilizador.
-[functions.stripe-webhook]
-verify_jwt = false
-
-# Painel: GET público — só devolve { available } sem segredos.
-[functions.stripe-checkout-available]
-verify_jwt = false

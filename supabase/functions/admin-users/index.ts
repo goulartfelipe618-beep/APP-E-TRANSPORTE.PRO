@@ -111,7 +111,7 @@ Deno.serve(async (req) => {
           const planEntry = planMap.get(u.id) as { plano: string; billing_manual_override: boolean } | undefined;
           const plano =
             role === "admin_master" ? "n/a" : (planEntry?.plano || "free");
-          const plano_bloqueado_stripe =
+          const plano_bloqueado_mp =
             role === "admin_master" ? false : Boolean(planEntry?.billing_manual_override);
           return {
             id: u.id,
@@ -119,7 +119,7 @@ Deno.serve(async (req) => {
             created_at: u.created_at,
             role,
             plano,
-            plano_bloqueado_stripe,
+            plano_bloqueado_mp,
           };
         });
 
@@ -207,21 +207,21 @@ Deno.serve(async (req) => {
     // UPDATE PLAN: FREE ↔ PRÓ (apenas contas com plano — não admin_master)
     if (req.method === "POST" && action === "update_plan") {
       const body = await req.json();
-      const { user_id, plano, allow_stripe_billing } = body as {
+      const { user_id, plano, allow_mp_billing } = body as {
         user_id?: string;
         plano?: unknown;
-        allow_stripe_billing?: unknown;
+        allow_mp_billing?: unknown;
       };
 
       if (!user_id || plano === undefined || plano === null || String(plano).trim() === "") {
         return new Response(JSON.stringify({ error: "user_id e plano são obrigatórios" }), { status: 400, headers: corsHeaders });
       }
 
-      const allowStripe =
-        allow_stripe_billing === true ||
-        allow_stripe_billing === "true" ||
-        allow_stripe_billing === 1 ||
-        allow_stripe_billing === "1";
+      const allowMercadoPago =
+        allow_mp_billing === true ||
+        allow_mp_billing === "true" ||
+        allow_mp_billing === 1 ||
+        allow_mp_billing === "1";
 
       const rawPlano = String(plano).toLowerCase().trim();
       const planoNorm = rawPlano === "standard" ? "standart" : rawPlano;
@@ -246,13 +246,13 @@ Deno.serve(async (req) => {
       }
 
       // Upsert plan (persistir sempre standart, nunca o alias "standard").
-      // admin_master: allow_stripe_billing=true → Stripe volta a sincronizar; caso contrário bloqueia webhooks.
+      // admin_master: allow_mp_billing=true → Mercado Pago volta a sincronizar; caso contrário bloqueia webhooks.
       const { error } = await supabaseAdmin.from("user_plans").upsert(
         {
           user_id,
           plano: planoNorm,
           updated_at: new Date().toISOString(),
-          billing_manual_override: !allowStripe,
+          billing_manual_override: !allowMercadoPago,
         },
         { onConflict: "user_id" },
       );

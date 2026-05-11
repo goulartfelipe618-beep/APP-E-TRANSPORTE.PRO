@@ -27,7 +27,7 @@ const DEFAULT_CONTEUDO = `1. OBJETO
 2.3. O plano PRÓ é o plano máximo da plataforma, incluindo os recursos do STANDART, solicitações, mini painel do motorista, presença digital, domínios, e-mail business, website, automações e integrações premium.
 
 3. ATIVAÇÃO, PAGAMENTO E ALTERAÇÃO DE PLANO
-3.1. A ativação de plano pago ocorre após confirmação do pagamento pela Stripe ou confirmação administrativa.
+3.1. A ativação de plano pago ocorre após confirmação do pagamento pelo Mercado Pago ou confirmação administrativa.
 3.2. Upgrades podem liberar recursos imediatamente após a confirmação. Downgrades ou cancelamentos podem suspender recursos premium no término ou interrupção do plano pago.
 
 4. DADOS E RETENÇÃO
@@ -40,7 +40,7 @@ const DEFAULT_CONTEUDO = `1. OBJETO
 
 6. SUPORTE E DISPONIBILIDADE
 6.1. A plataforma emprega esforços razoáveis para manter a disponibilidade dos serviços, podendo realizar manutenções, melhorias e atualizações.
-6.2. Integrações externas, como Stripe, provedores de e-mail, WhatsApp, domínios, mapas e automações, dependem também da disponibilidade e regras dos respetivos fornecedores.
+6.2. Integrações externas, como Mercado Pago, provedores de e-mail, WhatsApp, domínios, mapas e automações, dependem também da disponibilidade e regras dos respetivos fornecedores.
 
 7. ACEITE
 7.1. Ao utilizar, assinar ou solicitar ativação de plano, o usuário declara ciência das condições deste contrato e dos limites do plano atualmente ativo em sua conta.`;

@@ -114,8 +114,8 @@ Isto reduz uploads maliciosos disfarçados de imagem e alinha-se às boas práti
 ## Planos (`user_plans`)
 
 - Valores persistidos: **`free`** e **`pro`** (legados `seed` / `grow` / `rise` / `apex` são normalizados no cliente e migrados no Postgres para `pro`; ver `supabase/migrations/20260430220000_user_plans_free_pro.sql`).
-- **Stripe (subscrição):** com segredos `STRIPE_*` configurados no Supabase, o checkout (`stripe-create-checkout-session`) e os webhooks (`stripe-webhook`) actualizam `user_plans`; `billing_manual_override` impede que a Stripe altere contas que o **admin_master** marcou como só manuais. Passo a passo: **`STRIPE_SETUP.md`**.
-- **Upgrade de plano** sem Stripe (fallback): Edge Function `self-upgrade-plan` com JWT — **desactivada para tiers pagos** quando `STRIPE_SECRET_KEY` e preços estão definidos (evita upgrade sem pagamento).
+- **Mercado Pago (checkout transparente):** a API Node (`POST /api/payments/create-preference`, `POST /api/webhooks/mercadopago`, `GET /api/payments/status/:paymentId`) actualiza `user_plans`; `billing_manual_override` impede que webhooks Mercado Pago alterem contas que o **admin_master** marcou como só manuais.
+- **Upgrade de plano** sem Mercado Pago (fallback): Edge Function `self-upgrade-plan` com JWT — **desactivada para tiers pagos** quando `MP_ACCESS_TOKEN` está definido (evita upgrade sem pagamento).
 - **Admin:** `admin-users` (`update_plan`, `finalize_landing_lead`) valida `free` | `standart` | `pro`; FREE não é atribuído manualmente a utilizadores já em Cadastrados (regra de negócio).
 - O menu do motorista executivo restringe páginas no cliente (`painelPlanPolicy`); **não substitui RLS** — dados sensíveis seguem protegidos por políticas nas tabelas.
 

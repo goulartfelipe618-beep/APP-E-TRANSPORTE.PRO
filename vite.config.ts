@@ -20,10 +20,23 @@ function supabaseEnvFromProcess(fileEnv: Record<string, string>) {
   return { url: url ?? "", key: key ?? "", projectId: projectId ?? "" };
 }
 
+function mercadoPagoEnvFromProcess(fileEnv: Record<string, string>) {
+  const publicKey =
+    fileEnv.VITE_MP_PUBLIC_KEY ||
+    fileEnv.NEXT_PUBLIC_MP_PUBLIC_KEY ||
+    process.env.VITE_MP_PUBLIC_KEY ||
+    process.env.NEXT_PUBLIC_MP_PUBLIC_KEY ||
+    process.env.MP_PUBLIC_KEY;
+  const apiBaseUrl = fileEnv.VITE_API_BASE_URL || process.env.VITE_API_BASE_URL || "";
+  const billingEnabled = fileEnv.VITE_MP_BILLING_ENABLED || process.env.VITE_MP_BILLING_ENABLED || "";
+  return { publicKey: publicKey ?? "", apiBaseUrl, billingEnabled };
+}
+
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
   const fileEnv = loadEnv(mode, process.cwd(), "");
   const { url, key, projectId } = supabaseEnvFromProcess(fileEnv);
+  const mp = mercadoPagoEnvFromProcess(fileEnv);
 
   return {
     server: {
@@ -66,6 +79,10 @@ export default defineConfig(({ mode }) => {
       "import.meta.env.VITE_SUPABASE_URL": JSON.stringify(url),
       "import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY": JSON.stringify(key),
       "import.meta.env.VITE_SUPABASE_PROJECT_ID": JSON.stringify(projectId),
+      "import.meta.env.VITE_MP_PUBLIC_KEY": JSON.stringify(mp.publicKey),
+      "import.meta.env.NEXT_PUBLIC_MP_PUBLIC_KEY": JSON.stringify(mp.publicKey),
+      "import.meta.env.VITE_API_BASE_URL": JSON.stringify(mp.apiBaseUrl),
+      "import.meta.env.VITE_MP_BILLING_ENABLED": JSON.stringify(mp.billingEnabled),
     },
   };
 });

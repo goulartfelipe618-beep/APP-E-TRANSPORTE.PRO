@@ -1,39 +1,34 @@
 export const BILLING_CYCLES = ["monthly", "quarterly", "semiannual", "annual"] as const;
-export type StripeBillingCycle = (typeof BILLING_CYCLES)[number];
+export type BillingCycle = (typeof BILLING_CYCLES)[number];
 
-/** Rótulos do ciclo (alinhados ao checkout Stripe). */
-export const BILLING_CYCLE_LABELS: Record<StripeBillingCycle, string> = {
+/** Rótulos do ciclo (alinhados ao checkout Mercado Pago). */
+export const BILLING_CYCLE_LABELS: Record<BillingCycle, string> = {
   monthly: "Mensal",
   quarterly: "Trimestral",
   semiannual: "Semestral",
   annual: "Anual",
 };
 
-/**
- * Valores exibidos no painel (BRL, duas casas) — espelho dos preços configurados na Stripe.
- * O valor cobrado é sempre o do Price ID na Stripe.
- */
-export const PAID_PLAN_CYCLE_PRICES: Record<StripeBillingCycle, { standart: string; pro: string }> = {
+/** Totais exibidos/cobrados por ciclo no Mercado Pago (BRL). */
+export const PAID_PLAN_CYCLE_TOTALS_BRL: Record<BillingCycle, { standart: number; pro: number }> = {
+  monthly: { standart: 89.9, pro: 109.9 },
+  quarterly: { standart: 239.7, pro: 299.7 },
+  semiannual: { standart: 419.4, pro: 539.4 },
+  annual: { standart: 718.8, pro: 958.8 },
+};
+
+export const PAID_PLAN_CYCLE_PRICES: Record<BillingCycle, { standart: string; pro: string }> = {
   monthly: { standart: "R$ 89,90", pro: "R$ 109,90" },
   quarterly: { standart: "R$ 239,70", pro: "R$ 299,70" },
   semiannual: { standart: "R$ 419,40", pro: "R$ 539,40" },
   annual: { standart: "R$ 718,80", pro: "R$ 958,80" },
 };
 
-/** Meses por ciclo (totais em PAID_PLAN_CYCLE_TOTALS_BRL alinhados a PAID_PLAN_CYCLE_PRICES). */
-const CYCLE_MONTHS: Record<StripeBillingCycle, number> = {
+export const CYCLE_MONTHS: Record<BillingCycle, number> = {
   monthly: 1,
   quarterly: 3,
   semiannual: 6,
   annual: 12,
-};
-
-/** Totais em BRL por ciclo — espelho dos valores em `PAID_PLAN_CYCLE_PRICES`. */
-export const PAID_PLAN_CYCLE_TOTALS_BRL: Record<StripeBillingCycle, { standart: number; pro: number }> = {
-  monthly: { standart: 89.9, pro: 109.9 },
-  quarterly: { standart: 239.7, pro: 299.7 },
-  semiannual: { standart: 419.4, pro: 539.4 },
-  annual: { standart: 718.8, pro: 958.8 },
 };
 
 /** Formata valor para UI tipo `89,90` (sem prefixo). */
@@ -45,7 +40,7 @@ export function formatBrlParts(n: number): string {
 }
 
 /** Equivalente mensal, percentagem de poupança vs. mensal (por plano) e total do período. */
-export function getBillingCycleDisplay(cycle: StripeBillingCycle): {
+export function getBillingCycleDisplay(cycle: BillingCycle): {
   months: number;
   standartPerMonth: number;
   proPerMonth: number;
@@ -72,4 +67,12 @@ export function getBillingCycleDisplay(cycle: StripeBillingCycle): {
     standartTotalFormatted: formatBrlParts(t.standart),
     proTotalFormatted: formatBrlParts(t.pro),
   };
+}
+
+export function getBillingCycleTotal(cycle: BillingCycle, plano: "standart" | "pro"): number {
+  return PAID_PLAN_CYCLE_TOTALS_BRL[cycle][plano];
+}
+
+export function mercadoPagoPlanId(plano: "standart" | "pro", ciclo: BillingCycle): string {
+  return `${plano}_${ciclo}`;
 }

@@ -8,6 +8,7 @@ import { logger } from "./logger.mjs";
 import { authSupabaseMiddleware } from "./middleware/authSupabase.mjs";
 import { originAllowlistMiddleware } from "./middleware/originAllowlist.mjs";
 import { verifyWebhookHmacMiddleware } from "./middleware/verifyWebhookHmac.mjs";
+import { registerMercadoPagoRoutes } from "./mercadoPagoPayments.mjs";
 
 const EchoBodySchema = z.object({
   message: z.string().trim().min(1).max(2000),
@@ -121,6 +122,12 @@ export function createApp() {
       return res.status(200).json({ ok: true, received: true });
     },
   );
+
+  registerMercadoPagoRoutes(app, {
+    authSupabaseMiddleware,
+    originAllowlist: originAllowlistMiddleware(),
+    rateLimit,
+  });
 
   app.use(express.json({ limit: "100kb" }));
   app.use(originAllowlistMiddleware());

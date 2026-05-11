@@ -1,5 +1,4 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { stripeMonthlyCheckoutConfigured } from "../_shared/stripePlanPrices.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -54,11 +53,11 @@ Deno.serve(async (req) => {
       });
     }
 
-    if (stripeMonthlyCheckoutConfigured()) {
+    if ((Deno.env.get("MP_ACCESS_TOKEN") || "").trim()) {
       return new Response(
         JSON.stringify({
           error:
-            "O upgrade pago é feito pelo checkout seguro (Stripe). Abra o diálogo de planos no painel e utilize «Subscrever».",
+            "O upgrade pago é feito pelo checkout seguro (Mercado Pago). Abra o diálogo de planos no painel e utilize «Subscrever».",
         }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );

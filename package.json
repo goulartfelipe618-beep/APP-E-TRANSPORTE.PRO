@@ -14,8 +14,7 @@
     "server": "node server/index.mjs",
     "security-check": "node scripts/security-check.mjs",
     "scan-dead-src": "node scripts/scan-dead-src.mjs",
-    "verify:webhook-solicitacao": "node scripts/verify-webhook-solicitacao.mjs",
-    "deploy:stripe-functions": "supabase functions deploy stripe-checkout-available && supabase functions deploy stripe-create-checkout-session && supabase functions deploy stripe-webhook"
+    "verify:webhook-solicitacao": "node scripts/verify-webhook-solicitacao.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
@@ -64,6 +63,7 @@
     "jspdf": "^4.2.0",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.462.0",
+    "mercadopago": "^2.12.0",
     "qrcode": "^1.5.4",
     "qrcode.react": "^4.2.0",
     "react": "^18.3.1",
