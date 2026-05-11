@@ -179,6 +179,9 @@ Deno.serve(async (req) => {
 
     const form: Record<string, string> = {
       mode: "subscription",
+      /** Obrigatório quando o Dashboard não tem métodos activos para BRL / subscrição. */
+      "payment_method_types[0]": "card",
+      locale: "pt-BR",
       "success_url": successUrl,
       "cancel_url": cancelUrl,
       "line_items[0][price]": priceId,

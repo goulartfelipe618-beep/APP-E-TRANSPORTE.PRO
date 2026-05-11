@@ -210,5 +210,7 @@ Para um cliente voltar a pagar pela Stripe após ter sido posto em «só manual�
 | Pagamento ok, plano não muda | Webhook: ver logs da função; evento falhou ou `billing_manual_override` está activo. |
 | 401 no checkout | Sessão expirada ou função com `verify_jwt` mal configurada. |
 | Assinatura inválida no webhook | `STRIPE_WEBHOOK_SECRET` errado ou corpo alterado por proxy (deve ser raw body). |
+| «No valid payment method types» / 500 no checkout | A função envia `payment_method_types=card`. Em **Stripe → Definições → Métodos de pagamento**, active **Cartão** (e métodos compatíveis com **BRL** / subscrições no seu país). |
+| CSP bloqueia script inline no painel | O `vercel.json` inclui hash do script de tema em `index.html`; se alterar esse bloco, actualize o hash em `script-src` ou volte a copiar o valor que o browser mostra na consola. |
 
 Para suporte Stripe: [https://support.stripe.com](https://support.stripe.com) e documentação [https://stripe.com/docs/webhooks](https://stripe.com/docs/webhooks).
