@@ -58,6 +58,7 @@ import FinanceiroLancamentosPage from "@/pages/dashboard/financeiro/FinanceiroLa
 import FinanceiroReceberPage from "@/pages/dashboard/financeiro/FinanceiroReceberPage";
 import FinanceiroPagarPage from "@/pages/dashboard/financeiro/FinanceiroPagarPage";
 import FinanceiroRelatoriosPage from "@/pages/dashboard/financeiro/FinanceiroRelatoriosPage";
+import PlanosPage from "@/pages/dashboard/PlanosPage";
 import PainelAvisoBanner from "@/components/PainelAvisoBanner";
 import FullscreenBannerOverlay from "@/components/FullscreenBannerOverlay";
 
@@ -101,6 +102,7 @@ const PAGE_MAP: Record<string, React.ComponentType> = {
   "financeiro/receber": FinanceiroReceberPage,
   "financeiro/pagar": FinanceiroPagarPage,
   "financeiro/relatorios": FinanceiroRelatoriosPage,
+  planos: PlanosPage,
 };
 
 function readNetworkSpotlightActive() {

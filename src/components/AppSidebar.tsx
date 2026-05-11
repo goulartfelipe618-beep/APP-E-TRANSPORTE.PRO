@@ -8,6 +8,7 @@ import {
   Globe, Search, Mail, Monitor, Settings, StickyNote, Link2,
   Bell, Moon, Sun, LogOut, GraduationCap, Plane, Calendar,
   Wallet2,
+  CreditCard,
   List,
   Inbox,
   Banknote,
@@ -93,6 +94,7 @@ const getMenuStructure = (showNetwork: boolean, exibirComunicadorMotorista: bool
           { title: "Relatórios", page: "financeiro/relatorios", icon: BarChart3 },
         ],
       },
+      { title: "Planos", page: "planos", icon: CreditCard },
       {
         title: "Transfer",
         icon: ArrowLeftRight,

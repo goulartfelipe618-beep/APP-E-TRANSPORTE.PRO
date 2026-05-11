@@ -145,7 +145,7 @@ export function AdminSidebar() {
                   className={cn("cursor-pointer", isActive("contrato/transfer") && "bg-muted text-primary font-medium")}
                 >
                   <FileText className="mr-2 h-4 w-4 shrink-0" />
-                  {!collapsed && <span className="min-w-0 truncate">Contrato</span>}
+                  {!collapsed && <span className="min-w-0 truncate">Contrato Planos</span>}
                 </SidebarMenuButton>
               </SidebarMenuItem>
 
