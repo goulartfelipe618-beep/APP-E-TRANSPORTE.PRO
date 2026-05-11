@@ -118,6 +118,8 @@ function DashboardContent() {
   const onboarding = useMotoristaOnboarding();
   const { painelMotoristaEvolutionAtivo, ready: painelComunicadorReady } = usePainelMotoristaEvolutionAtivo();
   const mainRef = useRef<HTMLElement>(null);
+  /** Re-fetch do plano após Stripe: o webhook pode chegar alguns segundos depois do redirect. */
+  const billingPlanRetryTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   useScrollPanelToTop(activePage, mainRef);
   useSlowScrollContainer(mainRef, activePage === "website");
   const [showOverlay, setShowOverlay] = useState(readNetworkSpotlightActive);
@@ -127,13 +129,26 @@ function DashboardContent() {
   }, []);
 
   useEffect(() => {
+    return () => {
+      billingPlanRetryTimersRef.current.forEach(clearTimeout);
+      billingPlanRetryTimersRef.current = [];
+    };
+  }, []);
+
+  useEffect(() => {
     const sp = new URLSearchParams(location.search);
     if (sp.get("billing") !== "success") return;
     sp.delete("billing");
     const q = sp.toString();
     navigate({ pathname: location.pathname, search: q ? `?${q}` : "" }, { replace: true });
     toast.success("Pagamento concluído. A actualizar o seu plano…");
-    window.dispatchEvent(new Event("etp-user-plan-refetch"));
+    const refetchPlan = () => window.dispatchEvent(new Event("etp-user-plan-refetch"));
+    refetchPlan();
+    for (const id of billingPlanRetryTimersRef.current) clearTimeout(id);
+    billingPlanRetryTimersRef.current = [];
+    for (const ms of [1500, 3500, 7000]) {
+      billingPlanRetryTimersRef.current.push(window.setTimeout(refetchPlan, ms));
+    }
   }, [location.pathname, location.search, navigate]);
 
   useEffect(() => {
