@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import {
@@ -246,6 +246,7 @@ export default function UpgradePlanDialog({
   const [submitting, setSubmitting] = useState(false);
   const [paymentTier, setPaymentTier] = useState<null | "standart" | "pro">(null);
   const [billingCycle, setBillingCycle] = useState<BillingCycle>("monthly");
+  const checkoutAreaRef = useRef<HTMLDivElement | null>(null);
   const mercadoPagoOn = isMercadoPagoBillingEnabled();
   const mercadoPagoPublicKey = getMercadoPagoPublicKey();
   const { plano: currentPlano, refetch: refetchPlano } = useUserPlan();
@@ -264,11 +265,28 @@ export default function UpgradePlanDialog({
     if (open) void refetchPlano();
   }, [open, refetchPlano]);
 
+  useEffect(() => {
+    if (!open) setPaymentTier(null);
+  }, [open]);
+
+  useEffect(() => {
+    if (!paymentTier) return;
+    window.requestAnimationFrame(() => {
+      checkoutAreaRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    });
+  }, [paymentTier]);
+
   const openMercadoPagoCheckout = (tier: "standart" | "pro") => {
     if (!mercadoPagoOn || !mercadoPagoPublicKey) {
       toast.error("Mercado Pago não está configurado. Use o contacto comercial ou configure MP_PUBLIC_KEY.");
       return;
     }
+    console.info("[MercadoPago] checkout requested", {
+      tier,
+      billingCycle,
+      billingEnabled: mercadoPagoOn,
+      hasPublicKey: Boolean(mercadoPagoPublicKey),
+    });
     setPaymentTier((current) => (current === tier ? null : tier));
   };
 
@@ -365,7 +383,12 @@ export default function UpgradePlanDialog({
           <DialogDescription>Comparativo de funcionalidades e preços por ciclo de subscrição.</DialogDescription>
         </DialogHeader>
 
-        <div className="max-h-[min(70vh,720px)] overflow-y-auto border-b border-neutral-800 bg-neutral-950 px-4 py-5 sm:px-6">
+        <div
+          className={cn(
+            "overflow-y-auto border-b border-neutral-800 bg-neutral-950 px-4 py-5 sm:px-6",
+            paymentTier ? "max-h-[min(36vh,360px)]" : "max-h-[min(70vh,720px)]",
+          )}
+        >
           {isPro ? (
             <div className="mx-auto max-w-md space-y-4 text-center">
               <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-[#FF6600]/15">
@@ -466,7 +489,13 @@ export default function UpgradePlanDialog({
           )}
         </div>
 
-        <div className="space-y-3 bg-neutral-950 px-4 py-4 sm:px-6 sm:py-5">
+        <div
+          ref={checkoutAreaRef}
+          className={cn(
+            "space-y-3 bg-neutral-950 px-4 py-4 sm:px-6 sm:py-5",
+            paymentTier && "max-h-[min(58vh,600px)] overflow-y-auto",
+          )}
+        >
           {!isPro ? (
             <div className="flex gap-2 rounded-lg border border-neutral-800 bg-neutral-900/30 px-3 py-2.5 text-[11px] leading-relaxed text-neutral-400 sm:text-xs">
               <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-[#FF6600]" aria-hidden />

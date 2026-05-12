@@ -1,10 +1,11 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Loader2, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import {
   createMercadoPagoPayment,
   getMercadoPagoCheckoutAmount,
   getMercadoPagoCheckoutDescription,
+  getPaymentsApiBaseUrl,
   getMercadoPagoPublicKey,
   loadMercadoPagoSdk,
   type MercadoPagoBrickPayload,
@@ -18,6 +19,8 @@ interface MercadoPagoCardPaymentBrickProps {
   disabled?: boolean;
   onApproved?: () => void;
 }
+
+const CARD_PAYMENT_CONTAINER_ID = "cardPaymentBrick_container";
 
 function normalizeBrickPayload(raw: unknown): MercadoPagoBrickPayload {
   const r = (raw || {}) as Record<string, unknown>;
@@ -44,13 +47,13 @@ export default function MercadoPagoCardPaymentBrick({
   disabled = false,
   onApproved,
 }: MercadoPagoCardPaymentBrickProps) {
-  const reactId = useId();
-  const containerId = `mp-card-payment-${reactId.replace(/[^a-zA-Z0-9_-]/g, "")}`;
+  const containerRef = useRef<HTMLDivElement | null>(null);
   const controllerRef = useRef<{ unmount?: () => void } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (disabled) return;
     let cancelled = false;
     const publicKey = getMercadoPagoPublicKey();
     const amount = getMercadoPagoCheckoutAmount(plano, ciclo);
@@ -62,6 +65,25 @@ export default function MercadoPagoCardPaymentBrick({
         if (!publicKey) {
           throw new Error("Chave pública Mercado Pago não configurada.");
         }
+
+        console.info("[MercadoPago] Card Payment Brick init", {
+          hasPublicKey: Boolean(publicKey),
+          publicKeyPrefix: publicKey.slice(0, 12),
+          apiBaseUrl: getPaymentsApiBaseUrl() || "same-origin",
+          containerId: CARD_PAYMENT_CONTAINER_ID,
+          plano,
+          ciclo,
+          amount,
+        });
+
+        await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
+        if (cancelled) return;
+
+        const container = containerRef.current;
+        if (!container || !container.isConnected || container.id !== CARD_PAYMENT_CONTAINER_ID) {
+          throw new Error("Container do Mercado Pago não encontrado no DOM.");
+        }
+
         await loadMercadoPagoSdk();
         if (cancelled) return;
         if (!window.MercadoPago) {
@@ -69,9 +91,10 @@ export default function MercadoPagoCardPaymentBrick({
         }
 
         controllerRef.current?.unmount?.();
+        container.replaceChildren();
         const mp = new window.MercadoPago(publicKey, { locale: "pt-BR" });
         const bricksBuilder = mp.bricks();
-        controllerRef.current = await bricksBuilder.create("cardPayment", containerId, {
+        controllerRef.current = await bricksBuilder.create("cardPayment", CARD_PAYMENT_CONTAINER_ID, {
           initialization: {
             amount,
           },
@@ -92,7 +115,10 @@ export default function MercadoPagoCardPaymentBrick({
             onError: (err: unknown) => {
               console.error(err);
               const msg = err instanceof Error ? err.message : "Erro no formulário Mercado Pago.";
-              if (!cancelled) setError(msg);
+              if (!cancelled) {
+                setError(msg);
+                setLoading(false);
+              }
             },
             onSubmit: (formData: unknown) =>
               new Promise<void>((resolve, reject) => {
@@ -137,7 +163,7 @@ export default function MercadoPagoCardPaymentBrick({
       controllerRef.current?.unmount?.();
       controllerRef.current = null;
     };
-  }, [ciclo, containerId, onApproved, plano]);
+  }, [ciclo, disabled, onApproved, plano]);
 
   if (disabled) {
     return null;
@@ -162,7 +188,11 @@ export default function MercadoPagoCardPaymentBrick({
       {error ? (
         <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-200">{error}</div>
       ) : null}
-      <div id={containerId} className={loading ? "min-h-[220px] opacity-40" : ""} />
+      <div
+        id={CARD_PAYMENT_CONTAINER_ID}
+        ref={containerRef}
+        className={loading ? "min-h-[220px] opacity-40" : "min-h-[220px]"}
+      />
     </div>
   );
 }
