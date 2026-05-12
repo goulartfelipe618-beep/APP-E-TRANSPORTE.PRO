@@ -281,12 +281,6 @@ export default function UpgradePlanDialog({
       toast.error("Mercado Pago não está configurado. Use o contacto comercial ou configure MP_PUBLIC_KEY.");
       return;
     }
-    console.info("[MercadoPago] checkout requested", {
-      tier,
-      billingCycle,
-      billingEnabled: mercadoPagoOn,
-      hasPublicKey: Boolean(mercadoPagoPublicKey),
-    });
     setPaymentTier((current) => (current === tier ? null : tier));
   };
 

@@ -6,17 +6,17 @@ Frontend (build Vite):
 
 ```env
 VITE_MP_BILLING_ENABLED=true
-VITE_MP_PUBLIC_KEY=APP_USR-...
-NEXT_PUBLIC_MP_PUBLIC_KEY=APP_USR-...
+VITE_MP_PUBLIC_KEY=<mercado-pago-public-key>
+NEXT_PUBLIC_MP_PUBLIC_KEY=<mercado-pago-public-key>
 VITE_API_BASE_URL=https://api.seudominio.com
 ```
 
 Backend Node (`server/` ou função Vercel em `api/[...path].mjs`):
 
 ```env
-MP_ACCESS_TOKEN=APP_USR-...
-MP_PUBLIC_KEY=APP_USR-...
-MP_WEBHOOK_SECRET=...
+MP_ACCESS_TOKEN=<mercado-pago-access-token>
+MP_PUBLIC_KEY=<mercado-pago-public-key>
+MP_WEBHOOK_SECRET=<mercado-pago-webhook-secret>
 MP_BACK_URL=https://app.seudominio.com/dashboard
 APP_PUBLIC_URL=https://app.seudominio.com
 SUPABASE_URL=https://...

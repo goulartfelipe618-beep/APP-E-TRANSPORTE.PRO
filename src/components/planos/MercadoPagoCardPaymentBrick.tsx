@@ -5,7 +5,6 @@ import {
   createMercadoPagoPayment,
   getMercadoPagoCheckoutAmount,
   getMercadoPagoCheckoutDescription,
-  getPaymentsApiBaseUrl,
   getMercadoPagoPublicKey,
   loadMercadoPagoSdk,
   type MercadoPagoBrickPayload,
@@ -66,16 +65,6 @@ export default function MercadoPagoCardPaymentBrick({
           throw new Error("Chave pública Mercado Pago não configurada.");
         }
 
-        console.info("[MercadoPago] Card Payment Brick init", {
-          hasPublicKey: Boolean(publicKey),
-          publicKeyPrefix: publicKey.slice(0, 12),
-          apiBaseUrl: getPaymentsApiBaseUrl() || "same-origin",
-          containerId: CARD_PAYMENT_CONTAINER_ID,
-          plano,
-          ciclo,
-          amount,
-        });
-
         await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
         if (cancelled) return;
 
@@ -113,7 +102,6 @@ export default function MercadoPagoCardPaymentBrick({
               if (!cancelled) setLoading(false);
             },
             onError: (err: unknown) => {
-              console.error(err);
               const msg = err instanceof Error ? err.message : "Erro no formulário Mercado Pago.";
               if (!cancelled) {
                 setError(msg);

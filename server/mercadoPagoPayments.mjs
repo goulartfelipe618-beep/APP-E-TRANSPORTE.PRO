@@ -30,6 +30,9 @@ const CYCLE_FREQUENCY_MONTHS = {
   annual: 12,
 };
 
+const WEBHOOK_MAX_AGE_SECONDS = 300;
+const WEBHOOK_MAX_FUTURE_SECONDS = 60;
+
 const CreatePreferenceBodySchema = z
   .object({
     plano: z.enum(PAID_PLANS),
@@ -95,7 +98,10 @@ async function userRoles(admin, userId) {
   return (data || []).map((r) => r.role);
 }
 
-async function applyPaidPlan(admin, { userId, plano, mpCustomerId = null, mpSubscriptionId = null, mpPaymentId = null, mpPlanId }) {
+async function applyPaidPlan(
+  admin,
+  { userId, plano, mpCustomerId = null, mpSubscriptionId = null, mpPaymentId = null, mpPlanId, source = "api" },
+) {
   const { data: row, error: rowErr } = await admin
     .from("user_plans")
     .select("billing_manual_override")
@@ -123,10 +129,20 @@ async function applyPaidPlan(admin, { userId, plano, mpCustomerId = null, mpSubs
   );
   if (error) throw new Error(error.message);
 
+  logger.info("plan_changed", {
+    userId,
+    plano,
+    mpPaymentId,
+    mpSubscriptionId,
+    mpPlanId,
+    timestamp: new Date().toISOString(),
+    source,
+  });
+
   await admin.from("solicitacoes_motoristas").delete().eq("lead_user_id", userId);
 }
 
-async function applyFreeFromMercadoPago(admin, { userId, mpCustomerId = null }) {
+async function applyFreeFromMercadoPago(admin, { userId, mpCustomerId = null, source = "webhook" }) {
   const { data: row, error: rowErr } = await admin
     .from("user_plans")
     .select("billing_manual_override")
@@ -152,6 +168,14 @@ async function applyFreeFromMercadoPago(admin, { userId, mpCustomerId = null }) 
 
   const { error } = await admin.from("user_plans").upsert(patch, { onConflict: "user_id" });
   if (error) throw new Error(error.message);
+
+  logger.info("plan_changed", {
+    userId,
+    plano: "free",
+    mpCustomerId,
+    timestamp: new Date().toISOString(),
+    source,
+  });
 }
 
 function extractMpSignatureParts(signature) {
@@ -174,7 +198,12 @@ function timingSafeEqualHex(a, b) {
 
 function verifyMercadoPagoWebhookSignature(req, parsedBody) {
   const secret = process.env.MP_WEBHOOK_SECRET?.trim();
-  if (!secret) return { ok: true };
+  if (!secret) {
+    if (process.env.NODE_ENV === "production") {
+      return { ok: false, status: 500, error: "Webhook Mercado Pago não configurado" };
+    }
+    return { ok: true };
+  }
 
   const signature = req.get("x-signature") || "";
   const requestId = req.get("x-request-id") || "";
@@ -184,6 +213,15 @@ function verifyMercadoPagoWebhookSignature(req, parsedBody) {
 
   if (!ts || !v1 || !requestId || !dataId) {
     return { ok: false, status: 401, error: "Assinatura Mercado Pago incompleta" };
+  }
+
+  const tsNum = Number(ts);
+  if (!Number.isFinite(tsNum)) {
+    return { ok: false, status: 401, error: "Webhook timestamp inválido" };
+  }
+  const ageSecs = Date.now() / 1000 - tsNum;
+  if (ageSecs > WEBHOOK_MAX_AGE_SECONDS || ageSecs < -WEBHOOK_MAX_FUTURE_SECONDS) {
+    return { ok: false, status: 401, error: "Webhook timestamp fora do intervalo" };
   }
 
   const manifest = `id:${dataId};request-id:${requestId};ts:${ts};`;
@@ -253,12 +291,13 @@ async function handlePaymentWebhook(admin, paymentClient, paymentId) {
       mpSubscriptionId: null,
       mpPaymentId: String(payment.id || paymentId),
       mpPlanId: planId(ref.plano, ref.ciclo),
+      source: "webhook",
     });
     return;
   }
 
   if (["rejected", "cancelled", "refunded", "charged_back"].includes(status)) {
-    await applyFreeFromMercadoPago(admin, { userId: ref.userId, mpCustomerId });
+    await applyFreeFromMercadoPago(admin, { userId: ref.userId, mpCustomerId, source: "webhook" });
   }
 }
 
@@ -281,22 +320,58 @@ async function handlePreApprovalWebhook(admin, preApprovalClient, preApprovalId)
       mpSubscriptionId: String(sub?.id || preApprovalId),
       mpPaymentId: null,
       mpPlanId: planId(resolved.plano, resolved.ciclo),
+      source: "webhook",
     });
     return;
   }
 
   if (["cancelled", "paused", "rejected"].includes(status)) {
-    await applyFreeFromMercadoPago(admin, { userId: resolved.userId, mpCustomerId });
+    await applyFreeFromMercadoPago(admin, { userId: resolved.userId, mpCustomerId, source: "webhook" });
   }
 }
 
+async function knownPaymentOwner(admin, paymentId) {
+  const [{ data: paymentRow, error: paymentErr }, { data: subscriptionRow, error: subscriptionErr }] = await Promise.all([
+    admin.from("user_plans").select("user_id").eq("mp_payment_id", paymentId).maybeSingle(),
+    admin.from("user_plans").select("user_id").eq("mp_subscription_id", paymentId).maybeSingle(),
+  ]);
+  if (paymentErr) throw new Error(paymentErr.message);
+  if (subscriptionErr) throw new Error(subscriptionErr.message);
+  return paymentRow?.user_id || subscriptionRow?.user_id || null;
+}
+
+async function assertPaymentAccess(admin, { paymentId, authenticatedUserId, remoteResource }) {
+  const ref = parseExternalReference(remoteResource?.external_reference);
+  if (ref) return ref.userId === authenticatedUserId;
+
+  const owner = await knownPaymentOwner(admin, paymentId);
+  return owner === authenticatedUserId;
+}
+
 export function registerMercadoPagoRoutes(app, { authSupabaseMiddleware, originAllowlist, rateLimit }) {
-  const paymentsLimiter = rateLimit({
+  const paymentCreateIpLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: Number(process.env.RATE_LIMIT_PAYMENTS_MAX || 60),
+    max: Number(process.env.RATE_LIMIT_PAYMENTS_MAX || 5),
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: "Demasiadas tentativas de pagamento. Tente mais tarde." },
+  });
+
+  const paymentCreateUserLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: Number(process.env.RATE_LIMIT_PAYMENTS_USER_MAX || 5),
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: (req) => req.supabaseUser.id,
+    message: { error: "Demasiadas tentativas de pagamento nesta conta. Tente mais tarde." },
+  });
+
+  const paymentStatusLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: Number(process.env.RATE_LIMIT_PAYMENTS_STATUS_MAX || 60),
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: "Demasiadas consultas de pagamento. Tente mais tarde." },
   });
 
   const mpWebhookLimiter = rateLimit({
@@ -355,8 +430,9 @@ export function registerMercadoPagoRoutes(app, { authSupabaseMiddleware, originA
     "/api/payments/create-preference",
     express.json({ limit: "100kb" }),
     originAllowlist,
-    paymentsLimiter,
+    paymentCreateIpLimiter,
     authSupabaseMiddleware({ optional: false }),
+    paymentCreateUserLimiter,
     async (req, res) => {
       const parsed = CreatePreferenceBodySchema.safeParse(req.body ?? {});
       if (!parsed.success) {
@@ -433,6 +509,7 @@ export function registerMercadoPagoRoutes(app, { authSupabaseMiddleware, originA
               mpSubscriptionId: created?.id ? String(created.id) : null,
               mpPaymentId: null,
               mpPlanId: planId(plano, ciclo),
+              source: "api",
             });
           }
 
@@ -475,6 +552,7 @@ export function registerMercadoPagoRoutes(app, { authSupabaseMiddleware, originA
             mpSubscriptionId: null,
             mpPaymentId: created?.id ? String(created.id) : null,
             mpPlanId: planId(plano, ciclo),
+            source: "api",
           });
         }
 
@@ -489,14 +567,14 @@ export function registerMercadoPagoRoutes(app, { authSupabaseMiddleware, originA
         });
       } catch (e) {
         logger.error("mercadopago create preference", { message: e instanceof Error ? e.message : "unknown" });
-        return res.status(500).json({ error: e instanceof Error ? e.message : "Erro ao criar pagamento." });
+        return res.status(500).json({ error: "Erro ao criar pagamento." });
       }
     },
   );
 
   app.get(
     "/api/payments/status/:paymentId",
-    paymentsLimiter,
+    paymentStatusLimiter,
     authSupabaseMiddleware({ optional: false }),
     async (req, res) => {
       const paymentId = String(req.params.paymentId || "").trim();
@@ -508,6 +586,12 @@ export function registerMercadoPagoRoutes(app, { authSupabaseMiddleware, originA
         const paymentClient = new Payment(client);
         try {
           const payment = await paymentClient.get({ id: paymentId });
+          const allowed = await assertPaymentAccess(admin, {
+            paymentId,
+            authenticatedUserId: req.supabaseUser.id,
+            remoteResource: payment,
+          });
+          if (!allowed) return res.status(403).json({ error: "Acesso negado" });
           await handlePaymentWebhook(admin, paymentClient, paymentId);
           return res.json({
             id: payment?.id,
@@ -517,6 +601,12 @@ export function registerMercadoPagoRoutes(app, { authSupabaseMiddleware, originA
         } catch {
           const preApprovalClient = new PreApproval(client);
           const sub = await preApprovalClient.get({ id: paymentId });
+          const allowed = await assertPaymentAccess(admin, {
+            paymentId,
+            authenticatedUserId: req.supabaseUser.id,
+            remoteResource: sub,
+          });
+          if (!allowed) return res.status(403).json({ error: "Acesso negado" });
           await handlePreApprovalWebhook(admin, preApprovalClient, paymentId);
           return res.json({
             id: sub?.id,

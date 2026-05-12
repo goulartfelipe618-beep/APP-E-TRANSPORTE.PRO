@@ -61,8 +61,20 @@ export function createApp() {
 
   app.use(
     helmet({
-      contentSecurityPolicy: false,
+      contentSecurityPolicy: {
+        useDefaults: true,
+        directives: {
+          defaultSrc: ["'self'"],
+          scriptSrc: ["'self'", "https://sdk.mercadopago.com"],
+          connectSrc: ["'self'", "https://*.supabase.co", "wss://*.supabase.co", "https://api.mercadopago.com"],
+          frameSrc: ["'none'"],
+          objectSrc: ["'none'"],
+          baseUri: ["'self'"],
+          frameAncestors: ["'none'"],
+        },
+      },
       crossOriginEmbedderPolicy: false,
+      hsts: { maxAge: 31536000, includeSubDomains: true },
     }),
   );
 
