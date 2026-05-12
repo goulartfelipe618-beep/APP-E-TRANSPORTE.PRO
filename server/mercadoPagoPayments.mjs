@@ -389,33 +389,76 @@ export function registerMercadoPagoRoutes(app, { authSupabaseMiddleware, originA
         }
 
         const current = normalizePlan(planRow?.plano);
-        const { plano, ciclo, token } = parsed.data;
+        const { plano, ciclo, token, payment_method_id, issuer_id, installments } = parsed.data;
         if (current === "pro") return res.status(400).json({ error: "A sua conta já está no plano PRÓ." });
         if (current === "standart" && plano !== "pro") {
           return res.status(400).json({ error: "Com plano STANDART, só pode subscrever o upgrade para PRÓ." });
         }
 
         const client = mpClient();
-        const preApproval = new PreApproval(client);
         const amount = PLAN_TOTALS[plano][ciclo];
         const recurrence = CYCLE_FREQUENCY_MONTHS[ciclo];
         const ref = externalReference(user.id, plano, ciclo);
         const payerEmail = parsed.data.payer?.email || user.email;
         if (!payerEmail) return res.status(400).json({ error: "E-mail do pagador em falta." });
 
-        const created = await preApproval.create({
+        if (ciclo === "monthly") {
+          const preApproval = new PreApproval(client);
+          const created = await preApproval.create({
+            body: {
+              reason: `Assinatura ${plano === "pro" ? "PRÓ" : "STANDART"} E-Transporte.pro`,
+              external_reference: ref,
+              payer_email: payerEmail,
+              card_token_id: token,
+              back_url: process.env.MP_BACK_URL || process.env.APP_PUBLIC_URL || undefined,
+              status: "authorized",
+              auto_recurring: {
+                frequency: recurrence,
+                frequency_type: "months",
+                transaction_amount: amount,
+                currency_id: "BRL",
+              },
+            },
+            requestOptions: {
+              idempotencyKey: randomUUID(),
+            },
+          });
+
+          const status = String(created?.status || "").toLowerCase();
+          if (["authorized", "active"].includes(status)) {
+            await applyPaidPlan(admin, {
+              userId: user.id,
+              plano,
+              mpCustomerId: created?.payer_id ? String(created.payer_id) : null,
+              mpSubscriptionId: created?.id ? String(created.id) : null,
+              mpPaymentId: null,
+              mpPlanId: planId(plano, ciclo),
+            });
+          }
+
+          return res.status(201).json({
+            id: created?.id,
+            subscription_id: created?.id ?? null,
+            payment_id: null,
+            status: created?.status,
+            plano,
+            ciclo,
+          });
+        }
+
+        const paymentClient = new Payment(client);
+        const created = await paymentClient.create({
           body: {
-            reason: `Assinatura ${plano === "pro" ? "PRÓ" : "STANDART"} E-Transporte.pro`,
+            transaction_amount: amount,
+            token,
+            description: `Pagamento ${plano === "pro" ? "PRÓ" : "STANDART"} ${ciclo} E-Transporte.pro`,
+            installments,
+            payment_method_id,
+            issuer_id: issuer_id != null ? String(issuer_id) : undefined,
             external_reference: ref,
-            payer_email: payerEmail,
-            card_token_id: token,
-            back_url: process.env.MP_BACK_URL || process.env.APP_PUBLIC_URL || undefined,
-            status: "authorized",
-            auto_recurring: {
-              frequency: recurrence,
-              frequency_type: "months",
-              transaction_amount: amount,
-              currency_id: "BRL",
+            payer: {
+              email: payerEmail,
+              identification: parsed.data.payer?.identification,
             },
           },
           requestOptions: {
@@ -424,21 +467,23 @@ export function registerMercadoPagoRoutes(app, { authSupabaseMiddleware, originA
         });
 
         const status = String(created?.status || "").toLowerCase();
-        if (["authorized", "active"].includes(status)) {
+        if (status === "approved") {
           await applyPaidPlan(admin, {
             userId: user.id,
             plano,
-            mpCustomerId: created?.payer_id ? String(created.payer_id) : null,
-            mpSubscriptionId: created?.id ? String(created.id) : null,
-            mpPaymentId: null,
+            mpCustomerId: created?.payer?.id ? String(created.payer.id) : null,
+            mpSubscriptionId: null,
+            mpPaymentId: created?.id ? String(created.id) : null,
             mpPlanId: planId(plano, ciclo),
           });
         }
 
         return res.status(201).json({
           id: created?.id,
-          subscription_id: created?.id ?? null,
+          payment_id: created?.id ?? null,
+          subscription_id: null,
           status: created?.status,
+          status_detail: created?.status_detail ?? null,
           plano,
           ciclo,
         });
