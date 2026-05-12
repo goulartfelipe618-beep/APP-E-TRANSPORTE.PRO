@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, CalendarDays, RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { Tables } from "@/integrations/supabase/types";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -11,6 +10,11 @@ import {
   type AgendaItem,
 } from "@/lib/painelAgendaReservas";
 import FrotaReservaDetalheSheet from "@/components/frota/FrotaReservaDetalheSheet";
+import {
+  listFrotaPortalReservations,
+  type FrotaPortalGrupoReserva,
+  type FrotaPortalTransferReserva,
+} from "@/lib/frotaPortalReservations";
 
 const WEEKDAYS_PT = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"] as const;
 const MONTHS_PT = [
@@ -30,11 +34,11 @@ export default function FrotaAgendaPage() {
   const today = new Date();
   const [cursor, setCursor] = useState(() => ({ y: today.getFullYear(), m: today.getMonth() }));
   const [loading, setLoading] = useState(true);
-  const [transfers, setTransfers] = useState<Tables<"reservas_transfer">[]>([]);
-  const [grupos, setGrupos] = useState<Tables<"reservas_grupos">[]>([]);
+  const [transfers, setTransfers] = useState<FrotaPortalTransferReserva[]>([]);
+  const [grupos, setGrupos] = useState<FrotaPortalGrupoReserva[]>([]);
   const [userId, setUserId] = useState<string | null>(null);
-  const [detailTransfer, setDetailTransfer] = useState<Tables<"reservas_transfer"> | null>(null);
-  const [detailGrupo, setDetailGrupo] = useState<Tables<"reservas_grupos"> | null>(null);
+  const [detailTransfer, setDetailTransfer] = useState<FrotaPortalTransferReserva | null>(null);
+  const [detailGrupo, setDetailGrupo] = useState<FrotaPortalGrupoReserva | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
 
   const load = useCallback(async () => {
@@ -49,29 +53,14 @@ export default function FrotaAgendaPage() {
         return;
       }
 
-      const [tRes, gRes] = await Promise.all([
-        supabase
-          .from("reservas_transfer")
-          .select(
-            "id, tipo_viagem, numero_reserva, status, user_id, motorista_id, ida_data, ida_hora, volta_data, volta_hora, por_hora_data, por_hora_hora, ida_embarque, ida_desembarque, volta_embarque, volta_desembarque, por_hora_endereco_inicio, por_hora_ponto_encerramento",
-          ),
-        supabase
-          .from("reservas_grupos")
-          .select(
-            "id, numero_reserva, status, user_id, motorista_id, data_ida, hora_ida, data_retorno, hora_retorno, embarque, destino",
-          ),
-      ]);
-
-      if (tRes.error) {
+      const safe = await listFrotaPortalReservations();
+      if (safe.error) {
         toast.error("Erro ao carregar reservas.");
         setTransfers([]);
-      } else {
-        setTransfers((tRes.data as Tables<"reservas_transfer">[]) ?? []);
-      }
-      if (gRes.error) {
         setGrupos([]);
       } else {
-        setGrupos((gRes.data as Tables<"reservas_grupos">[]) ?? []);
+        setTransfers(safe.transfers);
+        setGrupos(safe.grupos);
       }
     } finally {
       setLoading(false);
@@ -117,28 +106,28 @@ export default function FrotaAgendaPage() {
   const openDetail = useCallback(async (it: AgendaItem) => {
     try {
       if (it.kind === "transfer") {
-        const { data, error } = await supabase.from("reservas_transfer").select("*").eq("id", it.reservaId).maybeSingle();
-        if (error || !data) {
+        const row = transfers.find((r) => r.id === it.reservaId) ?? null;
+        if (!row) {
           toast.error("Não foi possível abrir a reserva.");
           return;
         }
         setDetailGrupo(null);
-        setDetailTransfer(data as Tables<"reservas_transfer">);
+        setDetailTransfer(row);
         setDetailOpen(true);
         return;
       }
-      const { data, error } = await supabase.from("reservas_grupos").select("*").eq("id", it.reservaId).maybeSingle();
-      if (error || !data) {
+      const row = grupos.find((r) => r.id === it.reservaId) ?? null;
+      if (!row) {
         toast.error("Não foi possível abrir a reserva.");
         return;
       }
       setDetailTransfer(null);
-      setDetailGrupo(data as Tables<"reservas_grupos">);
+      setDetailGrupo(row);
       setDetailOpen(true);
     } catch {
       toast.error("Erro ao carregar detalhes.");
     }
-  }, []);
+  }, [grupos, transfers]);
 
   return (
     <div className="space-y-6">

@@ -5,11 +5,15 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Tables } from "@/integrations/supabase/types";
 import { badgeToneReservaStatus, labelReservaStatus } from "@/lib/reservaStatus";
 import FrotaReservaDetalheSheet from "@/components/frota/FrotaReservaDetalheSheet";
 import { cn } from "@/lib/utils";
 import { formatDbCalendarDatePtBr } from "@/lib/painelAgendaReservas";
+import {
+  listFrotaPortalReservations,
+  type FrotaPortalGrupoReserva,
+  type FrotaPortalTransferReserva,
+} from "@/lib/frotaPortalReservations";
 
 const tipoLabel: Record<string, string> = {
   somente_ida: "Somente Ida",
@@ -18,40 +22,27 @@ const tipoLabel: Record<string, string> = {
 };
 
 export default function FrotaReservasPage() {
-  const [transfers, setTransfers] = useState<Tables<"reservas_transfer">[]>([]);
-  const [grupos, setGrupos] = useState<Tables<"reservas_grupos">[]>([]);
+  const [transfers, setTransfers] = useState<FrotaPortalTransferReserva[]>([]);
+  const [grupos, setGrupos] = useState<FrotaPortalGrupoReserva[]>([]);
   const [loading, setLoading] = useState(true);
-  const [detailTransfer, setDetailTransfer] = useState<Tables<"reservas_transfer"> | null>(null);
-  const [detailGrupo, setDetailGrupo] = useState<Tables<"reservas_grupos"> | null>(null);
+  const [detailTransfer, setDetailTransfer] = useState<FrotaPortalTransferReserva | null>(null);
+  const [detailGrupo, setDetailGrupo] = useState<FrotaPortalGrupoReserva | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const { data: auth } = await supabase.auth.getUser();
-      const id = auth.user?.id ?? null;
-      if (!id) {
+      const { data: auth, error: authErr } = await supabase.auth.getUser();
+      if (authErr || !auth.user?.id) {
         setTransfers([]);
         setGrupos([]);
         return;
       }
 
-      const [tRes, gRes] = await Promise.all([
-        supabase.from("reservas_transfer").select("*").order("created_at", { ascending: false }),
-        supabase.from("reservas_grupos").select("*").order("created_at", { ascending: false }),
-      ]);
-
-      if (tRes.error) toast.error("Erro ao carregar transfers.");
-      else {
-        const all = (tRes.data as Tables<"reservas_transfer">[]) ?? [];
-        setTransfers(all.filter((r) => (r.motorista_id ?? "").trim() === id));
-      }
-
-      if (gRes.error) toast.error("Erro ao carregar grupos.");
-      else {
-        const all = (gRes.data as Tables<"reservas_grupos">[]) ?? [];
-        setGrupos(all.filter((r) => r.motorista_id === id));
-      }
+      const safe = await listFrotaPortalReservations();
+      if (safe.error) toast.error("Erro ao carregar reservas atribuídas.");
+      setTransfers(safe.transfers);
+      setGrupos(safe.grupos);
     } finally {
       setLoading(false);
     }
@@ -61,25 +52,25 @@ export default function FrotaReservasPage() {
     void load();
   }, [load]);
 
-  const openTransfer = async (id: string) => {
-    const { data, error } = await supabase.from("reservas_transfer").select("*").eq("id", id).maybeSingle();
-    if (error || !data) {
+  const openTransfer = (id: string) => {
+    const row = transfers.find((r) => r.id === id) ?? null;
+    if (!row) {
       toast.error("Reserva indisponível.");
       return;
     }
     setDetailGrupo(null);
-    setDetailTransfer(data as Tables<"reservas_transfer">);
+    setDetailTransfer(row);
     setDetailOpen(true);
   };
 
-  const openGrupo = async (id: string) => {
-    const { data, error } = await supabase.from("reservas_grupos").select("*").eq("id", id).maybeSingle();
-    if (error || !data) {
+  const openGrupo = (id: string) => {
+    const row = grupos.find((r) => r.id === id) ?? null;
+    if (!row) {
       toast.error("Reserva indisponível.");
       return;
     }
     setDetailTransfer(null);
-    setDetailGrupo(data as Tables<"reservas_grupos">);
+    setDetailGrupo(row);
     setDetailOpen(true);
   };
 
@@ -89,7 +80,8 @@ export default function FrotaReservasPage() {
         <div>
           <h1 className="text-2xl font-bold text-foreground">Reservas</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Transfer e grupos <strong className="text-foreground">atribuídos a si</strong>. Apenas visualizar estado e PDF.
+            Transfer e grupos <strong className="text-foreground">atribuídos a si</strong>. Dados de clientes e PDFs
+            ficam restritos ao operador.
           </p>
         </div>
         <Button type="button" variant="outline" size="icon" onClick={() => void load()} disabled={loading} aria-label="Atualizar">
@@ -110,7 +102,6 @@ export default function FrotaReservasPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Nº</TableHead>
-                  <TableHead>Cliente</TableHead>
                   <TableHead>Tipo</TableHead>
                   <TableHead>Trajeto</TableHead>
                   <TableHead>Data</TableHead>
@@ -122,9 +113,8 @@ export default function FrotaReservasPage() {
                 {transfers.map((r) => (
                   <TableRow key={r.id}>
                     <TableCell className="font-mono text-sm text-muted-foreground">#{r.numero_reserva}</TableCell>
-                    <TableCell className="font-medium">{r.nome_completo}</TableCell>
                     <TableCell>
-                      <Badge variant="secondary">{tipoLabel[r.tipo_viagem] || r.tipo_viagem}</Badge>
+                      <Badge variant="secondary">{tipoLabel[r.tipo_viagem ?? ""] || r.tipo_viagem || "—"}</Badge>
                     </TableCell>
                     <TableCell className="max-w-[200px] truncate text-sm">
                       {r.ida_embarque && r.ida_desembarque ? `${r.ida_embarque} → ${r.ida_desembarque}` : "—"}
@@ -138,7 +128,7 @@ export default function FrotaReservasPage() {
                       <Badge variant={badgeToneReservaStatus(r.status)}>{labelReservaStatus(r.status)}</Badge>
                     </TableCell>
                     <TableCell>
-                      <Button type="button" variant="outline" size="sm" className="h-8" onClick={() => void openTransfer(r.id)}>
+                      <Button type="button" variant="outline" size="sm" className="h-8" onClick={() => openTransfer(r.id)}>
                         <Eye className="mr-1 h-4 w-4" />
                         Ver
                       </Button>
@@ -165,7 +155,6 @@ export default function FrotaReservasPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Nº</TableHead>
-                  <TableHead>Cliente</TableHead>
                   <TableHead>Trajeto</TableHead>
                   <TableHead>Data Ida</TableHead>
                   <TableHead>Estado</TableHead>
@@ -176,7 +165,6 @@ export default function FrotaReservasPage() {
                 {grupos.map((r) => (
                   <TableRow key={r.id}>
                     <TableCell className="font-mono text-sm text-muted-foreground">#{r.numero_reserva}</TableCell>
-                    <TableCell className="font-medium">{r.nome_completo}</TableCell>
                     <TableCell className="max-w-[200px] truncate text-sm">
                       {r.embarque && r.destino ? `${r.embarque} → ${r.destino}` : "—"}
                     </TableCell>
@@ -185,7 +173,7 @@ export default function FrotaReservasPage() {
                       <Badge variant={badgeToneReservaStatus(r.status)}>{labelReservaStatus(r.status)}</Badge>
                     </TableCell>
                     <TableCell>
-                      <Button type="button" variant="outline" size="sm" className="h-8" onClick={() => void openGrupo(r.id)}>
+                      <Button type="button" variant="outline" size="sm" className="h-8" onClick={() => openGrupo(r.id)}>
                         <Eye className="mr-1 h-4 w-4" />
                         Ver
                       </Button>

@@ -1,15 +1,49 @@
-import type { Tables } from "@/integrations/supabase/types";
 import { primeiroSegmentoEndereco } from "@/lib/abrangenciaMapHelpers";
 
+export type TransferAgendaReserva = {
+  id: string;
+  user_id?: string | null;
+  motorista_id: string | null;
+  tipo_viagem: string | null;
+  numero_reserva: number;
+  status: string | null;
+  ida_data: string | null;
+  ida_hora: string | null;
+  volta_data: string | null;
+  volta_hora: string | null;
+  por_hora_data: string | null;
+  por_hora_hora: string | null;
+  ida_embarque: string | null;
+  ida_desembarque: string | null;
+  volta_embarque: string | null;
+  volta_desembarque: string | null;
+  por_hora_endereco_inicio: string | null;
+  por_hora_ponto_encerramento: string | null;
+};
+
+export type GrupoAgendaReserva = {
+  id: string;
+  user_id?: string | null;
+  motorista_id: string | null;
+  numero_reserva: number;
+  status: string | null;
+  data_ida: string | null;
+  hora_ida: string | null;
+  data_retorno: string | null;
+  hora_retorno: string | null;
+  embarque: string | null;
+  destino: string | null;
+};
+
 /** Reserva atribuída ao motorista OU criada por ele sem outro motorista definido (alinhado a Abrangência). */
-export function transferVisivelMotoristaExecutivo(r: Tables<"reservas_transfer">, userId: string): boolean {
+export function transferVisivelMotoristaExecutivo(r: TransferAgendaReserva, userId: string): boolean {
   const mid = (r.motorista_id ?? "").trim();
   if (mid === userId) return true;
   if (r.user_id === userId && mid === "") return true;
   return false;
 }
 
-export function grupoVisivelMotoristaExecutivo(r: Tables<"reservas_grupos">, userId: string): boolean {
+export function grupoVisivelMotoristaExecutivo(r: GrupoAgendaReserva, userId: string): boolean {
   if (r.motorista_id != null && r.motorista_id === userId) return true;
   if (r.user_id === userId && r.motorista_id == null) return true;
   return false;
@@ -95,7 +129,7 @@ export function parseAgendaInstantMs(dayKey: string, horario: string): number {
   return new Date(y, mo - 1, d, hh, mm, 0, 0).getTime();
 }
 
-function trajetoTransferLeg(r: Tables<"reservas_transfer">, leg: "ida" | "volta" | "por_hora"): string {
+function trajetoTransferLeg(r: TransferAgendaReserva, leg: "ida" | "volta" | "por_hora"): string {
   if (leg === "por_hora") {
     const a = primeiroSegmentoEndereco(r.por_hora_endereco_inicio) || "—";
     const b = (r.por_hora_ponto_encerramento || "").trim() || "—";
@@ -111,7 +145,7 @@ function trajetoTransferLeg(r: Tables<"reservas_transfer">, leg: "ida" | "volta"
   return `${a} → ${b}`;
 }
 
-function trajetoGrupoResumo(g: Tables<"reservas_grupos">): string {
+function trajetoGrupoResumo(g: GrupoAgendaReserva): string {
   const a = primeiroSegmentoEndereco(g.embarque) || "—";
   const b = (g.destino || "").trim() || "—";
   return `${a} → ${b}`;
@@ -161,18 +195,18 @@ function pushItem(
 
 /** Monta o mapa dia → linhas da agenda (só reservas, não solicitações). */
 /** Só reservas com motorista_id = utilizador (motorista da frota atribuído). */
-export function transferVisivelSomenteAtribuido(r: Tables<"reservas_transfer">, motoristaAuthId: string): boolean {
+export function transferVisivelSomenteAtribuido(r: TransferAgendaReserva, motoristaAuthId: string): boolean {
   return (r.motorista_id ?? "").trim() === motoristaAuthId;
 }
 
-export function grupoVisivelSomenteAtribuido(g: Tables<"reservas_grupos">, motoristaAuthId: string): boolean {
+export function grupoVisivelSomenteAtribuido(g: GrupoAgendaReserva, motoristaAuthId: string): boolean {
   return g.motorista_id != null && g.motorista_id === motoristaAuthId;
 }
 
 /** Agenda do submotorista: apenas serviços atribuídos a ele (auth uid). */
 export function buildAgendaItemsPorDiaAtribuidoSomente(
-  transfers: Tables<"reservas_transfer">[],
-  grupos: Tables<"reservas_grupos">[],
+  transfers: TransferAgendaReserva[],
+  grupos: GrupoAgendaReserva[],
   motoristaAuthId: string,
 ): Map<string, AgendaItem[]> {
   const map = new Map<string, AgendaItem[]>();
@@ -270,8 +304,8 @@ export function buildAgendaItemsPorDiaAtribuidoSomente(
 }
 
 export function buildAgendaItemsPorDia(
-  transfers: Tables<"reservas_transfer">[],
-  grupos: Tables<"reservas_grupos">[],
+  transfers: TransferAgendaReserva[],
+  grupos: GrupoAgendaReserva[],
   userId: string,
 ): Map<string, AgendaItem[]> {
   const map = new Map<string, AgendaItem[]>();

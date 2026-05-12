@@ -5,14 +5,13 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import type { Tables } from "@/integrations/supabase/types";
 import { RESERVA_STATUS_OPTIONS } from "@/lib/reservaStatus";
-import { generateGrupoPDF, generateTransferPDF } from "@/lib/pdfGenerator";
-import { Download, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
+import type { FrotaPortalGrupoReserva, FrotaPortalTransferReserva } from "@/lib/frotaPortalReservations";
 
 type Props = {
-  transfer: Tables<"reservas_transfer"> | null;
-  grupo: Tables<"reservas_grupos"> | null;
+  transfer: FrotaPortalTransferReserva | null;
+  grupo: FrotaPortalGrupoReserva | null;
   open: boolean;
   onOpenChange: (o: boolean) => void;
   onSaved: () => void;
@@ -21,7 +20,6 @@ type Props = {
 export default function FrotaReservaDetalheSheet({ transfer, grupo, open, onOpenChange, onSaved }: Props) {
   const [status, setStatus] = useState("pendente");
   const [saving, setSaving] = useState(false);
-  const [pdfLoading, setPdfLoading] = useState(false);
 
   const isTransfer = transfer != null;
 
@@ -38,13 +36,26 @@ export default function FrotaReservaDetalheSheet({ transfer, grupo, open, onOpen
       <SheetContent className="sm:max-w-lg overflow-y-auto">
         <SheetHeader>
           <SheetTitle>{isTransfer ? "Reserva de transfer" : "Reserva de grupo"}</SheetTitle>
-          <p className="text-sm text-muted-foreground">Altere o estado ou faça download do PDF (inclui contrato se o operador o tiver activo).</p>
+          <p className="text-sm text-muted-foreground">
+            Altere apenas o estado operacional. Dados pessoais do cliente e PDF de confirmação são restritos ao
+            operador da frota.
+          </p>
         </SheetHeader>
         {row ? (
           <div className="mt-6 space-y-4">
             <p className="text-sm">
-              <span className="text-muted-foreground">Cliente: </span>
-              <span className="font-medium">{isTransfer ? transfer!.nome_completo : grupo!.nome_completo}</span>
+              <span className="text-muted-foreground">Reserva: </span>
+              <span className="font-medium">#{row.numero_reserva}</span>
+            </p>
+            <p className="text-sm">
+              <span className="text-muted-foreground">Trajeto: </span>
+              <span className="font-medium">
+                {isTransfer
+                  ? transfer?.tipo_viagem === "por_hora"
+                    ? `${transfer.por_hora_endereco_inicio ?? "—"} → ${transfer.por_hora_ponto_encerramento ?? "—"}`
+                    : `${transfer?.ida_embarque ?? "—"} → ${transfer?.ida_desembarque ?? "—"}`
+                  : `${grupo?.embarque ?? "—"} → ${grupo?.destino ?? "—"}`}
+              </span>
             </p>
             <div className="space-y-2">
               <Label>Estado da reserva</Label>
@@ -95,24 +106,6 @@ export default function FrotaReservaDetalheSheet({ transfer, grupo, open, onOpen
               >
                 {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                 Guardar estado
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                disabled={pdfLoading}
-                onClick={async () => {
-                  setPdfLoading(true);
-                  try {
-                    toast.info("A gerar PDF…");
-                    if (isTransfer && transfer) await generateTransferPDF(transfer.id);
-                    else if (grupo) await generateGrupoPDF(grupo.id);
-                  } finally {
-                    setPdfLoading(false);
-                  }
-                }}
-              >
-                {pdfLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
-                Download PDF
               </Button>
             </div>
           </div>
