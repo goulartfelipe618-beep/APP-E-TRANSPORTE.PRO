@@ -59,6 +59,7 @@ import FinanceiroReceberPage from "@/pages/dashboard/financeiro/FinanceiroRecebe
 import FinanceiroPagarPage from "@/pages/dashboard/financeiro/FinanceiroPagarPage";
 import FinanceiroRelatoriosPage from "@/pages/dashboard/financeiro/FinanceiroRelatoriosPage";
 import PlanosPage from "@/pages/dashboard/PlanosPage";
+import DocumentacaoPainelPage from "@/pages/dashboard/DocumentacaoPainelPage";
 import PainelAvisoBanner from "@/components/PainelAvisoBanner";
 import FullscreenBannerOverlay from "@/components/FullscreenBannerOverlay";
 
@@ -103,6 +104,7 @@ const PAGE_MAP: Record<string, React.ComponentType> = {
   "financeiro/pagar": FinanceiroPagarPage,
   "financeiro/relatorios": FinanceiroRelatoriosPage,
   planos: PlanosPage,
+  documentacao: DocumentacaoPainelPage,
 };
 
 function readNetworkSpotlightActive() {
@@ -227,7 +229,7 @@ function DashboardContent() {
   /** Primeiro acesso: obriga concluir Sistema > Configurações; depois escolher Network na Home. */
   useEffect(() => {
     if (onboarding.loading) return;
-    if (!onboarding.phase1Complete && activePage !== "sistema/configuracoes") {
+    if (!onboarding.phase1Complete && activePage !== "sistema/configuracoes" && activePage !== "documentacao") {
       setActivePage("sistema/configuracoes");
       return;
     }
@@ -235,7 +237,8 @@ function DashboardContent() {
       onboarding.phase1Complete &&
       !onboarding.networkChosen &&
       activePage !== "home" &&
-      activePage !== "sistema/configuracoes"
+      activePage !== "sistema/configuracoes" &&
+      activePage !== "documentacao"
     ) {
       setActivePage("home");
     }

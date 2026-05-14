@@ -1,4 +1,4 @@
-import { useRef, useLayoutEffect } from "react";
+import { useRef, useLayoutEffect, useEffect } from "react";
 import { syncPanelThemeForCurrentUser } from "@/lib/panelTheme";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
@@ -12,7 +12,6 @@ import AdminMetricasPage from "@/pages/admin/AdminMetricas";
 import AdminAbrangenciaPage from "@/pages/admin/AdminAbrangencia";
 import AdminContratoTransferPage from "@/pages/admin/AdminContratoTransfer";
 import AdminUsuariosCadastradosPage from "@/pages/admin/AdminUsuariosCadastrados";
-import AdminUsuariosSolicitacoesPage from "@/pages/admin/AdminUsuariosSolicitacoes";
 import AdminNetworkPage from "@/pages/admin/AdminNetworkPage";
 import AdminSolicitacoesServicos from "@/pages/admin/AdminSolicitacoesServicos";
 import AdminTemplatesPage from "@/pages/admin/AdminTemplatesPage";
@@ -40,7 +39,6 @@ const PAGE_MAP: Record<string, React.ComponentType> = {
   comunidade: AdminCommunityPage,
   "contrato/transfer": AdminContratoTransferPage,
   "usuarios/cadastrados": AdminUsuariosCadastradosPage,
-  "usuarios/solicitacoes": AdminUsuariosSolicitacoesPage,
   network: AdminNetworkPage,
   "solicitacoes-servicos": AdminSolicitacoesServicos,
   templates: AdminTemplatesPage,
@@ -59,7 +57,13 @@ const PAGE_MAP: Record<string, React.ComponentType> = {
 
 function AdminContent() {
   usePainelErrorReporter("admin_master", "etp_nav_admin");
-  const { activePage } = useActivePage();
+  const { activePage, setActivePage } = useActivePage();
+
+  useEffect(() => {
+    if (activePage === "usuarios/solicitacoes") {
+      setActivePage("usuarios/cadastrados");
+    }
+  }, [activePage, setActivePage]);
   const { config } = useConfiguracoes();
   const mainRef = useRef<HTMLElement>(null);
   useScrollPanelToTop(activePage, mainRef);

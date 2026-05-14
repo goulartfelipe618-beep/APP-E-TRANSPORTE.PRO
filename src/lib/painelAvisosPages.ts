@@ -38,6 +38,7 @@ export const PAGINAS_MOTORISTA: { value: string; label: string }[] = [
   { value: "sistema/automacoes", label: "Sistema — Automações" },
   { value: "sistema/comunicador", label: "Sistema — Comunicador" },
   { value: "tickets", label: "Suporte" },
+  { value: "documentacao", label: "Documentação" },
 ];
 
 export type PainelTipo = "motorista";

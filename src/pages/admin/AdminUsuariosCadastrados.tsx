@@ -6,13 +6,11 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Trash2, Users, Search, RefreshCw, Crown } from "lucide-react";
+import { Plus, Users, Search, RefreshCw, Crown } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { PLAN_LABELS, PLAN_COLORS, PlanType, PLAN_ORDER, normalizeUserPlano } from "@/hooks/useUserPlan";
-import { ConfirmDeleteDialog } from "@/components/ConfirmDeleteDialog";
-import { purgeStoredStateForUserId } from "@/lib/hardDelete";
 import { validatePainelStrongPassword } from "@/lib/motoristaPortalPassword";
 
 interface UserItem {
@@ -54,8 +52,6 @@ export default function AdminUsuariosCadastrados() {
   const [creating, setCreating] = useState(false);
   const [updatingPlan, setUpdatingPlan] = useState(false);
   const [allowMercadoPagoSync, setAllowMercadoPagoSync] = useState(true);
-  const [deleteUserId, setDeleteUserId] = useState<string | null>(null);
-  const [deleteUserLoading, setDeleteUserLoading] = useState(false);
 
   const fetchUsers = useCallback(async () => {
     setLoading(true);
@@ -146,41 +142,6 @@ export default function AdminUsuariosCadastrados() {
     setCreating(false);
   };
 
-  const confirmDeleteUser = async () => {
-    if (!deleteUserId) return;
-    setDeleteUserLoading(true);
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        toast.error("Sessão não encontrada.");
-        return;
-      }
-
-      const res = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-users?action=delete`,
-        {
-          method: "POST",
-          headers: {
-            ...edgeFunctionHeaders(session.access_token),
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ user_id: deleteUserId }),
-        }
-      );
-      const data = await res.json();
-      if (data.error) {
-        toast.error(data.error);
-      } else {
-        purgeStoredStateForUserId(deleteUserId);
-        toast.success("Usuário e todos os dados excluídos com sucesso!");
-        setUsers((prev) => prev.filter((u) => u.id !== deleteUserId));
-        setDeleteUserId(null);
-      }
-    } finally {
-      setDeleteUserLoading(false);
-    }
-  };
-
   const handleOpenPlanDialog = (user: UserItem) => {
     setSelectedUser(user);
     const p = normalizeUserPlano(user.plano);
@@ -237,7 +198,8 @@ export default function AdminUsuariosCadastrados() {
           </h1>
           <p className="text-muted-foreground text-sm max-w-xl">
             Crie contas com e-mail e senha, e altere o plano entre <strong className="text-foreground">FREE</strong> e{" "}
-            <strong className="text-foreground">PRÓ</strong> para motoristas executivos (ícone da coroa na tabela). Apenas o administrador master acede a esta página.
+            <strong className="text-foreground">PRÓ</strong> para motoristas executivos (ícone da coroa na tabela). A remoção de
+            utilizadores faz-se no Supabase (Auth e dados). Apenas o administrador master acede a esta página.
           </p>
         </div>
         <div className="flex gap-2">
@@ -271,7 +233,7 @@ export default function AdminUsuariosCadastrados() {
               <TableHead>Função</TableHead>
               <TableHead>Plano</TableHead>
               <TableHead>Data de Cadastro</TableHead>
-              <TableHead className="w-28 text-right">Ações</TableHead>
+              <TableHead className="w-20 text-right">Ações</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -314,18 +276,12 @@ export default function AdminUsuariosCadastrados() {
                 <TableCell className="text-muted-foreground text-sm">
                   {new Date(u.created_at).toLocaleDateString("pt-BR")}
                 </TableCell>
-                <TableCell className="text-right flex items-center justify-end gap-1">
-                  {u.role !== "admin_master" && (
-                    <>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={() => handleOpenPlanDialog(u)} title="Alterar plano">
-                        <Crown className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => setDeleteUserId(u.id)}>
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </>
-                  )}
-                  {u.role === "admin_master" && (
+                <TableCell className="text-right">
+                  {u.role !== "admin_master" ? (
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={() => handleOpenPlanDialog(u)} title="Alterar plano">
+                      <Crown className="h-4 w-4" />
+                    </Button>
+                  ) : (
                     <span className="text-xs text-muted-foreground pr-2">Protegido</span>
                   )}
                 </TableCell>
@@ -452,15 +408,6 @@ export default function AdminUsuariosCadastrados() {
           </div>
         </DialogContent>
       </Dialog>
-
-      <ConfirmDeleteDialog
-        open={deleteUserId !== null}
-        onOpenChange={(o) => !o && setDeleteUserId(null)}
-        title="Excluir usuário?"
-        description="Todos os dados do painel deste usuário serão apagados permanentemente. Esta ação não pode ser desfeita."
-        onConfirm={confirmDeleteUser}
-        loading={deleteUserLoading}
-      />
     </div>
   );
 }

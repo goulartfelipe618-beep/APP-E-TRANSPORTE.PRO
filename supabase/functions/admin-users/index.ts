@@ -377,42 +377,15 @@ Deno.serve(async (req) => {
       });
     }
 
-    // DELETE USER
+    // DELETE USER — descontinuado no painel; usar o dashboard Supabase para remover contas.
     if (req.method === "POST" && action === "delete") {
-      const body = await req.json();
-      const { user_id } = body;
-
-      if (!user_id) {
-        return new Response(JSON.stringify({ error: "user_id é obrigatório" }), { status: 400, headers: corsHeaders });
-      }
-
-      const { data: targetRole } = await supabaseAdmin
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", user_id)
-        .eq("role", "admin_master")
-        .maybeSingle();
-
-      if (targetRole) {
-        return new Response(JSON.stringify({ error: "Não é possível excluir um admin master" }), { status: 403, headers: corsHeaders });
-      }
-
-      // Uma única transação no Postgres (RPC security definer + service_role); depois remoção em Auth.
-      const { error: rpcErr } = await supabaseAdmin.rpc("service_delete_user_owned_data", {
-        p_user_id: user_id,
-      });
-
-      if (rpcErr) {
-        return new Response(JSON.stringify({ error: rpcErr.message }), { status: 400, headers: corsHeaders });
-      }
-
-      const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(user_id);
-
-      if (deleteError) {
-        return new Response(JSON.stringify({ error: deleteError.message }), { status: 400, headers: corsHeaders });
-      }
-
-      return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      return new Response(
+        JSON.stringify({
+          error:
+            "A exclusão de utilizadores pelo painel foi descontinuada. Utilize o Supabase Dashboard (Auth e dados associados).",
+        }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
     }
 
     // DISABLE USER (ban at Auth level)

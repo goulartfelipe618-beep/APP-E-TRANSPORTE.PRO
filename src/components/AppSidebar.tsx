@@ -13,6 +13,7 @@ import {
   Inbox,
   Banknote,
   ContactRound,
+  Library,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -163,6 +164,7 @@ const getMenuStructure = (showNetwork: boolean, exibirComunicadorMotorista: bool
   {
     label: "Configurações",
     items: [
+      { title: "Documentação", page: "documentacao", icon: Library },
       {
         title: "Sistema",
         icon: Settings,

@@ -29,11 +29,6 @@ const simpleItems = [
   { title: "Veículos", page: "veiculos", icon: Car },
 ];
 
-const usuariosChildren = [
-  { title: "Cadastrados", page: "usuarios/cadastrados", icon: Users },
-  { title: "Solicitações", page: "usuarios/solicitacoes", icon: ClipboardList },
-];
-
 const sistemaChildren = [
   { title: "Logs do painel", page: "logs", icon: ScrollText },
   { title: "Configurações", page: "sistema/configuracoes", icon: Settings },
@@ -57,7 +52,6 @@ export function AdminSidebar() {
   const { darkMode, toggle: toggleTheme } = usePanelTheme("admin");
 
   const isActive = (page: string) => activePage === page;
-  const usuariosActive = usuariosChildren.some((c) => isActive(c.page));
   const sistemaActive = sistemaChildren.some((c) => isActive(c.page));
 
   const handleLogout = async () => {
@@ -159,7 +153,18 @@ export function AdminSidebar() {
                 </SidebarMenuButton>
               </SidebarMenuItem>
 
-              {renderCollapsible("Usuários", Users, usuariosChildren, usuariosActive)}
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  onClick={() => goPage("usuarios/cadastrados")}
+                  className={cn(
+                    "cursor-pointer",
+                    isActive("usuarios/cadastrados") && "bg-muted text-primary font-medium",
+                  )}
+                >
+                  <Users className="mr-2 h-4 w-4 shrink-0" />
+                  {!collapsed && <span className="min-w-0 truncate">Usuários</span>}
+                </SidebarMenuButton>
+              </SidebarMenuItem>
 
               <SidebarMenuItem>
                 <SidebarMenuButton
