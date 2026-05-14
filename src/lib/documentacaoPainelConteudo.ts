@@ -684,12 +684,12 @@ export const DOC_PAINEL_SECOES: DocSection[] = [
     chunks: [
       {
         id: "chat",
-        title: "FloatingSupportChat",
+        title: "Suporte no painel",
         blocks: [
           {
             t: "p",
             text:
-              "Botão flutuante de **mensagens instantâneas** (quando habilitado) permanece acima do `z-index` do conteúdo principal. Não obstrua elementos críticos de formulário ao posicionar janelas auxiliares.",
+              "O widget **Chatwoot** (mensagens instantâneas) **não é carregado** neste painel. Para contactar a equipa, use **Suporte** no menu lateral e abra um **ticket**.",
           },
         ],
       },

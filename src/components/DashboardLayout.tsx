@@ -8,13 +8,13 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { Shield } from "lucide-react";
 import { ActivePageProvider, useActivePage } from "@/contexts/ActivePageContext";
-import FloatingSupportChat from "@/components/FloatingSupportChat";
 import { NetworkSpotlightProvider } from "@/contexts/NetworkSpotlightContext";
 import { hydrateNetworkNacionalFromDb, persistNetworkHighlightDismissed } from "@/lib/networkNacionalPrefs";
 import { usePainelMotoristaEvolutionAtivo } from "@/hooks/usePainelMotoristaEvolutionAtivo";
 import { useMotoristaOnboarding } from "@/hooks/useMotoristaOnboarding";
 import { usePainelErrorReporter } from "@/hooks/usePainelErrorReporter";
 import { useScrollPanelToTop } from "@/hooks/useScrollPanelToTop";
+import { scheduleUserPlanRefetchWithBackoff } from "@/lib/userPlanRefetch";
 import { PainelContentZoomProvider } from "@/contexts/PainelContentZoomContext";
 import { PainelScaledContent } from "@/components/painel/PainelScaledContent";
 
@@ -122,8 +122,6 @@ function DashboardContent() {
   const onboarding = useMotoristaOnboarding();
   const { painelMotoristaEvolutionAtivo, ready: painelComunicadorReady } = usePainelMotoristaEvolutionAtivo();
   const mainRef = useRef<HTMLElement>(null);
-  /** Re-fetch do plano após pagamento: o webhook pode chegar alguns segundos depois da confirmação. */
-  const billingPlanRetryTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   useScrollPanelToTop(activePage, mainRef);
   useSlowScrollContainer(mainRef, activePage === "website");
   const [showOverlay, setShowOverlay] = useState(readNetworkSpotlightActive);
@@ -133,26 +131,16 @@ function DashboardContent() {
   }, []);
 
   useEffect(() => {
-    return () => {
-      billingPlanRetryTimersRef.current.forEach(clearTimeout);
-      billingPlanRetryTimersRef.current = [];
-    };
-  }, []);
-
-  useEffect(() => {
     const sp = new URLSearchParams(location.search);
     if (sp.get("billing") !== "success") return;
     sp.delete("billing");
     const q = sp.toString();
     navigate({ pathname: location.pathname, search: q ? `?${q}` : "" }, { replace: true });
     toast.success("Pagamento concluído. A actualizar o seu plano…");
-    const refetchPlan = () => window.dispatchEvent(new Event("etp-user-plan-refetch"));
-    refetchPlan();
-    for (const id of billingPlanRetryTimersRef.current) clearTimeout(id);
-    billingPlanRetryTimersRef.current = [];
-    for (const ms of [1500, 3500, 7000]) {
-      billingPlanRetryTimersRef.current.push(window.setTimeout(refetchPlan, ms));
-    }
+    const cancelBackoff = scheduleUserPlanRefetchWithBackoff();
+    return () => {
+      cancelBackoff();
+    };
   }, [location.pathname, location.search, navigate]);
 
   useEffect(() => {
@@ -287,7 +275,6 @@ function DashboardContent() {
             </PageLoader>
           </main>
         </div>
-        <FloatingSupportChat />
         <FullscreenBannerOverlay painel="motorista" activePage={activePage} />
       </div>
     </NetworkSpotlightProvider>

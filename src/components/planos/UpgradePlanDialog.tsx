@@ -366,9 +366,8 @@ export default function UpgradePlanDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        showCloseButton={false}
         className={cn(
-          "max-h-[min(94vh,920px)] w-[min(100vw-1rem,min(92vw,800px))] max-w-[min(100vw-1rem,min(92vw,800px))] gap-0 overflow-hidden p-0 sm:rounded-xl",
+          "max-h-[min(94vh,920px)] w-[min(100vw-1rem,min(92vw,800px))] max-w-[min(100vw-1rem,min(92vw,800px))] gap-0 overflow-hidden p-0 pt-[max(2.75rem,env(safe-area-inset-top))] sm:rounded-xl sm:pt-0",
           "border-neutral-800 bg-neutral-950",
         )}
       >
@@ -379,7 +378,7 @@ export default function UpgradePlanDialog({
 
         <div
           className={cn(
-            "overflow-y-auto border-b border-neutral-800 bg-neutral-950 px-4 py-5 sm:px-6",
+            "overflow-y-auto border-b border-neutral-800 bg-neutral-950 py-5 pl-4 pr-14 sm:px-6",
             paymentTier ? "max-h-[min(36vh,360px)]" : "max-h-[min(70vh,720px)]",
           )}
         >
@@ -486,7 +485,7 @@ export default function UpgradePlanDialog({
         <div
           ref={checkoutAreaRef}
           className={cn(
-            "space-y-3 bg-neutral-950 px-4 py-4 sm:px-6 sm:py-5",
+            "space-y-3 bg-neutral-950 py-4 pl-4 pr-14 sm:px-6 sm:py-5",
             paymentTier && "max-h-[min(58vh,600px)] overflow-y-auto",
           )}
         >

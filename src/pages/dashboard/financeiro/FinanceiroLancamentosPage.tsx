@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -31,6 +31,29 @@ function isoFromDate(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
+function pad2(n: number): string {
+  return String(n).padStart(2, "0");
+}
+
+/** Valor para `input type="datetime-local"` no fuso local do browser. */
+function toDateTimeLocalValue(d: Date): string {
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+}
+
+/** Interpreta `YYYY-MM-DDTHH:mm` como instante no calendário/relógio local. */
+function parseDateTimeLocal(s: string): Date {
+  const trimmed = s.trim();
+  const [datePart, timePart = "00:00"] = trimmed.split("T");
+  const [y, mo, d] = datePart.split("-").map((x) => Number(x));
+  const [h, mi] = timePart.split(":").map((x) => Number(x));
+  if (!Number.isFinite(y) || !Number.isFinite(mo) || !Number.isFinite(d)) return new Date(NaN);
+  return new Date(y, mo - 1, d, Number.isFinite(h) ? h : 0, Number.isFinite(mi) ? mi : 0, 0, 0);
+}
+
+function occurredOnFromLocalDate(d: Date): string {
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+}
+
 export default function FinanceiroLancamentosPage() {
   const { setActivePage } = useActivePage();
   const { from: fromDefault, to: toDefault } = useMemo(() => financeiroListagemRangePadrao(), []);
@@ -46,6 +69,8 @@ export default function FinanceiroLancamentosPage() {
   const [linkedCategory, setLinkedCategory] = useState("");
   const [payDialogRow, setPayDialogRow] = useState<FinancialTransaction | null>(null);
   const [payMethod, setPayMethod] = useState<FinanceiroPaymentMethod | "">("");
+  /** Data/hora de contabilização da baixa (local); define `paid_at` e `occurred_on` (dia) para o mês no dashboard. */
+  const [payContabilizarAt, setPayContabilizarAt] = useState("");
   const [saving, setSaving] = useState(false);
   const [kind, setKind] = useState<"receita" | "despesa">("despesa");
   const [category, setCategory] = useState("combustivel");
@@ -58,6 +83,13 @@ export default function FinanceiroLancamentosPage() {
     () => new Set(categoryPresets.map((c) => c.value)),
     [kind],
   );
+
+  const payContabilizarPreview = useMemo(() => {
+    if (!payContabilizarAt.trim()) return "";
+    const d = parseDateTimeLocal(payContabilizarAt);
+    if (Number.isNaN(d.getTime())) return "";
+    return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(d);
+  }, [payContabilizarAt]);
 
   const resetForm = () => {
     setKind("despesa");
@@ -205,13 +237,20 @@ export default function FinanceiroLancamentosPage() {
   const confirmMarkPaid = useCallback(async () => {
     const row = payDialogRow;
     if (!row || row.payment_status === "cancelled") return;
+    const when = parseDateTimeLocal(payContabilizarAt);
+    if (Number.isNaN(when.getTime())) {
+      toast.error("Indique uma data e hora válidas para contabilizar a baixa.");
+      return;
+    }
     setSaving(true);
     try {
+      const occurredOn = occurredOnFromLocalDate(when);
       const { error: uErr } = await supabase
         .from("financial_transactions")
         .update({
           payment_status: "paid",
-          paid_at: new Date().toISOString(),
+          paid_at: when.toISOString(),
+          occurred_on: occurredOn,
           payment_method: payMethod || null,
         })
         .eq("id", row.id);
@@ -222,11 +261,12 @@ export default function FinanceiroLancamentosPage() {
       toast.success("Marcado como pago.");
       setPayDialogRow(null);
       setPayMethod("");
+      setPayContabilizarAt("");
       void reload();
     } finally {
       setSaving(false);
     }
-  }, [payDialogRow, payMethod, reload]);
+  }, [payDialogRow, payContabilizarAt, payMethod, reload]);
 
   const removeManual = async (row: FinancialTransaction) => {
     if (row.origin !== "manual") return;
@@ -348,6 +388,7 @@ export default function FinanceiroLancamentosPage() {
                               className="h-8"
                               onClick={() => {
                                 setPayMethod("");
+                                setPayContabilizarAt(toDateTimeLocalValue(new Date()));
                                 setPayDialogRow(r);
                               }}
                             >
@@ -415,18 +456,40 @@ export default function FinanceiroLancamentosPage() {
           if (!o) {
             setPayDialogRow(null);
             setPayMethod("");
+            setPayContabilizarAt("");
           }
         }}
       >
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Marcar como pago</DialogTitle>
+            <DialogDescription>
+              A data de contabilização define em que mês o valor entra no dashboard financeiro e regista o momento da baixa.
+            </DialogDescription>
           </DialogHeader>
           {payDialogRow ? (
             <div className="space-y-4 py-2">
               <p className="text-sm text-muted-foreground">
                 {formatBRL(Number(payDialogRow.amount))} · {payDialogRow.description ?? payDialogRow.category}
               </p>
+              <div>
+                <Label htmlFor="pay-contabilizar-at">Contabilizar na data</Label>
+                <Input
+                  id="pay-contabilizar-at"
+                  className="mt-1 font-mono text-sm"
+                  type="datetime-local"
+                  value={payContabilizarAt}
+                  onChange={(e) => setPayContabilizarAt(e.target.value)}
+                />
+                {payContabilizarPreview ? (
+                  <p className="mt-1.5 text-xs text-muted-foreground">
+                    Pré-visualização:{" "}
+                    <span className="font-medium text-foreground">{payContabilizarPreview}</span>
+                    {" "}
+                    (ajuste se o pagamento tiver sido noutro dia ou hora)
+                  </p>
+                ) : null}
+              </div>
               <div>
                 <Label>Meio de pagamento</Label>
                 <Select value={payMethod || "__none__"} onValueChange={(v) => setPayMethod(v === "__none__" ? "" : (v as FinanceiroPaymentMethod))}>
@@ -452,6 +515,7 @@ export default function FinanceiroLancamentosPage() {
               onClick={() => {
                 setPayDialogRow(null);
                 setPayMethod("");
+                setPayContabilizarAt("");
               }}
             >
               Cancelar

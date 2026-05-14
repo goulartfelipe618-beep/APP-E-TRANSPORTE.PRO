@@ -4,7 +4,7 @@ import "./index.css";
 import { AppErrorBoundary } from "./components/AppErrorBoundary";
 import { installBrowserZoomLock } from "./lib/installBrowserZoomLock";
 
-/** Chatwoot opcional: só carrega com `VITE_CHATWOOT_ENABLED=true` e URL/token válidos (evita ERR_CONNECTION_TIMED_OUT a encher a consola). */
+/** Chatwoot opcional: só carrega com `VITE_CHATWOOT_ENABLED=true` e URL/token válidos. Nunca no painel Motorista Executivo (`/dashboard`). */
 function initChatwootSupportWidget() {
   if (typeof window === "undefined") return;
   const path = window.location.pathname || "";
@@ -13,7 +13,8 @@ function initChatwootSupportWidget() {
     path === "/login" ||
     path === "/mfa" ||
     path.startsWith("/rastreio/") ||
-    path.startsWith("/motorista-frota-doc");
+    path.startsWith("/motorista-frota-doc") ||
+    path.startsWith("/dashboard");
   if (skipPublic) return;
 
   const enabled = String(import.meta.env.VITE_CHATWOOT_ENABLED ?? "").toLowerCase();

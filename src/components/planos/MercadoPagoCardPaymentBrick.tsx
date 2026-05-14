@@ -10,6 +10,7 @@ import {
   type MercadoPagoBrickPayload,
   type MercadoPagoPlan,
 } from "@/lib/mercadoPagoBilling";
+import { scheduleUserPlanRefetchWithBackoff } from "@/lib/userPlanRefetch";
 import { type BillingCycle } from "@/lib/billingCycles";
 
 interface MercadoPagoCardPaymentBrickProps {
@@ -48,6 +49,7 @@ export default function MercadoPagoCardPaymentBrick({
 }: MercadoPagoCardPaymentBrickProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const controllerRef = useRef<{ unmount?: () => void } | null>(null);
+  const planRefetchCancelRef = useRef<(() => void) | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -116,7 +118,8 @@ export default function MercadoPagoCardPaymentBrick({
                     const status = String(result.status || "").toLowerCase();
                     if (status === "approved" || status === "authorized") {
                       toast.success("Pagamento aprovado. O seu plano será atualizado automaticamente.");
-                      window.dispatchEvent(new Event("etp-user-plan-refetch"));
+                      planRefetchCancelRef.current?.();
+                      planRefetchCancelRef.current = scheduleUserPlanRefetchWithBackoff();
                       onApproved?.();
                     } else {
                       toast.message(
@@ -148,6 +151,8 @@ export default function MercadoPagoCardPaymentBrick({
 
     return () => {
       cancelled = true;
+      planRefetchCancelRef.current?.();
+      planRefetchCancelRef.current = null;
       controllerRef.current?.unmount?.();
       controllerRef.current = null;
     };

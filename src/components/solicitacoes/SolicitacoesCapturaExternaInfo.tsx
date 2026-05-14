@@ -2,6 +2,7 @@ import { Info } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { useActivePage } from "@/contexts/ActivePageContext";
+import { useUserPlan } from "@/hooks/useUserPlan";
 
 export type SolicitacoesCapturaExternaInfoVariant = "lista" | "campanhas-ativos";
 
@@ -18,7 +19,13 @@ type Props = {
  */
 export function SolicitacoesCapturaExternaInfo({ variant = "lista" }: Props) {
   const { setActivePage } = useActivePage();
+  const { plano, loading: planLoading } = useUserPlan();
   const isCampanhasAtivos = variant === "campanhas-ativos";
+
+  /** Conta PRÓ: o bloco é orientação típica de conta FREE; some após upgrade ou alteração pelo admin. */
+  if (!planLoading && plano === "pro") {
+    return null;
+  }
 
   return (
     <Alert className="border-[#FF6600]/45 bg-[#FF6600]/10 text-foreground">

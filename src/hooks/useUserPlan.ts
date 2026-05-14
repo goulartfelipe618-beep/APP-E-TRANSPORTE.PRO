@@ -5,6 +5,7 @@ import {
   planMeetsMinimum,
   type PlanType,
 } from "@/lib/painelPlanPolicy";
+import { USER_PLAN_REFETCH_EVENT } from "@/lib/userPlanRefetch";
 
 export type { PlanType };
 
@@ -66,8 +67,43 @@ export function useUserPlan() {
     const onRefetch = () => {
       void refetch();
     };
-    window.addEventListener("etp-user-plan-refetch", onRefetch);
-    return () => window.removeEventListener("etp-user-plan-refetch", onRefetch);
+    window.addEventListener(USER_PLAN_REFETCH_EVENT, onRefetch);
+    return () => window.removeEventListener(USER_PLAN_REFETCH_EVENT, onRefetch);
+  }, [refetch]);
+
+  /** Plano alterado no servidor (pagamento, webhook ou admin): UI actualiza sem recarregar a página. */
+  useEffect(() => {
+    let cancelled = false;
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+
+    void (async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (cancelled || !user?.id) return;
+
+      const ch = supabase
+        .channel(`user-plans-self-${user.id}`)
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "user_plans", filter: `user_id=eq.${user.id}` },
+          () => {
+            void refetch();
+          },
+        );
+
+      if (cancelled) {
+        void supabase.removeChannel(ch);
+        return;
+      }
+      channel = ch;
+      channel.subscribe();
+    })();
+
+    return () => {
+      cancelled = true;
+      if (channel) void supabase.removeChannel(channel);
+    };
   }, [refetch]);
 
   /**
