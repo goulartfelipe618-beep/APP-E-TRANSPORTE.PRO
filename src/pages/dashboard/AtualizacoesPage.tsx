@@ -85,16 +85,16 @@ export default function AtualizacoesPage() {
   const { slice: itemsPage, page, setPage, totalPages, totalItems } = usePainelListPagination(items);
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
+    <div className="min-w-0 space-y-6">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
           <h1 className="text-2xl font-bold text-foreground">Atualizações</h1>
-          <p className="text-muted-foreground">
+          <p className="text-pretty break-words text-muted-foreground">
             Solicitações de Transfer e Grupos da sua operação ({items.length}). Pré-cadastros de interesse na plataforma
             ficam apenas no painel Admin Master.
           </p>
         </div>
-        <Button variant="outline" size="icon" onClick={fetchAtualizacoes} title="Atualizar">
+        <Button variant="outline" size="icon" className="h-10 w-10 shrink-0 self-end sm:self-auto sm:h-9 sm:w-9" onClick={fetchAtualizacoes} title="Atualizar" aria-label="Atualizar">
           <RefreshCw className="h-4 w-4" />
         </Button>
       </div>

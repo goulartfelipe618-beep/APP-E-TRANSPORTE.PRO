@@ -298,12 +298,12 @@ export default function MetricasPage() {
   }, [data?.funil]);
 
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-6">
       {/* Header com filtros */}
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-            <PieChartIcon className="h-6 w-6 text-orange-500" /> Métricas
+        <div className="min-w-0">
+          <h1 className="flex flex-wrap items-center gap-2 text-2xl font-bold text-foreground">
+            <PieChartIcon className="h-6 w-6 shrink-0 text-orange-500" /> Métricas
             {livePulse && (
               <span className="ml-1 inline-flex items-center gap-1 text-[11px] font-medium text-emerald-500">
                 <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" /> Live
@@ -314,15 +314,15 @@ export default function MetricasPage() {
             Indicadores de performance e KPIs do seu negócio. Atualização automática a cada 60 s.
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1 rounded-lg border border-border bg-card p-1">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          <div className="flex min-w-0 flex-wrap items-center gap-1 rounded-lg border border-border bg-card p-1">
             <Filter className="h-3.5 w-3.5 text-muted-foreground ml-1" />
             {PERIOD_OPTIONS.map((p) => (
               <button
                 key={p.key}
                 type="button"
                 onClick={() => setPeriodKey(p.key)}
-                className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+                className={`min-h-9 rounded-md px-2 py-2 text-xs font-medium transition-colors sm:px-3 sm:py-1 ${
                   periodKey === p.key
                     ? "bg-orange-500 text-white shadow"
                     : "text-muted-foreground hover:bg-accent"
@@ -335,6 +335,7 @@ export default function MetricasPage() {
           <Button
             variant="outline"
             size="icon"
+            className="h-10 w-10 shrink-0 sm:h-9 sm:w-9"
             onClick={() => {
               setRefreshKey((k) => k + 1);
               void refetch();

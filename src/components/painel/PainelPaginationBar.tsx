@@ -46,7 +46,7 @@ export function PainelPaginationBar({
           type="button"
           variant="outline"
           size="sm"
-          className="gap-1"
+          className="gap-1 min-h-10 px-3 sm:min-h-9"
           disabled={disabled || page <= 1}
           onClick={() => onPageChange(page - 1)}
         >
@@ -57,7 +57,7 @@ export function PainelPaginationBar({
           type="button"
           variant="outline"
           size="sm"
-          className="gap-1"
+          className="gap-1 min-h-10 px-3 sm:min-h-9"
           disabled={disabled || page >= totalPages}
           onClick={() => onPageChange(page + 1)}
         >

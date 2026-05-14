@@ -519,7 +519,7 @@ export default function SistemaAutomacoesPage() {
         title="Automações (visualização)"
         description="Webhooks, mapeamentos de campos e integrações com formulários e sistemas externos."
       >
-      <div className="space-y-6">
+      <div className="min-w-0 space-y-6">
         <button
           onClick={() => { setSelected(null); setMappings({}); setTestes([]); setSelectedTeste(null); setContainerTestes({}); setCollapsedContainers({}); setCampaignFields([]); setNewCampaignField(""); setCampaignFieldLocked(false); setCampaignMeta(null); }}
           className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
@@ -942,7 +942,7 @@ export default function SistemaAutomacoesPage() {
       title="Automações (visualização)"
       description="Webhooks, mapeamentos de campos e integrações com formulários e sistemas externos."
     >
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Automações</h1>

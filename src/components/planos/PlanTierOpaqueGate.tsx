@@ -39,7 +39,7 @@ export default function PlanTierOpaqueGate({
   const gated = blocked;
 
   return (
-    <div className="relative">
+    <div className="relative min-w-0">
       {gated ? (
         <div
           role="status"
@@ -68,7 +68,7 @@ export default function PlanTierOpaqueGate({
       ) : null}
       <div
         className={cn(
-          "transition-[opacity,filter] duration-200",
+          "min-w-0 transition-[opacity,filter] duration-200",
           gated && "pointer-events-none select-none opacity-[0.4] saturate-[0.65]",
         )}
       >

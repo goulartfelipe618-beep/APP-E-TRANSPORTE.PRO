@@ -119,7 +119,7 @@ export default function CampanhasLeadsPage() {
       title="Campanhas — Leads (visualização)"
       description="Leads captados pelos webhooks das suas campanhas ativas."
     >
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-6">
       <SolicitacoesCapturaExternaInfo />
       <div className="flex items-center justify-between">
         <div>

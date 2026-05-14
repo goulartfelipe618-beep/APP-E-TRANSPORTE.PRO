@@ -263,7 +263,7 @@ export default function MarketingQRCodePage() {
   };
 
   return (
-    <div className="space-y-10">
+    <div className="min-w-0 space-y-10">
       <div className="flex justify-center pt-4">
         <Dialog
           open={createOpen}

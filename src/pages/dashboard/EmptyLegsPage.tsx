@@ -50,7 +50,7 @@ export default function EmptyLegsPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
           <Plane className="h-6 w-6 text-primary" />

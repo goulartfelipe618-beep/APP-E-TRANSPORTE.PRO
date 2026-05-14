@@ -489,7 +489,7 @@ export default function TransferGeolocalizacaoPage() {
   }, [plano, planUserPlanLoading, rastreios]);
 
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-6">
       <SlideCarousel
         pagina="geolocalizacao"
         fallbackSlides={[
@@ -501,31 +501,40 @@ export default function TransferGeolocalizacaoPage() {
         ]}
       />
 
-      <div className="flex items-center justify-between">
-        <div>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
           <h1 className="text-2xl font-bold text-foreground">Geolocalização de Clientes</h1>
-          <p className="text-muted-foreground">
+          <p className="text-pretty break-words text-muted-foreground">
             Crie um link de rastreio, envie ao cliente via WhatsApp (webhook n8n) e acompanhe o trajeto em tempo real.
             {!planUserPlanLoading && geoLockedIds.size > 0 ? (
-              <span className="ml-2 block pt-1 text-xs text-amber-700 dark:text-amber-400">
+              <span className="mt-1 block text-xs text-amber-700 dark:text-amber-400 sm:ml-2 sm:mt-0 sm:inline">
                 Alguns links excedem o limite mensal do plano FREE: continuam listados, mas só os primeiros três do mês
                 podem ser usados até renovar o plano. Os dados não são apagados.
               </span>
             ) : null}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex w-full shrink-0 flex-wrap gap-2 sm:w-auto sm:justify-end">
           <Button
             variant="outline"
             size="icon"
-            onClick={() => { void loadRastreios(); }}
+            className="h-10 w-10 shrink-0 sm:h-9 sm:w-9"
+            onClick={() => {
+              void loadRastreios();
+            }}
             disabled={loadingRastreios}
             title="Atualizar lista de rastreios"
+            aria-label="Atualizar lista de rastreios"
           >
             <RefreshCw className={`h-4 w-4 ${loadingRastreios ? "animate-spin" : ""}`} />
           </Button>
-          <Button onClick={() => setOpen(true)} disabled={!planUserPlanLoading && freeGeoMonthAtCap} title={freeGeoMonthAtCap ? `Plano FREE: máximo de ${FREE_MAX_LINKS_GEO_MES} links no mês civil (SP).` : undefined}>
-            <Plus className="h-4 w-4 mr-2" /> Novo Link
+          <Button
+            className="min-h-10 flex-1 sm:min-h-9 sm:flex-initial"
+            onClick={() => setOpen(true)}
+            disabled={!planUserPlanLoading && freeGeoMonthAtCap}
+            title={freeGeoMonthAtCap ? `Plano FREE: máximo de ${FREE_MAX_LINKS_GEO_MES} links no mês civil (SP).` : undefined}
+          >
+            <Plus className="mr-2 h-4 w-4 shrink-0" /> Novo Link
           </Button>
         </div>
       </div>

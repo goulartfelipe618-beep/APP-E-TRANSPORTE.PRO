@@ -208,7 +208,7 @@ export default function CampanhasAtivosPage() {
       title="Campanhas — Ativos (visualização)"
       description="Crie e gira campanhas com webhooks dedicados e período de captação."
     >
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-6">
       <SolicitacoesCapturaExternaInfo variant="campanhas-ativos" />
       <div className="flex items-center justify-between">
         <div>

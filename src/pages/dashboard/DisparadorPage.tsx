@@ -81,7 +81,7 @@ export default function DisparadorPage() {
   };
 
   return (
-    <div className="space-y-8">
+    <div className="min-w-0 space-y-8">
       <SlideCarousel pagina="disparador" />
       {disparadorBloqueado && <FerramentaBetaBloqueioAviso />}
 

@@ -12,7 +12,7 @@ export function PainelScaledContent({ children, className }: { children: ReactNo
   const scale = isMobile ? 1 : zoomPercent / 100;
 
   if (!ready || isMobile || scale >= 0.999) {
-    return <div className={cn("min-w-0", className)}>{children}</div>;
+    return <div className={cn("min-w-0 w-full max-w-full", className)}>{children}</div>;
   }
 
   // O filho usa width > 100 % + scale() para caber visualmente na coluna; isso alarga a caixa de layout.

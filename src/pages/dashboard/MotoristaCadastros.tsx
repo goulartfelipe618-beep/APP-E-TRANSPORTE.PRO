@@ -148,11 +148,11 @@ export default function MotoristaCadastrosPage() {
 
   return (
     <TooltipProvider>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
+      <div className="min-w-0 space-y-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
             <h1 className="text-2xl font-bold text-foreground">Cadastros de motoristas</h1>
-            <p className="text-muted-foreground">
+            <p className="text-pretty break-words text-muted-foreground">
               Motoristas da <strong>sua frota</strong> (cada registo fica associado à sua conta; o painel Admin Master gere
               pré-cadastros do site separadamente). A lista usa o mesmo critério de segurança na base de dados (RLS). Cada
               motorista recebe um <strong className="text-foreground">link fixo</strong> de portal; após definir a senha, só ele acede aos seus dados e
@@ -169,6 +169,7 @@ export default function MotoristaCadastrosPage() {
             </p>
           </div>
           <Button
+            className="min-h-10 w-full shrink-0 sm:min-h-9 sm:w-auto"
             onClick={() => {
               if (!planLoading && plano === "free" && motoristas.length >= 3) {
                 toast.error("Plano FREE: no máximo 3 motoristas cadastrados.");
@@ -179,16 +180,16 @@ export default function MotoristaCadastrosPage() {
             }}
             disabled={!planLoading && plano === "free" && motoristas.length >= 3}
           >
-            <Plus className="mr-2 h-4 w-4" /> Novo motorista
+            <Plus className="mr-2 h-4 w-4 shrink-0" /> Novo motorista
           </Button>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="relative min-w-0 max-w-md flex-1">
+        <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+          <div className="relative min-w-0 flex-1 sm:max-w-md">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               placeholder="Buscar por nome ou CPF..."
-              className="pl-9"
+              className="min-h-10 pl-9 sm:min-h-9"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
@@ -201,7 +202,7 @@ export default function MotoristaCadastrosPage() {
                   variant="ghost"
                   size="icon"
                   className={cn(
-                    "rounded-none first:rounded-l-lg last:rounded-r-lg",
+                    "h-10 w-10 rounded-none first:rounded-l-lg last:rounded-r-lg sm:h-9 sm:w-9",
                     viewMode === "list" && "bg-yellow-400 text-black hover:bg-yellow-500 hover:text-black",
                   )}
                   onClick={() => setViewMode("list")}
@@ -219,7 +220,7 @@ export default function MotoristaCadastrosPage() {
                   variant="ghost"
                   size="icon"
                   className={cn(
-                    "rounded-none first:rounded-l-lg last:rounded-r-lg",
+                    "h-10 w-10 rounded-none first:rounded-l-lg last:rounded-r-lg sm:h-9 sm:w-9",
                     viewMode === "grid" && "bg-yellow-400 text-black hover:bg-yellow-500 hover:text-black",
                   )}
                   onClick={() => setViewMode("grid")}

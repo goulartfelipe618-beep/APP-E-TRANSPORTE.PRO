@@ -258,7 +258,7 @@ export default function FinanceiroDashboardPage() {
   const monthLabel = new Date(cursor.y, cursor.m, 1).toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
 
   return (
-    <div className="space-y-6 pb-8">
+    <div className="min-w-0 space-y-6 pb-8">
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-foreground">Financeiro</h1>
         <p className="mt-1 max-w-3xl text-sm text-muted-foreground">

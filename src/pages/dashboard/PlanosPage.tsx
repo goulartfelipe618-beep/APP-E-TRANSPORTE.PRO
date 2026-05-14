@@ -326,7 +326,7 @@ export default function PlanosPage() {
   const showUpgrade = plano !== "pro";
 
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-6">
       <section className="overflow-hidden rounded-2xl border border-[#FF6600]/25 bg-gradient-to-br from-neutral-950 via-neutral-950 to-[#1a0f05] p-5 shadow-sm sm:p-6">
         <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
           <div className="max-w-3xl space-y-3">

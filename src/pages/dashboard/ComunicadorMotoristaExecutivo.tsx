@@ -279,9 +279,9 @@ export default function ComunicadorMotoristaExecutivoPage() {
   const qrImg = qrSrc(sessionQrBase64 || own?.qr_code_base64 || null);
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between gap-4">
-        <div>
+    <div className="min-w-0 space-y-6">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
           <h1 className="text-2xl font-bold text-foreground">Comunicador</h1>
           <p className="text-pretty text-muted-foreground">
             A plataforma indica o <strong className="text-foreground">WhatsApp oficial</strong> para referência. Pode
@@ -290,7 +290,7 @@ export default function ComunicadorMotoristaExecutivoPage() {
             caso contrário, usam a linha oficial.
           </p>
         </div>
-        <Button type="button" variant="outline" onClick={() => void reload()} disabled={loading}>
+        <Button type="button" variant="outline" className="min-h-10 w-full shrink-0 sm:min-h-9 sm:w-auto" onClick={() => void reload()} disabled={loading}>
           Atualizar
         </Button>
       </div>

@@ -354,7 +354,7 @@ export default function MotoristaAbrangencia() {
   const zoom = pins.length === 0 ? 4 : pins.length === 1 ? 12 : 5;
 
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-6">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">

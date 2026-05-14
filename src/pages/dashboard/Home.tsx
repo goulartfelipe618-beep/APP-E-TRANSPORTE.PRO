@@ -92,6 +92,7 @@ function buildHomeSections(showNetwork: boolean, exibirComunicadorMotorista: boo
       title: "Motoristas",
       items: [
         { title: "Cadastros", page: "motoristas/cadastros", desc: "Motoristas parceiros e fichas completas.", icon: UserCheck },
+        { title: "Agendamentos", page: "motoristas/agendamentos", desc: "Reuniões e calendário com motoristas (atalho directo).", icon: Calendar },
       ],
     },
     {
@@ -415,7 +416,7 @@ export default function HomePage() {
   );
 
   return (
-    <div className="space-y-10 pb-8">
+    <div className="min-w-0 space-y-10 pb-8">
       {!onboarding.loading && onboarding.phase1Complete && !onboarding.networkChosen ? (
         <div className="space-y-3">
           <h2 className="text-lg font-bold text-foreground">Passo seguinte: Network Nacional</h2>

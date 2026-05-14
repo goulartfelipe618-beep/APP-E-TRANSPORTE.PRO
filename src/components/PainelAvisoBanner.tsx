@@ -205,7 +205,7 @@ export default function PainelAvisoBanner({ painel, activePage }: Props) {
                 variant="ghost"
                 size="icon"
                 className={cn(
-                  "h-8 w-8 shrink-0 text-current hover:bg-black/10 dark:hover:bg-white/10",
+                  "h-10 w-10 min-h-[44px] min-w-[44px] shrink-0 text-current hover:bg-black/10 dark:hover:bg-white/10 sm:h-8 sm:w-8 sm:min-h-0 sm:min-w-0",
                   a.cor === "amarelo" && "hover:bg-black/15",
                 )}
                 onClick={() => fechar(a.id)}

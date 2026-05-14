@@ -633,7 +633,7 @@ export default function DominiosPage() {
         title="Domínios (visualização)"
         description="Registar e gerir domínios próprios para o site e e-mail profissional faz parte do plano PRÓ."
       >
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-6">
       {isAdminMaster ? (
         <Alert className="border-border bg-muted/40 text-foreground">
           <Info className="h-4 w-4 text-muted-foreground" />

@@ -7,7 +7,7 @@ const TRANSPORTE_EXECUTIVO_SITE = "https://www.transporteexecutivo.com";
 
 export default function NetworkPage() {
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-6">
       <Alert className="border-[#FF6600]/45 bg-[#FF6600]/10 text-foreground">
         <AlertTitle className="text-foreground">Divulgação Network</AlertTitle>
         <AlertDescription className="space-y-3 text-sm text-muted-foreground">

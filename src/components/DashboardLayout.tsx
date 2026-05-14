@@ -266,8 +266,8 @@ function DashboardContent() {
               onClick={dismissSpotlight}
             />
           )}
-          <header className="relative z-0 flex h-12 min-h-12 shrink-0 items-center gap-2 border-b border-border bg-card px-2 sm:gap-3 sm:px-4">
-            <SidebarTrigger className="shrink-0" />
+          <header className="relative z-0 flex min-h-12 shrink-0 items-center gap-2 border-b border-border bg-card px-2 py-1 sm:gap-3 sm:px-4 sm:py-0">
+            <SidebarTrigger className="h-10 w-10 shrink-0 sm:h-9 sm:w-9 lg:h-7 lg:w-7" />
             <div className="flex min-w-0 flex-1 items-center gap-2">
               <Shield className="h-5 w-5 shrink-0 text-muted-foreground" />
               <span className="truncate text-sm font-medium text-foreground">

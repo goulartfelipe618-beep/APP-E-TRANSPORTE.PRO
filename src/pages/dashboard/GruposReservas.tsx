@@ -187,32 +187,32 @@ export default function GruposReservasPage() {
     filterSearch.trim() !== "";
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
+    <div className="min-w-0 space-y-6">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
           <h1 className="text-2xl font-bold text-foreground">Reservas de Grupos</h1>
-          <p className="text-muted-foreground">
+          <p className="text-pretty break-words text-muted-foreground">
             Reservas convertidas a partir de solicitações de grupos ({reservasFiltradas.length}
             {filtrosAtivos ? ` de ${reservas.length}` : ""})
             {!planLoading && freeLockedReservaIds.size > 0 ? (
-              <span className="ml-2 text-xs text-muted-foreground">
+              <span className="mt-1 block text-xs text-muted-foreground sm:ml-2 sm:mt-0 sm:inline">
                 · {freeLockedReservaIds.size} reserva(s) acima do limite diário do plano FREE (visíveis; ações limitadas)
               </span>
             ) : null}
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="icon" onClick={fetchAll}>
+        <div className="flex w-full shrink-0 flex-wrap gap-2 sm:w-auto sm:justify-end">
+          <Button variant="outline" size="icon" className="h-10 w-10 shrink-0 sm:h-9 sm:w-9" onClick={fetchAll} aria-label="Atualizar lista">
             <RefreshCw className="h-4 w-4" />
           </Button>
           <Button
-            className="bg-primary text-primary-foreground"
+            className="min-h-10 flex-1 bg-primary px-4 text-primary-foreground sm:min-h-9 sm:flex-initial"
             onClick={() => {
               setReservaGrupoEdicao(null);
               setDialogOpen(true);
             }}
           >
-            <Plus className="h-4 w-4 mr-2" /> Criar Reserva
+            <Plus className="mr-2 h-4 w-4 shrink-0" /> Criar Reserva
           </Button>
         </div>
       </div>
@@ -320,7 +320,7 @@ export default function GruposReservasPage() {
                   <TableHead>Motorista</TableHead>
                   <TableHead>Valor</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead className="min-w-[220px] whitespace-nowrap text-right">Ações</TableHead>
+                  <TableHead className="text-right sm:min-w-[11rem] sm:whitespace-nowrap">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -345,8 +345,8 @@ export default function GruposReservasPage() {
                   <TableCell className={cn(rowLocked && "opacity-60")}>
                     <Badge variant={badgeToneReservaStatus(r.status)}>{labelReservaStatus(r.status)}</Badge>
                   </TableCell>
-                  <TableCell className="text-right align-middle whitespace-nowrap">
-                    <div className="inline-flex max-w-full flex-nowrap items-center justify-end gap-0.5">
+                  <TableCell className="max-w-[11rem] text-right align-top sm:max-w-none sm:align-middle">
+                    <div className="flex max-w-full flex-wrap justify-end gap-1 sm:inline-flex sm:max-w-none sm:flex-nowrap sm:items-center sm:gap-0.5">
                       {rowLocked ? (
                         <Badge
                           variant="outline"
@@ -360,7 +360,7 @@ export default function GruposReservasPage() {
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-8 w-8 shrink-0"
+                        className="h-9 w-9 shrink-0 sm:h-8 sm:w-8"
                         disabled={rowLocked}
                         onClick={() => {
                           setReservaGrupoEdicao(r);
@@ -373,7 +373,7 @@ export default function GruposReservasPage() {
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-8 w-8 shrink-0"
+                        className="h-9 w-9 shrink-0 sm:h-8 sm:w-8"
                         onClick={() => {
                           setSelected(r);
                           setSheetOpen(true);
@@ -385,7 +385,7 @@ export default function GruposReservasPage() {
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-8 w-8 shrink-0"
+                        className="h-9 w-9 shrink-0 sm:h-8 sm:w-8"
                         disabled={rowLocked}
                         onClick={() => handleComunicar(r)}
                         title="Comunicar"
@@ -395,7 +395,7 @@ export default function GruposReservasPage() {
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-8 w-8 shrink-0"
+                        className="h-9 w-9 shrink-0 sm:h-8 sm:w-8"
                         disabled={rowLocked}
                         onClick={() => handleDownload(r)}
                         title="Download"
@@ -405,7 +405,7 @@ export default function GruposReservasPage() {
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-8 w-8 shrink-0"
+                        className="h-9 w-9 shrink-0 sm:h-8 sm:w-8"
                         disabled={rowLocked}
                         onClick={() => setDeleteId(r.id)}
                         title="Excluir"

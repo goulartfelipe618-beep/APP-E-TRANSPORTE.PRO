@@ -30,7 +30,7 @@ function renderRichText(text: string) {
 
 function DocBlocks({ blocks }: { blocks: DocBlock[] }) {
   return (
-    <div className="space-y-4 text-sm leading-relaxed text-muted-foreground">
+    <div className="min-w-0 space-y-4 text-sm leading-relaxed text-muted-foreground">
       {blocks.map((b, idx) => {
         if (b.t === "p") {
           return (

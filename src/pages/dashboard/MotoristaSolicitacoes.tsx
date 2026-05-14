@@ -150,7 +150,7 @@ export default function MotoristaSolicitacoesPage() {
       title="Solicitações — Motoristas (visualização)"
       description="Candidatos e leads do webhook de motoristas para completar cadastro na frota."
     >
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-6">
       <SolicitacoesCapturaExternaInfo />
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
@@ -168,18 +168,18 @@ export default function MotoristaSolicitacoesPage() {
         </Button>
       </div>
 
-      <div className="flex items-center gap-3">
-        <div className="relative max-w-md flex-1">
+      <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="relative min-w-0 flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input placeholder="Buscar por nome, e-mail ou telefone…" className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
+          <Input placeholder="Buscar por nome, e-mail ou telefone…" className="min-h-10 pl-9 sm:min-h-9" value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
-        <div className="flex overflow-hidden rounded-lg border border-border">
+        <div className="flex shrink-0 overflow-hidden rounded-lg border border-border">
           <Button
             type="button"
             variant="ghost"
             size="icon"
             className={cn(
-              "rounded-none first:rounded-l-lg last:rounded-r-lg",
+              "h-10 w-10 rounded-none first:rounded-l-lg last:rounded-r-lg sm:h-9 sm:w-9",
               viewMode === "grid" && "bg-yellow-400 text-black hover:bg-yellow-500 hover:text-black",
             )}
             onClick={() => setViewMode("grid")}
@@ -191,7 +191,7 @@ export default function MotoristaSolicitacoesPage() {
             variant="ghost"
             size="icon"
             className={cn(
-              "rounded-none first:rounded-l-lg last:rounded-r-lg",
+              "h-10 w-10 rounded-none first:rounded-l-lg last:rounded-r-lg sm:h-9 sm:w-9",
               viewMode === "list" && "bg-yellow-400 text-black hover:bg-yellow-500 hover:text-black",
             )}
             onClick={() => setViewMode("list")}
@@ -248,8 +248,8 @@ export default function MotoristaSolicitacoesPage() {
           ))}
         </div>
       ) : (
-        <div className="overflow-hidden rounded-xl border border-border bg-card">
-          <table className="w-full text-sm">
+        <div className="min-w-0 overflow-x-auto overscroll-x-contain rounded-xl border border-border bg-card">
+          <table className="w-full min-w-[520px] text-sm">
             <thead className="bg-muted/40">
               <tr>
                 <th className="p-3 text-left">Nome</th>

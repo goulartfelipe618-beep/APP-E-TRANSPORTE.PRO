@@ -102,7 +102,7 @@ export default function MentoriaPage() {
         ? safeMediaSrc(selectedCard.video_url)
         : undefined;
     return (
-      <div className="space-y-6">
+      <div className="min-w-0 space-y-6">
         <Button variant="ghost" onClick={() => setSelectedCard(null)} className="gap-2 text-muted-foreground hover:text-foreground">
           <ArrowLeft className="h-4 w-4" /> Voltar para Mentoria
         </Button>
@@ -161,7 +161,7 @@ export default function MentoriaPage() {
 
   // Card grid view
   return (
-    <div className="space-y-8">
+    <div className="min-w-0 space-y-8">
       <SlideCarousel pagina="mentoria" />
 
       <div>

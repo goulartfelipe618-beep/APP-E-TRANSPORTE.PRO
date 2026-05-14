@@ -279,7 +279,7 @@ export default function EmailBusinessPage() {
         {listLoading ? (
           <p className="text-center text-sm text-muted-foreground py-12">Carregando…</p>
         ) : emailSolicitacoes.length > 0 ? (
-          <div className="space-y-6">
+          <div className="min-w-0 space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div>
                 <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
@@ -362,7 +362,7 @@ export default function EmailBusinessPage() {
                   <p className="text-sm text-muted-foreground">
                     Informações extras preenchidas pela equipe para solicitações já concluídas.
                   </p>
-                  <div className="space-y-6">
+                  <div className="min-w-0 space-y-6">
                     {detailRows.map((row) => {
                       const { email } = parseEmailRowDados(row.dados_solicitacao);
                       return (
@@ -561,7 +561,7 @@ export default function EmailBusinessPage() {
 
         {/* STEP 3 – Dados */}
         {step === 2 && (
-          <div className="space-y-6">
+          <div className="min-w-0 space-y-6">
             <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
               <User className="h-5 w-5" /> Seus dados
             </h2>
@@ -586,7 +586,7 @@ export default function EmailBusinessPage() {
 
         {/* STEP 4 – Confirmação */}
         {step === 3 && (
-          <div className="space-y-6">
+          <div className="min-w-0 space-y-6">
             <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
               <CheckCircle2 className="h-5 w-5" /> Confirme sua solicitação
             </h2>

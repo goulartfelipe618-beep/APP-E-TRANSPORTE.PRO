@@ -554,7 +554,7 @@ export default function WebsitePage() {
       (servicoAtivo.status === "publicado" || servicoAtivo.status === "concluido");
 
     return (
-      <div className="space-y-6">
+      <div className="min-w-0 space-y-6">
         <div>
           <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
             <Monitor className="h-7 w-7 text-primary" /> Website — Acompanhamento do projeto
@@ -743,7 +743,7 @@ export default function WebsitePage() {
           title="Website (visualização)"
           description="Pedidos de site, templates e integração com o seu domínio estão incluídos no plano PRÓ."
         >
-        <div className="space-y-6">
+        <div className="min-w-0 space-y-6">
           <div>
             <h1 className="text-2xl font-bold text-foreground">Website — Briefing Completo</h1>
             <p className="text-sm text-muted-foreground">
@@ -1180,7 +1180,7 @@ export default function WebsitePage() {
         title="Website (visualização)"
         description="Pedidos de site, templates e integração com o seu domínio estão incluídos no plano PRÓ."
       >
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-6">
       <SlideCarousel pagina="website" breakoutTop fallbackSlides={[
         { titulo: "Crie Seu Site Profissional", subtitulo: "Design premium e responsivo para transporte executivo." },
         { titulo: "Templates Exclusivos", subtitulo: "Modelos desenvolvidos para o segmento de transporte." },
