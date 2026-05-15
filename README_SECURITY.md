@@ -2,9 +2,81 @@
 
 Este projeto combina **React (Vite)**, **Supabase** (Auth + Postgres + Storage), **Edge Functions** e uma **API Node opcional** (`server/`). Use este ficheiro como checklist ao alterar autenticação, uploads, multi-tenant ou integrações externas.
 
-**Pré-deploy:** `npm run security-check` — `npm audit` (falha só em high/critical) + verificação de ficheiros `.env*` fora do padrão e de `.env` versionado no Git.
+**Pré-deploy:** `npm run security-check` — `npm audit` (falha só em high/critical) + verificação de ficheiros `.env*` fora do padrão e de `.env` versionado no Git. No GitHub, o workflow **CI security gate** (`.github/workflows/ci-security.yml`) corre o mesmo gate + lint + testes + build em cada push/PR a `main` ou `master`.
 
 ---
+
+## GitHub, Vercel e Supabase (camadas que não são só código)
+
+Não existe segurança **“100%”** em sentido matemático: existe **risco residual**, **processo** e **defesa em profundidade**. O repositório já inclui CSP e cabeçalhos no `vercel.json`, RLS e guias em `README_SECURITY.md`, API Node com Helmet/rate limit/Zod onde aplicável, e agora CI + Dependabot.
+
+### GitHub
+
+1. **Branch protection em `main`** (neste repositório o remoto por defeito é **`origin/main`**):
+   - **Settings** → **Branches** → **Add branch protection rule** → *Branch name pattern*: `main`.
+   - **Require a pull request before merging** (opcional: **Require approvals**).
+   - **Require status checks to pass before merging** → **Add checks** → seleccionar **CI security gate** / job **`gate`** (só aparece na lista depois de o workflow correr pelo menos uma vez com sucesso).
+   - Opcional: **Do not allow bypassing the above settings** (inclui admins), se a governança o permitir.
+2. Repositório **privado** se o código não for público por necessidade.
+3. **Secret scanning** e **push protection** (*Settings* → *Code security and analysis*) para bloquear commits com segredos conhecidos.
+4. Activar **Private vulnerability reporting** e alinhar com `SECURITY.md` na raiz.
+5. **Dependabot** (`.github/dependabot.yml`): rever e testar PRs de dependências antes de merge.
+
+### Vercel (deploy a partir do GitHub)
+
+- Variáveis no **painel da Vercel** (Production / Preview separados). **Nunca** `SUPABASE_SERVICE_ROLE_KEY`, `MP_ACCESS_TOKEN`, ou segredos de webhook no prefixo `VITE_` — tudo com `VITE_` vai para o bundle público.
+- **Deployment Protection** em previews se o repositório for sensível (evita URL de preview indexável com dados de staging).
+- **Domínio produção** em HTTPS; HSTS já vem no `vercel.json` para respostas cobertas por essa regra de cabeçalhos.
+- Após cada alteração a integrações externas, validar a consola do browser contra a **CSP** (já documentado em `README_SECURITY.md`).
+
+### Inventário de variáveis (cruzar com Vercel e com `.env.example`)
+
+O **build da Vercel** injeta variáveis no **Vite** no momento do `npm run build`. Tudo com prefixo **`VITE_`** (e `NEXT_PUBLIC_MP_PUBLIC_KEY` no `vite.config`) acaba **visível no JavaScript público** — use apenas chaves **anon / públicas** e URLs que aceite expor.
+
+**Frontend (Vercel — build Vite; ver também `vite.config.ts` `define`):**
+
+| Variável | Uso típico |
+|----------|------------|
+| `VITE_SUPABASE_URL` | Cliente Supabase; também aceite no build: `SUPABASE_URL`. |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | Chave anon/publicável; alternativas no build: `VITE_SUPABASE_ANON_KEY`, `SUPABASE_ANON_KEY`. |
+| `VITE_SUPABASE_PROJECT_ID` | Metadados / build; alternativa: `SUPABASE_PROJECT_REF`. |
+| `VITE_MP_PUBLIC_KEY` / `NEXT_PUBLIC_MP_PUBLIC_KEY` / `MP_PUBLIC_KEY` | Chave **pública** Mercado Pago (Brick). |
+| `VITE_API_BASE_URL` | Origem da **API Node** (pagamentos, etc.); sem barra final. |
+| `VITE_MP_BILLING_ENABLED` | Activa fluxo de billing no cliente. |
+| `VITE_MAPBOX_ACCESS_TOKEN` | Token Mapbox (restringir por URL no dashboard Mapbox). |
+| `VITE_MAPBOX_DEFAULT_PROXIMITY` | Viés geográfico opcional (`lng,lat`). |
+| `VITE_APP_PUBLIC_URL` | URL canónica da app (links, QR). |
+| `VITE_MOTORISTA_VERIFICACAO_APP_ORIGIN` | Origem exacta do painel para QR motorista. |
+| `VITE_GEO_RASTREIO_APP_ORIGIN` | Origem para links de geolocalização. |
+| `VITE_MEDIA_HOST_ALLOWLIST` | Hostnames extra para media (`safeExternalUrl`). |
+| `VITE_EVOLUTION_API_URL` / `VITE_EVOLUTION_API_KEY` | Evolution (dev / 2º slot; produção pode vir da base). |
+| `VITE_CHATWOOT_ENABLED` / `VITE_CHATWOOT_BASE_URL` / `VITE_CHATWOOT_WEBSITE_TOKEN` | Widget Chatwoot (opcional). |
+| `VITE_PUBLIC_APP_NAME` | Nome exibido em configurações. |
+| `VITE_MIGRAR_PLANO_WEBHOOK_URL` | Webhook HTTPS (upgrade plano); alternativa é URL em código. |
+
+**API Node (`server/` — Railway, VPS, container, etc.; não colocar na Vercel se só servires o SPA estático):**
+
+| Variável | Notas |
+|----------|--------|
+| `SUPABASE_URL` | Obrigatório para JWT e rotas que falam com Supabase. |
+| `SUPABASE_ANON_KEY` | Middleware `authSupabase`. |
+| `SUPABASE_SERVICE_ROLE_KEY` | Só servidor; ex.: login-attempt, Mercado Pago admin client. |
+| `ALLOWED_ORIGINS` | Em produção, lista CSV das origens do front (CORS + *origin allowlist* em mutações). |
+| `MP_ACCESS_TOKEN` | Servidor Mercado Pago. |
+| `MP_WEBHOOK_SECRET` | Validação de assinatura webhook MP. |
+| `MP_BACK_URL` / `APP_PUBLIC_URL` | URLs de retorno / públicas nas preferências MP. |
+| `WEBHOOK_INBOUND_HMAC_SECRET` | HMAC `POST /webhooks/inbound`. |
+| `RATE_LIMIT_*`, `LOG_LEVEL`, `PORT`, `NODE_ENV` | Ver `server/app.mjs` e `server/mercadoPagoPayments.mjs` (predefinições documentadas em `.env.example`). |
+
+**Supabase Edge:** segredos no **Dashboard → Edge Functions → Secrets** (ex.: `WEBHOOK_INBOUND_HMAC_SECRET`, segredos n8n, etc.); **não** duplicar como `VITE_` na Vercel.
+
+### Supabase (fonte de verdade dos dados)
+
+- **RLS** em todas as tabelas expostas a `anon` / `authenticated`; correr `supabase/scripts/audit_rls_gaps.sql` após migrações.
+- Dashboard → **Advisors** (performance e segurança) e **Database** → políticas por tabela.
+- **Secrets** só em Edge/Backend; rodar chaves em caso de incidente.
+- **Auth:** MFA / políticas de password conforme o produto; não logar tokens nem passwords.
+
 
 ## Modelo multi-tenant e isolamento de dados
 
@@ -72,7 +144,8 @@ Isto reduz uploads maliciosos disfarçados de imagem e alinha-se às boas práti
    - **INSERT/UPDATE/DELETE**: regras explícitas (ex.: só o dono, ou só staff) — sem isto, o RLS pode bloquear escritas.
 4. Se precisar de **leitura anónima** (ex.: conteúdo público na página de login), crie política `FOR SELECT TO anon USING (...)` explícita e `GRANT SELECT ... TO anon`.
 5. Correr localmente o script **`supabase/scripts/audit_rls_gaps.sql`** após o deploy da migração para confirmar que não ficaram tabelas sem políticas.
-6. Regenerar tipos TypeScript se usar `supabase gen types`.
+6. Migração **`20260515160000_rls_gapfill_owner_iud.sql`**: preenche lacunas de escrita só-dono e trigger `tenant_row_force_user_id_ins` em tabelas elegíveis (ver ficheiro para exclusões).
+7. Regenerar tipos TypeScript se usar `supabase gen types`.
 
 ### Tabela `painel_client_error_logs`
 

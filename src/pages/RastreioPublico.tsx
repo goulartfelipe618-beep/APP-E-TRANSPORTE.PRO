@@ -15,6 +15,7 @@ import {
   guardarDeviceSecret,
   lerDeviceSecret,
 } from "@/lib/rastreioDeviceSecret";
+import { isCategoriaMotorista, nomeExibicaoPaginaPublica } from "@/lib/rastreioDestinatario";
 
 // --------------------------------------------------------------------
 // Tipagem do retorno de get_rastreio_publico (linha do RPC)
@@ -120,6 +121,7 @@ function Resumo({ data }: { data: RastreioPublico }) {
   const distancia = data.distancia_total_km != null ? Number(data.distancia_total_km) : null;
   const dur = data.duracao_segundos;
   const fim = data.data_hora_fim || data.finalizado_em;
+  const nomeDest = nomeExibicaoPaginaPublica(data);
 
   return (
     <div className="mx-auto max-w-xl px-4 py-10">
@@ -128,9 +130,12 @@ function Resumo({ data }: { data: RastreioPublico }) {
           <Car className="h-5 w-5 text-[#FF6600]" />
           <h1 className="text-xl font-bold">Viagem concluída</h1>
         </div>
-        {data.cliente_nome && (
+        {nomeDest && (
           <p className="text-sm text-muted-foreground">
-            Olá <strong className="text-foreground">{data.cliente_nome}</strong>, obrigado por viajar connosco!
+            Olá <strong className="text-foreground">{nomeDest}</strong>
+            {isCategoriaMotorista(data.categoria_rastreamento)
+              ? ", obrigado por conduzir connosco!"
+              : ", obrigado por viajar connosco!"}
           </p>
         )}
         <div className="grid grid-cols-2 gap-4 pt-2">
@@ -629,10 +634,12 @@ export default function RastreioPublico() {
   }
 
   if (modo === "pre-start" || modo === "iniciando") {
+    const nomeDest = rastreio ? nomeExibicaoPaginaPublica(rastreio) : null;
+    const ehRastreioMotorista = isCategoriaMotorista(rastreio?.categoria_rastreamento);
     return (
       <PreStartScreen
-        clienteNome={rastreio?.cliente_nome ?? null}
-        motoristaNome={rastreio?.motorista_nome ?? null}
+        clienteNome={nomeDest}
+        motoristaNome={ehRastreioMotorista ? null : rastreio?.motorista_nome ?? null}
         veiculo={rastreio?.veiculo_descricao ?? null}
         onIniciar={() => { void handleIniciar(); }}
         iniciando={modo === "iniciando"}
@@ -679,6 +686,8 @@ export default function RastreioPublico() {
   const HudIcon = hud.Icon;
 
   const centerForMap = position ?? DEFAULT_CENTER;
+  const nomeDestTracking = rastreio ? nomeExibicaoPaginaPublica(rastreio) : null;
+  const ehRastreioMotorista = isCategoriaMotorista(rastreio?.categoria_rastreamento);
 
   return (
     <div className="h-[100dvh] w-full bg-background flex flex-col overflow-hidden">
@@ -687,12 +696,17 @@ export default function RastreioPublico() {
           <MapPin className="h-4 w-4 text-[#FF6600] shrink-0" />
           <div className="min-w-0">
             <div className="text-sm font-semibold text-foreground truncate">
-              {rastreio?.cliente_nome ? `Olá, ${rastreio.cliente_nome}` : "Acompanhe sua viagem"}
+              {nomeDestTracking ? `Olá, ${nomeDestTracking}` : "Acompanhe sua viagem"}
             </div>
-            {rastreio?.motorista_nome && (
+            {!ehRastreioMotorista && rastreio?.motorista_nome && (
               <div className="text-[11px] text-muted-foreground truncate">
                 Motorista: {rastreio.motorista_nome}
                 {rastreio?.veiculo_descricao ? ` · ${rastreio.veiculo_descricao}` : ""}
+              </div>
+            )}
+            {ehRastreioMotorista && rastreio?.veiculo_descricao && (
+              <div className="text-[11px] text-muted-foreground truncate">
+                Veículo: {rastreio.veiculo_descricao}
               </div>
             )}
           </div>

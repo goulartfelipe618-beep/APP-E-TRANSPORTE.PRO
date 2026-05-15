@@ -1,6 +1,6 @@
 /**
- * Senha padrão para leads FREE (motorista) — deve coincidir com o snippet JS
- * em `examples/n8n-lead-password-code.js` (mensagens WhatsApp / n8n).
+ * Senha padrão para leads FREE (motorista) — manter alinhado a qualquer nó Code n8n
+ * que replique esta lógica (acentos removidos, 3 letras + 4 dígitos + ETP).
  */
 export function stripAccents(input: string): string {
   return input.normalize("NFD").replace(/[\u0300-\u036f]/g, "");

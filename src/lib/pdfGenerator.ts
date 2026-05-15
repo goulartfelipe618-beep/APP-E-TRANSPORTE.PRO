@@ -466,6 +466,49 @@ function addContractText(doc: jsPDF, title: string, text: string, startY: number
   return y + SP.sectionGap;
 }
 
+/** Bloco final com imagem da assinatura eletrónica (Configurações → Informações Contratuais). */
+async function appendAssinaturaEletronicaFinal(doc: jsPDF, cab: any): Promise<void> {
+  const url = String(cab?.assinatura_url ?? "").trim();
+  if (!url) return;
+
+  const img = await loadLogoForPdf(url);
+  if (!img) return;
+
+  const blockH = 40;
+  let pageNum = doc.getNumberOfPages();
+  doc.setPage(pageNum);
+
+  let y = SAFE_BOTTOM - blockH;
+  if (y < MARGIN + 22) {
+    doc.addPage();
+    pageNum = doc.getNumberOfPages();
+    doc.setPage(pageNum);
+    y = MARGIN + 10;
+  }
+
+  doc.setFontSize(FS.sectionTitle);
+  doc.setFont("helvetica", "bold");
+  setColor(doc, CLR.dark);
+  doc.text("ASSINATURA", MARGIN, y);
+  y += 7;
+
+  const maxW = 62;
+  const maxH = 26;
+  const fitted = fitLogoSize(img.w, img.h, maxW, maxH);
+  const imgX = PAGE_W - MARGIN - fitted.w;
+  doc.addImage(img.dataUrl, img.format, imgX, y, fitted.w, fitted.h);
+  y += fitted.h + 5;
+
+  doc.setFontSize(FS.small);
+  doc.setFont("helvetica", "normal");
+  setColor(doc, CLR.muted);
+  const rotulo = String(cab?.razao_social ?? cab?.representante_legal ?? "").trim();
+  if (rotulo) {
+    doc.text(rotulo, imgX, y);
+  }
+  setColor(doc, CLR.black);
+}
+
 function addSignatureArea(doc: jsPDF, clientName: string, companyName: string | null, startY: number): number {
   let y = checkPage(doc, startY, 45);
   y += 14;
@@ -690,6 +733,8 @@ async function buildTransferReservaPdfDocument(reservaId: string): Promise<{ doc
   // ── Contract pages ──
   await addContractPages(doc, contrato, cabecalho, numReserva, r.id, r.nome_completo);
 
+  await appendAssinaturaEletronicaFinal(doc, cabecalho);
+
   // ── Footer on all pages ──
   addFooter(doc, cabecalho);
 
@@ -815,6 +860,8 @@ async function buildGrupoReservaPdfDocument(reservaId: string): Promise<{ doc: j
   // ── Contract pages ──
   await addContractPages(doc, contrato, cabecalho, numReserva, r.id, r.nome_completo);
 
+  await appendAssinaturaEletronicaFinal(doc, cabecalho);
+
   // ── Footer on all pages ──
   addFooter(doc, cabecalho);
 
@@ -843,7 +890,8 @@ export async function getGrupoReservaPdfBase64(
 // ═══════════════════════════════════════════════════════════
 
 export async function generateSolicitacaoTransferPDF(solicitacao: Record<string, any>) {
-  const cabecalho = await fetchCabecalho();
+  const ownerId = solicitacao.user_id as string | undefined;
+  const cabecalho = await fetchCabecalho(ownerId);
   const doc = new jsPDF();
   const s = solicitacao;
 
@@ -934,6 +982,7 @@ export async function generateSolicitacaoTransferPDF(solicitacao: Record<string,
     y += SP.sectionGap;
   }
 
+  await appendAssinaturaEletronicaFinal(doc, cabecalho);
   addFooter(doc, cabecalho);
   doc.save(`solicitacao-transfer-${s.nome_cliente?.replace(/\s/g, "_") || "sem-nome"}.pdf`);
 }
@@ -943,7 +992,8 @@ export async function generateSolicitacaoTransferPDF(solicitacao: Record<string,
 // ═══════════════════════════════════════════════════════════
 
 export async function generateSolicitacaoGrupoPDF(solicitacao: Record<string, any>) {
-  const cabecalho = await fetchCabecalho();
+  const ownerId = solicitacao.user_id as string | undefined;
+  const cabecalho = await fetchCabecalho(ownerId);
   const doc = new jsPDF();
   const s = solicitacao;
 
@@ -998,6 +1048,7 @@ export async function generateSolicitacaoGrupoPDF(solicitacao: Record<string, an
     y = wrappedText(doc, s.mensagem, MARGIN, y, CONTENT_W, SP.paraLine);
   }
 
+  await appendAssinaturaEletronicaFinal(doc, cabecalho);
   addFooter(doc, cabecalho);
   doc.save(`solicitacao-grupo-${s.nome_cliente?.replace(/\s/g, "_") || "sem-nome"}.pdf`);
 }

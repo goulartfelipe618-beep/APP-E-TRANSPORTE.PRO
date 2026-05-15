@@ -78,7 +78,8 @@ Nunca commite `.env`. Segredos de webhooks e service role ficam no **Supabase Da
 
 ## Documentação extra
 
-- **`README_SECURITY.md`** — alinhado a boas práticas do projeto (CSP, webhooks HMAC, uploads, RLS).
+- **`README_SECURITY.md`** — CSP, webhooks HMAC, uploads, RLS, variáveis Vercel/API, Mercado Pago (endpoints e env).
+- **`.env.example`** — variáveis de build e de servidor (incl. MP).
 
 ## ADR (resumo)
 

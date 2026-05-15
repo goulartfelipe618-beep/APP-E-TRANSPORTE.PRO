@@ -12,7 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Car, User, Upload, Save, Key, Shield, RefreshCw, Type, Pencil, FileText, Users, AlertTriangle, Loader2 } from "lucide-react";
+import { Car, User, Upload, Save, Key, Shield, RefreshCw, Type, Pencil, FileText, Users, AlertTriangle, Loader2, PenLine, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useConfiguracoes } from "@/contexts/ConfiguracoesContext";
@@ -176,6 +176,9 @@ export default function SistemaConfiguracoesPage() {
   const [whatsappContratual, setWhatsappContratual] = useState("");
   const [emailOficial, setEmailOficial] = useState("");
   const [uploadingLogoContratual, setUploadingLogoContratual] = useState("");
+  const [assinaturaUrl, setAssinaturaUrl] = useState("");
+  const [uploadingAssinatura, setUploadingAssinatura] = useState(false);
+  const assinaturaRef = useRef<HTMLInputElement>(null);
 
   const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
   const [currentPassword, setCurrentPassword] = useState("");
@@ -236,6 +239,7 @@ export default function SistemaConfiguracoesPage() {
       setEnderecoSede(d.endereco_sede || "");
       setRepresentanteLegal(d.representante_legal || "");
       setLogoContratualUrl(d.logo_contratual_url || "");
+      setAssinaturaUrl(d.assinatura_url || "");
       setTelefoneContratual(d.telefone || "");
       setWhatsappContratual(d.whatsapp || "");
       setEmailOficial(d.email_oficial || "");
@@ -447,6 +451,7 @@ export default function SistemaConfiguracoesPage() {
         endereco_sede: cfgRow.endereco_completo.trim(),
         representante_legal: (cfgRow.nome_completo || "").trim(),
         logo_contratual_url: logoContratualUrl || null,
+        assinatura_url: assinaturaUrl || null,
         telefone: cfgRow.telefone.trim(),
         whatsapp: cfgRow.telefone.trim(),
         email_oficial: cfgRow.email.trim(),
@@ -496,6 +501,7 @@ export default function SistemaConfiguracoesPage() {
       endereco_sede: enderecoSede,
       representante_legal: representanteLegal,
       logo_contratual_url: logoContratualUrl,
+      assinatura_url: assinaturaUrl || null,
       telefone: telefoneContratual,
       whatsapp: whatsappContratual,
       email_oficial: emailOficial,
@@ -523,6 +529,98 @@ export default function SistemaConfiguracoesPage() {
     setContratualEditing(false);
     setContratualSaved(true);
     window.dispatchEvent(new Event("configuracoes-updated"));
+  };
+
+  const upsertAssinaturaUrl = async (url: string | null) => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      toast.error("Não autenticado");
+      return false;
+    }
+
+    const { data: existing } = await supabase
+      .from("cabecalho_contratual" as any)
+      .select("id")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    const patch = { assinatura_url: url, updated_at: new Date().toISOString() };
+    let error;
+    if (existing) {
+      ({ error } = await supabase.from("cabecalho_contratual" as any).update(patch).eq("user_id", user.id));
+    } else {
+      ({ error } = await supabase.from("cabecalho_contratual" as any).insert({
+        user_id: user.id,
+        nome: "Cabeçalho 1",
+        possui_cnpj: "nao",
+        ...patch,
+      }));
+    }
+    if (error) {
+      toast.error("Erro ao guardar assinatura");
+      return false;
+    }
+    window.dispatchEvent(new Event("configuracoes-updated"));
+    return true;
+  };
+
+  const handleAssinaturaUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingAssinatura(true);
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      toast.error("Não autenticado");
+      setUploadingAssinatura(false);
+      return;
+    }
+
+    let ext = "png";
+    try {
+      const { mime } = await assertUploadMagicBytes(file, "raster-or-pdf", 5 * 1024 * 1024);
+      if (mime === "application/pdf") {
+        toast.error("Para assinatura eletrónica use uma imagem (PNG, JPEG ou WebP), não PDF.");
+        setUploadingAssinatura(false);
+        return;
+      }
+      ext = extensionForDetectedMime(mime);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Ficheiro inválido");
+      setUploadingAssinatura(false);
+      return;
+    }
+
+    const filePath = `${user.id}/assinatura-${Date.now()}.${ext}`;
+    const { error: upErr } = await supabase.storage.from("logos").upload(filePath, file, { upsert: true });
+    if (upErr) {
+      toast.error("Erro no upload da assinatura");
+      setUploadingAssinatura(false);
+      return;
+    }
+
+    const { data: urlData } = supabase.storage.from("logos").getPublicUrl(filePath);
+    const publicUrl = urlData.publicUrl;
+    const ok = await upsertAssinaturaUrl(publicUrl);
+    if (ok) {
+      setAssinaturaUrl(publicUrl);
+      toast.success("Assinatura eletrónica guardada");
+    }
+    setUploadingAssinatura(false);
+    if (assinaturaRef.current) assinaturaRef.current.value = "";
+  };
+
+  const handleRemoverAssinatura = async () => {
+    setUploadingAssinatura(true);
+    const ok = await upsertAssinaturaUrl(null);
+    if (ok) {
+      setAssinaturaUrl("");
+      toast.success("Assinatura removida");
+    }
+    setUploadingAssinatura(false);
   };
 
   const handleLogoContratualUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1130,6 +1228,69 @@ export default function SistemaConfiguracoesPage() {
             <Save className="h-4 w-4 mr-2" /> {possuiCnpj === "nao" ? "Salvar (usar dados do perfil)" : "Salvar Cabeçalho 1"}
           </Button>
         )}
+      </div>
+
+      {/* Assinatura eletrónica (PDFs) */}
+      <div className="rounded-xl border border-border bg-card p-6 max-w-2xl">
+        <div className="flex items-center gap-2 mb-1">
+          <PenLine className="h-5 w-5 text-[#FF6600]" />
+          <h3 className="font-semibold text-foreground">Assinatura eletrónica</h3>
+        </div>
+        <p className="text-sm text-muted-foreground mb-4">
+          Envie uma imagem digitalizada da sua assinatura (PNG, JPEG ou WebP). Ela aparece no final dos PDFs de
+          confirmação e solicitações de <strong className="text-foreground">Transfer</strong> e{" "}
+          <strong className="text-foreground">Grupos</strong>.
+        </p>
+
+        <div className="bg-muted/30 rounded-lg p-6 flex items-center justify-center mb-3 border border-dashed border-border min-h-[100px]">
+          {assinaturaUrl ? (
+            <img
+              src={assinaturaUrl}
+              alt="Assinatura eletrónica"
+              className="max-h-20 max-w-full object-contain"
+            />
+          ) : (
+            <p className="text-sm text-muted-foreground text-center">Nenhuma assinatura configurada</p>
+          )}
+        </div>
+
+        <input
+          ref={assinaturaRef}
+          type="file"
+          accept="image/png,image/jpeg,image/webp,image/gif"
+          className="hidden"
+          onChange={(ev) => void handleAssinaturaUpload(ev)}
+        />
+
+        <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => assinaturaRef.current?.click()}
+            disabled={uploadingAssinatura}
+          >
+            {uploadingAssinatura ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <Upload className="h-4 w-4 mr-2" />
+            )}
+            {assinaturaUrl ? "Substituir assinatura" : "Enviar assinatura"}
+          </Button>
+          {assinaturaUrl ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="text-destructive hover:text-destructive"
+              onClick={() => void handleRemoverAssinatura()}
+              disabled={uploadingAssinatura}
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Remover
+            </Button>
+          ) : null}
+        </div>
       </div>
 
       {/* Segurança */}

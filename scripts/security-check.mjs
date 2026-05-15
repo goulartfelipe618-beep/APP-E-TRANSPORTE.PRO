@@ -85,9 +85,17 @@ try {
   /* fora de repo git */
 }
 
-/** Alinhado a README_SECURITY.md — service role nunca no bundle do browser. */
+/** Alinhado a README_SECURITY.md — segredos de servidor nunca no bundle do browser. */
 console.log("\n--- Verificação rápida `src/` (segredos) ---\n");
-const GREP_PATTERNS = ["service_role", "SUPABASE_SERVICE_ROLE_KEY"];
+const GREP_PATTERNS = [
+  "service_role",
+  "SUPABASE_SERVICE_ROLE_KEY",
+  "MP_ACCESS_TOKEN",
+  "MP_WEBHOOK_SECRET",
+  "WEBHOOK_INBOUND_HMAC_SECRET",
+  "BEGIN RSA PRIVATE KEY",
+  "BEGIN OPENSSH PRIVATE KEY",
+];
 try {
   let found = false;
   for (const pat of GREP_PATTERNS) {
@@ -100,7 +108,7 @@ try {
     }
   }
   if (found) exit = 1;
-  else console.log("Nenhuma correspondência service_role / SUPABASE_SERVICE_ROLE_KEY em src/.");
+  else console.log("Nenhuma correspondência aos padrões de segredo em src/ (lista alargada).");
 } catch {
   console.log("(Pulado: git grep em src não disponível.)");
 }

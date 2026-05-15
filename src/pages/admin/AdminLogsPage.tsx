@@ -92,7 +92,7 @@ export default function AdminLogsPage() {
       }
       const { data, error } = await supabase.rpc("is_admin_master", { _user_id: user.id });
       if (cancelled) return;
-      if (error || !Boolean(data)) {
+      if (error || !data) {
         setMasterAccess("no");
         navigate("/", { replace: true });
         return;

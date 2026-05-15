@@ -39,6 +39,12 @@ import { useUserPlan } from "@/hooks/useUserPlan";
 import { freePlanLockedRastreioIdsByCreationMonth } from "@/lib/freePlanLocks";
 import { usePainelListPagination } from "@/hooks/usePainelListPagination";
 import { PainelPaginationBar } from "@/components/painel/PainelPaginationBar";
+import {
+  isCategoriaMotorista,
+  type MotoristaFrotaOpt,
+  resolveDestinatarioAoCriar,
+  resolveDestinatarioComunicar,
+} from "@/lib/rastreioDestinatario";
 
 type ReservaTransfer = Tables<"reservas_transfer">;
 type ReservaGrupo = Tables<"reservas_grupos">;
@@ -137,6 +143,7 @@ export default function TransferGeolocalizacaoPage() {
   const [submitting, setSubmitting] = useState(false);
   const [reservasTransfer, setReservasTransfer] = useState<ReservaTransfer[]>([]);
   const [reservasGrupos, setReservasGrupos] = useState<ReservaGrupo[]>([]);
+  const [motoristasFrota, setMotoristasFrota] = useState<MotoristaFrotaOpt[]>([]);
   const [rastreios, setRastreios] = useState<RastreioRow[]>([]);
   const [reservaKey, setReservaKey] = useState<string>("");
   const [categoria, setCategoria] = useState<"cliente" | "motorista">("cliente");
@@ -157,13 +164,20 @@ export default function TransferGeolocalizacaoPage() {
     if (!uid) {
       setReservasTransfer([]);
       setReservasGrupos([]);
+      setMotoristasFrota([]);
       setLoading(false);
       return;
     }
     const filtroDonoOuMotorista = `user_id.eq.${uid},motorista_id.eq.${uid}`;
-    const [t, g] = await Promise.all([
+    const [t, g, mot] = await Promise.all([
       supabase.from("reservas_transfer").select("*").or(filtroDonoOuMotorista).order("created_at", { ascending: false }),
       supabase.from("reservas_grupos").select("*").or(filtroDonoOuMotorista).order("created_at", { ascending: false }),
+      supabase
+        .from("solicitacoes_motoristas")
+        .select("nome, telefone, portal_auth_user_id")
+        .eq("user_id", uid)
+        .eq("status", "cadastrado")
+        .not("portal_auth_user_id", "is", null),
     ]);
     if (t.error) {
       toast.error("Erro ao carregar reservas de transfer");
@@ -174,6 +188,19 @@ export default function TransferGeolocalizacaoPage() {
       toast.error("Erro ao carregar reservas de grupos");
     } else {
       setReservasGrupos(g.data || []);
+    }
+    if (!mot.error && mot.data) {
+      setMotoristasFrota(
+        (mot.data as { portal_auth_user_id: string | null; nome: string; telefone: string | null }[])
+          .filter((m) => m.portal_auth_user_id != null)
+          .map((m) => ({
+            portalAuthUserId: m.portal_auth_user_id as string,
+            nome: m.nome,
+            telefone: m.telefone,
+          })),
+      );
+    } else {
+      setMotoristasFrota([]);
     }
     setLoading(false);
   }, []);
@@ -218,25 +245,46 @@ export default function TransferGeolocalizacaoPage() {
     }
   }, [open, loadReservas]);
 
-  // Auto-preenche nome/telefone ao escolher a reserva
+  // Auto-preenche nome/telefone ao escolher a reserva ou mudar cliente/motorista
   useEffect(() => {
     if (!reservaKey || reservaKey === "__empty__") return;
     const [kind, id] = reservaKey.split(":");
     if (kind === "transfer") {
       const r = reservasTransfer.find((x) => x.id === id);
-      if (r) {
-        if (!nomeOpcional.trim()) setNomeOpcional(r.nome_completo ?? "");
-        if (!telefoneOpcional.trim()) setTelefoneOpcional(r.telefone ?? "");
+      if (!r) return;
+      if (categoria === "motorista") {
+        const dest = resolveDestinatarioAoCriar({
+          categoria: "motorista",
+          nomeOpcional: "",
+          telefoneOpcional: "",
+          reservaTransfer: r,
+          motoristasFrota,
+        });
+        setNomeOpcional(dest.nome ?? "");
+        setTelefoneOpcional(dest.telefone ?? "");
+      } else {
+        setNomeOpcional(r.nome_completo ?? "");
+        setTelefoneOpcional(r.telefone ?? "");
       }
     } else if (kind === "grupo") {
       const r = reservasGrupos.find((x) => x.id === id);
-      if (r) {
-        if (!nomeOpcional.trim()) setNomeOpcional(r.nome_completo ?? "");
-        if (!telefoneOpcional.trim()) setTelefoneOpcional(r.whatsapp ?? "");
+      if (!r) return;
+      if (categoria === "motorista") {
+        const dest = resolveDestinatarioAoCriar({
+          categoria: "motorista",
+          nomeOpcional: "",
+          telefoneOpcional: "",
+          reservaGrupo: r,
+          motoristasFrota,
+        });
+        setNomeOpcional(dest.nome ?? "");
+        setTelefoneOpcional(dest.telefone ?? "");
+      } else {
+        setNomeOpcional(r.nome_completo ?? "");
+        setTelefoneOpcional(r.whatsapp ?? "");
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [reservaKey]);
+  }, [reservaKey, categoria, reservasTransfer, reservasGrupos, motoristasFrota]);
 
   const reservasTransferFuturas = useMemo(() => {
     const now = new Date();
@@ -291,16 +339,14 @@ export default function TransferGeolocalizacaoPage() {
         }
       }
 
-      const nomeCliente =
-        nomeOpcional.trim() ||
-        reservaTransfer?.nome_completo ||
-        reservaGrupo?.nome_completo ||
-        null;
-      const telefoneCliente =
-        telefoneOpcional.replace(/\D/g, "") ||
-        (reservaTransfer?.telefone ?? "").replace(/\D/g, "") ||
-        (reservaGrupo?.whatsapp ?? "").replace(/\D/g, "") ||
-        null;
+      const destinatario = resolveDestinatarioAoCriar({
+        categoria,
+        nomeOpcional,
+        telefoneOpcional,
+        reservaTransfer,
+        reservaGrupo,
+        motoristasFrota,
+      });
 
       const { data: inserted, error: insertErr } = await supabase
         .from("rastreios_ao_vivo")
@@ -308,8 +354,8 @@ export default function TransferGeolocalizacaoPage() {
           user_id: user.id,
           reserva_transfer_id: isTransfer ? id : null,
           reserva_grupo_id: !isTransfer ? id : null,
-          cliente_nome: nomeCliente,
-          cliente_telefone: telefoneCliente,
+          cliente_nome: destinatario.nome,
+          cliente_telefone: destinatario.telefone,
           observacoes: observacoes.trim() || null,
           categoria_rastreamento: categoria,
           status: "ativo",
@@ -379,6 +425,22 @@ export default function TransferGeolocalizacaoPage() {
         if (data) reservaSnapshot = jsonSafeRecord(data as unknown as Record<string, unknown>);
       }
 
+      const destinatario = resolveDestinatarioComunicar({
+        categoria: r.categoria_rastreamento,
+        clienteNome: r.cliente_nome,
+        clienteTelefone: r.cliente_telefone,
+        reservaSnapshot,
+        motoristasFrota,
+      });
+
+      if (!destinatario.telefone) {
+        throw new Error(
+          isCategoriaMotorista(r.categoria_rastreamento)
+            ? "Sem telefone do motorista na reserva. Atribua um motorista com telefone cadastrado ou preencha o campo ao criar o link."
+            : "Sem telefone do cliente para enviar o link.",
+        );
+      }
+
       const mensagemGeo = `Acompanhe em tempo real: ${url}`;
       const comunicadorSnap = buildComunicadorSnapshot(sistema, own);
       await dispatchComunicarWebhook("geolocalizacao", {
@@ -390,13 +452,15 @@ export default function TransferGeolocalizacaoPage() {
         tipo_reserva: tipoReserva,
         reserva_id: r.reserva_transfer_id || r.reserva_grupo_id || null,
         categoria_rastreamento: r.categoria_rastreamento,
-        cliente_nome: r.cliente_nome,
-        cliente_telefone: r.cliente_telefone,
+        cliente_nome: destinatario.nome,
+        cliente_telefone: destinatario.telefone,
+        destinatario_nome: destinatario.nome,
+        destinatario_telefone: destinatario.telefone,
         observacoes: r.observacoes,
         reserva: reservaSnapshot,
         motorista_painel: motorista,
         comunicador: comunicadorSnap,
-        ...buildN8nEnvioWhatsappCampos(comunicadorSnap, r.cliente_telefone, {
+        ...buildN8nEnvioWhatsappCampos(comunicadorSnap, destinatario.telefone, {
           mensagem: mensagemGeo,
           tipo: "geolocalizacao",
         }),
@@ -404,11 +468,19 @@ export default function TransferGeolocalizacaoPage() {
 
       const { error: updErr } = await supabase
         .from("rastreios_ao_vivo")
-        .update({ comunicado_em: new Date().toISOString() })
+        .update({
+          comunicado_em: new Date().toISOString(),
+          cliente_nome: destinatario.nome,
+          cliente_telefone: destinatario.telefone,
+        })
         .eq("id", r.id);
       if (updErr) console.warn("Falha a marcar comunicado_em:", updErr.message);
 
-      toast.success("Link enviado ao cliente pelo webhook.");
+      toast.success(
+        isCategoriaMotorista(r.categoria_rastreamento)
+          ? "Link enviado ao motorista pelo webhook."
+          : "Link enviado ao cliente pelo webhook.",
+      );
       void loadRastreios();
     } catch (e) {
       console.error(e);
@@ -576,7 +648,8 @@ export default function TransferGeolocalizacaoPage() {
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-medium text-foreground truncate">
-                        {r.cliente_nome?.trim() || "Cliente sem nome"}
+                        {r.cliente_nome?.trim() ||
+                          (isCategoriaMotorista(r.categoria_rastreamento) ? "Motorista sem nome" : "Cliente sem nome")}
                       </span>
                       {rowLocked ? (
                         <Badge variant="outline" className="gap-1 border-amber-600/40 text-[11px] text-amber-700 dark:text-amber-400">
@@ -923,23 +996,25 @@ export default function TransferGeolocalizacaoPage() {
             </div>
 
             <div>
-              <Label>Nome do cliente (opcional)</Label>
+              <Label>{categoria === "motorista" ? "Nome do motorista (opcional)" : "Nome do cliente (opcional)"}</Label>
               <Input
-                placeholder="Ex: João Silva"
+                placeholder={categoria === "motorista" ? "Ex: Carlos Motorista" : "Ex: João Silva"}
                 value={nomeOpcional}
                 onChange={(e) => setNomeOpcional(e.target.value)}
               />
             </div>
 
             <div>
-              <Label>Telefone do cliente (opcional)</Label>
+              <Label>{categoria === "motorista" ? "Telefone do motorista (opcional)" : "Telefone do cliente (opcional)"}</Label>
               <Input
                 placeholder="(__) _____-____"
                 value={telefoneOpcional}
                 onChange={(e) => setTelefoneOpcional(e.target.value)}
               />
               <p className="text-[11px] text-muted-foreground mt-1">
-                Usado pelo n8n para enviar o link via WhatsApp.
+                {categoria === "motorista"
+                  ? "Usado pelo n8n para enviar o link ao motorista via WhatsApp."
+                  : "Usado pelo n8n para enviar o link ao cliente via WhatsApp."}
               </p>
             </div>
 

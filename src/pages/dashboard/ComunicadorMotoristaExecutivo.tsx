@@ -32,7 +32,7 @@ function isOwnWhatsAppConnected(row: ComunicadorRow | null): boolean {
 
 function isConfirmedSyncConnected(sync: { connected: boolean; phone: string | null; state: string | null }): boolean {
   if (!sync.connected) return false;
-  if (Boolean(sync.phone?.trim())) return true;
+  if (sync.phone?.trim()) return true;
   const normalized = (sync.state || "").trim().toLowerCase();
   return CONNECTED_STATUS.has(normalized);
 }
