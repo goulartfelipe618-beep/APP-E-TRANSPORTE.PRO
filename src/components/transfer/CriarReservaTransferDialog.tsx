@@ -17,6 +17,7 @@ import { RESERVA_STATUS_OPTIONS } from "@/lib/reservaStatus";
 import { toAgendaDayKey } from "@/lib/painelAgendaReservas";
 import { normalizeUserPlano, FREE_MAX_RESERVAS_DIA } from "@/lib/painelPlanPolicy";
 import { calendarDayKeySaoPauloFromIso, todayKeySaoPaulo } from "@/lib/spCalendarBr";
+import { splitAmountInTwoHalves, valorTotalFromBaseDiscount } from "@/lib/reservaIdaVoltaSplit";
 
 function toDateInput(v: string | null | undefined): string {
   return toAgendaDayKey(v) ?? "";
@@ -344,8 +345,13 @@ export default function CriarReservaTransferDialog({
         }
         const today = todayKeySaoPaulo();
         const countDay = (recent ?? []).filter((r) => calendarDayKeySaoPauloFromIso(r.created_at) === today).length;
-        if (countDay >= FREE_MAX_RESERVAS_DIA) {
-          toast.error(`Plano FREE: no máximo ${FREE_MAX_RESERVAS_DIA} reservas de transfer por dia.`);
+        const slotsNeeded = !reservaEdicao?.id && tipoViagem === "ida_volta" ? 2 : 1;
+        if (countDay + slotsNeeded > FREE_MAX_RESERVAS_DIA) {
+          toast.error(
+            slotsNeeded > 1
+              ? `Plano FREE: ida e volta criam 2 reservas; no máximo ${FREE_MAX_RESERVAS_DIA} por dia (inclui as já criadas hoje).`
+              : `Plano FREE: no máximo ${FREE_MAX_RESERVAS_DIA} reservas de transfer por dia.`,
+          );
           setSaving(false);
           return;
         }
@@ -395,6 +401,9 @@ export default function CriarReservaTransferDialog({
       });
     }
 
+    const repasseNumParsed = parseFloat(String(repasseMotorista).replace(",", "."));
+    const repasseNum = Number.isFinite(repasseNumParsed) && repasseNumParsed > 0 ? repasseNumParsed : null;
+
     const rowPayload = {
       nome_completo: nomeCompleto,
       cpf_cnpj: cpfCnpj,
@@ -430,18 +439,125 @@ export default function CriarReservaTransferDialog({
       metodo_pagamento: metodoPagamento || null,
       observacoes: observacoes || null,
       status: statusOperacional,
-      repasse_motorista: (() => {
-        const r = parseFloat(String(repasseMotorista).replace(",", "."));
-        return Number.isFinite(r) && r > 0 ? r : null;
-      })(),
+      repasse_motorista: repasseNum,
       motorista_id:
         quemViaja === "motorista" && motoristaAtribUid.trim() !== "" ? motoristaAtribUid.trim() : null,
       cadastro_cliente_id: cadastroClienteIdOut,
     };
 
-    const { error } = reservaEdicao?.id
-      ? await supabase.from("reservas_transfer").update(rowPayload).eq("id", reservaEdicao.id)
-      : await supabase.from("reservas_transfer").insert({ user_id: user.id, ...rowPayload });
+    let error: { message: string } | null = null;
+
+    if (reservaEdicao?.id) {
+      const res = await supabase.from("reservas_transfer").update(rowPayload).eq("id", reservaEdicao.id);
+      error = res.error;
+    } else if (tipoViagem === "ida_volta") {
+      if (!voltaData.trim()) {
+        toast.error("Informe a data da volta para viagens ida e volta.");
+        setSaving(false);
+        return;
+      }
+      const parReservaId = crypto.randomUUID();
+      const descNum = parseFloat(desconto) || 0;
+      const baseNum = parseFloat(valorBase) || 0;
+      const [vb1, vb2] = splitAmountInTwoHalves(baseNum);
+      const vt1 = valorTotalFromBaseDiscount(vb1, descNum);
+      const vt2 = valorTotalFromBaseDiscount(vb2, descNum);
+      const [r1, r2] = repasseNum != null ? splitAmountInTwoHalves(repasseNum) : [null, null];
+
+      const motoristaId =
+        quemViaja === "motorista" && motoristaAtribUid.trim() !== "" ? motoristaAtribUid.trim() : null;
+
+      const baseShared = {
+        nome_completo: nomeCompleto,
+        cpf_cnpj: cpfCnpj,
+        email,
+        telefone,
+        quem_viaja: quemViaja,
+        desconto: descNum,
+        metodo_pagamento: metodoPagamento || null,
+        observacoes: observacoes || null,
+        status: statusOperacional,
+        motorista_id: motoristaId,
+        cadastro_cliente_id: cadastroClienteIdOut,
+        por_hora_endereco_inicio: null as string | null,
+        por_hora_ponto_encerramento: null as string | null,
+        por_hora_data: null as string | null,
+        por_hora_hora: null as string | null,
+        por_hora_passageiros: null as number | null,
+        por_hora_qtd_horas: null as number | null,
+        por_hora_cupom: null as string | null,
+        por_hora_itinerario: null as string | null,
+      };
+
+      const idaRow = {
+        ...baseShared,
+        tipo_viagem: "somente_ida" as const,
+        perna_viagem: "ida" as const,
+        par_reserva_id: parReservaId,
+        ida_embarque: idaEmbarque || null,
+        ida_desembarque: idaDesembarque || null,
+        ida_data: idaData || null,
+        ida_hora: idaHora || null,
+        ida_passageiros: idaPassageiros ? parseInt(idaPassageiros, 10) : null,
+        ida_cupom: idaCupom || null,
+        ida_mensagem: idaMensagem || null,
+        volta_embarque: null as string | null,
+        volta_desembarque: null as string | null,
+        volta_data: null as string | null,
+        volta_hora: null as string | null,
+        volta_passageiros: null as number | null,
+        volta_cupom: null as string | null,
+        volta_mensagem: null as string | null,
+        valor_base: vb1,
+        valor_total: vt1,
+        repasse_motorista: r1,
+      };
+
+      const ve = (voltaEmbarque || "").trim() || idaDesembarque || null;
+      const vd = (voltaDesembarque || "").trim() || idaEmbarque || null;
+
+      const voltaRow = {
+        ...baseShared,
+        tipo_viagem: "somente_ida" as const,
+        perna_viagem: "volta" as const,
+        par_reserva_id: parReservaId,
+        ida_embarque: ve,
+        ida_desembarque: vd,
+        ida_data: voltaData || null,
+        ida_hora: voltaHora || null,
+        ida_passageiros: voltaPassageiros
+          ? parseInt(voltaPassageiros, 10)
+          : idaPassageiros
+            ? parseInt(idaPassageiros, 10)
+            : null,
+        ida_cupom: voltaCupom || null,
+        ida_mensagem: voltaMensagem || null,
+        volta_embarque: null as string | null,
+        volta_desembarque: null as string | null,
+        volta_data: null as string | null,
+        volta_hora: null as string | null,
+        volta_passageiros: null as number | null,
+        volta_cupom: null as string | null,
+        volta_mensagem: null as string | null,
+        valor_base: vb2,
+        valor_total: vt2,
+        repasse_motorista: r2,
+      };
+
+      const first = await supabase.from("reservas_transfer").insert({ user_id: user.id, ...idaRow }).select("id").single();
+      if (first.error) {
+        error = first.error;
+      } else {
+        const second = await supabase.from("reservas_transfer").insert({ user_id: user.id, ...voltaRow });
+        if (second.error && first.data?.id) {
+          await supabase.from("reservas_transfer").delete().eq("id", first.data.id);
+          error = second.error;
+        }
+      }
+    } else {
+      const res = await supabase.from("reservas_transfer").insert({ user_id: user.id, ...rowPayload });
+      error = res.error;
+    }
 
     setSaving(false);
     if (error) {
@@ -449,6 +565,8 @@ export default function CriarReservaTransferDialog({
     } else {
       if (novoClientePct != null) {
         toast.success(`Reserva criada. Novo cliente no menu Clientes — perfil ${novoClientePct}% (complete dados quando quiser).`);
+      } else if (!reservaEdicao?.id && tipoViagem === "ida_volta") {
+        toast.success("Foram criadas 2 reservas (ida e volta), cada uma com metade do valor e do repasse.");
       } else {
         toast.success(reservaEdicao?.id ? "Reserva atualizada com sucesso!" : "Reserva criada com sucesso!");
       }

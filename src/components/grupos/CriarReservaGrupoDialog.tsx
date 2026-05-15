@@ -17,6 +17,7 @@ import { RESERVA_STATUS_OPTIONS } from "@/lib/reservaStatus";
 import { toAgendaDayKey } from "@/lib/painelAgendaReservas";
 import { normalizeUserPlano, FREE_MAX_RESERVAS_DIA } from "@/lib/painelPlanPolicy";
 import { calendarDayKeySaoPauloFromIso, todayKeySaoPaulo } from "@/lib/spCalendarBr";
+import { splitAmountInTwoHalves, valorTotalFromBaseDiscount } from "@/lib/reservaIdaVoltaSplit";
 
 const TIPOS_VEICULO = ["van", "micro_onibus", "onibus"] as const;
 
@@ -278,8 +279,14 @@ export default function CriarReservaGrupoDialog({
         }
         const today = todayKeySaoPaulo();
         const countDay = (recent ?? []).filter((r) => calendarDayKeySaoPauloFromIso(r.created_at) === today).length;
-        if (countDay >= FREE_MAX_RESERVAS_DIA) {
-          toast.error(`Plano FREE: no máximo ${FREE_MAX_RESERVAS_DIA} reservas de grupo por dia.`);
+        const splitRoundTrip = !reservaGrupoEdicao?.id && dataRetorno.trim() !== "";
+        const slotsNeeded = splitRoundTrip ? 2 : 1;
+        if (countDay + slotsNeeded > FREE_MAX_RESERVAS_DIA) {
+          toast.error(
+            slotsNeeded > 1
+              ? `Plano FREE: ida com retorno cria 2 reservas; no máximo ${FREE_MAX_RESERVAS_DIA} por dia (inclui as já criadas hoje).`
+              : `Plano FREE: no máximo ${FREE_MAX_RESERVAS_DIA} reservas de grupo por dia.`,
+          );
           setSaving(false);
           return;
         }
@@ -329,6 +336,15 @@ export default function CriarReservaGrupoDialog({
       });
     }
 
+    const repasseNumParsed = parseFloat(String(repasseMotorista).replace(",", "."));
+    const repasseNum = Number.isFinite(repasseNumParsed) && repasseNumParsed > 0 ? repasseNumParsed : null;
+
+    const nomeMotoristaResolved = (() => {
+      if (!motoristaAtribUid.trim()) return nomeMotorista || null;
+      const hit = motoristasFrota.find((m) => m.portal_auth_user_id === motoristaAtribUid.trim());
+      return (hit?.nome ?? nomeMotorista) || null;
+    })();
+
     const rowPayload = {
       nome_completo: nomeCompleto,
       cpf_cnpj: cpfCnpj,
@@ -350,22 +366,103 @@ export default function CriarReservaGrupoDialog({
       valor_total: valorTotalNum,
       metodo_pagamento: metodoPagamento || null,
       status: statusOperacional,
-      repasse_motorista: (() => {
-        const r = parseFloat(String(repasseMotorista).replace(",", "."));
-        return Number.isFinite(r) && r > 0 ? r : null;
-      })(),
+      repasse_motorista: repasseNum,
       motorista_id: motoristaAtribUid.trim() !== "" ? motoristaAtribUid.trim() : null,
-      nome_motorista: (() => {
-        if (!motoristaAtribUid.trim()) return nomeMotorista || null;
-        const hit = motoristasFrota.find((m) => m.portal_auth_user_id === motoristaAtribUid.trim());
-        return (hit?.nome ?? nomeMotorista) || null;
-      })(),
+      nome_motorista: nomeMotoristaResolved,
       cadastro_cliente_id: cadastroClienteIdOut,
     };
 
-    const { error } = reservaGrupoEdicao?.id
-      ? await supabase.from("reservas_grupos").update(rowPayload).eq("id", reservaGrupoEdicao.id)
-      : await supabase.from("reservas_grupos").insert({ user_id: user.id, ...rowPayload });
+    const splitRoundTrip = !reservaGrupoEdicao?.id && dataRetorno.trim() !== "";
+
+    let error: { message: string } | null = null;
+
+    if (reservaGrupoEdicao?.id) {
+      const res = await supabase.from("reservas_grupos").update(rowPayload).eq("id", reservaGrupoEdicao.id);
+      error = res.error;
+    } else if (splitRoundTrip) {
+      const parReservaId = crypto.randomUUID();
+      const descNum = parseFloat(desconto) || 0;
+      const baseNum = parseFloat(valorBase) || 0;
+      const [vb1, vb2] = splitAmountInTwoHalves(baseNum);
+      const vt1 = valorTotalFromBaseDiscount(vb1, descNum);
+      const vt2 = valorTotalFromBaseDiscount(vb2, descNum);
+      const [r1, r2] = repasseNum != null ? splitAmountInTwoHalves(repasseNum) : [null, null];
+
+      const emb = embarque || null;
+      const des = destino || null;
+
+      const idaRow = {
+        nome_completo: nomeCompleto,
+        cpf_cnpj: cpfCnpj,
+        email,
+        whatsapp,
+        tipo_veiculo: tipoVeiculo || null,
+        num_passageiros: numPassageiros ? parseInt(numPassageiros, 10) : null,
+        embarque: emb,
+        destino: des,
+        data_ida: dataIda || null,
+        hora_ida: horaIda || null,
+        data_retorno: null as string | null,
+        hora_retorno: null as string | null,
+        cupom: cupom || null,
+        observacoes_viagem: observacoesViagem || null,
+        telefone_motorista: telefoneMotorista || null,
+        valor_base: vb1,
+        desconto: descNum,
+        valor_total: vt1,
+        metodo_pagamento: metodoPagamento || null,
+        status: statusOperacional,
+        repasse_motorista: r1,
+        motorista_id: motoristaAtribUid.trim() !== "" ? motoristaAtribUid.trim() : null,
+        nome_motorista: nomeMotoristaResolved,
+        cadastro_cliente_id: cadastroClienteIdOut,
+        perna_viagem: "ida" as const,
+        par_reserva_id: parReservaId,
+      };
+
+      const voltaRow = {
+        nome_completo: nomeCompleto,
+        cpf_cnpj: cpfCnpj,
+        email,
+        whatsapp,
+        tipo_veiculo: tipoVeiculo || null,
+        num_passageiros: numPassageiros ? parseInt(numPassageiros, 10) : null,
+        embarque: des,
+        destino: emb,
+        data_ida: dataRetorno || null,
+        hora_ida: horaRetorno || null,
+        data_retorno: null as string | null,
+        hora_retorno: null as string | null,
+        cupom: cupom || null,
+        observacoes_viagem: observacoesViagem || null,
+        telefone_motorista: telefoneMotorista || null,
+        valor_base: vb2,
+        desconto: descNum,
+        valor_total: vt2,
+        metodo_pagamento: metodoPagamento || null,
+        status: statusOperacional,
+        repasse_motorista: r2,
+        motorista_id: motoristaAtribUid.trim() !== "" ? motoristaAtribUid.trim() : null,
+        nome_motorista: nomeMotoristaResolved,
+        cadastro_cliente_id: cadastroClienteIdOut,
+        perna_viagem: "volta" as const,
+        par_reserva_id: parReservaId,
+      };
+
+      const first = await supabase.from("reservas_grupos").insert({ user_id: user.id, ...idaRow }).select("id").single();
+      if (first.error) {
+        error = first.error;
+      } else {
+        const second = await supabase.from("reservas_grupos").insert({ user_id: user.id, ...voltaRow });
+        if (second.error && first.data?.id) {
+          await supabase.from("reservas_grupos").delete().eq("id", first.data.id);
+          error = second.error;
+        }
+      }
+    } else {
+      const res = await supabase.from("reservas_grupos").insert({ user_id: user.id, ...rowPayload });
+      error = res.error;
+    }
 
     setSaving(false);
     if (error) {
@@ -373,6 +470,8 @@ export default function CriarReservaGrupoDialog({
     } else {
       if (novoClientePct != null) {
         toast.success(`Reserva criada. Novo cliente no menu Clientes — perfil ${novoClientePct}% (complete dados quando quiser).`);
+      } else if (splitRoundTrip) {
+        toast.success("Foram criadas 2 reservas de grupo (ida e volta), cada uma com metade do valor e do repasse.");
       } else {
         toast.success(reservaGrupoEdicao?.id ? "Reserva de grupo atualizada com sucesso!" : "Reserva de grupo criada com sucesso!");
       }

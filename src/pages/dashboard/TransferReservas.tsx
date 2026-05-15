@@ -315,7 +315,17 @@ export default function TransferReservasPage() {
                     <div className="text-xs text-muted-foreground">{r.email}</div>
                   </TableCell>
                   <TableCell className={cn(rowLocked && "opacity-60")}>
-                    <Badge variant="secondary">{tipoLabel[r.tipo_viagem] || r.tipo_viagem}</Badge>
+                    <div className="flex flex-wrap items-center gap-1">
+                      <Badge variant="secondary">{tipoLabel[r.tipo_viagem] || r.tipo_viagem}</Badge>
+                      {r.perna_viagem === "ida" || r.perna_viagem === "volta" ? (
+                        <Badge
+                          variant="outline"
+                          className="border-[#FF6600]/60 text-[#FF6600] dark:border-[#FF6600]/50 dark:text-[#FF6600]"
+                        >
+                          {r.perna_viagem === "volta" ? "VOLTA" : "IDA"}
+                        </Badge>
+                      ) : null}
+                    </div>
                   </TableCell>
                   <TableCell className={cn("max-w-[200px] truncate text-sm", rowLocked && "opacity-60")}>
                     {r.ida_embarque && r.ida_desembarque ? `${r.ida_embarque} → ${r.ida_desembarque}` : "—"}

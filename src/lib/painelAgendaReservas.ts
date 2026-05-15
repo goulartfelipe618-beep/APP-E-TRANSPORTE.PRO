@@ -5,6 +5,8 @@ export type TransferAgendaReserva = {
   user_id?: string | null;
   motorista_id: string | null;
   tipo_viagem: string | null;
+  /** Quando ida+volta foi persistido em duas linhas (`somente_ida` + metadados). */
+  perna_viagem?: string | null;
   numero_reserva: number;
   status: string | null;
   ida_data: string | null;
@@ -27,6 +29,7 @@ export type GrupoAgendaReserva = {
   motorista_id: string | null;
   numero_reserva: number;
   status: string | null;
+  perna_viagem?: string | null;
   data_ida: string | null;
   hora_ida: string | null;
   data_retorno: string | null;
@@ -231,6 +234,23 @@ export function buildAgendaItemsPorDiaAtribuidoSomente(
       continue;
     }
 
+    const pernaMeta = (r.perna_viagem ?? "").trim().toLowerCase();
+    if (r.tipo_viagem === "somente_ida" && (pernaMeta === "ida" || pernaMeta === "volta")) {
+      const dk = toAgendaDayKey(r.ida_data);
+      const labelPerna = pernaMeta === "volta" ? "Volta" : "Ida";
+      pushItem(map, dk, {
+        reservaId: r.id,
+        kind: "transfer",
+        numeroLabel: num,
+        perna: labelPerna,
+        horario: formatHoraReserva(r.ida_hora),
+        trajetoResumo: trajetoTransferLeg(r, "ida"),
+        status: r.status,
+        key: `transfer:${r.id}:perna:${pernaMeta}`,
+      });
+      continue;
+    }
+
     const dkIda = toAgendaDayKey(r.ida_data);
     pushItem(map, dkIda, {
       reservaId: r.id,
@@ -263,6 +283,23 @@ export function buildAgendaItemsPorDiaAtribuidoSomente(
     if (isReservaCanceladaAgenda(g.status)) continue;
     const num = formatNumeroReservaPad(g.numero_reserva);
     const traj = trajetoGrupoResumo(g);
+
+    const pernaG = (g.perna_viagem ?? "").trim().toLowerCase();
+    if (pernaG === "ida" || pernaG === "volta") {
+      const dk = toAgendaDayKey(g.data_ida);
+      const labelPerna = pernaG === "volta" ? "Volta" : "Ida";
+      pushItem(map, dk, {
+        reservaId: g.id,
+        kind: "grupo",
+        numeroLabel: num,
+        perna: labelPerna,
+        horario: formatHoraReserva(g.hora_ida),
+        trajetoResumo: traj,
+        status: g.status,
+        key: `grupo:${g.id}:perna:${pernaG}`,
+      });
+      continue;
+    }
 
     const dkIda = toAgendaDayKey(g.data_ida);
     pushItem(map, dkIda, {
@@ -330,6 +367,23 @@ export function buildAgendaItemsPorDia(
       continue;
     }
 
+    const pernaMeta = (r.perna_viagem ?? "").trim().toLowerCase();
+    if (r.tipo_viagem === "somente_ida" && (pernaMeta === "ida" || pernaMeta === "volta")) {
+      const dk = toAgendaDayKey(r.ida_data);
+      const labelPerna = pernaMeta === "volta" ? "Volta" : "Ida";
+      pushItem(map, dk, {
+        reservaId: r.id,
+        kind: "transfer",
+        numeroLabel: num,
+        perna: labelPerna,
+        horario: formatHoraReserva(r.ida_hora),
+        trajetoResumo: trajetoTransferLeg(r, "ida"),
+        status: r.status,
+        key: `transfer:${r.id}:perna:${pernaMeta}`,
+      });
+      continue;
+    }
+
     const dkIda = toAgendaDayKey(r.ida_data);
     pushItem(map, dkIda, {
       reservaId: r.id,
@@ -362,6 +416,23 @@ export function buildAgendaItemsPorDia(
     if (isReservaCanceladaAgenda(g.status)) continue;
     const num = formatNumeroReservaPad(g.numero_reserva);
     const traj = trajetoGrupoResumo(g);
+
+    const pernaG = (g.perna_viagem ?? "").trim().toLowerCase();
+    if (pernaG === "ida" || pernaG === "volta") {
+      const dk = toAgendaDayKey(g.data_ida);
+      const labelPerna = pernaG === "volta" ? "Volta" : "Ida";
+      pushItem(map, dk, {
+        reservaId: g.id,
+        kind: "grupo",
+        numeroLabel: num,
+        perna: labelPerna,
+        horario: formatHoraReserva(g.hora_ida),
+        trajetoResumo: traj,
+        status: g.status,
+        key: `grupo:${g.id}:perna:${pernaG}`,
+      });
+      continue;
+    }
 
     const dkIda = toAgendaDayKey(g.data_ida);
     pushItem(map, dkIda, {

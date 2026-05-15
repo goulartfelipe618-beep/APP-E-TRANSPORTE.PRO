@@ -314,9 +314,10 @@ export default function GruposReservasPage() {
                   <TableHead>Cliente</TableHead>
                   <TableHead>Contato</TableHead>
                   <TableHead>Veículo</TableHead>
+                  <TableHead>Perna</TableHead>
                   <TableHead>Passageiros</TableHead>
                   <TableHead>Trajeto</TableHead>
-                  <TableHead>Data Ida</TableHead>
+                  <TableHead>Data</TableHead>
                   <TableHead>Motorista</TableHead>
                   <TableHead>Valor</TableHead>
                   <TableHead>Status</TableHead>
@@ -335,6 +336,18 @@ export default function GruposReservasPage() {
                     <div className="text-xs text-muted-foreground">{r.email}</div>
                   </TableCell>
                   <TableCell className={cn(rowLocked && "opacity-60")}>{r.tipo_veiculo ? <Badge variant="secondary">{veiculoLabel[r.tipo_veiculo] || r.tipo_veiculo}</Badge> : "—"}</TableCell>
+                  <TableCell className={cn(rowLocked && "opacity-60")}>
+                    {r.perna_viagem === "ida" || r.perna_viagem === "volta" ? (
+                      <Badge
+                        variant="outline"
+                        className="border-[#FF6600]/60 text-[#FF6600] dark:border-[#FF6600]/50 dark:text-[#FF6600]"
+                      >
+                        {r.perna_viagem === "volta" ? "VOLTA" : "IDA"}
+                      </Badge>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    )}
+                  </TableCell>
                   <TableCell className={cn(rowLocked && "opacity-60")}>{r.num_passageiros ?? "—"}</TableCell>
                   <TableCell className={cn("max-w-[200px] truncate text-sm", rowLocked && "opacity-60")}>
                     {r.embarque && r.destino ? `${r.embarque} → ${r.destino}` : "—"}
