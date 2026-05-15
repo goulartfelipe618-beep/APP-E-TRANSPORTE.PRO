@@ -2,8 +2,6 @@ import jsPDF from "jspdf";
 import { supabase } from "@/integrations/supabase/client";
 import { mergeCabecalhoComPerfilSeNecessario } from "@/lib/cabecalhoContratualResolve";
 import { formatDbCalendarDatePtBr, formatDbCalendarDatePtBrShortMonth } from "@/lib/painelAgendaReservas";
-import { fetchRouteMapImageDataUrl } from "@/lib/pdfRouteMapMapbox";
-import { isMapboxConfigured } from "@/lib/mapboxGeocode";
 
 // ─── Layout Constants ───────────────────────────────────────
 const PAGE_W = 210;
@@ -26,32 +24,36 @@ const SP = {
   paraLine: 4.2,       // paragraph line height
 };
 
-// ─── Font sizes ─────────────────────────────────────────────
+// ─── Font sizes (hierarquia reduzida: título / corpo / pequeno) ─
 const FS = {
-  companyName: 13,
-  companyDetail: 7.5,
-  pageTitle: 16,
-  sectionTitle: 10,
+  companyName: 12,
+  companyDetail: 8,
+  pageTitle: 15,
+  sectionTitle: 11,
   subtitle: 9,
-  body: 8.5,
-  small: 7.5,
-  cardLabel: 7,
-  cardValue: 13,
-  priceTotal: 17,
-  footer: 7,
+  body: 9,
+  small: 8,
+  cardLabel: 8,
+  cardValue: 11,
+  priceTotal: 15,
+  footer: 8,
 };
+
+/** Marca institucional (faixas / realces) — inspirado em confirmações profissionais. */
+const BRAND = { r: 13, g: 95, b: 102 };
+const BRAND_SOFT = { r: 232, g: 245, b: 246 };
 
 // ─── Colors ─────────────────────────────────────────────────
 const CLR = {
   black: "#000000",
   dark: "#1a1a1a",
   body: "#333333",
-  muted: "#666666",
-  light: "#999999",
-  line: "#d4d4d4",
-  lineFaint: "#e5e5e5",
-  cardBg: "#f4f5f7",
-  priceBg: "#f0f2f5",
+  muted: "#555555",
+  light: "#888888",
+  line: "#c5d5d8",
+  lineFaint: "#dce8ea",
+  cardBg: "#f5fafb",
+  priceBg: "#eef6f7",
 };
 
 // ─── Helpers ────────────────────────────────────────────────
@@ -222,7 +224,7 @@ async function addCompanyHeader(
   }
 
   const boxTop = startY;
-  doc.setFillColor(0, 0, 0);
+  doc.setFillColor(BRAND.r, BRAND.g, BRAND.b);
   doc.roundedRect(MARGIN, boxTop, PAGE_W - 2 * MARGIN, headerH, 2, 2, "F");
 
   let ty = boxTop + INNER + 4;
@@ -284,7 +286,7 @@ function addPageTitle(doc: jsPDF, titulo: string, numReserva: number | string, r
   const headerH = INNER + titleH + 3 + metaH + INNER;
 
   const boxTop = startY;
-  doc.setFillColor(0, 0, 0);
+  doc.setFillColor(BRAND.r, BRAND.g, BRAND.b);
   doc.roundedRect(MARGIN, boxTop, CONTENT_W, headerH, 2, 2, "F");
 
   let ty = boxTop + INNER + 5;
@@ -323,28 +325,40 @@ async function addFullHeader(
 }
 
 function addSectionTitle(doc: jsPDF, title: string, y: number): number {
-  y = checkPage(doc, y, 14);
+  y = checkPage(doc, y, 16);
+  const bandH = 9;
+  const bandTop = y - 1;
+  doc.setFillColor(BRAND_SOFT.r, BRAND_SOFT.g, BRAND_SOFT.b);
+  doc.roundedRect(MARGIN, bandTop, CONTENT_W, bandH, 1.5, 1.5, "F");
+  doc.setFillColor(BRAND.r, BRAND.g, BRAND.b);
+  doc.rect(MARGIN, bandTop, 2.4, bandH, "F");
+
   doc.setFontSize(FS.sectionTitle);
   doc.setFont("helvetica", "bold");
-  setColor(doc, CLR.dark);
-  doc.text(title, MARGIN, y);
-  y += 2.5;
-  drawLine(doc, MARGIN, y, PAGE_W - MARGIN, CLR.lineFaint);
+  doc.setTextColor(BRAND.r, BRAND.g, BRAND.b);
+  doc.text(title.toUpperCase(), MARGIN + 5, bandTop + 6.3);
+  doc.setTextColor(0, 0, 0);
+
+  y = bandTop + bandH + 3;
+  drawLine(doc, MARGIN, y, PAGE_W - MARGIN, CLR.line);
   y += SP.titleAfter;
   return y;
 }
 
 function addInfoCard(doc: jsPDF, x: number, y: number, w: number, label: string, value: string): number {
-  const h = 24;
+  const h = 22;
   drawRect(doc, x, y, w, h, CLR.cardBg);
+  doc.setDrawColor(CLR.line);
+  doc.setLineWidth(0.25);
+  doc.roundedRect(x, y, w, h, 2, 2, "S");
   doc.setFontSize(FS.cardLabel);
   doc.setFont("helvetica", "bold");
   setColor(doc, CLR.muted);
-  doc.text(label, x + 5, y + 8);
+  doc.text(label.toUpperCase(), x + 5, y + 7);
   setColor(doc, CLR.dark);
   doc.setFontSize(FS.cardValue);
   doc.setFont("helvetica", "bold");
-  doc.text(value || "—", x + 5, y + 18);
+  doc.text(value || "—", x + 5, y + 16);
   doc.setFont("helvetica", "normal");
   return y + h + SP.cardGap;
 }
@@ -406,25 +420,29 @@ function addTwoColumnFields(doc: jsPDF, leftFields: { l: string; v: string }[], 
 }
 
 function addPriceBlock(doc: jsPDF, items: { label: string; value: string }[], total: string, startY: number): number {
-  const blockH = Math.max(32, 12 + items.length * 6);
+  const blockH = Math.max(30, 11 + items.length * 6);
   const y = checkPage(doc, startY, blockH + 4);
 
-  drawRect(doc, MARGIN, y, CONTENT_W, blockH, CLR.priceBg, 4);
+  doc.setFillColor(BRAND.r, BRAND.g, BRAND.b);
+  doc.rect(MARGIN, y, 2.8, blockH, "F");
+  drawRect(doc, MARGIN + 2.8, y, CONTENT_W - 2.8, blockH, CLR.priceBg, 4);
+  doc.setDrawColor(CLR.line);
+  doc.setLineWidth(0.25);
+  doc.roundedRect(MARGIN + 2.8, y, CONTENT_W - 2.8, blockH, 3, 3, "S");
 
   doc.setFontSize(FS.body);
   doc.setFont("helvetica", "normal");
-  let iy = y + SP.blockPad + 4;
+  let iy = y + SP.blockPad + 5;
   for (const item of items) {
     setColor(doc, CLR.muted);
-    doc.text(item.label, MARGIN + 6, iy);
+    doc.text(item.label, MARGIN + 9, iy);
     if (item.value) {
       setColor(doc, CLR.body);
-      doc.text(item.value, MARGIN + 75, iy);
+      doc.text(item.value, MARGIN + 78, iy);
     }
     iy += 6;
   }
 
-  // Total aligned right
   doc.setFontSize(FS.small);
   doc.setFont("helvetica", "bold");
   setColor(doc, CLR.muted);
@@ -432,7 +450,7 @@ function addPriceBlock(doc: jsPDF, items: { label: string; value: string }[], to
   doc.setFontSize(FS.priceTotal);
   doc.setFont("helvetica", "bold");
   setColor(doc, CLR.dark);
-  doc.text(total, PAGE_W - MARGIN - 52, y + SP.blockPad + 16);
+  doc.text(total, PAGE_W - MARGIN - 52, y + SP.blockPad + 15);
 
   setColor(doc, CLR.black);
   return y + blockH + SP.sectionGap;
@@ -485,8 +503,8 @@ function addFooter(doc: jsPDF, cab: any) {
     doc.setFont("helvetica", "normal");
     setColor(doc, CLR.light);
     if (cab?.email_oficial) doc.text(cab.email_oficial, MARGIN, footerY);
-    doc.text(`Página ${i} de ${totalPages}`, PAGE_W / 2 - 12, footerY);
-    doc.text(new Date().toLocaleDateString("pt-BR"), PAGE_W - MARGIN - 22, footerY);
+    doc.text(`Página ${i} de ${totalPages}`, PAGE_W - MARGIN, footerY, { align: "right" });
+    doc.text(new Date().toLocaleDateString("pt-BR"), PAGE_W / 2, footerY, { align: "center" });
     setColor(doc, CLR.black);
   }
 }
@@ -535,75 +553,6 @@ function addTimeRow(doc: jsPDF, entries: { label: string; value: string }[], y: 
   return y + SP.sectionGap;
 }
 
-function drawRouteMapPlaceholder(doc: jsPDF, x: number, yTop: number, w: number, h: number, msg: string) {
-  doc.setFillColor(244, 245, 247);
-  doc.roundedRect(x, yTop, w, h, 1.5, 1.5, "F");
-  doc.setFontSize(FS.small);
-  doc.setFont("helvetica", "normal");
-  setColor(doc, CLR.muted);
-  const lines = doc.splitTextToSize(msg, w - 6);
-  let ty = yTop + h / 2 - ((lines.length - 1) * 3.1) / 2;
-  for (const line of lines) {
-    doc.text(line, x + 3, ty);
-    ty += 3.1;
-  }
-  setColor(doc, CLR.black);
-}
-
-/** Mapa retangular (rota) entre dois endereços; não altera largura da página. */
-async function addRouteMapSection(
-  doc: jsPDF,
-  y: number,
-  title: string,
-  origin: string | null | undefined,
-  dest: string | null | undefined,
-): Promise<number> {
-  const mapW = CONTENT_W;
-  const mapH = 46;
-  const innerPad = 1.5;
-  const titleGap = 6;
-  y = checkPage(doc, y, titleGap + mapH + SP.sectionGap + 2);
-
-  doc.setFontSize(FS.subtitle);
-  doc.setFont("helvetica", "bold");
-  setColor(doc, CLR.dark);
-  doc.text(title, MARGIN, y);
-  y += titleGap;
-
-  const boxTop = y;
-  doc.setDrawColor(CLR.line);
-  doc.setLineWidth(0.35);
-  doc.roundedRect(MARGIN, boxTop, mapW, mapH, 2, 2, "S");
-
-  const innerX = MARGIN + innerPad;
-  const innerY = boxTop + innerPad;
-  const innerW = mapW - innerPad * 2;
-  const innerH = mapH - innerPad * 2;
-
-  const img = await fetchRouteMapImageDataUrl(origin, dest);
-  if (img) {
-    try {
-      doc.addImage(img.dataUrl, img.format, innerX, innerY, innerW, innerH);
-    } catch {
-      drawRouteMapPlaceholder(
-        doc,
-        innerX,
-        innerY,
-        innerW,
-        innerH,
-        "Mapa indisponível neste formato.",
-      );
-    }
-  } else {
-    const msg = isMapboxConfigured()
-      ? "Não foi possível gerar o mapa. Verifique os endereços ou tente mais tarde."
-      : "Defina VITE_MAPBOX_ACCESS_TOKEN no .env para incluir mapas da rota no PDF.";
-    drawRouteMapPlaceholder(doc, innerX, innerY, innerW, innerH, msg);
-  }
-
-  return boxTop + mapH + SP.sectionGap;
-}
-
 // ═══════════════════════════════════════════════════════════
 //  TRANSFER PDF
 // ═══════════════════════════════════════════════════════════
@@ -631,11 +580,11 @@ async function buildTransferReservaPdfDocument(reservaId: string): Promise<{ doc
   const tipoLabel: Record<string, string> = { somente_ida: "Somente Ida", ida_volta: "Ida e Volta", por_hora: "Por Hora" };
   const tipoStr = tipoLabel[r.tipo_viagem] || r.tipo_viagem;
 
-  doc.setFontSize(FS.sectionTitle);
+  doc.setFontSize(FS.subtitle);
   doc.setFont("helvetica", "bold");
   setColor(doc, CLR.dark);
   doc.text(`Transfer — ${tipoStr}`, MARGIN, y);
-  y += 8;
+  y += 7;
 
   const serviceFields: { l: string; v: string }[] = [];
   if (r.ida_embarque) serviceFields.push({ l: "Embarque:", v: r.ida_embarque });
@@ -664,7 +613,7 @@ async function buildTransferReservaPdfDocument(reservaId: string): Promise<{ doc
     addInfoCard(doc, MARGIN + cardW + SP.cardGap, y, cardW, "HORAS", String(r.por_hora_qtd_horas || "—"));
     addInfoCard(doc, MARGIN + 2 * (cardW + SP.cardGap), y, cardW, "PASSAGEIROS", String(r.por_hora_passageiros || "—"));
   }
-  y += 24 + SP.cardGap + 2;
+  y += 22 + SP.cardGap + 2;
 
   // Horários
   if (r.tipo_viagem !== "por_hora") {
@@ -674,18 +623,6 @@ async function buildTransferReservaPdfDocument(reservaId: string): Promise<{ doc
     if (timeEntries.length) y = addTimeRow(doc, timeEntries, y);
   } else {
     if (r.por_hora_hora) y = addTimeRow(doc, [{ label: "Horário:", value: r.por_hora_hora }], y);
-  }
-
-  if (r.tipo_viagem === "somente_ida" || r.tipo_viagem === "ida_volta") {
-    if (r.ida_embarque?.trim() && r.ida_desembarque?.trim()) {
-      y = await addRouteMapSection(doc, y, "Mapa da rota (ida)", r.ida_embarque, r.ida_desembarque);
-    }
-  } else if (r.tipo_viagem === "por_hora") {
-    const a = r.por_hora_endereco_inicio?.trim();
-    const b = r.por_hora_ponto_encerramento?.trim();
-    if (a && b) {
-      y = await addRouteMapSection(doc, y, "Mapa do percurso", a, b);
-    }
   }
 
   // Section: Price
@@ -735,11 +672,6 @@ async function buildTransferReservaPdfDocument(reservaId: string): Promise<{ doc
     ];
     y = addFieldRows(doc, voltaFields, MARGIN, y, 34);
     y += 4;
-    const ve = (r.volta_embarque ?? "").trim();
-    const vd = (r.volta_desembarque ?? "").trim();
-    if (ve && vd) {
-      y = await addRouteMapSection(doc, y, "Mapa da rota (volta)", ve, vd);
-    }
   }
 
   // Por hora details
@@ -807,11 +739,11 @@ async function buildGrupoReservaPdfDocument(reservaId: string): Promise<{ doc: j
   const veiculoLabel: Record<string, string> = { van: "Van", micro_onibus: "Micro-ônibus", onibus: "Ônibus" };
   const veiculoStr = r.tipo_veiculo ? veiculoLabel[r.tipo_veiculo] || r.tipo_veiculo : "Não informado";
 
-  doc.setFontSize(FS.sectionTitle);
+  doc.setFontSize(FS.subtitle);
   doc.setFont("helvetica", "bold");
   setColor(doc, CLR.dark);
   doc.text(`Grupo — ${veiculoStr}`, MARGIN, y);
-  y += 8;
+  y += 7;
 
   const serviceFields: { l: string; v: string }[] = [];
   if (r.embarque) serviceFields.push({ l: "Embarque:", v: r.embarque });
@@ -832,20 +764,13 @@ async function buildGrupoReservaPdfDocument(reservaId: string): Promise<{ doc: j
     addInfoCard(doc, MARGIN + cardW + SP.cardGap, y, cardW, "DATA RETORNO", fmtDate(r.data_retorno));
   }
   addInfoCard(doc, MARGIN + (r.data_retorno ? 2 : 1) * (cardW + SP.cardGap), y, cardW, "PASSAGEIROS", String(r.num_passageiros || "—"));
-  y += 24 + SP.cardGap + 2;
+  y += 22 + SP.cardGap + 2;
 
   // Horários
   const timeEntries = [];
   if (r.hora_ida) timeEntries.push({ label: "Horário Ida:", value: r.hora_ida });
   if (r.hora_retorno) timeEntries.push({ label: "Horário Retorno:", value: r.hora_retorno });
   if (timeEntries.length) y = addTimeRow(doc, timeEntries, y);
-
-  if (r.embarque?.trim() && r.destino?.trim()) {
-    y = await addRouteMapSection(doc, y, "Mapa da rota (ida)", r.embarque, r.destino);
-  }
-  if (r.data_retorno && r.embarque?.trim() && r.destino?.trim()) {
-    y = await addRouteMapSection(doc, y, "Mapa da rota (retorno)", r.destino, r.embarque);
-  }
 
   // Section: Price
   y = addSectionTitle(doc, "PREÇO", y);

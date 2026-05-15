@@ -15,8 +15,6 @@ import { toast } from "sonner";
 import type { Json, Tables } from "@/integrations/supabase/types";
 import { RESERVA_STATUS_OPTIONS } from "@/lib/reservaStatus";
 import { toAgendaDayKey } from "@/lib/painelAgendaReservas";
-import MapboxNormalizeAddressField from "@/components/mapbox/MapboxNormalizeAddressField";
-import { isMapboxConfigured } from "@/lib/mapboxGeocode";
 import { normalizeUserPlano, FREE_MAX_RESERVAS_DIA } from "@/lib/painelPlanPolicy";
 import { calendarDayKeySaoPauloFromIso, todayKeySaoPaulo } from "@/lib/spCalendarBr";
 
@@ -581,11 +579,9 @@ export default function CriarReservaTransferDialog({
           {/* Detalhes da Viagem */}
           <div>
             <h3 className="font-semibold text-foreground mb-3">Detalhes da Viagem</h3>
-            {isMapboxConfigured() ? (
-              <p className="text-xs text-muted-foreground mb-3 -mt-1">
-                Após escrever cada endereço, use o pin laranja para confirmar no Mapbox. Inclua a <strong className="text-foreground">cidade após uma vírgula</strong> (ex.: Rua, nº, Bairro, Curitiba) para fixar a região certa. Opcional no .env: <code className="text-xs">VITE_MAPBOX_DEFAULT_PROXIMITY=lng,lat</code> (centro da operação).
-              </p>
-            ) : null}
+            <p className="text-xs text-muted-foreground mb-3 -mt-1">
+              Indique endereços completos (rua, número, bairro e cidade) para facilitar o atendimento.
+            </p>
             <div className="space-y-4">
               <div className="w-1/2 space-y-1.5">
                 <Label>Tipo de Viagem *</Label>
@@ -605,20 +601,20 @@ export default function CriarReservaTransferDialog({
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1.5">
                       <Label>Local de Embarque (IDA) *</Label>
-                      <MapboxNormalizeAddressField
-                        placeholder="Digite o endereço…"
+                      <Input
+                        placeholder="Endereço completo de embarque"
                         required
                         value={idaEmbarque}
-                        onChange={setIdaEmbarque}
+                        onChange={(e) => setIdaEmbarque(e.target.value)}
                       />
                     </div>
                     <div className="space-y-1.5">
                       <Label>Local de Desembarque (IDA) *</Label>
-                      <MapboxNormalizeAddressField
-                        placeholder="Digite o endereço…"
+                      <Input
+                        placeholder="Endereço completo de destino"
                         required
                         value={idaDesembarque}
-                        onChange={setIdaDesembarque}
+                        onChange={(e) => setIdaDesembarque(e.target.value)}
                       />
                     </div>
                     <div className="space-y-1.5"><Label>Data do Embarque (IDA) *</Label><Input type="date" required value={idaData} onChange={(e) => setIdaData(e.target.value)} /></div>
@@ -636,18 +632,18 @@ export default function CriarReservaTransferDialog({
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1.5">
                       <Label>Local de Embarque (Volta)</Label>
-                      <MapboxNormalizeAddressField
-                        placeholder="Digite o endereço…"
+                      <Input
+                        placeholder="Endereço completo"
                         value={voltaEmbarque}
-                        onChange={setVoltaEmbarque}
+                        onChange={(e) => setVoltaEmbarque(e.target.value)}
                       />
                     </div>
                     <div className="space-y-1.5">
                       <Label>Local de Desembarque (Volta)</Label>
-                      <MapboxNormalizeAddressField
-                        placeholder="Digite o endereço…"
+                      <Input
+                        placeholder="Endereço completo"
                         value={voltaDesembarque}
-                        onChange={setVoltaDesembarque}
+                        onChange={(e) => setVoltaDesembarque(e.target.value)}
                       />
                     </div>
                     <div className="space-y-1.5"><Label>Data</Label><Input type="date" value={voltaData} onChange={(e) => setVoltaData(e.target.value)} /></div>
@@ -665,18 +661,18 @@ export default function CriarReservaTransferDialog({
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1.5">
                       <Label>Endereço de Início</Label>
-                      <MapboxNormalizeAddressField
-                        placeholder="Digite o endereço…"
+                      <Input
+                        placeholder="Endereço completo"
                         value={porHoraEnderecoInicio}
-                        onChange={setPorHoraEnderecoInicio}
+                        onChange={(e) => setPorHoraEnderecoInicio(e.target.value)}
                       />
                     </div>
                     <div className="space-y-1.5">
                       <Label>Ponto de Encerramento</Label>
-                      <MapboxNormalizeAddressField
-                        placeholder="Digite o endereço…"
+                      <Input
+                        placeholder="Endereço completo"
                         value={porHoraPontoEncerramento}
-                        onChange={setPorHoraPontoEncerramento}
+                        onChange={(e) => setPorHoraPontoEncerramento(e.target.value)}
                       />
                     </div>
                     <div className="space-y-1.5"><Label>Data</Label><Input type="date" value={porHoraData} onChange={(e) => setPorHoraData(e.target.value)} /></div>
