@@ -305,6 +305,12 @@ export async function fetchEvolutionQrCode(
         instanceName,
         qrcode: true,
         integration: "WHATSAPP-BAILEYS",
+        rejectCall: false,
+        msgCall: "",
+        groupsIgnore: false,
+        readMessages: true,
+        readStatus: true,
+        syncFullHistory: false,
       },
     });
     if (![200, 201, 409].includes(createPack.status)) {
@@ -367,6 +373,12 @@ export async function ensureInstanceAndPollConnection(
       instanceName,
       qrcode: false,
       integration: "WHATSAPP-BAILEYS",
+      rejectCall: false,
+      msgCall: "",
+      groupsIgnore: false,
+      readMessages: true,
+      readStatus: true,
+      syncFullHistory: false,
     };
     const nd = opts?.nomeDispositivo?.trim();
     if (nd) {

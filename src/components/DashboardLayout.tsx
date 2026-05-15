@@ -60,6 +60,7 @@ import FinanceiroPagarPage from "@/pages/dashboard/financeiro/FinanceiroPagarPag
 import FinanceiroRelatoriosPage from "@/pages/dashboard/financeiro/FinanceiroRelatoriosPage";
 import PlanosPage from "@/pages/dashboard/PlanosPage";
 import DocumentacaoPainelPage from "@/pages/dashboard/DocumentacaoPainelPage";
+import WhatsAppInboxPage from "@/pages/dashboard/WhatsAppInboxPage";
 import PainelAvisoBanner from "@/components/PainelAvisoBanner";
 import FullscreenBannerOverlay from "@/components/FullscreenBannerOverlay";
 
@@ -105,6 +106,7 @@ const PAGE_MAP: Record<string, React.ComponentType> = {
   "financeiro/relatorios": FinanceiroRelatoriosPage,
   planos: PlanosPage,
   documentacao: DocumentacaoPainelPage,
+  whatsapp: WhatsAppInboxPage,
 };
 
 function readNetworkSpotlightActive() {
@@ -178,7 +180,7 @@ function DashboardContent() {
 
   useEffect(() => {
     if (!painelComunicadorReady) return;
-    if (activePage === "sistema/comunicador" && !painelMotoristaEvolutionAtivo) {
+    if (!painelMotoristaEvolutionAtivo && (activePage === "sistema/comunicador" || activePage === "whatsapp")) {
       setActivePage("sistema/configuracoes");
     }
   }, [painelComunicadorReady, activePage, painelMotoristaEvolutionAtivo, setActivePage]);

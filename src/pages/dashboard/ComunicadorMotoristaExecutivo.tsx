@@ -7,7 +7,9 @@ import { useUserPlan } from "@/hooks/useUserPlan";
 import UpgradePlanDialog from "@/components/planos/UpgradePlanDialog";
 import PlanTierOpaqueGate from "@/components/planos/PlanTierOpaqueGate";
 import { ComunicadorEvolutionSection } from "@/components/comunicador/ComunicadorEvolutionSection";
-import { useComunicadoresEvolution, qrSrc, type ComunicadorRow } from "@/hooks/useComunicadoresEvolution";
+import { useComunicadoresEvolution, qrSrc } from "@/hooks/useComunicadoresEvolution";
+import { useActivePage } from "@/contexts/ActivePageContext";
+import { isOwnEvolutionConnected } from "@/lib/evolutionConnection";
 import { WHATSAPP_OFICIAL_PLATAFORMA_EXIBICAO } from "@/lib/comunicadorOficial";
 import {
   fetchEvolutionMotoristaDeleteFromServer,
@@ -22,13 +24,6 @@ const QR_SESSION_MS = 10 * 60 * 1000;
 const POLL_MS = 3000;
 
 const CONNECTED_STATUS = new Set(["open", "conectado", "connected", "online"]);
-
-function isOwnWhatsAppConnected(row: ComunicadorRow | null): boolean {
-  if (!row) return false;
-  if (row.telefone_conectado?.trim()) return true;
-  const s = (row.connection_status || "").trim().toLowerCase();
-  return CONNECTED_STATUS.has(s);
-}
 
 function isConfirmedSyncConnected(sync: { connected: boolean; phone: string | null; state: string | null }): boolean {
   if (!sync.connected) return false;
@@ -45,6 +40,7 @@ function formatMmSs(ms: number): string {
 }
 
 export default function ComunicadorMotoristaExecutivoPage() {
+  const { setActivePage } = useActivePage();
   const { painelMotoristaEvolutionAtivo, ready: painelComunicadorReady } = usePainelMotoristaEvolutionAtivo();
   const { plano, loading: planLoading } = useUserPlan();
   const { sistema, own, loading, reload, setOwn } = useComunicadoresEvolution();
@@ -64,7 +60,12 @@ export default function ComunicadorMotoristaExecutivoPage() {
   const endQrSessionRef = useRef<(opts?: { connected: boolean }) => Promise<void>>(async () => {});
   const expiryNotifiedRef = useRef(false);
 
-  const ownConnected = useMemo(() => isOwnWhatsAppConnected(own), [own]);
+  const ownConnected = useMemo(() => isOwnEvolutionConnected(own), [own]);
+  /** Evita regravar `inbox_sessao_conectado_em` em cada poll; só na transição para ligado. */
+  const wasConnectedRef = useRef(false);
+  useEffect(() => {
+    wasConnectedRef.current = isOwnEvolutionConnected(own);
+  }, [own]);
 
   const clearTimers = useCallback(() => {
     if (pollRef.current) {
@@ -141,17 +142,24 @@ export default function ComunicadorMotoristaExecutivoPage() {
       return;
     }
     if (isConfirmedSyncConnected(sync)) {
+      const prevConn = wasConnectedRef.current;
+      const sessaoIso = new Date().toISOString();
       await persistOwnPatch({
         telefone_conectado: sync.phone ?? own?.telefone_conectado ?? null,
         connection_status: "conectado",
         nome_dispositivo: sync.profileName?.trim() || own?.nome_dispositivo || null,
         foto_perfil_url: sync.profilePicUrl ?? own?.foto_perfil_url ?? null,
         qr_code_base64: null,
+        ...(!prevConn ? { inbox_sessao_conectado_em: sessaoIso } : {}),
       });
+      wasConnectedRef.current = true;
+      if (qrSession && !prevConn) {
+        setActivePage("whatsapp");
+      }
       await endQrSession({ connected: true });
       toast.success("WhatsApp conectado. Os envios em Comunicar passam a usar o seu número quando estiver ativo.");
     }
-  }, [persistOwnPatch, endQrSession, own?.nome_dispositivo, own?.foto_perfil_url]);
+  }, [persistOwnPatch, endQrSession, own?.nome_dispositivo, own?.foto_perfil_url, qrSession, setActivePage]);
 
   trySyncRef.current = trySync;
   endQrSessionRef.current = endQrSession;
@@ -199,7 +207,7 @@ export default function ComunicadorMotoristaExecutivoPage() {
         // Evita spam quando a instância já existe/conectou fora deste fluxo.
         if (pack.code === "already_connected" || detail.includes("already in use")) {
           await trySync();
-          if (!isOwnWhatsAppConnected(own)) {
+          if (!isOwnEvolutionConnected(own)) {
             toast.message("Instância já existe. Desconecte para criar um novo vínculo.");
           }
           return;
@@ -242,6 +250,7 @@ export default function ComunicadorMotoristaExecutivoPage() {
       }
       setOwn(null);
       await reload();
+      wasConnectedRef.current = false;
       toast.success("WhatsApp próprio desconectado.");
     } finally {
       setBusyDelete(false);

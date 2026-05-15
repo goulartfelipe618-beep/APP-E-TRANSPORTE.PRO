@@ -32,6 +32,7 @@ import {
   Inbox,
   Banknote,
   FileBarChart,
+  MessageCircle,
 } from "lucide-react";
 import { useState, useEffect, useMemo, type LucideIcon } from "react";
 import luxuryCar from "@/assets/luxury-car.jpg";
@@ -48,6 +49,8 @@ import {
 } from "@/lib/networkNacionalPrefs";
 import { cn } from "@/lib/utils";
 import { usePainelMotoristaEvolutionAtivo } from "@/hooks/usePainelMotoristaEvolutionAtivo";
+import { useComunicadoresEvolution } from "@/hooks/useComunicadoresEvolution";
+import { isOwnEvolutionConnected } from "@/lib/evolutionConnection";
 
 type ToolDef = { title: string; page: string; desc: string; icon: LucideIcon };
 
@@ -61,7 +64,11 @@ type MajorSection = {
   subsections: Subsection[];
 };
 
-function buildHomeSections(showNetwork: boolean, exibirComunicadorMotorista: boolean): MajorSection[] {
+function buildHomeSections(
+  showNetwork: boolean,
+  exibirComunicadorMotorista: boolean,
+  exibirWhatsAppInbox: boolean,
+): MajorSection[] {
   const principal: Subsection[] = [
     {
       title: "Painel",
@@ -144,6 +151,16 @@ function buildHomeSections(showNetwork: boolean, exibirComunicadorMotorista: boo
         ...(exibirComunicadorMotorista
           ? [{ title: "Comunicador", page: "sistema/comunicador", desc: "Canal WhatsApp oficial da plataforma.", icon: Monitor } as ToolDef]
           : []),
+        ...(exibirWhatsAppInbox
+          ? [
+              {
+                title: "WhatsApp",
+                page: "whatsapp",
+                desc: "Conversas do seu número (após ligar o QR).",
+                icon: MessageCircle,
+              } as ToolDef,
+            ]
+          : []),
       ],
     },
     {
@@ -208,14 +225,17 @@ export default function HomePage() {
   const { setActivePage } = useActivePage();
   const onboarding = useMotoristaOnboarding();
   const { painelMotoristaEvolutionAtivo, ready: painelComunicadorReady } = usePainelMotoristaEvolutionAtivo();
+  const { own: evolutionUsuarioOwn, loading: evolutionUsuarioLoading } = useComunicadoresEvolution();
   const exibirComunicadorMotorista = !painelComunicadorReady || painelMotoristaEvolutionAtivo;
+  const exibirWhatsAppInbox =
+    exibirComunicadorMotorista && !evolutionUsuarioLoading && isOwnEvolutionConnected(evolutionUsuarioOwn);
   const [networkAceito, setNetworkAceito] = useState<boolean | null>(null);
   const [mostrarRegras, setMostrarRegras] = useState(false);
   const [menuNetwork, setMenuNetwork] = useState(() => localStorage.getItem("network_nacional_aceito") === "sim");
 
   const sections = useMemo(
-    () => buildHomeSections(menuNetwork, exibirComunicadorMotorista),
-    [menuNetwork, exibirComunicadorMotorista],
+    () => buildHomeSections(menuNetwork, exibirComunicadorMotorista, exibirWhatsAppInbox),
+    [menuNetwork, exibirComunicadorMotorista, exibirWhatsAppInbox],
   );
 
   useEffect(() => {

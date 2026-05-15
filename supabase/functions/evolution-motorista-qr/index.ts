@@ -215,17 +215,25 @@ Deno.serve(async (req) => {
 
     const root = baseUrl.replace(/\/+$/, "");
     const createTarget = `${root}/instance/create`;
+    /** Opções Evolution v2: mensagens/grupos/áudio e mídia não bloqueados; sem sync de histórico completo no servidor. */
+    const createPayload = {
+      instanceName,
+      qrcode: true,
+      integration: "WHATSAPP-BAILEYS",
+      rejectCall: false,
+      msgCall: "",
+      groupsIgnore: false,
+      readMessages: true,
+      readStatus: true,
+      syncFullHistory: false,
+    };
     const createRes = await fetch(createTarget, {
       method: "POST",
       headers: {
         apikey: rawKey,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        instanceName,
-        qrcode: true,
-        integration: "WHATSAPP-BAILEYS",
-      }),
+      body: JSON.stringify(createPayload),
     });
     const createText = await createRes.text();
     const createTextLower = createText.toLowerCase();

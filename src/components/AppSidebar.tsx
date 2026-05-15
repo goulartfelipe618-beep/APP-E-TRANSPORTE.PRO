@@ -14,6 +14,7 @@ import {
   Banknote,
   ContactRound,
   Library,
+  MessageCircle,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -32,6 +33,8 @@ import { useConfiguracoes } from "@/contexts/ConfiguracoesContext";
 import { useActivePage } from "@/contexts/ActivePageContext";
 import { persistNetworkHighlightDismissed } from "@/lib/networkNacionalPrefs";
 import { usePainelMotoristaEvolutionAtivo } from "@/hooks/usePainelMotoristaEvolutionAtivo";
+import { useComunicadoresEvolution } from "@/hooks/useComunicadoresEvolution";
+import { isOwnEvolutionConnected } from "@/lib/evolutionConnection";
 import { useUserPlan } from "@/hooks/useUserPlan";
 import { sidebarPlanBadgeLabel } from "@/lib/painelPlanPolicy";
 import PainelZoomHeaderButton from "@/components/painel/PainelZoomHeaderButton";
@@ -69,7 +72,11 @@ type MenuGroup = {
   >;
 };
 
-const getMenuStructure = (showNetwork: boolean, exibirComunicadorMotorista: boolean): MenuGroup[] => [
+const getMenuStructure = (
+  showNetwork: boolean,
+  exibirComunicadorMotorista: boolean,
+  exibirWhatsAppInbox: boolean,
+): MenuGroup[] => [
   {
     label: "Principal",
     items: [
@@ -174,6 +181,9 @@ const getMenuStructure = (showNetwork: boolean, exibirComunicadorMotorista: bool
           ...(exibirComunicadorMotorista
             ? [{ title: "Comunicador", page: "sistema/comunicador", icon: Monitor }]
             : []),
+          ...(exibirComunicadorMotorista && exibirWhatsAppInbox
+            ? [{ title: "WhatsApp", page: "whatsapp", icon: MessageCircle }]
+            : []),
         ],
       },
       { title: "Anotações", page: "anotacoes", icon: StickyNote },
@@ -193,7 +203,10 @@ export function AppSidebar() {
   const [networkAceito, setNetworkAceito] = useState(() => localStorage.getItem("network_nacional_aceito") === "sim");
   const [showNetworkHighlight, setShowNetworkHighlight] = useState(readNetworkSpotlightHighlight);
   const { painelMotoristaEvolutionAtivo, ready: painelComunicadorReady } = usePainelMotoristaEvolutionAtivo();
+  const { own: evolutionUsuarioRow, loading: evolutionUsuarioLoading } = useComunicadoresEvolution();
   const exibirComunicadorMotorista = !painelComunicadorReady || painelMotoristaEvolutionAtivo;
+  const exibirWhatsAppInboxMenu =
+    exibirComunicadorMotorista && !evolutionUsuarioLoading && isOwnEvolutionConnected(evolutionUsuarioRow);
   const { plano, loading: planLoading } = useUserPlan();
   const badgeForPage = (page: string) => (planLoading ? null : sidebarPlanBadgeLabel(plano, page));
   const mostrarBadgePlano = (page: string) => badgeForPage(page) !== null;
@@ -282,7 +295,7 @@ export function AppSidebar() {
       </div>
 
       <SidebarContent className={cn(showNetworkHighlight && "relative z-30")}>
-        {getMenuStructure(networkAceito, exibirComunicadorMotorista).map((group) => (
+        {getMenuStructure(networkAceito, exibirComunicadorMotorista, exibirWhatsAppInboxMenu).map((group) => (
           <SidebarGroup key={group.label}>
             <SidebarGroupLabel
               className={cn(
