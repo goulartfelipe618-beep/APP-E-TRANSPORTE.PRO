@@ -17,6 +17,8 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
 
   useEffect(() => {
     let mounted = true;
+    /** Fila única — evita dezenas de `getSession` em paralelo (contenção no lock interno do auth-js). */
+    let queue = Promise.resolve();
 
     const check = async (opts?: { withSpinner?: boolean }) => {
       const withSpinner = opts?.withSpinner === true;
@@ -60,18 +62,35 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
         const shouldChallenge = await sessionRequiresMfaTotpChallenge(supabase);
         setNeedsMfa(shouldChallenge);
         setAuthenticated(true);
+      } catch {
+        if (!mounted) return;
+        setAuthenticated(false);
+        setNeedsMfa(false);
+        setRedirectFrota(false);
+        setLoading(false);
       } finally {
         if (mounted && withSpinner) setLoading(false);
       }
     };
 
+    const enqueueCheck = (opts?: { withSpinner?: boolean }) => {
+      queue = queue
+        .then(async () => {
+          if (!mounted) return;
+          await check(opts);
+        })
+        .catch(() => {
+          /* evita rebentar a cadeia; falhas auth tratadas dentro de check */
+        });
+    };
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
       if (!mounted) return;
       // Sem withSpinner: TOKEN_REFRESHED / INITIAL_SESSION ao focar a aba não desmontam o layout (evita voltar ao Home).
-      void check();
+      enqueueCheck();
     });
 
-    void check({ withSpinner: true });
+    enqueueCheck({ withSpinner: true });
 
     return () => {
       mounted = false;

@@ -100,6 +100,22 @@ function benignConsoleNoise(message: string): boolean {
   return false;
 }
 
+/** Não tentar `getUser` em cadeia quando o próprio erro é contenção do lock do Supabase (piora o incidente). */
+function isSupabaseAuthLockNoise(message: string): boolean {
+  const m = message.toLowerCase();
+  return m.includes("acquiring process lock") && m.includes("auth-token") && m.includes("timed out");
+}
+
+function stringifyRejectionReason(reason: unknown): string {
+  if (reason instanceof Error) return reason.message || "Unhandled rejection";
+  if (typeof reason === "string") return reason;
+  if (reason && typeof reason === "object" && "message" in reason) {
+    const raw = (reason as { message?: unknown }).message;
+    return typeof raw === "string" && raw.trim() !== "" ? raw : "Unhandled rejection";
+  }
+  return "Unhandled rejection";
+}
+
 export function initPainelErrorReporter(next: ReporterConfig): void {
   shutdownPainelErrorReporter();
   cfg = next;
@@ -107,7 +123,7 @@ export function initPainelErrorReporter(next: ReporterConfig): void {
 
   boundOnError = (ev: ErrorEvent) => {
     const msg = ev.message || String(ev.error ?? "Error");
-    if (benignConsoleNoise(msg)) return;
+    if (benignConsoleNoise(msg) || isSupabaseAuthLockNoise(msg)) return;
     void reportPainelError({
       kind: "error",
       message: msg,
@@ -122,13 +138,8 @@ export function initPainelErrorReporter(next: ReporterConfig): void {
 
   boundOnRejection = (ev: PromiseRejectionEvent) => {
     const reason = ev.reason;
-    const msg =
-      reason instanceof Error
-        ? reason.message || "Unhandled rejection"
-        : typeof reason === "string"
-          ? reason
-          : "Unhandled rejection";
-    if (benignConsoleNoise(msg)) return;
+    const msg = stringifyRejectionReason(reason);
+    if (benignConsoleNoise(msg) || isSupabaseAuthLockNoise(msg)) return;
     void reportPainelError({
       kind: "unhandledrejection",
       message: msg,
@@ -163,6 +174,8 @@ export async function reportPainelError(payload: {
   extra?: Record<string, unknown>;
 }): Promise<void> {
   if (!cfg) return;
+  if (isSupabaseAuthLockNoise(payload.message)) return;
+
   const now = Date.now();
   const fp = fingerprint(payload.kind, payload.message, payload.stack ?? null);
   if (shouldSkipDuplicate(fp)) return;
