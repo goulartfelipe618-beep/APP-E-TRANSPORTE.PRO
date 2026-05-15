@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useParams, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { BadgeCheck, Building2, Loader2, MapPin, QrCode, Shield, ShieldAlert, User } from "lucide-react";
 
 /** Aceita qualquer UUID em formato canónico (legado com token na path). */
@@ -18,6 +18,7 @@ type VerificacaoPayload = {
 };
 
 export default function VerificarMotoristaPage() {
+  const navigate = useNavigate();
   const { token: pathToken } = useParams<{ token?: string }>();
   const [searchParams] = useSearchParams();
   const gateJwt = (searchParams.get("g") || "").trim();
@@ -68,9 +69,57 @@ export default function VerificarMotoristaPage() {
       }
 
       const fnBase = base.replace(/\/$/, "");
-      const url = gateJwt
-        ? `${fnBase}/functions/v1/motorista-verificacao-public?g=${encodeURIComponent(gateJwt)}`
-        : `${fnBase}/functions/v1/motorista-verificacao-public?token=${encodeURIComponent(legacyUuid)}`;
+
+      /** Caminho QR estável (/verificar-motorista/:uuid) → novo JWT à cada abertura. */
+      if (!gateJwt && legacyUuid && UUID_RE.test(legacyUuid)) {
+        try {
+          const boot = await fetch(
+            `${fnBase}/functions/v1/motorista-verificacao-public?session=1&qrt=${encodeURIComponent(legacyUuid)}`,
+            {
+              method: "GET",
+              headers: {
+                apikey: anon,
+                Authorization: `Bearer ${anon}`,
+              },
+            },
+          );
+          const bootJson = (await boot.json()) as { jwt?: string; error?: string };
+          if (!cancelled && boot.ok && typeof bootJson.jwt === "string" && bootJson.jwt.trim() !== "") {
+            navigate(`/verificar-motorista?g=${encodeURIComponent(bootJson.jwt.trim())}`, { replace: true });
+            return;
+          }
+        } catch {
+          /* fallback ao token público direto */
+        }
+
+        try {
+          const res = await fetch(
+            `${fnBase}/functions/v1/motorista-verificacao-public?token=${encodeURIComponent(legacyUuid)}`,
+            {
+              method: "GET",
+              headers: {
+                apikey: anon,
+                Authorization: `Bearer ${anon}`,
+              },
+            },
+          );
+          const json = (await res.json()) as VerificacaoPayload | { error?: string };
+          if (cancelled) return;
+          if (!res.ok || !("ok" in json) || !json.ok) {
+            setErr((json as { error?: string }).error || "Não foi possível validar este registo.");
+            return;
+          }
+          setData(json);
+        } catch {
+          if (!cancelled) setErr("Erro de rede. Tente novamente.");
+        } finally {
+          if (!cancelled) setLoading(false);
+        }
+        return;
+      }
+
+      const url =
+        `${fnBase}/functions/v1/motorista-verificacao-public?g=${encodeURIComponent(gateJwt)}`;
 
       try {
         const res = await fetch(url, {
@@ -96,7 +145,7 @@ export default function VerificarMotoristaPage() {
     return () => {
       cancelled = true;
     };
-  }, [gateJwt, legacyUuid]);
+  }, [gateJwt, legacyUuid, navigate]);
 
   if (!gateJwt && (!legacyUuid || !UUID_RE.test(legacyUuid))) {
     return (
@@ -115,11 +164,13 @@ export default function VerificarMotoristaPage() {
             </div>
             <h1 className="text-lg font-semibold text-white">Selo digital</h1>
             <p className="mt-3 text-sm leading-relaxed text-white/65">
-              Utilize o QR no final da ficha PDF do motorista. O link é de uso único e expira; cada exportação gera um novo código.
+              Utilize o QR no final da ficha PDF do motorista. O <strong className="text-white/85">QR da ficha não muda</strong>{" "}
+              entre exportações; ao abrir a página, o sistema gera um <strong className="text-white/85">link de sessão</strong>{" "}
+              diferente (recarregar ou voltar a digitalizar gera outro).
             </p>
             <div className="mt-6 flex items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/[0.04] px-4 py-3 text-xs text-white/50">
               <QrCode className="h-4 w-4 shrink-0 text-[#c9a227]" />
-              <span>O acesso público só funciona com o código emitido na exportação da ficha.</span>
+              <span>Fichas antigas com link de uso único continuam válidas até serem consumidas.</span>
             </div>
             <p className="mt-8 text-center text-xs text-white/40">
               <Link to="/login" className="text-[#FF6600] underline-offset-4 hover:underline">

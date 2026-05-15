@@ -31,10 +31,29 @@ async function hmacSha256B64Url(secret: string, data: string): Promise<string> {
   return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
 }
 
-async function verifyJwtHS256(
-  token: string,
-  secret: string,
-): Promise<{ sub: string; jti: string; iat: number; exp: number } | null> {
+function b64urlFromString(s: string): string {
+  return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+
+async function signJwtHS256(payload: Record<string, unknown>, secret: string): Promise<string> {
+  const header = { alg: "HS256", typ: "JWT" };
+  const h = b64urlFromString(JSON.stringify(header));
+  const p = b64urlFromString(JSON.stringify(payload));
+  const sig = await hmacSha256B64Url(secret, `${h}.${p}`);
+  return `${h}.${p}.${sig}`;
+}
+
+type VerifiedClaims = {
+  sub: string;
+  jti: string;
+  iat: number;
+  exp: number;
+  /** 1 = uso único + gate na linha (PDF antigo); 2 = sessão reutilizável (QR estável na ficha). */
+  version: 1 | 2;
+  qrt?: string;
+};
+
+async function verifyJwtHS256(token: string, secret: string): Promise<VerifiedClaims | null> {
   const parts = token.split(".");
   if (parts.length !== 3) return null;
   const [h, p, s] = parts;
@@ -59,7 +78,14 @@ async function verifyJwtHS256(
   if (!UUID_RE.test(sub) || !jti || !Number.isFinite(iat) || !Number.isFinite(exp)) return null;
   const now = Math.floor(Date.now() / 1000);
   if (exp < now || iat > now + 120) return null;
-  return { sub, jti, iat, exp };
+  const vNum = Number(payload.v);
+  const version: 1 | 2 = vNum === 2 ? 2 : 1;
+  if (version === 2) {
+    const qrt = String(payload.qrt || "").trim();
+    if (!UUID_RE.test(qrt)) return null;
+    return { sub, jti, iat, exp, version, qrt };
+  }
+  return { sub, jti, iat, exp, version: 1 };
 }
 
 function maskCnpj(digits: string): string | null {
@@ -186,6 +212,50 @@ Deno.serve(async (req) => {
   );
 
   try {
+    const session = (url.searchParams.get("session") || "").trim();
+    const qrtBootstrap = (url.searchParams.get("qrt") || "").trim();
+    if (session === "1" && qrtBootstrap && UUID_RE.test(qrtBootstrap)) {
+      const secretSes = await resolveMotoristaJwtSecret();
+      if (secretSes.length < 16) {
+        return new Response(JSON.stringify({ error: "Serviço de verificação indisponível." }), {
+          status: 503,
+          headers: { ...corsHeaders, "Content-Type": "application/json", "Cache-Control": "no-store" },
+        });
+      }
+      const { data: smSes, error: sesErr } = await supabaseAdmin
+        .from("solicitacoes_motoristas")
+        .select("id, motorista_verificacao_qr_token, status")
+        .eq("motorista_verificacao_qr_token", qrtBootstrap)
+        .maybeSingle();
+      const stOk = String(smSes?.status || "").toLowerCase().trim();
+      if (sesErr || !smSes || (stOk && stOk !== "cadastrado")) {
+        return new Response(JSON.stringify({ error: "Selo não encontrado." }), {
+          status: 404,
+          headers: { ...corsHeaders, "Content-Type": "application/json", "Cache-Control": "no-store" },
+        });
+      }
+      const jti = crypto.randomUUID();
+      const iat = Math.floor(Date.now() / 1000);
+      const exp = iat + 2 * 3600;
+      const jwt = await signJwtHS256({
+        v: 2,
+        sub: smSes.id as string,
+        qrt: qrtBootstrap,
+        jti,
+        iat,
+        exp,
+      }, secretSes);
+
+      return new Response(JSON.stringify({ jwt, exp }), {
+        status: 200,
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "application/json",
+          "Cache-Control": "no-store",
+        },
+      });
+    }
+
     if (g) {
       const secret = await resolveMotoristaJwtSecret();
       if (secret.length < 16) {
@@ -200,6 +270,31 @@ Deno.serve(async (req) => {
         return new Response(JSON.stringify({ error: "Link inválido ou expirado. Exporte uma ficha nova no painel." }), {
           status: 410,
           headers: { ...corsHeaders, "Content-Type": "application/json", "Cache-Control": "no-store" },
+        });
+      }
+
+      /** JWT v2 — sessão a partir do QR estável na ficha PDF (vários scans / recargas válidos até exp). */
+      if (claims.version === 2 && claims.qrt) {
+        const { data: sm2, error: sm2Err } = await supabaseAdmin
+          .from("solicitacoes_motoristas")
+          .select("id, nome, user_id, status, dados_webhook, motorista_verificacao_qr_token")
+          .eq("id", claims.sub)
+          .maybeSingle();
+        const tokDb = String(sm2?.motorista_verificacao_qr_token ?? "").trim();
+        if (sm2Err || !sm2 || tokDb !== claims.qrt) {
+          return new Response(JSON.stringify({ error: "Link inválido ou expirado. Peça ao operador a ficha atualizada." }), {
+            status: 410,
+            headers: { ...corsHeaders, "Content-Type": "application/json", "Cache-Control": "no-store" },
+          });
+        }
+        const body = await buildVerificationJson(supabaseAdmin, sm2 as SmRow);
+        return new Response(JSON.stringify(body), {
+          status: 200,
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/json",
+            "Cache-Control": "no-store, max-age=0",
+          },
         });
       }
 

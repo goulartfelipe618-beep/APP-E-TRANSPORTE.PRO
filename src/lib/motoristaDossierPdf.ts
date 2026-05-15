@@ -17,11 +17,11 @@ export interface MotoristaDossierPdfInput {
   dados_webhook: Json | null;
   docUrls: MotoristaFrotaDocSignedUrls;
   /**
-   * JWT emitido na exportação (uso único + expiração ~26h). Preferido no QR.
-   * Legado: `verificacao_qr_token` (UUID permanente na linha).
+   * URL estável impressa no QR (token permanente da linha). Cada visita/recarga da página
+   * obtém JWT de sessão (v=2); PDFs antigos podem usar `verificacao_jwt` (v=1, uso único).
    */
   verificacao_jwt?: string | null;
-  /** Token da coluna `motorista_verificacao_qr_token` — apenas legado se não houver JWT. */
+  /** Token `motorista_verificacao_qr_token` — preferido para o QR (mesmo código em todas as exportações). */
   verificacao_qr_token?: string | null;
   /** Origem do site (ex.: `window.location.origin`) para o URL do QR. */
   app_public_origin: string;
@@ -515,24 +515,24 @@ export async function downloadMotoristaDossierPdf(input: MotoristaDossierPdfInpu
 
   const origin = (input.app_public_origin || "").replace(/\/$/, "");
   const jwtGate = (input.verificacao_jwt || "").trim();
-  const legacyToken = (input.verificacao_qr_token || "").trim();
+  const stableQrToken = (input.verificacao_qr_token || "").trim();
   let qrUrl: string;
-  if (jwtGate) {
+  if (stableQrToken) {
+    if (!origin) {
+      throw new Error(
+        "URL pública do app em falta: defina VITE_APP_PUBLIC_URL no ambiente ou abra o sistema no domínio correto.",
+      );
+    }
+    qrUrl = `${origin}/verificar-motorista/${encodeURIComponent(stableQrToken)}`;
+  } else if (jwtGate) {
     if (!origin) {
       throw new Error(
         "URL do painel em falta: defina VITE_MOTORISTA_VERIFICACAO_APP_ORIGIN ou VITE_APP_PUBLIC_URL com o domínio onde a app corre (não use o site de marketing).",
       );
     }
     qrUrl = `${origin}/verificar-motorista?g=${encodeURIComponent(jwtGate)}`;
-  } else if (legacyToken) {
-    if (!origin) {
-      throw new Error(
-        "URL pública do app em falta: defina VITE_APP_PUBLIC_URL no ambiente ou abra o sistema no domínio correto.",
-      );
-    }
-    qrUrl = `${origin}/verificar-motorista/${encodeURIComponent(legacyToken)}`;
   } else {
-    throw new Error("Selo de verificação em falta: tente exportar de novo.");
+    throw new Error("Selo de verificação em falta: atualize este motorista ou exporte de novo pelo painel.");
   }
   let hostLabel = origin.replace(/^https?:\/\//i, "");
   try {
@@ -562,7 +562,11 @@ export async function downloadMotoristaDossierPdf(input: MotoristaDossierPdfInpu
   doc.setFontSize(5.8);
   doc.setTextColor(220, 226, 240);
   doc.text(
-    jwtGate ? `Selo digital · ${hostLabel}/verificar-motorista (uso único)` : `Selo digital · ${hostLabel}/verificar-motorista/…`,
+    stableQrToken
+      ? `Selo digital estável · ${hostLabel}/verificar-motorista/… · cada visita usa link de sessão`
+      : jwtGate
+        ? `Selo digital (ficha legacy) · ${hostLabel}/verificar-motorista (uso único)`
+        : `Selo digital · ${hostLabel}/verificar-motorista`,
     M + 7,
     y + footerH - 3,
   );
@@ -573,8 +577,8 @@ export async function downloadMotoristaDossierPdf(input: MotoristaDossierPdfInpu
   doc.roundedRect(M + INNER_W - qrBox - qrPad - 1, y + qrPad - 0.5, qrBox + 2, qrBox + 2, 1.2, 1.2, "F");
   const qr = await QRCode.toDataURL(qrUrl, {
     margin: 1,
-    width: jwtGate ? 280 : 200,
-    errorCorrectionLevel: jwtGate ? "L" : "M",
+    width: 256,
+    errorCorrectionLevel: "M",
   });
   doc.addImage(qr, "PNG", M + INNER_W - qrBox - qrPad, y + qrPad, qrBox, qrBox);
 

@@ -19,6 +19,9 @@ import { useUserPlan } from "@/hooks/useUserPlan";
 import { canUseMotoristaPortalLink } from "@/lib/painelPlanPolicy";
 import UpgradePlanDialog from "@/components/planos/UpgradePlanDialog";
 
+const UUID_SELLO_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export interface MotoristaFrotaDetalheRow {
   id: string;
   nome: string;
@@ -161,31 +164,28 @@ export default function DetalhesMotoristaFrotaSheet({
             "Defina VITE_MOTORISTA_VERIFICACAO_APP_ORIGIN (URL do painel, ex.: https://app.seudominio.com) ou VITE_APP_PUBLIC_URL para o QR abrir na app certa — não use o domínio do site de marketing.",
           );
         }
-        const { data: mintData, error: mintErr } = await supabase.functions.invoke("motorista-verificacao-mint", {
-          body: { motorista_id: motorista.id },
-        });
-        const jwt = typeof mintData?.jwt === "string" ? mintData.jwt.trim() : "";
-        if (mintErr || !jwt) {
-          let msg = "";
-          if (typeof mintData === "object" && mintData && "error" in mintData) {
-            msg = String((mintData as { error?: string }).error || "");
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (!user) throw new Error("Sessão expirada.");
+
+        /** QR estável no PDF — o link mágico muda só na página (JWT v2 ao abrir). */
+        let qrToken = (motorista.motorista_verificacao_qr_token || "").trim();
+        if (!UUID_SELLO_RE.test(qrToken)) {
+          qrToken = crypto.randomUUID();
+          const { error: tokErr } = await supabase
+            .from("solicitacoes_motoristas")
+            .update({ motorista_verificacao_qr_token: qrToken })
+            .eq("id", motorista.id)
+            .eq("user_id", user.id);
+          if (tokErr) {
+            throw new Error(
+              tokErr.message ||
+                "Não foi possível gerar o token do selo QR. Confirme a coluna motorista_verificacao_qr_token e as permissões (RLS).",
+            );
           }
-          if (!msg && mintErr) {
-            const ctx = (mintErr as { context?: { body?: unknown; status?: number } }).context;
-            if (ctx?.body && typeof ctx.body === "object" && ctx.body !== null && "error" in (ctx.body as object)) {
-              msg = String((ctx.body as { error?: string }).error || "");
-            }
-            if (!msg && ctx?.status === 503) {
-              msg =
-                "No Supabase: crie o secret MOTORISTA_VERIFICACAO_JWT_SECRET (Edge Functions → Secrets), mín. 16 caracteres. O mesmo valor deve existir para a função motorista-verificacao-public.";
-            }
-            if (!msg) msg = mintErr.message || "";
-          }
-          throw new Error(
-            msg ||
-              "Não foi possível emitir o selo do QR. Confirme o deploy de motorista-verificacao-mint e os secrets no Supabase.",
-          );
         }
+
         const urls = await signMotoristaFrotaDocUrls(supabase, motorista.dados_webhook, 7200);
         await downloadMotoristaDossierPdf({
           id: motorista.id,
@@ -199,7 +199,7 @@ export default function DetalhesMotoristaFrotaSheet({
           created_at: motorista.created_at,
           dados_webhook: motorista.dados_webhook,
           docUrls: urls.preview,
-          verificacao_jwt: jwt,
+          verificacao_qr_token: qrToken,
           app_public_origin: origin,
         });
       })(),

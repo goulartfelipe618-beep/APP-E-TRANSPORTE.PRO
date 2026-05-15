@@ -466,73 +466,81 @@ function addContractText(doc: jsPDF, title: string, text: string, startY: number
   return y + SP.sectionGap;
 }
 
-/** Bloco final com imagem da assinatura eletrónica (Configurações → Informações Contratuais). */
-async function appendAssinaturaEletronicaFinal(doc: jsPDF, cab: any): Promise<void> {
-  const url = String(cab?.assinatura_url ?? "").trim();
-  if (!url) return;
+const SIG_LINE_LEN = 72;
+const SIG_IMG_MAX_W = 62;
+const SIG_IMG_MAX_H = 26;
+const SIG_GAP_ABOVE_LINE = 2;
 
-  const img = await loadLogoForPdf(url);
-  if (!img) return;
-
-  const blockH = 40;
-  let pageNum = doc.getNumberOfPages();
-  doc.setPage(pageNum);
-
-  let y = SAFE_BOTTOM - blockH;
-  if (y < MARGIN + 22) {
-    doc.addPage();
-    pageNum = doc.getNumberOfPages();
-    doc.setPage(pageNum);
-    y = MARGIN + 10;
+/**
+ * Traços Contratante / Contratado e, se existir `cabecalho.assinatura_url`, a imagem
+ * centrada **acima** do traço do Contratado (não no rodapé da página).
+ */
+async function addDualPartySignatureWithImage(
+  doc: jsPDF,
+  clientName: string,
+  companyName: string | null,
+  cabecalho: any,
+  startY: number,
+): Promise<number> {
+  const url = String(cabecalho?.assinatura_url ?? "").trim();
+  let logo: LogoPdf | null = null;
+  if (url) {
+    logo = await loadLogoForPdf(url);
   }
 
-  doc.setFontSize(FS.sectionTitle);
-  doc.setFont("helvetica", "bold");
-  setColor(doc, CLR.dark);
-  doc.text("ASSINATURA", MARGIN, y);
-  y += 7;
-
-  const maxW = 62;
-  const maxH = 26;
-  const fitted = fitLogoSize(img.w, img.h, maxW, maxH);
-  const imgX = PAGE_W - MARGIN - fitted.w;
-  doc.addImage(img.dataUrl, img.format, imgX, y, fitted.w, fitted.h);
-  y += fitted.h + 5;
-
-  doc.setFontSize(FS.small);
-  doc.setFont("helvetica", "normal");
-  setColor(doc, CLR.muted);
-  const rotulo = String(cab?.razao_social ?? cab?.representante_legal ?? "").trim();
-  if (rotulo) {
-    doc.text(rotulo, imgX, y);
+  let imgSlotH = 0;
+  let fitted = { w: 0, h: 0 };
+  if (logo) {
+    fitted = fitLogoSize(logo.w, logo.h, SIG_IMG_MAX_W, SIG_IMG_MAX_H);
+    imgSlotH = fitted.h + SIG_GAP_ABOVE_LINE;
   }
-  setColor(doc, CLR.black);
-}
 
-function addSignatureArea(doc: jsPDF, clientName: string, companyName: string | null, startY: number): number {
-  let y = checkPage(doc, startY, 45);
-  y += 14;
-  const lineLen = 72;
+  const belowLineH = 5 + 5 + 8;
+  const topPad = 14;
+  const needed = topPad + imgSlotH + belowLineH;
 
-  drawLine(doc, MARGIN, y, MARGIN + lineLen, CLR.dark);
-  drawLine(doc, PAGE_W - MARGIN - lineLen, y, PAGE_W - MARGIN, CLR.dark);
-  y += 5;
+  let y = checkPage(doc, startY, needed);
+  y += topPad;
 
+  const lineY = y + imgSlotH;
+  const leftX1 = MARGIN;
+  const leftX2 = MARGIN + SIG_LINE_LEN;
+  const rightX1 = PAGE_W - MARGIN - SIG_LINE_LEN;
+  const rightX2 = PAGE_W - MARGIN;
+  const rightCenter = (rightX1 + rightX2) / 2;
+
+  if (logo) {
+    const imgX = rightCenter - fitted.w / 2;
+    const imgTop = lineY - SIG_GAP_ABOVE_LINE - fitted.h;
+    doc.addImage(logo.dataUrl, logo.format, imgX, imgTop, fitted.w, fitted.h);
+  }
+
+  drawLine(doc, leftX1, lineY, leftX2, CLR.dark);
+  drawLine(doc, rightX1, lineY, rightX2, CLR.dark);
+
+  let textY = lineY + 5;
   doc.setFontSize(FS.body);
   doc.setFont("helvetica", "bold");
   setColor(doc, CLR.dark);
-  doc.text("Contratante", MARGIN + lineLen / 2 - 12, y);
-  doc.text("Contratado", PAGE_W - MARGIN - lineLen / 2 - 10, y);
-  y += 5;
+  doc.text("Contratante", leftX1 + SIG_LINE_LEN / 2 - 12, textY);
+  doc.text("Contratado", rightX1 + SIG_LINE_LEN / 2 - 10, textY);
+  textY += 5;
 
   doc.setFontSize(FS.small);
   doc.setFont("helvetica", "normal");
   setColor(doc, CLR.muted);
-  doc.text(clientName, MARGIN, y);
-  if (companyName) doc.text(companyName, PAGE_W - MARGIN - lineLen, y);
+  doc.text(clientName, leftX1, textY);
+  if (companyName) doc.text(companyName, rightX1, textY);
   setColor(doc, CLR.black);
 
-  return y + 6;
+  return textY + 8;
+}
+
+function contractPdfIncludesSignatureBlock(contrato: any): boolean {
+  if (!contrato) return false;
+  if (contrato.incluir_no_pdf_confirmacao === false) return false;
+  if (!contrato.modelo_contrato && !contrato.politica_cancelamento && !contrato.clausulas_adicionais) return false;
+  return true;
 }
 
 function addFooter(doc: jsPDF, cab: any) {
@@ -573,7 +581,8 @@ async function addContractPages(
   if (contrato.politica_cancelamento) y = addContractText(doc, "POLÍTICA DE CANCELAMENTO", contrato.politica_cancelamento, y);
   if (contrato.clausulas_adicionais) y = addContractText(doc, "CLÁUSULAS ADICIONAIS", contrato.clausulas_adicionais, y);
 
-  addSignatureArea(doc, clientName, cabecalho?.razao_social || null, y);
+  const company = cabecalho?.razao_social != null ? String(cabecalho.razao_social).trim() || null : null;
+  await addDualPartySignatureWithImage(doc, clientName, company, cabecalho, y);
 }
 
 // ─── Horários helper ────────────────────────────────────────
@@ -730,10 +739,13 @@ async function buildTransferReservaPdfDocument(reservaId: string): Promise<{ doc
     y += 4;
   }
 
-  // ── Contract pages ──
+  // ── Contract pages (assinatura ficam nesta página se o contrato for incluído) ──
   await addContractPages(doc, contrato, cabecalho, numReserva, r.id, r.nome_completo);
 
-  await appendAssinaturaEletronicaFinal(doc, cabecalho);
+  if (!contractPdfIncludesSignatureBlock(contrato)) {
+    const company = cabecalho?.razao_social != null ? String(cabecalho.razao_social).trim() || null : null;
+    y = await addDualPartySignatureWithImage(doc, r.nome_completo, company, cabecalho, y);
+  }
 
   // ── Footer on all pages ──
   addFooter(doc, cabecalho);
@@ -857,10 +869,13 @@ async function buildGrupoReservaPdfDocument(reservaId: string): Promise<{ doc: j
   ];
   y = addTwoColumnFields(doc, detailsLeft, detailsRight, y);
 
-  // ── Contract pages ──
+  // ── Contract pages (assinatura ficam nesta página se o contrato for incluído) ──
   await addContractPages(doc, contrato, cabecalho, numReserva, r.id, r.nome_completo);
 
-  await appendAssinaturaEletronicaFinal(doc, cabecalho);
+  if (!contractPdfIncludesSignatureBlock(contrato)) {
+    const company = cabecalho?.razao_social != null ? String(cabecalho.razao_social).trim() || null : null;
+    y = await addDualPartySignatureWithImage(doc, r.nome_completo, company, cabecalho, y);
+  }
 
   // ── Footer on all pages ──
   addFooter(doc, cabecalho);
@@ -982,7 +997,8 @@ export async function generateSolicitacaoTransferPDF(solicitacao: Record<string,
     y += SP.sectionGap;
   }
 
-  await appendAssinaturaEletronicaFinal(doc, cabecalho);
+  const company = cabecalho?.razao_social != null ? String(cabecalho.razao_social).trim() || null : null;
+  await addDualPartySignatureWithImage(doc, s.nome_cliente || "—", company, cabecalho, y);
   addFooter(doc, cabecalho);
   doc.save(`solicitacao-transfer-${s.nome_cliente?.replace(/\s/g, "_") || "sem-nome"}.pdf`);
 }
@@ -1048,7 +1064,8 @@ export async function generateSolicitacaoGrupoPDF(solicitacao: Record<string, an
     y = wrappedText(doc, s.mensagem, MARGIN, y, CONTENT_W, SP.paraLine);
   }
 
-  await appendAssinaturaEletronicaFinal(doc, cabecalho);
+  const company = cabecalho?.razao_social != null ? String(cabecalho.razao_social).trim() || null : null;
+  await addDualPartySignatureWithImage(doc, s.nome_cliente || "—", company, cabecalho, y);
   addFooter(doc, cabecalho);
   doc.save(`solicitacao-grupo-${s.nome_cliente?.replace(/\s/g, "_") || "sem-nome"}.pdf`);
 }
