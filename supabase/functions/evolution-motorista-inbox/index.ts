@@ -29,6 +29,18 @@ async function evolutionPost(root: string, apiKey: string, path: string, jsonBod
   return { status: res.status, text: text.length > MAX_BODY_CHARS ? text.slice(0, MAX_BODY_CHARS) + "\n…" : text };
 }
 
+async function evolutionDeleteJson(root: string, apiKey: string, path: string, jsonBody: unknown): Promise<{ status: number; text: string }> {
+  const url = `${root}${path.startsWith("/") ? path : `/${path}`}`;
+  const init: RequestInit = {
+    method: "DELETE",
+    headers: { apikey: apiKey, "Content-Type": "application/json" },
+    body: JSON.stringify(jsonBody ?? {}),
+  };
+  const res = await fetch(url, init);
+  const text = await res.text();
+  return { status: res.status, text: text.length > MAX_BODY_CHARS ? text.slice(0, MAX_BODY_CHARS) + "\n…" : text };
+}
+
 function parseJsonSafe(text: string): unknown {
   try {
     return JSON.parse(text) as unknown;
@@ -122,6 +134,9 @@ Deno.serve(async (req) => {
       remoteJid?: string;
       text?: string;
       number?: string;
+      messageId?: string;
+      fromMe?: boolean;
+      participant?: string;
       media?: {
         base64: string;
         mimetype: string;
@@ -237,6 +252,44 @@ Deno.serve(async (req) => {
         audio,
         encoding: true,
       });
+      return new Response(JSON.stringify({ httpStatus: pack.status, bodyText: pack.text }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (action === "delete_for_everyone") {
+      const remoteJid = String(body.remoteJid || "").trim();
+      const messageId = String(body.messageId || "").trim();
+      const fromMe = body.fromMe === true;
+      const participantRaw = typeof body.participant === "string" ? body.participant.trim() : "";
+      if (!remoteJid || !messageId) {
+        return new Response(JSON.stringify({ error: "remoteJid e messageId são obrigatórios" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      if (!fromMe) {
+        return new Response(
+          JSON.stringify({
+            error: "Só é possível apagar para todas as pessoas as mensagens que você enviou.",
+            code: "delete_for_others_denied",
+          }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
+        );
+      }
+      const payload: Record<string, unknown> = {
+        id: messageId,
+        remoteJid,
+        fromMe: true,
+      };
+      if (participantRaw && remoteJid.endsWith("@g.us")) {
+        payload.participant = participantRaw;
+      }
+      const pack = await evolutionDeleteJson(root, apiKey, `/chat/deleteMessageForEveryone/${encInst}`, payload);
       return new Response(JSON.stringify({ httpStatus: pack.status, bodyText: pack.text }), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },

@@ -222,7 +222,7 @@ Deno.serve(async (req) => {
       integration: "WHATSAPP-BAILEYS",
       rejectCall: false,
       msgCall: "",
-      groupsIgnore: false,
+      groupsIgnore: true,
       readMessages: true,
       readStatus: true,
       syncFullHistory: false,

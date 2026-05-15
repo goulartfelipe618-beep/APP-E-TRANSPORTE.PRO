@@ -3,6 +3,8 @@
 export type UiMsg = {
   id: string;
   remoteJid: string;
+  /** Participante que enviou (mensagens em grupo). */
+  participant?: string;
   fromMe: boolean;
   tsMs: number;
   kind: "text" | "media" | "audio" | "unknown";
@@ -29,7 +31,7 @@ export function toTsMs(v: unknown): number | null {
   return null;
 }
 
-function readKey(obj: Record<string, unknown>): { remoteJid: string; fromMe: boolean; id: string } | null {
+function readKey(obj: Record<string, unknown>): { remoteJid: string; fromMe: boolean; id: string; participant?: string } | null {
   const k = obj.key;
   if (!k || typeof k !== "object") return null;
   const o = k as Record<string, unknown>;
@@ -41,8 +43,9 @@ function readKey(obj: Record<string, unknown>): { remoteJid: string; fromMe: boo
         ? globalThis.crypto.randomUUID()
         : `${Date.now()}`;
   const fromMe = o.fromMe === true;
+  const participant = typeof o.participant === "string" && o.participant.trim() ? o.participant : undefined;
   if (!remoteJid) return null;
-  return { remoteJid, fromMe, id };
+  return { remoteJid, fromMe, id, ...(participant !== undefined ? { participant } : {}) };
 }
 
 function pickTextFromMessage(m: Record<string, unknown>): string | null {
@@ -204,6 +207,7 @@ export function normalizeEvolutionMessageRow(raw: unknown): UiMsg | null {
   return {
     id: baseKey.id,
     remoteJid: baseKey.remoteJid,
+    ...(baseKey.participant !== undefined ? { participant: baseKey.participant } : {}),
     fromMe: baseKey.fromMe,
     tsMs: finalTs,
     ...media,

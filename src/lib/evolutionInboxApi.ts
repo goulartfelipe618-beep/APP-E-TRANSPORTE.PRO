@@ -73,3 +73,23 @@ export async function inboxSendMedia(
   if ("error" in r && r.error) return r;
   return r as InboxResp<{ httpStatus?: number; bodyText?: string }>;
 }
+
+export async function inboxDeleteForEveryone(params: {
+  remoteJid: string;
+  messageId: string;
+  fromMe: boolean;
+  participant?: string;
+}): Promise<InboxResp<{ httpStatus?: number; bodyText?: string }>> {
+  const payload: Record<string, unknown> = {
+    action: "delete_for_everyone",
+    remoteJid: params.remoteJid,
+    messageId: params.messageId,
+    fromMe: params.fromMe,
+  };
+  if (params.participant?.trim()) {
+    payload.participant = params.participant.trim();
+  }
+  const r = await invokeInbox(payload);
+  if ("error" in r && r.error) return r;
+  return r as InboxResp<{ httpStatus?: number; bodyText?: string }>;
+}

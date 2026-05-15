@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useComunicadoresEvolution } from "@/hooks/useComunicadoresEvolution";
 import { useActivePage } from "@/contexts/ActivePageContext";
 import { isOwnEvolutionConnected } from "@/lib/evolutionConnection";
-import { inboxFetchChats, inboxFetchMessages, inboxSendAudio, inboxSendMedia, inboxSendText } from "@/lib/evolutionInboxApi";
+import { inboxFetchChats, inboxDeleteForEveryone, inboxFetchMessages, inboxSendAudio, inboxSendMedia, inboxSendText } from "@/lib/evolutionInboxApi";
 import { normalizeEvolutionChatRow, normalizeEvolutionMessageRow, type UiMsg } from "@/lib/evolutionInboxParse";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,12 +14,30 @@ import {
   Loader2,
   MessageCircle,
   Mic,
+  MoreVertical,
   Paperclip,
   Phone,
   Plus,
   SendHorizonal,
   Square,
 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Dialog,
   DialogContent,
@@ -28,6 +46,45 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+
+function storageKeyHiddenMsgs(jid: string) {
+  return `motora-evolution-inbox-hide:v1:${jid}`;
+}
+
+function loadHiddenMessageIds(jid: string | null): string[] {
+  if (!jid || typeof sessionStorage === "undefined") return [];
+  try {
+    const raw = sessionStorage.getItem(storageKeyHiddenMsgs(jid));
+    if (!raw) return [];
+    const p = JSON.parse(raw) as unknown;
+    return Array.isArray(p) ? p.filter((x): x is string => typeof x === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveHiddenMessageIds(jid: string, ids: string[]) {
+  if (typeof sessionStorage === "undefined") return;
+  try {
+    sessionStorage.setItem(storageKeyHiddenMsgs(jid), JSON.stringify(ids));
+  } catch {
+    /* ignore quota */
+  }
+}
+
+function snippetEvolutionBody(bodyText: unknown, max = 160): string {
+  if (typeof bodyText !== "string" || !bodyText.trim()) return "";
+  const t = bodyText.trim().slice(0, max);
+  try {
+    const j = JSON.parse(bodyText) as unknown;
+    if (j && typeof j === "object" && typeof (j as { message?: string }).message === "string") {
+      return String((j as { message: string }).message).slice(0, max);
+    }
+  } catch {
+    /* ignore */
+  }
+  return t;
+}
 
 function arrayBufferToBase64(buf: ArrayBuffer): string {
   const bytes = new Uint8Array(buf);
@@ -75,9 +132,41 @@ export default function WhatsAppInboxPage() {
   const [newPhone, setNewPhone] = useState("");
   const listEndRef = useRef<HTMLDivElement>(null);
 
+  const [hiddenIds, setHiddenIds] = useState<string[]>([]);
+  const [everyoneConfirmMsg, setEveryoneConfirmMsg] = useState<UiMsg | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+
   const activeChat = useMemo(() => chats.find((c) => c.remoteJid === activeJid) ?? null, [chats, activeJid]);
   const sendDigits = activeJid ? jidToDigits(activeJid) : "";
   const isGroupChat = Boolean(activeJid?.includes("@g.us"));
+
+  const hiddenSet = useMemo(() => new Set(hiddenIds), [hiddenIds]);
+
+  const visibleMessages = useMemo(
+    () => messages.filter((m) => !hiddenSet.has(m.id)),
+    [messages, hiddenSet],
+  );
+
+  useEffect(() => {
+    setHiddenIds(loadHiddenMessageIds(activeJid));
+  }, [activeJid]);
+
+  const hideMessageForMeLocally = useCallback(
+    (m: UiMsg) => {
+      if (!activeJid) return;
+      setHiddenIds((prev) => {
+        if (prev.includes(m.id)) return prev;
+        const next = [...prev, m.id];
+        saveHiddenMessageIds(activeJid, next);
+        return next;
+      });
+      toast.success("Mensagem oculta só para si neste painel.", {
+        description:
+          "Para outras pessoas nada muda. O armazenamento local do navegador guarda esta lista; limpar dados pode mostrar a mensagem outra vez.",
+      });
+    },
+    [activeJid],
+  );
 
   const loadChats = useCallback(async () => {
     if (!connected) return;
@@ -134,6 +223,47 @@ export default function WhatsAppInboxPage() {
     [connected, sessionSinceMs],
   );
 
+  const runDeleteForEveryone = useCallback(async () => {
+    const m = everyoneConfirmMsg;
+    if (!m || !activeJid || deleteBusy) return;
+    if (!m.fromMe) {
+      toast.error("Só pode apagar para todos as mensagens que enviou.");
+      setEveryoneConfirmMsg(null);
+      return;
+    }
+    setDeleteBusy(true);
+    try {
+      const res = await inboxDeleteForEveryone({
+        remoteJid: m.remoteJid,
+        messageId: m.id,
+        fromMe: m.fromMe,
+        participant: m.participant,
+      });
+      if ("error" in res && res.error) {
+        toast.error(res.error);
+        return;
+      }
+      const httpStatus = res.httpStatus;
+      if (httpStatus !== undefined && (httpStatus < 200 || httpStatus >= 300)) {
+        const hint = snippetEvolutionBody((res as { bodyText?: unknown }).bodyText);
+        toast.error(hint || "A Evolution não conseguiu apagar a mensagem (verifique tempo limite do WhatsApp ou ligação).");
+        return;
+      }
+      toast.success("Pedido de apagar para todos enviado.");
+      setHiddenIds((prev) => {
+        if (prev.includes(m.id)) return prev;
+        const next = [...prev, m.id];
+        saveHiddenMessageIds(activeJid, next);
+        return next;
+      });
+      setEveryoneConfirmMsg(null);
+      await loadMessages(activeJid);
+      void loadChats();
+    } finally {
+      setDeleteBusy(false);
+    }
+  }, [activeJid, deleteBusy, everyoneConfirmMsg, loadChats, loadMessages]);
+
   useEffect(() => {
     void loadChats();
   }, [loadChats]);
@@ -154,7 +284,7 @@ export default function WhatsAppInboxPage() {
 
   useEffect(() => {
     listEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages.length, activeJid]);
+  }, [visibleMessages.length, activeJid]);
 
   const sendText = async () => {
     const t = draft.trim();
@@ -375,30 +505,76 @@ export default function WhatsAppInboxPage() {
                   <div className="flex justify-center py-12">
                     <Loader2 className="h-8 w-8 animate-spin text-[#8696a0]" />
                   </div>
+                ) : visibleMessages.length === 0 ? (
+                  <p className="py-12 text-center text-sm text-[#8696a0]">
+                    Nenhuma mensagem visível nesta conversa nesta vista (filtro de sessão ou mensagens ocultas).
+                  </p>
                 ) : (
-                  messages.map((m) => (
-                    <div key={m.id} className={cn("flex w-full", m.fromMe ? "justify-end" : "justify-start")}>
-                      <div
-                        className={cn(
-                          "max-w-[85%] rounded-lg px-2 py-1.5 shadow-sm sm:max-w-[70%]",
-                          m.fromMe ? "rounded-br-none bg-[#005c4b] text-[#e9edef]" : "rounded-bl-none bg-[#202c33] text-[#e9edef]",
-                        )}
-                      >
-                        <div className="whitespace-pre-wrap break-words text-sm">{m.text || (m.kind === "unknown" ? "…" : "")}</div>
-                        {m.kind === "audio" && m.mediaUrl && (
-                          <audio controls src={m.mediaUrl} className="mt-1 max-w-full rounded" preload="none">
-                            <track kind="captions" />
-                          </audio>
-                        )}
-                        {m.kind === "media" && m.mediaUrl && m.mimetype?.startsWith("image/") && (
-                          <img src={m.mediaUrl} alt="" className="mt-1 max-h-64 rounded object-contain" />
-                        )}
-                        {m.kind === "media" && m.mediaUrl && !m.mimetype?.startsWith("image/") && (
-                          <a href={m.mediaUrl} target="_blank" rel="noopener noreferrer" className="mt-1 block text-xs text-[#FF6600] underline">
-                            Abrir {m.fileName ?? "ficheiro"}
-                          </a>
-                        )}
-                        <div className="mt-1 text-right text-[10px] opacity-70">{formatTime(m.tsMs)}</div>
+                  visibleMessages.map((m) => (
+                    <div key={m.id} className={cn("group relative flex w-full", m.fromMe ? "justify-end" : "justify-start")}>
+                      <div className={cn("relative max-w-[85%] sm:max-w-[70%]", m.fromMe ? "pr-1" : "pl-1")}>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="absolute -right-0.5 -top-0.5 z-10 h-7 w-7 shrink-0 text-[#e9edef] opacity-75 hover:bg-[#000]/20 hover:text-[#FF6600] sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100"
+                              aria-label="Opções da mensagem"
+                            >
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent
+                            align="end"
+                            className="border-border bg-popover text-popover-foreground"
+                            collisionPadding={8}
+                          >
+                            <DropdownMenuItem
+                              disabled={!m.fromMe}
+                              title={m.fromMe ? undefined : "Apenas para mensagens que enviou"}
+                              className={cn(!m.fromMe && "text-muted-foreground")}
+                              onSelect={(ev) => {
+                                ev.preventDefault();
+                                if (!m.fromMe) return;
+                                setTimeout(() => setEveryoneConfirmMsg(m), 0);
+                              }}
+                            >
+                              Apagar para todos (WhatsApp)
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              onSelect={(ev) => {
+                                ev.preventDefault();
+                                hideMessageForMeLocally(m);
+                              }}
+                            >
+                              Ocultar só para mim neste painel
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                        <div
+                          className={cn(
+                            "rounded-lg px-2 py-1.5 pr-7 shadow-sm",
+                            m.fromMe ? "rounded-br-none bg-[#005c4b] text-[#e9edef]" : "rounded-bl-none bg-[#202c33] text-[#e9edef]",
+                          )}
+                        >
+                          <div className="whitespace-pre-wrap break-words text-sm">{m.text || (m.kind === "unknown" ? "…" : "")}</div>
+                          {m.kind === "audio" && m.mediaUrl && (
+                            <audio controls src={m.mediaUrl} className="mt-1 max-w-full rounded" preload="none">
+                              <track kind="captions" />
+                            </audio>
+                          )}
+                          {m.kind === "media" && m.mediaUrl && m.mimetype?.startsWith("image/") && (
+                            <img src={m.mediaUrl} alt="" className="mt-1 max-h-64 rounded object-contain" />
+                          )}
+                          {m.kind === "media" && m.mediaUrl && !m.mimetype?.startsWith("image/") && (
+                            <a href={m.mediaUrl} target="_blank" rel="noopener noreferrer" className="mt-1 block text-xs text-[#FF6600] underline">
+                              Abrir {m.fileName ?? "ficheiro"}
+                            </a>
+                          )}
+                          <div className="mt-1 text-right text-[10px] opacity-70">{formatTime(m.tsMs)}</div>
+                        </div>
                       </div>
                     </div>
                   ))
@@ -464,6 +640,32 @@ export default function WhatsAppInboxPage() {
           </div>
         )}
       </div>
+
+      <AlertDialog open={everyoneConfirmMsg !== null} onOpenChange={(open) => !open && !deleteBusy && setEveryoneConfirmMsg(null)}>
+        <AlertDialogContent className="border-border bg-card">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Apagar para todos?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação pede à Evolution que revogue a mensagem no WhatsApp para todos os participantes. Mensagens antigas ou já
+              vistas podem estar sujeitas aos limites habituais da aplicação oficial.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteBusy}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deleteBusy}
+              onClick={(ev) => {
+                ev.preventDefault();
+                void runDeleteForEveryone();
+              }}
+            >
+              {deleteBusy ? <Loader2 className="mr-2 inline h-4 w-4 animate-spin" /> : null}
+              Apagar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Dialog open={newOpen} onOpenChange={setNewOpen}>
         <DialogContent className="border-border bg-card">
