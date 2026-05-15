@@ -21,6 +21,7 @@ import { freePlanLockedReservaIdsByCreationDay } from "@/lib/freePlanLocks";
 import { cn } from "@/lib/utils";
 import { usePainelListPagination } from "@/hooks/usePainelListPagination";
 import { PainelPaginationBar } from "@/components/painel/PainelPaginationBar";
+import { buildGrupoDadosComunicarCliente } from "@/lib/comunicarReservaCliente";
 
 type ReservaGrupo = Tables<"reservas_grupos">;
 
@@ -40,7 +41,8 @@ export default function GruposReservasPage() {
   const [selected, setSelected] = useState<ReservaGrupo | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [comunicarOpen, setComunicarOpen] = useState(false);
-  const [comunicarDados, setComunicarDados] = useState<ReservaGrupo | null>(null);
+  const [comunicarLinha, setComunicarLinha] = useState<ReservaGrupo | null>(null);
+  const [comunicarPayload, setComunicarPayload] = useState<Record<string, unknown> | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
 
@@ -168,9 +170,15 @@ export default function GruposReservasPage() {
     }
   };
 
-  const handleComunicar = (r: ReservaGrupo) => {
-    setComunicarDados(r);
-    setComunicarOpen(true);
+  const handleComunicar = async (r: ReservaGrupo) => {
+    try {
+      const payload = await buildGrupoDadosComunicarCliente(r);
+      setComunicarLinha(r);
+      setComunicarPayload(payload);
+      setComunicarOpen(true);
+    } catch {
+      toast.error("Erro ao preparar dados para comunicação.");
+    }
   };
 
   const handleDownload = async (r: ReservaGrupo) => {
@@ -466,16 +474,26 @@ export default function GruposReservasPage() {
         loading={deleteLoading}
       />
 
-      {comunicarDados && (
+      {comunicarLinha && comunicarPayload && (
         <ComunicarDialog
           open={comunicarOpen}
-          onOpenChange={setComunicarOpen}
-          dados={comunicarDados}
-          telefone={comunicarDados.whatsapp}
+          onOpenChange={(o) => {
+            setComunicarOpen(o);
+            if (!o) {
+              setComunicarLinha(null);
+              setComunicarPayload(null);
+            }
+          }}
+          dados={comunicarPayload}
+          telefone={
+            typeof comunicarPayload.whatsapp === "string" && comunicarPayload.whatsapp.trim() !== ""
+              ? comunicarPayload.whatsapp
+              : comunicarLinha.whatsapp
+          }
           titulo="Comunicar — Reserva de Grupo"
-          onGerarPDF={() => generateGrupoPDF(comunicarDados.id)}
+          onGerarPDF={() => generateGrupoPDF(comunicarLinha.id)}
           webhookTipo="grupo_reserva"
-          getConfirmacaoReservaPdfBase64={() => getGrupoReservaPdfBase64(comunicarDados.id)}
+          getConfirmacaoReservaPdfBase64={() => getGrupoReservaPdfBase64(comunicarLinha.id)}
         />
       )}
     </div>

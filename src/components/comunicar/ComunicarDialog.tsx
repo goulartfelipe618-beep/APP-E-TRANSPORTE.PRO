@@ -20,6 +20,7 @@ import {
   dadosRegistroComunicarParaWebhook,
   formatComunicarValorCampo,
 } from "@/lib/comunicarFieldFormat";
+import { COMUNICAR_CLIENTE_CHAVES_CONFIDENCIAIS } from "@/lib/comunicarReservaCliente";
 
 interface ComunicarDialogProps {
   open: boolean;
@@ -81,6 +82,8 @@ const labelMap: Record<string, string> = {
   volta_desembarque: "Desembarque (Volta)",
   volta_data: "Data (Volta)",
   volta_hora: "Hora (Volta)",
+  embarque_retorno: "Embarque (Retorno)",
+  destino_retorno: "Destino (Retorno)",
   por_hora_endereco_inicio: "Endereço Início",
   por_hora_ponto_encerramento: "Ponto Encerramento",
   por_hora_data: "Data (Por Hora)",
@@ -89,7 +92,16 @@ const labelMap: Record<string, string> = {
   por_hora_itinerario: "Itinerário",
 };
 
-const ignoredKeys = ["id", "user_id", "created_at", "updated_at", "veiculo_id", "motorista_id", "solicitacao_id"];
+const ignoredKeys = [
+  "id",
+  "user_id",
+  "created_at",
+  "updated_at",
+  "veiculo_id",
+  "motorista_id",
+  "solicitacao_id",
+  ...COMUNICAR_CLIENTE_CHAVES_CONFIDENCIAIS,
+];
 
 function nomeClienteParaComunicar(dados: Record<string, unknown>): string {
   const d = dados as { nome_cliente?: string; nome_completo?: string; nome?: string };

@@ -1,3 +1,5 @@
+import { COMUNICAR_CLIENTE_CHAVES_CONFIDENCIAIS } from "@/lib/comunicarReservaCliente";
+
 /** Rótulos iguais ao PDF e às telas de detalhe (Transfer). */
 const TIPO_VIAGEM_LABELS: Record<string, string> = {
   somente_ida: "Somente Ida",
@@ -38,6 +40,9 @@ export function formatComunicarValorCampo(key: string, value: unknown): string {
  */
 export function dadosRegistroComunicarParaWebhook(dados: Record<string, unknown>): Record<string, unknown> {
   const base = JSON.parse(JSON.stringify(dados)) as Record<string, unknown>;
+  for (const k of COMUNICAR_CLIENTE_CHAVES_CONFIDENCIAIS) {
+    delete base[k];
+  }
   if ("tipo_viagem" in base && base.tipo_viagem != null && base.tipo_viagem !== "") {
     base.tipo_viagem = formatTipoViagemParaComunicar(base.tipo_viagem);
   }

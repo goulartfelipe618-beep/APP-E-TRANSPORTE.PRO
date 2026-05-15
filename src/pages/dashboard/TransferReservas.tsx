@@ -21,6 +21,7 @@ import { freePlanLockedReservaIdsByCreationDay } from "@/lib/freePlanLocks";
 import { cn } from "@/lib/utils";
 import { usePainelListPagination } from "@/hooks/usePainelListPagination";
 import { PainelPaginationBar } from "@/components/painel/PainelPaginationBar";
+import { buildTransferDadosComunicarCliente } from "@/lib/comunicarReservaCliente";
 
 type Reserva = Tables<"reservas_transfer">;
 
@@ -50,7 +51,8 @@ export default function TransferReservasPage() {
   const [selected, setSelected] = useState<Reserva | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [comunicarOpen, setComunicarOpen] = useState(false);
-  const [comunicarDados, setComunicarDados] = useState<Reserva | null>(null);
+  const [comunicarLinha, setComunicarLinha] = useState<Reserva | null>(null);
+  const [comunicarPayload, setComunicarPayload] = useState<Record<string, unknown> | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
 
@@ -166,9 +168,15 @@ export default function TransferReservasPage() {
     }
   };
 
-  const handleComunicar = (r: Reserva) => {
-    setComunicarDados(r);
-    setComunicarOpen(true);
+  const handleComunicar = async (r: Reserva) => {
+    try {
+      const payload = await buildTransferDadosComunicarCliente(r);
+      setComunicarLinha(r);
+      setComunicarPayload(payload);
+      setComunicarOpen(true);
+    } catch {
+      toast.error("Erro ao preparar dados para comunicação.");
+    }
   };
 
   const handleDownload = async (r: Reserva) => {
@@ -448,16 +456,26 @@ export default function TransferReservasPage() {
         loading={deleteLoading}
       />
 
-      {comunicarDados && (
+      {comunicarLinha && comunicarPayload && (
         <ComunicarDialog
           open={comunicarOpen}
-          onOpenChange={setComunicarOpen}
-          dados={comunicarDados}
-          telefone={comunicarDados.telefone}
+          onOpenChange={(o) => {
+            setComunicarOpen(o);
+            if (!o) {
+              setComunicarLinha(null);
+              setComunicarPayload(null);
+            }
+          }}
+          dados={comunicarPayload}
+          telefone={
+            typeof comunicarPayload.telefone === "string" && comunicarPayload.telefone.trim() !== ""
+              ? comunicarPayload.telefone
+              : comunicarLinha.telefone
+          }
           titulo="Comunicar — Reserva Transfer"
-          onGerarPDF={() => generateTransferPDF(comunicarDados.id)}
+          onGerarPDF={() => generateTransferPDF(comunicarLinha.id)}
           webhookTipo="transfer_reserva"
-          getConfirmacaoReservaPdfBase64={() => getTransferReservaPdfBase64(comunicarDados.id)}
+          getConfirmacaoReservaPdfBase64={() => getTransferReservaPdfBase64(comunicarLinha.id)}
         />
       )}
     </div>

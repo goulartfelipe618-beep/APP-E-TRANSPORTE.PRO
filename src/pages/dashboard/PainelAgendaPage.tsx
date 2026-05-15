@@ -14,6 +14,7 @@ import DetalhesReservaTransferSheet from "@/components/reservas/DetalhesReservaT
 import DetalhesReservaGrupoSheet from "@/components/reservas/DetalhesReservaGrupoSheet";
 import ComunicarDialog from "@/components/comunicar/ComunicarDialog";
 import { generateGrupoPDF, generateTransferPDF, getGrupoReservaPdfBase64, getTransferReservaPdfBase64 } from "@/lib/pdfGenerator";
+import { buildGrupoDadosComunicarCliente, buildTransferDadosComunicarCliente } from "@/lib/comunicarReservaCliente";
 
 const WEEKDAYS_PT = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"] as const;
 
@@ -51,8 +52,10 @@ export default function PainelAgendaPage() {
   const [detailGrupo, setDetailGrupo] = useState<Tables<"reservas_grupos"> | null>(null);
   const [detailSheetOpen, setDetailSheetOpen] = useState(false);
   const [comunicarOpen, setComunicarOpen] = useState(false);
-  const [comunicarTransfer, setComunicarTransfer] = useState<Tables<"reservas_transfer"> | null>(null);
-  const [comunicarGrupo, setComunicarGrupo] = useState<Tables<"reservas_grupos"> | null>(null);
+  const [comunicarTransferLinha, setComunicarTransferLinha] = useState<Tables<"reservas_transfer"> | null>(null);
+  const [comunicarTransferPayload, setComunicarTransferPayload] = useState<Record<string, unknown> | null>(null);
+  const [comunicarGrupoLinha, setComunicarGrupoLinha] = useState<Tables<"reservas_grupos"> | null>(null);
+  const [comunicarGrupoPayload, setComunicarGrupoPayload] = useState<Record<string, unknown> | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -158,16 +161,30 @@ export default function PainelAgendaPage() {
     }
   }, []);
 
-  const handleComunicarTransfer = useCallback((r: Tables<"reservas_transfer">) => {
-    setComunicarTransfer(r);
-    setComunicarGrupo(null);
-    setComunicarOpen(true);
+  const handleComunicarTransfer = useCallback(async (r: Tables<"reservas_transfer">) => {
+    try {
+      const payload = await buildTransferDadosComunicarCliente(r);
+      setComunicarGrupoLinha(null);
+      setComunicarGrupoPayload(null);
+      setComunicarTransferLinha(r);
+      setComunicarTransferPayload(payload);
+      setComunicarOpen(true);
+    } catch {
+      toast.error("Erro ao preparar dados para comunicação.");
+    }
   }, []);
 
-  const handleComunicarGrupo = useCallback((r: Tables<"reservas_grupos">) => {
-    setComunicarGrupo(r);
-    setComunicarTransfer(null);
-    setComunicarOpen(true);
+  const handleComunicarGrupo = useCallback(async (r: Tables<"reservas_grupos">) => {
+    try {
+      const payload = await buildGrupoDadosComunicarCliente(r);
+      setComunicarTransferLinha(null);
+      setComunicarTransferPayload(null);
+      setComunicarGrupoLinha(r);
+      setComunicarGrupoPayload(payload);
+      setComunicarOpen(true);
+    } catch {
+      toast.error("Erro ao preparar dados para comunicação.");
+    }
   }, []);
 
   const handleDownloadTransfer = useCallback(async (r: Tables<"reservas_transfer">) => {
@@ -326,35 +343,49 @@ export default function PainelAgendaPage() {
         onDownload={handleDownloadGrupo}
       />
 
-      {comunicarTransfer && (
+      {comunicarTransferLinha && comunicarTransferPayload && (
         <ComunicarDialog
-          open={comunicarOpen && comunicarTransfer != null}
+          open={comunicarOpen && comunicarTransferLinha != null}
           onOpenChange={(o) => {
             setComunicarOpen(o);
-            if (!o) setComunicarTransfer(null);
+            if (!o) {
+              setComunicarTransferLinha(null);
+              setComunicarTransferPayload(null);
+            }
           }}
-          dados={comunicarTransfer}
-          telefone={comunicarTransfer.telefone}
+          dados={comunicarTransferPayload}
+          telefone={
+            typeof comunicarTransferPayload.telefone === "string" && comunicarTransferPayload.telefone.trim() !== ""
+              ? comunicarTransferPayload.telefone
+              : comunicarTransferLinha.telefone
+          }
           titulo="Comunicar — Reserva Transfer"
-          onGerarPDF={() => generateTransferPDF(comunicarTransfer.id)}
+          onGerarPDF={() => generateTransferPDF(comunicarTransferLinha.id)}
           webhookTipo="transfer_reserva"
-          getConfirmacaoReservaPdfBase64={() => getTransferReservaPdfBase64(comunicarTransfer.id)}
+          getConfirmacaoReservaPdfBase64={() => getTransferReservaPdfBase64(comunicarTransferLinha.id)}
         />
       )}
 
-      {comunicarGrupo && (
+      {comunicarGrupoLinha && comunicarGrupoPayload && (
         <ComunicarDialog
-          open={comunicarOpen && comunicarGrupo != null}
+          open={comunicarOpen && comunicarGrupoLinha != null}
           onOpenChange={(o) => {
             setComunicarOpen(o);
-            if (!o) setComunicarGrupo(null);
+            if (!o) {
+              setComunicarGrupoLinha(null);
+              setComunicarGrupoPayload(null);
+            }
           }}
-          dados={comunicarGrupo}
-          telefone={comunicarGrupo.whatsapp}
+          dados={comunicarGrupoPayload}
+          telefone={
+            typeof comunicarGrupoPayload.whatsapp === "string" && comunicarGrupoPayload.whatsapp.trim() !== ""
+              ? comunicarGrupoPayload.whatsapp
+              : comunicarGrupoLinha.whatsapp
+          }
           titulo="Comunicar — Reserva de Grupo"
-          onGerarPDF={() => generateGrupoPDF(comunicarGrupo.id)}
+          onGerarPDF={() => generateGrupoPDF(comunicarGrupoLinha.id)}
           webhookTipo="grupo_reserva"
-          getConfirmacaoReservaPdfBase64={() => getGrupoReservaPdfBase64(comunicarGrupo.id)}
+          getConfirmacaoReservaPdfBase64={() => getGrupoReservaPdfBase64(comunicarGrupoLinha.id)}
         />
       )}
     </div>
