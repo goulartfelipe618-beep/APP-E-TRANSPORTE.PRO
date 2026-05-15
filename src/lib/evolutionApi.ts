@@ -1,9 +1,6 @@
 /**
- * Evolution API (WhatsApp) — URL e chave podem vir do painel (comunicador oficial)
- * ou, para testes, de VITE_EVOLUTION_API_URL / VITE_EVOLUTION_API_KEY.
- *
- * As chamadas usam a Edge Function `evolution-proxy` (servidor → Evolution) para evitar
- * 403 Forbidden que proxies costumam aplicar ao navegador.
+ * Evolution API via Edge Function `evolution-proxy`: só endpoints /instance/* da **sua**
+ * sessão (`auth.uid()` no proxy); credenciais vêm sempre do servidor.
  */
 
 import { supabase } from "@/integrations/supabase/client";
@@ -54,16 +51,10 @@ export function evolutionEnvConfigured(override?: EvolutionCreds | null): boolea
   return resolveEvolutionCreds(override) !== null;
 }
 
-async function evolutionHttp(
-  creds: EvolutionCreds,
-  path: string,
-  opts: { method: "GET" | "POST"; jsonBody?: unknown },
-): Promise<{ status: number; bodyText: string }> {
+async function evolutionHttp(path: string, opts: { method: "GET" | "POST"; jsonBody?: unknown }): Promise<{ status: number; bodyText: string }> {
   const p = path.startsWith("/") ? path : `/${path}`;
   const { data, error } = await supabase.functions.invoke("evolution-proxy", {
     body: {
-      baseUrl: creds.baseUrl,
-      apiKey: creds.apiKey,
       path: p,
       method: opts.method,
       jsonBody: opts.method === "POST" ? opts.jsonBody ?? null : undefined,
@@ -142,13 +133,12 @@ function extractState(data: unknown): string | null {
   return null;
 }
 
-/** Lista instâncias e tenta achar telefone/estado pelo nome */
+/** Lista instâncias — o proxy já filtra no servidor apenas à instância da sessão. */
 async function fetchPhoneFromInstancesList(
-  creds: EvolutionCreds,
   instanceName: string,
 ): Promise<{ phone: string | null; state: string | null }> {
   try {
-    const { status, bodyText } = await evolutionHttp(creds, "/instance/fetchInstances", { method: "GET" });
+    const { status, bodyText } = await evolutionHttp("/instance/fetchInstances", { method: "GET" });
     if (status < 200 || status >= 300) return { phone: null, state: null };
     const list = JSON.parse(bodyText) as unknown;
     const arr = Array.isArray(list) ? list : [list];
@@ -166,7 +156,6 @@ async function fetchPhoneFromInstancesList(
           state = extractState(o) ?? state;
         }
       }
-      phone = phone ?? extractPhoneFromUnknown(item);
     }
     return { phone, state };
   } catch {
@@ -287,19 +276,14 @@ export async function fetchEvolutionMotoristaDeleteFromServer(): Promise<{ ok: b
 
 export async function fetchEvolutionQrCode(
   instanceName: string,
-  creds?: EvolutionCreds | null,
+  _creds?: EvolutionCreds | null,
 ): Promise<{
   base64: string | null;
   error?: "missing_env" | "http" | "parse";
   detail?: string;
 }> {
-  const c = resolveEvolutionCreds(creds ?? undefined);
-  if (!c) {
-    return { base64: null, error: "missing_env" };
-  }
-
   try {
-    const createPack = await evolutionHttp(c, "/instance/create", {
+    const createPack = await evolutionHttp("/instance/create", {
       method: "POST",
       jsonBody: {
         instanceName,
@@ -317,7 +301,7 @@ export async function fetchEvolutionQrCode(
       return { base64: null, error: "http", detail: `${createPack.status}: ${createPack.bodyText.slice(0, 200)}` };
     }
 
-    const connectPack = await evolutionHttp(c, `/instance/connect/${encodeURIComponent(instanceName)}`, {
+    const connectPack = await evolutionHttp(`/instance/connect/${encodeURIComponent(instanceName)}`, {
       method: "GET",
     });
 
@@ -354,14 +338,9 @@ export type EnsureInstanceResult = {
  */
 export async function ensureInstanceAndPollConnection(
   instanceName: string,
-  creds: EvolutionCreds,
+  _creds: EvolutionCreds,
   opts?: { pollAttempts?: number; pollMs?: number; nomeDispositivo?: string | null },
 ): Promise<EnsureInstanceResult> {
-  const c = resolveEvolutionCreds(creds);
-  if (!c) {
-    return { phone: null, state: null, createErrorHint: "Credenciais inválidas." };
-  }
-
   const pollAttempts = opts?.pollAttempts ?? 10;
   const pollMs = opts?.pollMs ?? 2000;
 
@@ -384,7 +363,7 @@ export async function ensureInstanceAndPollConnection(
     if (nd) {
       body.deviceName = nd;
     }
-    const createPack = await evolutionHttp(c, "/instance/create", {
+    const createPack = await evolutionHttp("/instance/create", {
       method: "POST",
       jsonBody: body,
     });
@@ -409,38 +388,33 @@ export async function ensureInstanceAndPollConnection(
     if (i > 0) {
       await new Promise((r) => setTimeout(r, pollMs));
     }
-    const { phone, state } = await fetchEvolutionConnectionInfo(instanceName, c);
+    const { phone, state } = await fetchEvolutionConnectionInfo(instanceName);
     if (phone) {
       return { phone, state, createHttpStatus, createErrorHint };
     }
     if (state === "open") {
-      const again = await fetchEvolutionConnectionInfo(instanceName, c);
+      const again = await fetchEvolutionConnectionInfo(instanceName);
       if (again.phone) {
         return { phone: again.phone, state: again.state, createHttpStatus, createErrorHint };
       }
     }
   }
 
-  const last = await fetchEvolutionConnectionInfo(instanceName, c);
+  const last = await fetchEvolutionConnectionInfo(instanceName);
   return { ...last, createHttpStatus, createErrorHint };
 }
 
 /** Estado da conexão e número (quando conectado) */
 export async function fetchEvolutionConnectionInfo(
   instanceName: string,
-  creds?: EvolutionCreds | null,
+  _creds?: EvolutionCreds | null,
 ): Promise<{
   phone: string | null;
   state: string | null;
   detail?: string;
 }> {
-  const c = resolveEvolutionCreds(creds ?? undefined);
-  if (!c) {
-    return { phone: null, state: null, detail: "missing_creds" };
-  }
-
   try {
-    const pack = await evolutionHttp(c, `/instance/connectionState/${encodeURIComponent(instanceName)}`, {
+    const pack = await evolutionHttp(`/instance/connectionState/${encodeURIComponent(instanceName)}`, {
       method: "GET",
     });
     const text = pack.bodyText;
@@ -450,7 +424,7 @@ export async function fetchEvolutionConnectionInfo(
       data = JSON.parse(text) as unknown;
     } catch {
       if (status === 404) {
-        return fetchPhoneFromInstancesList(c, instanceName);
+        return fetchPhoneFromInstancesList(instanceName);
       }
       return { phone: null, state: null, detail: text.slice(0, 200) };
     }
@@ -459,13 +433,13 @@ export async function fetchEvolutionConnectionInfo(
     let state = extractState(data);
 
     if (!phone && status >= 200 && status < 300) {
-      const fromList = await fetchPhoneFromInstancesList(c, instanceName);
+      const fromList = await fetchPhoneFromInstancesList(instanceName);
       phone = phone ?? fromList.phone;
       state = state ?? fromList.state;
     }
 
     if (!phone && (status === 404 || status < 200 || status >= 300)) {
-      const fromList = await fetchPhoneFromInstancesList(c, instanceName);
+      const fromList = await fetchPhoneFromInstancesList(instanceName);
       phone = fromList.phone;
       state = fromList.state ?? state;
     }

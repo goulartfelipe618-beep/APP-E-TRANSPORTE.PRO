@@ -8,6 +8,16 @@ import {
   instanceNameForUser,
 } from "../_shared/evolutionMotorista.ts";
 
+function privateJsonHeaders(): Record<string, string> {
+  return {
+    ...corsHeaders,
+    "Content-Type": "application/json",
+    "Cache-Control": "private, no-store, max-age=0",
+    "Pragma": "no-cache",
+    "Vary": "Authorization",
+  };
+}
+
 const MAX_BODY_CHARS = 500_000;
 const CONNECTED_ROW = /^(open|connected|conectado|online)$/i;
 
@@ -79,7 +89,7 @@ Deno.serve(async (req) => {
   if (req.method !== "POST") {
     return new Response(JSON.stringify({ error: "Method not allowed" }), {
       status: 405,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: privateJsonHeaders(),
     });
   }
 
@@ -88,7 +98,7 @@ Deno.serve(async (req) => {
     if (!authHeader) {
       return new Response(JSON.stringify({ error: "Não autorizado" }), {
         status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: privateJsonHeaders(),
       });
     }
 
@@ -100,7 +110,7 @@ Deno.serve(async (req) => {
     if (!auth.ok) {
       return new Response(auth.body, {
         status: auth.status,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: privateJsonHeaders(),
       });
     }
 
@@ -118,14 +128,14 @@ Deno.serve(async (req) => {
     if (ownErr) {
       return new Response(JSON.stringify({ error: "Erro ao ler comunicador do utilizador." }), {
         status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: privateJsonHeaders(),
       });
     }
 
     if (!isUsuarioRowConnected(ownRow?.connection_status ?? null, ownRow?.telefone_conectado ?? null)) {
       return new Response(JSON.stringify({ error: "WhatsApp próprio não conectado.", code: "not_connected" }), {
         status: 403,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: privateJsonHeaders(),
       });
     }
 
@@ -152,7 +162,7 @@ Deno.serve(async (req) => {
     if (!action) {
       return new Response(JSON.stringify({ error: "action é obrigatório" }), {
         status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: privateJsonHeaders(),
       });
     }
 
@@ -167,7 +177,7 @@ Deno.serve(async (req) => {
           raw: parsed !== null ? parsed : pack.text,
           chats: normalizeChatsArray(parsed),
         }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        { status: 200, headers: privateJsonHeaders() },
       );
     }
 
@@ -176,7 +186,7 @@ Deno.serve(async (req) => {
       if (!remoteJid) {
         return new Response(JSON.stringify({ error: "remoteJid é obrigatório" }), {
           status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          headers: privateJsonHeaders(),
         });
       }
       const limit = Math.min(Math.max(Number(body.limit) || 80, 1), 200);
@@ -191,7 +201,7 @@ Deno.serve(async (req) => {
           raw: parsed !== null ? parsed : pack.text,
           messages: normalizeMessagesArray(parsed),
         }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        { status: 200, headers: privateJsonHeaders() },
       );
     }
 
@@ -201,7 +211,7 @@ Deno.serve(async (req) => {
       if (!text || !num || num.length < 10) {
         return new Response(JSON.stringify({ error: "text e number (E.164) são obrigatórios" }), {
           status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          headers: privateJsonHeaders(),
         });
       }
       const pack = await evolutionPost(root, apiKey, `/message/sendText/${encInst}`, {
@@ -211,7 +221,7 @@ Deno.serve(async (req) => {
       });
       return new Response(JSON.stringify({ httpStatus: pack.status, bodyText: pack.text }), {
         status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: privateJsonHeaders(),
       });
     }
 
@@ -221,7 +231,7 @@ Deno.serve(async (req) => {
       if (!m?.base64 || !m.mimetype || !m.fileName || !m.mediatype || !num || num.length < 10) {
         return new Response(JSON.stringify({ error: "media e number inválidos" }), {
           status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          headers: privateJsonHeaders(),
         });
       }
       const pack = await evolutionPost(root, apiKey, `/message/sendMedia/${encInst}`, {
@@ -234,7 +244,7 @@ Deno.serve(async (req) => {
       });
       return new Response(JSON.stringify({ httpStatus: pack.status, bodyText: pack.text }), {
         status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: privateJsonHeaders(),
       });
     }
 
@@ -244,7 +254,7 @@ Deno.serve(async (req) => {
       if (!audio || !num || num.length < 10) {
         return new Response(JSON.stringify({ error: "audioBase64 e number são obrigatórios" }), {
           status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          headers: privateJsonHeaders(),
         });
       }
       const pack = await evolutionPost(root, apiKey, `/message/sendWhatsAppAudio/${encInst}`, {
@@ -254,7 +264,7 @@ Deno.serve(async (req) => {
       });
       return new Response(JSON.stringify({ httpStatus: pack.status, bodyText: pack.text }), {
         status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: privateJsonHeaders(),
       });
     }
 
@@ -266,7 +276,7 @@ Deno.serve(async (req) => {
       if (!remoteJid || !messageId) {
         return new Response(JSON.stringify({ error: "remoteJid e messageId são obrigatórios" }), {
           status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          headers: privateJsonHeaders(),
         });
       }
       if (!fromMe) {
@@ -277,7 +287,7 @@ Deno.serve(async (req) => {
           }),
           {
             status: 400,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
+            headers: privateJsonHeaders(),
           },
         );
       }
@@ -292,19 +302,19 @@ Deno.serve(async (req) => {
       const pack = await evolutionDeleteJson(root, apiKey, `/chat/deleteMessageForEveryone/${encInst}`, payload);
       return new Response(JSON.stringify({ httpStatus: pack.status, bodyText: pack.text }), {
         status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: privateJsonHeaders(),
       });
     }
 
     return new Response(JSON.stringify({ error: "action desconhecido" }), {
       status: 400,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: privateJsonHeaders(),
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     return new Response(JSON.stringify({ error: msg }), {
       status: 400,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: privateJsonHeaders(),
     });
   }
 });

@@ -4,6 +4,7 @@ import { useActivePage } from "@/contexts/ActivePageContext";
 import { isOwnEvolutionConnected } from "@/lib/evolutionConnection";
 import { inboxFetchChats, inboxDeleteForEveryone, inboxFetchMessages, inboxSendAudio, inboxSendMedia, inboxSendText } from "@/lib/evolutionInboxApi";
 import { normalizeEvolutionChatRow, normalizeEvolutionMessageRow, type UiMsg } from "@/lib/evolutionInboxParse";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -150,6 +151,20 @@ export default function WhatsAppInboxPage() {
   useEffect(() => {
     setHiddenIds(loadHiddenMessageIds(activeJid));
   }, [activeJid]);
+
+  /** Nunca reutilizar chats de outra conta na mesma tab: limpa ao terminar sessão. */
+  useEffect(() => {
+    const { data } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "SIGNED_OUT" || !session) {
+        setChats([]);
+        setMessages([]);
+        setActiveJid(null);
+        setHiddenIds([]);
+        setEveryoneConfirmMsg(null);
+      }
+    });
+    return () => data.subscription.unsubscribe();
+  }, []);
 
   const hideMessageForMeLocally = useCallback(
     (m: UiMsg) => {
