@@ -34,7 +34,6 @@ import { useActivePage } from "@/contexts/ActivePageContext";
 import { persistNetworkHighlightDismissed } from "@/lib/networkNacionalPrefs";
 import { usePainelMotoristaEvolutionAtivo } from "@/hooks/usePainelMotoristaEvolutionAtivo";
 import { useComunicadoresEvolution } from "@/hooks/useComunicadoresEvolution";
-import { isOwnEvolutionConnected } from "@/lib/evolutionConnection";
 import { useUserPlan } from "@/hooks/useUserPlan";
 import { sidebarPlanBadgeLabel } from "@/lib/painelPlanPolicy";
 import PainelZoomHeaderButton from "@/components/painel/PainelZoomHeaderButton";
@@ -203,10 +202,9 @@ export function AppSidebar() {
   const [networkAceito, setNetworkAceito] = useState(() => localStorage.getItem("network_nacional_aceito") === "sim");
   const [showNetworkHighlight, setShowNetworkHighlight] = useState(readNetworkSpotlightHighlight);
   const { painelMotoristaEvolutionAtivo, ready: painelComunicadorReady } = usePainelMotoristaEvolutionAtivo();
-  const { own: evolutionUsuarioRow, loading: evolutionUsuarioLoading } = useComunicadoresEvolution();
+  const { loading: evolutionUsuarioLoading } = useComunicadoresEvolution();
   const exibirComunicadorMotorista = !painelComunicadorReady || painelMotoristaEvolutionAtivo;
-  const exibirWhatsAppInboxMenu =
-    exibirComunicadorMotorista && !evolutionUsuarioLoading && isOwnEvolutionConnected(evolutionUsuarioRow);
+  const exibirWhatsAppInboxMenu = exibirComunicadorMotorista && !evolutionUsuarioLoading;
   const { plano, loading: planLoading } = useUserPlan();
   const badgeForPage = (page: string) => (planLoading ? null : sidebarPlanBadgeLabel(plano, page));
   const mostrarBadgePlano = (page: string) => badgeForPage(page) !== null;

@@ -50,7 +50,6 @@ import {
 import { cn } from "@/lib/utils";
 import { usePainelMotoristaEvolutionAtivo } from "@/hooks/usePainelMotoristaEvolutionAtivo";
 import { useComunicadoresEvolution } from "@/hooks/useComunicadoresEvolution";
-import { isOwnEvolutionConnected } from "@/lib/evolutionConnection";
 
 type ToolDef = { title: string; page: string; desc: string; icon: LucideIcon };
 
@@ -156,7 +155,7 @@ function buildHomeSections(
               {
                 title: "WhatsApp",
                 page: "whatsapp",
-                desc: "Conversas do seu número (após ligar o QR).",
+                desc: "Chats após ligar o QR em Sistema → Comunicador.",
                 icon: MessageCircle,
               } as ToolDef,
             ]
@@ -225,10 +224,9 @@ export default function HomePage() {
   const { setActivePage } = useActivePage();
   const onboarding = useMotoristaOnboarding();
   const { painelMotoristaEvolutionAtivo, ready: painelComunicadorReady } = usePainelMotoristaEvolutionAtivo();
-  const { own: evolutionUsuarioOwn, loading: evolutionUsuarioLoading } = useComunicadoresEvolution();
+  const { loading: evolutionUsuarioLoading } = useComunicadoresEvolution();
   const exibirComunicadorMotorista = !painelComunicadorReady || painelMotoristaEvolutionAtivo;
-  const exibirWhatsAppInbox =
-    exibirComunicadorMotorista && !evolutionUsuarioLoading && isOwnEvolutionConnected(evolutionUsuarioOwn);
+  const exibirWhatsAppInbox = exibirComunicadorMotorista && !evolutionUsuarioLoading;
   const [networkAceito, setNetworkAceito] = useState<boolean | null>(null);
   const [mostrarRegras, setMostrarRegras] = useState(false);
   const [menuNetwork, setMenuNetwork] = useState(() => localStorage.getItem("network_nacional_aceito") === "sim");

@@ -34,6 +34,16 @@ export function instanceNameForUser(userId: string): string {
   return `etp-u-${userId.replace(/-/g, "").slice(0, 16)}`;
 }
 
+/**
+ * Apenas utilizadores do painel de frota podem usar a instância Evolution pessoal `etp-u-*`.
+ * `admin_master` não entra aqui para evitar uso cruzado de credenciais de outro utilizador pelo mesmo papel.
+ */
+const MOTORISTA_EVOLUTION_INSTANCE_ROLES = new Set(["admin_transfer", "motorista_executivo"]);
+
+export function hasMotoristaEvolutionInstanceRole(roleRows: Array<{ role: string }>): boolean {
+  return roleRows.some((r) => MOTORISTA_EVOLUTION_INSTANCE_ROLES.has(r.role));
+}
+
 export async function getAuthorizedUserAndCreds(
   authHeader: string,
   supabaseUrl: string,
@@ -63,15 +73,14 @@ export async function getAuthorizedUserAndCreds(
     return { ok: false, status: 500, body: JSON.stringify({ error: "Não foi possível verificar permissões." }) };
   }
 
-  const allowed = (roleRows || []).some((r: { role: string }) =>
-    ["admin_transfer", "admin_master", "motorista_executivo"].includes(r.role),
-  );
-  if (!allowed) {
+  if (!hasMotoristaEvolutionInstanceRole(roleRows || [])) {
     return {
       ok: false,
       status: 403,
       body: JSON.stringify({
-        error: "Apenas motorista executivo ou administrador pode usar esta ação.",
+        error:
+          "Acesso negado: instância WhatsApp própria é só para conta de frota (Motorista Executivo).",
+        code: "evolution_motorista_role_only",
       }),
     };
   }
