@@ -80,7 +80,7 @@ const getMenuStructure = (
         title: "Painel",
         icon: LayoutDashboard,
         children: [
-          { title: "Home", page: "home", icon: Home },
+          { title: "Início", page: "home", icon: Home },
           { title: "Abrangência", page: "abrangencia", icon: MapPin },
           { title: "Agenda", page: "agenda", icon: Calendar },
           { title: "Atualizações", page: "atualizacoes", icon: Bell },

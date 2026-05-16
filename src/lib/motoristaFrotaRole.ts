@@ -22,6 +22,16 @@ export function clearDashboardNavSessionStorage(): void {
   }
 }
 
+/** Garante que o painel do operador abre na página inicial (logo), não num submenu guardado. */
+export function setDashboardNavToHome(): void {
+  if (typeof window === "undefined") return;
+  try {
+    sessionStorage.setItem(DASHBOARD_NAV_STORAGE_KEY, "home");
+  } catch {
+    /* ignore */
+  }
+}
+
 /** Utilizador é motorista da frota (submotorista com portal activado). */
 export async function isMotoristaFrotaUser(userId: string, user?: User | null): Promise<boolean> {
   if (userIsMotoristaFrotaFromMetadata(user)) return true;
