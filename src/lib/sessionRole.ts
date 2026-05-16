@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import {
   clearDashboardNavSessionStorage,
   isMotoristaFrotaUser,
-  setDashboardNavToHome,
+  setDashboardNavToEntrada,
   userIsMotoristaFrotaFromMetadata,
 } from "@/lib/motoristaFrotaRole";
 
@@ -27,13 +27,13 @@ export async function getPostLoginPath(
 
   if (!error && primary) {
     if (primary === "admin_master") return "/admin";
-    setDashboardNavToHome();
+    setDashboardNavToEntrada();
     return "/dashboard";
   }
 
   const { data: rows } = await supabase.from("user_roles").select("role").eq("user_id", userId);
   const roles = rows?.map((r) => r.role) ?? [];
   if (roles.includes("admin_master")) return "/admin";
-  setDashboardNavToHome();
+  setDashboardNavToEntrada();
   return "/dashboard";
 }

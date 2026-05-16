@@ -22,15 +22,21 @@ export function clearDashboardNavSessionStorage(): void {
   }
 }
 
-/** Garante que o painel do operador abre na página inicial (logo), não num submenu guardado. */
-export function setDashboardNavToHome(): void {
+/** Página exibida ao entrar no painel (logo E-Transporte à direita). */
+export const DASHBOARD_ENTRADA_PAGE = "entrada";
+
+/** Garante que o painel do operador abre na tela de entrada, não num submenu guardado. */
+export function setDashboardNavToEntrada(): void {
   if (typeof window === "undefined") return;
   try {
-    sessionStorage.setItem(DASHBOARD_NAV_STORAGE_KEY, "home");
+    sessionStorage.setItem(DASHBOARD_NAV_STORAGE_KEY, DASHBOARD_ENTRADA_PAGE);
   } catch {
     /* ignore */
   }
 }
+
+/** @deprecated Use setDashboardNavToEntrada */
+export const setDashboardNavToHome = setDashboardNavToEntrada;
 
 /** Utilizador é motorista da frota (submotorista com portal activado). */
 export async function isMotoristaFrotaUser(userId: string, user?: User | null): Promise<boolean> {

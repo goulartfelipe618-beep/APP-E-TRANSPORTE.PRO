@@ -26,6 +26,7 @@ import { PainelScaledContent } from "@/components/painel/PainelScaledContent";
 
 // Import all page components
 import HomePage from "@/pages/dashboard/Home";
+import PainelEntradaPage from "@/pages/dashboard/PainelEntradaPage";
 import MetricasPage from "@/pages/dashboard/Metricas";
 import MotoristaAbrangenciaPage from "@/pages/dashboard/MotoristaAbrangencia";
 import TransferSolicitacoesPage from "@/pages/dashboard/TransferSolicitacoes";
@@ -71,6 +72,7 @@ import PainelAvisoBanner from "@/components/PainelAvisoBanner";
 import FullscreenBannerOverlay from "@/components/FullscreenBannerOverlay";
 
 const PAGE_MAP: Record<string, React.ComponentType> = {
+  entrada: PainelEntradaPage,
   home: HomePage,
   atualizacoes: AtualizacoesPage,
   metricas: MetricasPage,
@@ -223,7 +225,7 @@ function DashboardContent() {
   /** Rotas descontinuadas (Catálogo / Google Maps): evita sessão antiga presa numa página removida. */
   useEffect(() => {
     if (activePage === "catalogo" || activePage === "google" || activePage === "whatsapp") {
-      setActivePage("home");
+      setActivePage("entrada");
     }
   }, [activePage, setActivePage]);
 
@@ -276,7 +278,7 @@ function DashboardContent() {
     window.dispatchEvent(new Event("network-highlight-dismissed"));
   };
 
-  const PageComponent = PAGE_MAP[activePage] || HomePage;
+  const PageComponent = PAGE_MAP[activePage] || PainelEntradaPage;
 
   return (
     <NetworkSpotlightProvider active={showOverlay}>
@@ -320,7 +322,7 @@ function DashboardContent() {
 
 export default function DashboardLayout() {
   return (
-    <ActivePageProvider defaultPage="home" storageKey="etp_nav_dashboard">
+    <ActivePageProvider defaultPage="entrada" storageKey="etp_nav_dashboard">
       <PainelContentZoomProvider>
         <SidebarProvider>
           <DashboardContent />
