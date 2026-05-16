@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { RESERVA_STATUS_OPTIONS } from "@/lib/reservaStatus";
 import { Loader2 } from "lucide-react";
 import type { FrotaPortalGrupoReserva, FrotaPortalTransferReserva } from "@/lib/frotaPortalReservations";
+import { formatTransferTipoViagemExibicao } from "@/lib/transferPernaViagem";
 
 type Props = {
   transfer: FrotaPortalTransferReserva | null;
@@ -47,6 +48,14 @@ export default function FrotaReservaDetalheSheet({ transfer, grupo, open, onOpen
               <span className="text-muted-foreground">Reserva: </span>
               <span className="font-medium">#{row.numero_reserva}</span>
             </p>
+            {isTransfer && transfer ? (
+              <p className="text-sm">
+                <span className="text-muted-foreground">Tipo: </span>
+                <span className="font-medium">
+                  {formatTransferTipoViagemExibicao(transfer.tipo_viagem, transfer.perna_viagem)}
+                </span>
+              </p>
+            ) : null}
             <p className="text-sm">
               <span className="text-muted-foreground">Trajeto: </span>
               <span className="font-medium">

@@ -1,4 +1,5 @@
 import { primeiroSegmentoEndereco } from "@/lib/abrangenciaMapHelpers";
+import { isTransferPernaDividida, transferPernaNormalizada } from "@/lib/transferPernaViagem";
 
 export type TransferAgendaReserva = {
   id: string;
@@ -236,8 +237,8 @@ export function buildAgendaItemsPorDiaAtribuidoSomente(
       continue;
     }
 
-    const pernaMeta = (r.perna_viagem ?? "").trim().toLowerCase();
-    if (r.tipo_viagem === "somente_ida" && (pernaMeta === "ida" || pernaMeta === "volta")) {
+    const pernaMeta = transferPernaNormalizada(r.perna_viagem);
+    if (isTransferPernaDividida(r.tipo_viagem, r.perna_viagem) && pernaMeta) {
       const dk = toAgendaDayKey(r.ida_data);
       const labelPerna = pernaMeta === "volta" ? "Volta" : "Ida";
       pushItem(map, dk, {
@@ -372,8 +373,8 @@ export function buildAgendaItemsPorDia(
       continue;
     }
 
-    const pernaMeta = (r.perna_viagem ?? "").trim().toLowerCase();
-    if (r.tipo_viagem === "somente_ida" && (pernaMeta === "ida" || pernaMeta === "volta")) {
+    const pernaMeta = transferPernaNormalizada(r.perna_viagem);
+    if (isTransferPernaDividida(r.tipo_viagem, r.perna_viagem) && pernaMeta) {
       const dk = toAgendaDayKey(r.ida_data);
       const labelPerna = pernaMeta === "volta" ? "Volta" : "Ida";
       pushItem(map, dk, {

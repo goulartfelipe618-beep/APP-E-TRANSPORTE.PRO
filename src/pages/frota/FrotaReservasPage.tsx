@@ -9,17 +9,12 @@ import { badgeToneReservaStatus, labelReservaStatus } from "@/lib/reservaStatus"
 import FrotaReservaDetalheSheet from "@/components/frota/FrotaReservaDetalheSheet";
 import { cn } from "@/lib/utils";
 import { formatDbCalendarDatePtBr } from "@/lib/painelAgendaReservas";
+import { formatTransferTipoViagemExibicao } from "@/lib/transferPernaViagem";
 import {
   listFrotaPortalReservations,
   type FrotaPortalGrupoReserva,
   type FrotaPortalTransferReserva,
 } from "@/lib/frotaPortalReservations";
-
-const tipoLabel: Record<string, string> = {
-  somente_ida: "Somente Ida",
-  ida_volta: "Ida e Volta",
-  por_hora: "Por Hora",
-};
 
 export default function FrotaReservasPage() {
   const [transfers, setTransfers] = useState<FrotaPortalTransferReserva[]>([]);
@@ -114,7 +109,19 @@ export default function FrotaReservasPage() {
                   <TableRow key={r.id}>
                     <TableCell className="font-mono text-sm text-muted-foreground">#{r.numero_reserva}</TableCell>
                     <TableCell>
-                      <Badge variant="secondary">{tipoLabel[r.tipo_viagem ?? ""] || r.tipo_viagem || "—"}</Badge>
+                      <div className="flex flex-wrap items-center gap-1">
+                        <Badge variant="secondary">
+                          {formatTransferTipoViagemExibicao(r.tipo_viagem, r.perna_viagem)}
+                        </Badge>
+                        {(r.perna_viagem === "ida" || r.perna_viagem === "volta") && (
+                          <Badge
+                            variant="outline"
+                            className="border-[#FF6600]/60 text-[#FF6600] dark:border-[#FF6600]/50 dark:text-[#FF6600]"
+                          >
+                            {r.perna_viagem === "volta" ? "VOLTA" : "IDA"}
+                          </Badge>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell className="max-w-[200px] truncate text-sm">
                       {r.ida_embarque && r.ida_desembarque ? `${r.ida_embarque} → ${r.ida_desembarque}` : "—"}

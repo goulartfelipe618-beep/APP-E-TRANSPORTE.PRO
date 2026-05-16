@@ -6,14 +6,14 @@ import { MessageSquare, Download } from "lucide-react";
 import { Tables } from "@/integrations/supabase/types";
 import { badgeToneReservaStatus, labelReservaStatus } from "@/lib/reservaStatus";
 import { formatDbCalendarDatePtBr } from "@/lib/painelAgendaReservas";
+import {
+  formatTransferTipoViagemExibicao,
+  transferMostraTrechoIdaCampos,
+  transferMostraTrechoVoltaCampos,
+  transferSecaoTrajetoTitulo,
+} from "@/lib/transferPernaViagem";
 
 type Reserva = Tables<"reservas_transfer">;
-
-const tipoLabel: Record<string, string> = {
-  somente_ida: "Somente Ida",
-  ida_volta: "Ida e Volta",
-  por_hora: "Por Hora",
-};
 
 interface Props {
   reserva: Reserva | null;
@@ -58,7 +58,10 @@ export default function DetalhesReservaTransferSheet({ reserva, open, onOpenChan
           {/* Viagem */}
           <Section title="Detalhes da Viagem">
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Tipo de Viagem" value={tipoLabel[r.tipo_viagem] || r.tipo_viagem} />
+              <Field
+                label="Tipo de Viagem"
+                value={formatTransferTipoViagemExibicao(r.tipo_viagem, (r as { perna_viagem?: string | null }).perna_viagem)}
+              />
               <Field
                 label="Status"
                 value={<Badge variant={badgeToneReservaStatus(r.status)}>{labelReservaStatus(r.status)}</Badge>}
@@ -67,10 +70,12 @@ export default function DetalhesReservaTransferSheet({ reserva, open, onOpenChan
           </Section>
 
           {/* IDA */}
-          {(r.tipo_viagem === "somente_ida" || r.tipo_viagem === "ida_volta") && (
+          {transferMostraTrechoIdaCampos(r.tipo_viagem, (r as { perna_viagem?: string | null }).perna_viagem) && (
             <>
               <Separator />
-              <Section title="→ Ida">
+              <Section
+                title={transferSecaoTrajetoTitulo(r.tipo_viagem, (r as { perna_viagem?: string | null }).perna_viagem)}
+              >
                 <div className="grid grid-cols-2 gap-3">
                   <Field label="Embarque" value={r.ida_embarque} />
                   <Field label="Desembarque" value={r.ida_desembarque} />
@@ -85,7 +90,7 @@ export default function DetalhesReservaTransferSheet({ reserva, open, onOpenChan
           )}
 
           {/* VOLTA */}
-          {r.tipo_viagem === "ida_volta" && (
+          {transferMostraTrechoVoltaCampos(r.tipo_viagem) && (
             <>
               <Separator />
               <Section title="⇆ Volta">

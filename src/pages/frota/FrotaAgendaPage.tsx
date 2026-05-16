@@ -226,6 +226,11 @@ export default function FrotaAgendaPage() {
                         >
                           {it.numeroLabel}
                         </span>
+                        {(it.perna === "Ida" || it.perna === "Volta") && (
+                          <span className="shrink-0 rounded px-0.5 text-[9px] font-bold uppercase leading-none text-[#FF6600]">
+                            {it.perna}
+                          </span>
+                        )}
                         <span className="min-w-0 flex-1 truncate text-muted-foreground">{it.trajetoResumo}</span>
                         <span className="shrink-0 whitespace-nowrap text-muted-foreground">· {it.horario}</span>
                       </button>
