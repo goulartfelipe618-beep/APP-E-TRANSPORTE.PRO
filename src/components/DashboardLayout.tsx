@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useLayoutEffect } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { Navigate, useLocation, useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { syncPanelThemeForCurrentUser } from "@/lib/panelTheme";
 import { useSlowScrollContainer } from "@/hooks/useSlowScrollContainer";
@@ -15,6 +16,11 @@ import { useMotoristaOnboarding } from "@/hooks/useMotoristaOnboarding";
 import { usePainelErrorReporter } from "@/hooks/usePainelErrorReporter";
 import { useScrollPanelToTop } from "@/hooks/useScrollPanelToTop";
 import { scheduleUserPlanRefetchWithBackoff } from "@/lib/userPlanRefetch";
+import {
+  clearDashboardNavSessionStorage,
+  isMotoristaFrotaUser,
+  userIsMotoristaFrotaFromMetadata,
+} from "@/lib/motoristaFrotaRole";
 import { PainelContentZoomProvider } from "@/contexts/PainelContentZoomContext";
 import { PainelScaledContent } from "@/components/painel/PainelScaledContent";
 
@@ -127,10 +133,39 @@ function DashboardContent() {
   useScrollPanelToTop(activePage, mainRef);
   useSlowScrollContainer(mainRef, activePage === "website");
   const [showOverlay, setShowOverlay] = useState(readNetworkSpotlightActive);
+  const [redirectMotoristaFrota, setRedirectMotoristaFrota] = useState(false);
 
   useLayoutEffect(() => {
     syncPanelThemeForCurrentUser("frota");
   }, []);
+
+  /** Defesa em profundidade: submotorista nunca deve ver o painel do operador (ex.: WhatsApp). */
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!session || cancelled) return;
+      if (userIsMotoristaFrotaFromMetadata(session.user)) {
+        clearDashboardNavSessionStorage();
+        if (!cancelled) setRedirectMotoristaFrota(true);
+        return;
+      }
+      const frota = await isMotoristaFrotaUser(session.user.id, session.user);
+      if (frota && !cancelled) {
+        clearDashboardNavSessionStorage();
+        setRedirectMotoristaFrota(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (redirectMotoristaFrota) {
+    return <Navigate to="/frota" replace />;
+  }
 
   useEffect(() => {
     const sp = new URLSearchParams(location.search);
@@ -180,14 +215,14 @@ function DashboardContent() {
 
   useEffect(() => {
     if (!painelComunicadorReady) return;
-    if (!painelMotoristaEvolutionAtivo && (activePage === "sistema/comunicador" || activePage === "whatsapp")) {
+    if (!painelMotoristaEvolutionAtivo && activePage === "sistema/comunicador") {
       setActivePage("sistema/configuracoes");
     }
   }, [painelComunicadorReady, activePage, painelMotoristaEvolutionAtivo, setActivePage]);
 
   /** Rotas descontinuadas (Catálogo / Google Maps): evita sessão antiga presa numa página removida. */
   useEffect(() => {
-    if (activePage === "catalogo" || activePage === "google") {
+    if (activePage === "catalogo" || activePage === "google" || activePage === "whatsapp") {
       setActivePage("home");
     }
   }, [activePage, setActivePage]);

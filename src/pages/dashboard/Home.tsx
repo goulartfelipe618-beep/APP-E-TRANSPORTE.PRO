@@ -32,7 +32,6 @@ import {
   Inbox,
   Banknote,
   FileBarChart,
-  MessageCircle,
 } from "lucide-react";
 import { useState, useEffect, useMemo, type LucideIcon } from "react";
 import luxuryCar from "@/assets/luxury-car.jpg";
@@ -49,8 +48,6 @@ import {
 } from "@/lib/networkNacionalPrefs";
 import { cn } from "@/lib/utils";
 import { usePainelMotoristaEvolutionAtivo } from "@/hooks/usePainelMotoristaEvolutionAtivo";
-import { useComunicadoresEvolution } from "@/hooks/useComunicadoresEvolution";
-
 type ToolDef = { title: string; page: string; desc: string; icon: LucideIcon };
 
 type Subsection = { title: string; items: ToolDef[] };
@@ -66,7 +63,6 @@ type MajorSection = {
 function buildHomeSections(
   showNetwork: boolean,
   exibirComunicadorMotorista: boolean,
-  exibirWhatsAppInbox: boolean,
 ): MajorSection[] {
   const principal: Subsection[] = [
     {
@@ -150,16 +146,6 @@ function buildHomeSections(
         ...(exibirComunicadorMotorista
           ? [{ title: "Comunicador", page: "sistema/comunicador", desc: "Canal WhatsApp oficial da plataforma.", icon: Monitor } as ToolDef]
           : []),
-        ...(exibirWhatsAppInbox
-          ? [
-              {
-                title: "WhatsApp",
-                page: "whatsapp",
-                desc: "Chats após ligar o QR em Sistema → Comunicador.",
-                icon: MessageCircle,
-              } as ToolDef,
-            ]
-          : []),
       ],
     },
     {
@@ -224,16 +210,14 @@ export default function HomePage() {
   const { setActivePage } = useActivePage();
   const onboarding = useMotoristaOnboarding();
   const { painelMotoristaEvolutionAtivo, ready: painelComunicadorReady } = usePainelMotoristaEvolutionAtivo();
-  const { loading: evolutionUsuarioLoading } = useComunicadoresEvolution();
   const exibirComunicadorMotorista = !painelComunicadorReady || painelMotoristaEvolutionAtivo;
-  const exibirWhatsAppInbox = exibirComunicadorMotorista && !evolutionUsuarioLoading;
   const [networkAceito, setNetworkAceito] = useState<boolean | null>(null);
   const [mostrarRegras, setMostrarRegras] = useState(false);
   const [menuNetwork, setMenuNetwork] = useState(() => localStorage.getItem("network_nacional_aceito") === "sim");
 
   const sections = useMemo(
-    () => buildHomeSections(menuNetwork, exibirComunicadorMotorista, exibirWhatsAppInbox),
-    [menuNetwork, exibirComunicadorMotorista, exibirWhatsAppInbox],
+    () => buildHomeSections(menuNetwork, exibirComunicadorMotorista),
+    [menuNetwork, exibirComunicadorMotorista],
   );
 
   useEffect(() => {

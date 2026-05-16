@@ -37,7 +37,7 @@ export default function ProtectedAdminRoute({ children }: { children: React.Reac
         return;
       }
 
-      const path = await getPostLoginPath(session.user.id);
+      const path = await getPostLoginPath(session.user.id, session.user);
       setAuthorized(path === "/admin");
       setLoading(false);
     };

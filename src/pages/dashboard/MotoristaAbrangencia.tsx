@@ -9,6 +9,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import "leaflet/dist/leaflet.css";
 import { nominatimGeocode, nominatimDelayMs } from "@/lib/nominatimGeocode";
 import { findCoords, primeiroSegmentoEndereco, sleep } from "@/lib/abrangenciaMapHelpers";
+import { grupoVisivelMotoristaExecutivo, transferVisivelMotoristaExecutivo } from "@/lib/painelAgendaReservas";
 import { Tables } from "@/integrations/supabase/types";
 import { toast } from "sonner";
 
@@ -100,20 +101,6 @@ function labelGrupo(r: Tables<"reservas_grupos">): string {
 function cidadeFromEmbarque(embarque: string): string {
   const first = embarque.split(",")[0]?.trim();
   return first && first.length > 0 ? first : "Sem localização";
-}
-
-/** Reserva atribuída ao motorista OU criada por ele sem outro motorista definido. */
-function transferVisivelMotoristaExecutivo(r: Tables<"reservas_transfer">, userId: string): boolean {
-  const mid = (r.motorista_id ?? "").trim();
-  if (mid === userId) return true;
-  if (r.user_id === userId && mid === "") return true;
-  return false;
-}
-
-function grupoVisivelMotoristaExecutivo(r: Tables<"reservas_grupos">, userId: string): boolean {
-  if (r.motorista_id != null && r.motorista_id === userId) return true;
-  if (r.user_id === userId && r.motorista_id == null) return true;
-  return false;
 }
 
 /** Fallback quando a RPC ainda não foi aplicada ou retorna vazio. */

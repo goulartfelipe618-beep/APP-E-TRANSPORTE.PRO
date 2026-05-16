@@ -8,7 +8,6 @@ import UpgradePlanDialog from "@/components/planos/UpgradePlanDialog";
 import PlanTierOpaqueGate from "@/components/planos/PlanTierOpaqueGate";
 import { ComunicadorEvolutionSection } from "@/components/comunicador/ComunicadorEvolutionSection";
 import { useComunicadoresEvolution, qrSrc } from "@/hooks/useComunicadoresEvolution";
-import { useActivePage } from "@/contexts/ActivePageContext";
 import { isOwnEvolutionConnected } from "@/lib/evolutionConnection";
 import { WHATSAPP_OFICIAL_PLATAFORMA_EXIBICAO } from "@/lib/comunicadorOficial";
 import {
@@ -40,7 +39,6 @@ function formatMmSs(ms: number): string {
 }
 
 export default function ComunicadorMotoristaExecutivoPage() {
-  const { setActivePage } = useActivePage();
   const { painelMotoristaEvolutionAtivo, ready: painelComunicadorReady } = usePainelMotoristaEvolutionAtivo();
   const { plano, loading: planLoading } = useUserPlan();
   const { sistema, own, loading, reload, setOwn } = useComunicadoresEvolution();
@@ -153,13 +151,10 @@ export default function ComunicadorMotoristaExecutivoPage() {
         ...(!prevConn ? { inbox_sessao_conectado_em: sessaoIso } : {}),
       });
       wasConnectedRef.current = true;
-      if (qrSession && !prevConn) {
-        setActivePage("whatsapp");
-      }
       await endQrSession({ connected: true });
       toast.success("WhatsApp conectado. Os envios em Comunicar passam a usar o seu número quando estiver ativo.");
     }
-  }, [persistOwnPatch, endQrSession, own?.nome_dispositivo, own?.foto_perfil_url, qrSession, setActivePage]);
+  }, [persistOwnPatch, endQrSession, own?.nome_dispositivo, own?.foto_perfil_url, qrSession]);
 
   trySyncRef.current = trySync;
   endQrSessionRef.current = endQrSession;

@@ -73,12 +73,12 @@ export default function PainelAgendaPage() {
         supabase
           .from("reservas_transfer")
           .select(
-            "id, tipo_viagem, numero_reserva, status, user_id, motorista_id, ida_data, ida_hora, volta_data, volta_hora, por_hora_data, por_hora_hora, ida_embarque, ida_desembarque, volta_embarque, volta_desembarque, por_hora_endereco_inicio, por_hora_ponto_encerramento",
+            "id, tipo_viagem, perna_viagem, numero_reserva, status, user_id, motorista_id, ida_data, ida_hora, volta_data, volta_hora, por_hora_data, por_hora_hora, ida_embarque, ida_desembarque, volta_embarque, volta_desembarque, por_hora_endereco_inicio, por_hora_ponto_encerramento",
           ),
         supabase
           .from("reservas_grupos")
           .select(
-            "id, numero_reserva, status, user_id, motorista_id, data_ida, hora_ida, data_retorno, hora_retorno, embarque, destino",
+            "id, numero_reserva, status, user_id, motorista_id, perna_viagem, data_ida, hora_ida, data_retorno, hora_retorno, embarque, destino",
           ),
       ]);
 
@@ -105,7 +105,7 @@ export default function PainelAgendaPage() {
 
   const itemsByDay = useMemo((): Map<string, AgendaItem[]> => {
     if (!userId) return new Map();
-    return buildAgendaItemsPorDia(transfers, grupos, userId);
+    return buildAgendaItemsPorDia(transfers, grupos);
   }, [transfers, grupos, userId]);
 
   const { y, m } = cursor;
@@ -207,8 +207,8 @@ export default function PainelAgendaPage() {
           </h1>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
             Calendário com as suas <strong className="text-foreground">reservas</strong> (transfer e grupos). Solicitações
-            não aparecem aqui. Os dados respeitam a sua conta (RLS) e o mesmo critério de visibilidade do painel (frota
-            atribuída a si ou criada por si).
+            não aparecem aqui. A lista segue as mesmas regras de acesso da base de dados (RLS) que o menu Reservas:
+            inclui serviços criados na sua conta, com ou sem motorista atribuído.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">

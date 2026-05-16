@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 import { applyThemeForRoute } from "@/lib/panelTheme";
+import { clearDashboardNavSessionStorage } from "@/lib/motoristaFrotaRole";
 import { validateMotoristaPortalPassword } from "@/lib/motoristaPortalPassword";
 import { Loader2 } from "lucide-react";
 
@@ -147,6 +148,7 @@ export default function MotoristaFrotaAcessoPage() {
       }
       const { data: s } = await supabase.auth.getSession();
       if (s.session?.user) applyThemeForRoute("/frota", s.session.user.id);
+      clearDashboardNavSessionStorage();
       toast.success("Conta criada. Bem-vindo!");
       navigate("/frota", { replace: true });
     } finally {
@@ -175,6 +177,7 @@ export default function MotoristaFrotaAcessoPage() {
       }
       const { data: s } = await supabase.auth.getSession();
       if (s.session?.user) applyThemeForRoute("/frota", s.session.user.id);
+      clearDashboardNavSessionStorage();
       navigate("/frota", { replace: true });
     } finally {
       setBusy(false);

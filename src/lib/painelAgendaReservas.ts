@@ -38,17 +38,19 @@ export type GrupoAgendaReserva = {
   destino: string | null;
 };
 
-/** Reserva atribuída ao motorista OU criada por ele sem outro motorista definido (alinhado a Abrangência). */
+/**
+ * Painel do operador (`admin_transfer`): vê todas as reservas da sua conta (`user_id`)
+ * e também entradas onde é o motorista em campo. Isolamento entre contas continua via RLS no Supabase.
+ */
 export function transferVisivelMotoristaExecutivo(r: TransferAgendaReserva, userId: string): boolean {
-  const mid = (r.motorista_id ?? "").trim();
-  if (mid === userId) return true;
-  if (r.user_id === userId && mid === "") return true;
+  if ((r.user_id ?? "").trim() === userId) return true;
+  if ((r.motorista_id ?? "").trim() === userId) return true;
   return false;
 }
 
 export function grupoVisivelMotoristaExecutivo(r: GrupoAgendaReserva, userId: string): boolean {
-  if (r.motorista_id != null && r.motorista_id === userId) return true;
-  if (r.user_id === userId && r.motorista_id == null) return true;
+  if ((r.user_id ?? "").trim() === userId) return true;
+  if ((r.motorista_id ?? "").trim() === userId) return true;
   return false;
 }
 
@@ -340,15 +342,18 @@ export function buildAgendaItemsPorDiaAtribuidoSomente(
   return map;
 }
 
+/**
+ * Agenda do painel principal (admin_transfer): usa **todas** as linhas devolvidas pelo Supabase.
+ * O isolamento por conta é garantido pelas políticas RLS nas tabelas — não duplicar aqui um critério
+ * que possa esconder reservas atribuídas a motorista (`motorista_id` preenchido, `user_id` = dono).
+ */
 export function buildAgendaItemsPorDia(
   transfers: TransferAgendaReserva[],
   grupos: GrupoAgendaReserva[],
-  userId: string,
 ): Map<string, AgendaItem[]> {
   const map = new Map<string, AgendaItem[]>();
 
   for (const r of transfers) {
-    if (!transferVisivelMotoristaExecutivo(r, userId)) continue;
     if (isReservaCanceladaAgenda(r.status)) continue;
     const num = formatNumeroReservaPad(r.numero_reserva);
 
@@ -412,7 +417,6 @@ export function buildAgendaItemsPorDia(
   }
 
   for (const g of grupos) {
-    if (!grupoVisivelMotoristaExecutivo(g, userId)) continue;
     if (isReservaCanceladaAgenda(g.status)) continue;
     const num = formatNumeroReservaPad(g.numero_reserva);
     const traj = trajetoGrupoResumo(g);

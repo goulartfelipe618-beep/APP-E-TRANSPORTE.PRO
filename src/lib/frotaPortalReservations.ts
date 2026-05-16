@@ -7,6 +7,8 @@ export type FrotaPortalTransferReserva = {
   status: string | null;
   motorista_id: string | null;
   tipo_viagem: string | null;
+  /** Ida/volta persistido em duas linhas (`somente_ida` + metadados). */
+  perna_viagem?: string | null;
   ida_data: string | null;
   ida_hora: string | null;
   volta_data: string | null;
@@ -27,6 +29,7 @@ export type FrotaPortalGrupoReserva = {
   numero_reserva: number;
   status: string | null;
   motorista_id: string | null;
+  perna_viagem?: string | null;
   data_ida: string | null;
   hora_ida: string | null;
   data_retorno: string | null;
@@ -66,6 +69,7 @@ function parseReserva(raw: unknown): FrotaPortalReserva | null {
       status: nullableString(r.status),
       motorista_id: nullableString(r.motorista_id),
       tipo_viagem: nullableString(r.tipo_viagem),
+      perna_viagem: nullableString(r.perna_viagem),
       ida_data: nullableString(r.ida_data),
       ida_hora: nullableString(r.ida_hora),
       volta_data: nullableString(r.volta_data),
@@ -87,6 +91,7 @@ function parseReserva(raw: unknown): FrotaPortalReserva | null {
     numero_reserva: reservaNumber(r.numero_reserva),
     status: nullableString(r.status),
     motorista_id: nullableString(r.motorista_id),
+    perna_viagem: nullableString(r.perna_viagem),
     data_ida: nullableString(r.data_ida),
     hora_ida: nullableString(r.hora_ida),
     data_retorno: nullableString(r.data_retorno),

@@ -2,7 +2,11 @@ import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { clearAuthStartedAt, isAuthExpired, readAuthStartedAt, setAuthStartedAt } from "@/lib/authExpiry";
-import { isMotoristaFrotaUser } from "@/lib/motoristaFrotaRole";
+import {
+  clearDashboardNavSessionStorage,
+  isMotoristaFrotaUser,
+  userIsMotoristaFrotaFromMetadata,
+} from "@/lib/motoristaFrotaRole";
 import { sessionRequiresMfaTotpChallenge } from "@/lib/mfaGate";
 
 /**
@@ -50,8 +54,18 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
           return;
         }
 
-        const frota = await isMotoristaFrotaUser(session.user.id);
+        if (userIsMotoristaFrotaFromMetadata(session.user)) {
+          clearDashboardNavSessionStorage();
+          setRedirectFrota(true);
+          setNeedsMfa(false);
+          setAuthenticated(false);
+          setLoading(false);
+          return;
+        }
+
+        const frota = await isMotoristaFrotaUser(session.user.id, session.user);
         if (frota) {
+          clearDashboardNavSessionStorage();
           setRedirectFrota(true);
           setNeedsMfa(false);
           setAuthenticated(false);

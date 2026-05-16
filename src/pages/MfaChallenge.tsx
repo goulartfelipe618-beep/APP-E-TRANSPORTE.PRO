@@ -43,7 +43,7 @@ export default function MfaChallengePage() {
       return;
     }
 
-    const path = await getPostLoginPath(session.user.id);
+    const path = await getPostLoginPath(session.user.id, session.user);
     navigate(path, { replace: true });
   }
 

@@ -36,7 +36,6 @@ export const PAGES_SEM_BADGE_PLANO = new Set<string>([
   "disparador",
   "empty-legs",
   "sistema/comunicador",
-  "whatsapp",
   "network",
   "comunidade",
   "mentoria",

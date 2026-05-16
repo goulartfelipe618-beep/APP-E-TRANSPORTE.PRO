@@ -126,7 +126,7 @@ const Login = () => {
         return;
       }
 
-      const path = await getPostLoginPath(session.user.id);
+      const path = await getPostLoginPath(session.user.id, session.user);
       applyThemeForRoute(path, session.user.id);
       navigate(path, { replace: true });
     };
@@ -223,7 +223,7 @@ const Login = () => {
       passwordRecoveryRef.current = false;
       setPasswordRecovery(false);
       setAuthStartedAt(Date.now());
-      const path = await getPostLoginPath(user.id);
+      const path = await getPostLoginPath(user.id, user);
       applyThemeForRoute(path, user.id);
       try {
         window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}`);
@@ -352,7 +352,7 @@ const Login = () => {
       return;
     }
 
-    const path = await getPostLoginPath(data.user.id);
+    const path = await getPostLoginPath(data.user.id, data.user);
     setLoading(false);
     setAuthStartedAt(Date.now());
     // Aplica o tema do utilizador para a rota de destino antes da navegação,

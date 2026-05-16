@@ -1,13 +1,26 @@
+import type { User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  clearDashboardNavSessionStorage,
+  isMotoristaFrotaUser,
+  userIsMotoristaFrotaFromMetadata,
+} from "@/lib/motoristaFrotaRole";
 
 /** Rota após login/MFA. Usa RPC security definer para não depender de RLS em user_roles. */
-export async function getPostLoginPath(userId: string): Promise<"/admin" | "/dashboard" | "/frota"> {
-  const { data: frotaRow } = await supabase
-    .from("solicitacoes_motoristas")
-    .select("id")
-    .eq("portal_auth_user_id", userId)
-    .maybeSingle();
-  if (frotaRow) return "/frota";
+export async function getPostLoginPath(
+  userId: string,
+  user?: User | null,
+): Promise<"/admin" | "/dashboard" | "/frota"> {
+  if (userIsMotoristaFrotaFromMetadata(user)) {
+    clearDashboardNavSessionStorage();
+    return "/frota";
+  }
+
+  const frotaByDb = await isMotoristaFrotaUser(userId, user);
+  if (frotaByDb) {
+    clearDashboardNavSessionStorage();
+    return "/frota";
+  }
 
   const { data: primary, error } = await supabase.rpc("get_session_primary_role");
 

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { isMotoristaFrotaUser } from "@/lib/motoristaFrotaRole";
+import { isMotoristaFrotaUser, userIsMotoristaFrotaFromMetadata } from "@/lib/motoristaFrotaRole";
 import { clearAuthStartedAt, isAuthExpired, readAuthStartedAt, setAuthStartedAt } from "@/lib/authExpiry";
 
 /**
@@ -37,7 +37,14 @@ export default function ProtectedFrotaRoute({ children }: { children: React.Reac
         return;
       }
 
-      const frota = await isMotoristaFrotaUser(session.user.id);
+      if (userIsMotoristaFrotaFromMetadata(session.user)) {
+        if (!mounted) return;
+        setOk(true);
+        setLoading(false);
+        return;
+      }
+
+      const frota = await isMotoristaFrotaUser(session.user.id, session.user);
       if (!mounted) return;
       setOk(frota);
       setLoading(false);
