@@ -18,6 +18,7 @@ import { toAgendaDayKey } from "@/lib/painelAgendaReservas";
 import { normalizeUserPlano, FREE_MAX_RESERVAS_DIA } from "@/lib/painelPlanPolicy";
 import { calendarDayKeySaoPauloFromIso, todayKeySaoPaulo } from "@/lib/spCalendarBr";
 import { splitAmountInTwoHalves, valorTotalFromBaseDiscount } from "@/lib/reservaIdaVoltaSplit";
+import { logUserActivity } from "@/lib/userActivityLog";
 
 const TIPOS_VEICULO = ["van", "micro_onibus", "onibus"] as const;
 
@@ -474,6 +475,7 @@ export default function CriarReservaGrupoDialog({
         toast.success("Foram criadas 2 reservas de grupo (ida e volta), cada uma com metade do valor e do repasse.");
       } else {
         toast.success(reservaGrupoEdicao?.id ? "Reserva de grupo atualizada com sucesso!" : "Reserva de grupo criada com sucesso!");
+        if (!reservaGrupoEdicao?.id) void logUserActivity("reserva_grupo_criada");
       }
       resetForm();
       onOpenChange(false);

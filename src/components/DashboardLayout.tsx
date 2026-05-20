@@ -23,6 +23,7 @@ import {
 } from "@/lib/motoristaFrotaRole";
 import { PainelContentZoomProvider } from "@/contexts/PainelContentZoomContext";
 import { PainelScaledContent } from "@/components/painel/PainelScaledContent";
+import { logUserActivity } from "@/lib/userActivityLog";
 
 // Import all page components
 import HomePage from "@/pages/dashboard/Home";
@@ -136,6 +137,7 @@ function DashboardContent() {
   useSlowScrollContainer(mainRef, activePage === "website");
   const [showOverlay, setShowOverlay] = useState(readNetworkSpotlightActive);
   const [redirectMotoristaFrota, setRedirectMotoristaFrota] = useState(false);
+  const primeiroAcessoLoggedRef = useRef(false);
 
   useLayoutEffect(() => {
     syncPanelThemeForCurrentUser("frota");
@@ -164,6 +166,13 @@ function DashboardContent() {
       cancelled = true;
     };
   }, []);
+
+  /** Registo único de primeiro acesso ao painel Motorista Executivo (admin_master vê em Usuários → Atividades). */
+  useEffect(() => {
+    if (redirectMotoristaFrota || primeiroAcessoLoggedRef.current) return;
+    primeiroAcessoLoggedRef.current = true;
+    void logUserActivity("primeiro_acesso");
+  }, [redirectMotoristaFrota]);
 
   if (redirectMotoristaFrota) {
     return <Navigate to="/frota" replace />;
@@ -241,6 +250,7 @@ function DashboardContent() {
       return;
     }
     if (phase1CompletePrevRef.current === false && onboarding.phase1Complete) {
+      void logUserActivity("config_iniciais_concluidas");
       try {
         sessionStorage.setItem("etp_nav_dashboard", "home");
       } catch {

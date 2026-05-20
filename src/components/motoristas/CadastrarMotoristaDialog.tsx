@@ -21,6 +21,7 @@ import {
 import { fetchViaCep } from "@/lib/viaCep";
 import { uploadMotoristaFrotaDocs, type MotoristaFrotaDocSlug } from "@/lib/motoristaFrotaStorage";
 import { normalizeUserPlano, FREE_MAX_MOTORISTAS_CADASTRADOS } from "@/lib/painelPlanPolicy";
+import { logUserActivity } from "@/lib/userActivityLog";
 
 const CNH_CATEGORIAS = ["A", "ACC", "B", "C", "D", "E", "AB", "AD", "AE"] as const;
 
@@ -601,6 +602,7 @@ export default function CadastrarMotoristaDialog({ open, onOpenChange, onCreated
         : "Motorista salvo e disponível na sua lista.",
       { duration: 12_000 },
     );
+    void logUserActivity("motorista_cadastrado");
     setSaving(false);
     onOpenChange(false);
     onCreated?.();

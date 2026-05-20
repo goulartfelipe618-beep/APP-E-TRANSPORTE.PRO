@@ -13,6 +13,7 @@ import type { Json } from "@/integrations/supabase/types";
 import { assertUploadMagicBytes, extensionForDetectedMime } from "@/lib/validateUploadMagicBytes";
 import { validateVehicleCoverDimensions, VEHICLE_COVER_DIMENSIONS } from "@/lib/validateVehicleCoverDimensions";
 import { cn } from "@/lib/utils";
+import { logUserActivity } from "@/lib/userActivityLog";
 
 type Props = {
   open: boolean;
@@ -372,6 +373,7 @@ export default function CadastrarVeiculoDialog({ open, onOpenChange, veiculoId =
         });
         if (error) throw new Error(error.message);
         toast.success("Veículo cadastrado com sucesso.");
+        void logUserActivity("veiculo_cadastrado");
       }
 
       onOpenChange(false);

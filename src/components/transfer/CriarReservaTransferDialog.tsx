@@ -18,6 +18,7 @@ import { toAgendaDayKey } from "@/lib/painelAgendaReservas";
 import { normalizeUserPlano, FREE_MAX_RESERVAS_DIA } from "@/lib/painelPlanPolicy";
 import { calendarDayKeySaoPauloFromIso, todayKeySaoPaulo } from "@/lib/spCalendarBr";
 import { splitAmountInTwoHalves, valorTotalFromBaseDiscount } from "@/lib/reservaIdaVoltaSplit";
+import { logUserActivity } from "@/lib/userActivityLog";
 
 function toDateInput(v: string | null | undefined): string {
   return toAgendaDayKey(v) ?? "";
@@ -569,6 +570,7 @@ export default function CriarReservaTransferDialog({
         toast.success("Foram criadas 2 reservas (ida e volta), cada uma com metade do valor e do repasse.");
       } else {
         toast.success(reservaEdicao?.id ? "Reserva atualizada com sucesso!" : "Reserva criada com sucesso!");
+        if (!reservaEdicao?.id) void logUserActivity("reserva_transfer_criada");
       }
       resetForm();
       onOpenChange(false);

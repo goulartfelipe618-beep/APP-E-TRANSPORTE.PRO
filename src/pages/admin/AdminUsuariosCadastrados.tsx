@@ -6,7 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Users, Search, RefreshCw, Crown } from "lucide-react";
+import { Plus, Users, Search, RefreshCw, Crown, Activity } from "lucide-react";
+import UserActivityTerminalDialog from "@/components/admin/UserActivityTerminalDialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -52,6 +53,8 @@ export default function AdminUsuariosCadastrados() {
   const [creating, setCreating] = useState(false);
   const [updatingPlan, setUpdatingPlan] = useState(false);
   const [allowMercadoPagoSync, setAllowMercadoPagoSync] = useState(true);
+  const [activityDialogOpen, setActivityDialogOpen] = useState(false);
+  const [activityUser, setActivityUser] = useState<UserItem | null>(null);
 
   const fetchUsers = useCallback(async () => {
     setLoading(true);
@@ -140,6 +143,11 @@ export default function AdminUsuariosCadastrados() {
       fetchUsers();
     }
     setCreating(false);
+  };
+
+  const handleOpenActivityDialog = (user: UserItem) => {
+    setActivityUser(user);
+    setActivityDialogOpen(true);
   };
 
   const handleOpenPlanDialog = (user: UserItem) => {
@@ -233,7 +241,7 @@ export default function AdminUsuariosCadastrados() {
               <TableHead>Função</TableHead>
               <TableHead>Plano</TableHead>
               <TableHead>Data de Cadastro</TableHead>
-              <TableHead className="w-20 text-right">Ações</TableHead>
+              <TableHead className="w-28 text-right">Ações</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -278,9 +286,20 @@ export default function AdminUsuariosCadastrados() {
                 </TableCell>
                 <TableCell className="text-right">
                   {u.role !== "admin_master" ? (
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={() => handleOpenPlanDialog(u)} title="Alterar plano">
-                      <Crown className="h-4 w-4" />
-                    </Button>
+                    <div className="flex items-center justify-end gap-0.5">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-[#FF6600] hover:text-[#FF6600]"
+                        onClick={() => handleOpenActivityDialog(u)}
+                        title="Atividades do utilizador"
+                      >
+                        <Activity className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={() => handleOpenPlanDialog(u)} title="Alterar plano">
+                        <Crown className="h-4 w-4" />
+                      </Button>
+                    </div>
                   ) : (
                     <span className="text-xs text-muted-foreground pr-2">Protegido</span>
                   )}
@@ -355,6 +374,13 @@ export default function AdminUsuariosCadastrados() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <UserActivityTerminalDialog
+        open={activityDialogOpen}
+        onOpenChange={setActivityDialogOpen}
+        userId={activityUser?.id ?? null}
+        userEmail={activityUser?.email ?? null}
+      />
 
       {/* Change Plan Dialog */}
       <Dialog open={planDialogOpen} onOpenChange={setPlanDialogOpen}>

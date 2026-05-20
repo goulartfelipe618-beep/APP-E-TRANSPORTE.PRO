@@ -13,6 +13,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useConfiguracoes } from "@/contexts/ConfiguracoesContext";
 import type { Tables } from "@/integrations/supabase/types";
+import { logUserActivity } from "@/lib/userActivityLog";
 import {
   buildFooterPayloadFromReserva,
   generateReceptivoTransferPdf,
@@ -125,6 +126,7 @@ export default function NovoReceptivoDialog({ open, onOpenChange, onSaved }: Pro
         toast.error("PDF gerado, mas não foi possível salvar o histórico: " + insErr.message);
       } else {
         toast.success("Receptivo gerado e salvo no histórico");
+        void logUserActivity("receptivo_criado");
       }
 
       reset();
