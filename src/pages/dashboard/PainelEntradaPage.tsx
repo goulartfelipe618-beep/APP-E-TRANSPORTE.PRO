@@ -1,19 +1,15 @@
 import { PLATFORM_LOGO_URL } from "@/lib/painelBrand";
 
-/** Tela exibida ao entrar no painel: apenas a marca E-Transporte, centralizada à direita. */
+/** Tela exibida ao entrar no painel: marca E-Transporte centralizada na área de conteúdo. */
 export default function PainelEntradaPage() {
   return (
-    <div className="flex min-h-[min(72vh,calc(100dvh-12rem))] w-full min-w-0">
-      <div className="hidden min-w-0 flex-1 lg:block" aria-hidden />
-
-      <div className="flex min-w-0 flex-1 items-center justify-center px-6 py-10 sm:px-10 sm:py-14 lg:flex-[0_0_50%] lg:max-w-[50%]">
-        <img
-          src={PLATFORM_LOGO_URL}
-          alt="E-Transporte"
-          className="max-h-[min(68vh,26rem)] w-auto max-w-full object-contain"
-          draggable={false}
-        />
-      </div>
+    <div className="flex min-h-[min(calc(100dvh-8rem),80vh)] w-full min-w-0 items-center justify-center px-6 py-8 sm:px-10 sm:py-12">
+      <img
+        src={PLATFORM_LOGO_URL}
+        alt="E-Transporte"
+        className="mx-auto max-h-[min(60vh,22rem)] w-auto max-w-[min(92vw,28rem)] object-contain"
+        draggable={false}
+      />
     </div>
   );
 }

@@ -21,7 +21,7 @@ import { assertSafeHref } from "@/lib/safeExternalUrl";
 
 interface Solicitacao {
   id: string;
-  user_id: string;
+  user_id: string | null;
   tipo_servico: string;
   status: string;
   dados_solicitacao: any;
@@ -37,6 +37,31 @@ type UserConfigRow = {
   nome_completo: string | null;
   nome_empresa: string | null;
 };
+
+function isWordPressEmbedSolicitacao(dados: Record<string, unknown> | null | undefined): boolean {
+  return dados?.origem === "wordpress_embed";
+}
+
+function solicitacaoUserLabel(
+  s: Solicitacao,
+  userById: Record<string, UserConfigRow>,
+): { nome: string; empresa: string; badge?: string } {
+  const dados = (s.dados_solicitacao || {}) as Record<string, unknown>;
+  if (!s.user_id || isWordPressEmbedSolicitacao(dados)) {
+    const emp = typeof dados.nome_empresa === "string" ? dados.nome_empresa.trim() : "";
+    const resp = typeof dados.responsavel === "string" ? dados.responsavel.trim() : "";
+    return {
+      nome: resp || emp || "Visitante WordPress",
+      empresa: emp || "—",
+      badge: "WordPress",
+    };
+  }
+  const u = userById[s.user_id];
+  return {
+    nome: u?.nome_completo?.trim() || "Sem nome cadastrado",
+    empresa: u?.nome_empresa?.trim() || "—",
+  };
+}
 
 function formatCobrancaEmailBusiness(c: unknown): string {
   if (!c || typeof c !== "object") return "—";
@@ -243,10 +268,12 @@ export default function AdminSolicitacoesServicos() {
     if (filtroStatus !== "all" && s.status !== filtroStatus) return false;
     const q = filtroUsuario.trim().toLowerCase();
     if (q) {
-      const u = userById[s.user_id];
-      const nome = (u?.nome_completo || "").toLowerCase();
-      const emp = (u?.nome_empresa || "").toLowerCase();
-      if (!nome.includes(q) && !emp.includes(q)) return false;
+      const dados = (s.dados_solicitacao || {}) as Record<string, unknown>;
+      const label = solicitacaoUserLabel(s, userById);
+      const nome = label.nome.toLowerCase();
+      const emp = label.empresa.toLowerCase();
+      const embedEmp = typeof dados.nome_empresa === "string" ? dados.nome_empresa.toLowerCase() : "";
+      if (!nome.includes(q) && !emp.includes(q) && !embedEmp.includes(q)) return false;
     }
     return true;
   });
@@ -353,7 +380,7 @@ export default function AdminSolicitacoesServicos() {
                       : s.tipo_servico === "google" && typeof dados.business_title === "string" && dados.business_title.trim()
                         ? dados.business_title.trim()
                         : (dados.dominio || dados.nome_empresa || dados.template || "—");
-                  const u = userById[s.user_id];
+                  const uLabel = solicitacaoUserLabel(s, userById);
                   return (
                     <TableRow key={s.id}>
                       <TableCell>
@@ -364,11 +391,18 @@ export default function AdminSolicitacoesServicos() {
                       </TableCell>
                       <TableCell>
                         <div className="min-w-[10rem] max-w-[14rem]">
-                          <div className="text-sm font-medium text-foreground truncate" title={u?.nome_completo || undefined}>
-                            {u?.nome_completo?.trim() || "Sem nome cadastrado"}
+                          <div className="flex items-center gap-2 min-w-0">
+                            <div className="text-sm font-medium text-foreground truncate" title={uLabel.nome}>
+                              {uLabel.nome}
+                            </div>
+                            {uLabel.badge ? (
+                              <Badge variant="outline" className="shrink-0 text-[10px] px-1.5 py-0 border-[#FF6600]/40 text-[#FF6600]">
+                                {uLabel.badge}
+                              </Badge>
+                            ) : null}
                           </div>
-                          <div className="text-xs text-muted-foreground truncate" title={u?.nome_empresa || undefined}>
-                            {u?.nome_empresa?.trim() || "—"}
+                          <div className="text-xs text-muted-foreground truncate" title={uLabel.empresa}>
+                            {uLabel.empresa}
                           </div>
                         </div>
                       </TableCell>
@@ -412,18 +446,30 @@ export default function AdminSolicitacoesServicos() {
               {selected && (TIPO_LABELS[selected.tipo_servico] || selected.tipo_servico)}
             </SheetTitle>
             {selected && (() => {
-              const uc = userById[selected.user_id];
+              const uc = solicitacaoUserLabel(selected, userById);
+              const dados = (selected.dados_solicitacao || {}) as Record<string, unknown>;
+              const isEmbed = isWordPressEmbedSolicitacao(dados);
               return (
                 <SheetDescription className="text-left space-y-1">
                   <span className="block text-foreground font-medium">
-                    {uc?.nome_completo?.trim() || "Motorista sem nome no cadastro"}
+                    {uc.nome}
+                    {uc.badge ? (
+                      <Badge variant="outline" className="ml-2 text-[10px] border-[#FF6600]/40 text-[#FF6600]">
+                        {uc.badge}
+                      </Badge>
+                    ) : null}
                   </span>
                   <span className="block text-muted-foreground text-xs">
-                    {uc?.nome_empresa?.trim()
-                      ? `Empresa: ${uc.nome_empresa}`
-                      : "Empresa não informada nas configurações"}
+                    {uc.empresa !== "—" ? `Empresa: ${uc.empresa}` : "Empresa não informada"}
                   </span>
-                  <span className="block text-xs text-muted-foreground font-mono pt-1">ID: {selected.user_id}</span>
+                  {isEmbed && typeof dados.email === "string" && dados.email.trim() ? (
+                    <span className="block text-xs text-muted-foreground">E-mail: {dados.email.trim()}</span>
+                  ) : null}
+                  {selected.user_id ? (
+                    <span className="block text-xs text-muted-foreground font-mono pt-1">ID: {selected.user_id}</span>
+                  ) : (
+                    <span className="block text-xs text-muted-foreground pt-1">Origem: widget WordPress (sem conta no painel)</span>
+                  )}
                 </SheetDescription>
               );
             })()}

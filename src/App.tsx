@@ -29,6 +29,7 @@ const MotoristaFrotaAcessoPage = lazy(() => import("./pages/frota/MotoristaFrota
 const FrotaMotoristaLayout = lazy(() => import("./components/FrotaMotoristaLayout"));
 const VerificarMotoristaPage = lazy(() => import("./pages/VerificarMotoristaPage"));
 const MotoristaFrotaDocViewPage = lazy(() => import("./pages/MotoristaFrotaDocViewPage"));
+const WebsiteEmbedPage = lazy(() => import("./pages/embed/WebsiteEmbedPage"));
 
 function RouteFallback() {
   return (
@@ -58,6 +59,7 @@ const App = () => (
             <Route path="/rastreio/:token" element={<RastreioPublico />} />
             <Route path="/frota/acesso/:token" element={<MotoristaFrotaAcessoPage />} />
             <Route path="/verificar-motorista/:token?" element={<VerificarMotoristaPage />} />
+            <Route path="/embed/website" element={<WebsiteEmbedPage />} />
             <Route path="/frota" element={<ProtectedFrotaRoute><FrotaMotoristaLayout /></ProtectedFrotaRoute>} />
             <Route path="/dashboard" element={<ProtectedRoute><DashboardLayout /></ProtectedRoute>} />
             <Route path="/admin" element={<ProtectedAdminRoute><AdminLayout /></ProtectedAdminRoute>} />

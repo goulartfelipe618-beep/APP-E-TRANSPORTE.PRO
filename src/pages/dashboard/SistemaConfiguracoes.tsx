@@ -23,6 +23,7 @@ import MapboxAddressInput from "@/components/mapbox/MapboxAddressInput";
 import { isMapboxConfigured } from "@/lib/mapboxGeocode";
 import { persistNetworkRetornoSolicitado, persistNetworkSair } from "@/lib/networkNacionalPrefs";
 import LoginConfiguracoesSection from "@/pages/dashboard/LoginConfiguracoesSection";
+import WebsiteEmbedSnippetSection from "@/components/admin/WebsiteEmbedSnippetSection";
 import { assertUploadMagicBytes, extensionForDetectedMime } from "@/lib/validateUploadMagicBytes";
 import { validatePainelStrongPassword } from "@/lib/motoristaPortalPassword";
 import { FONTES_GLOBAIS, FONTE_GLOBAL_PADRAO, resolveFonteCss } from "@/lib/fontesGlobais";
@@ -858,6 +859,8 @@ export default function SistemaConfiguracoesPage() {
         <h1 className="text-2xl font-bold text-foreground">Configurações</h1>
         <p className="text-muted-foreground">Configurações gerais do sistema</p>
       </div>
+
+      {isAdminMaster ? <WebsiteEmbedSnippetSection /> : null}
 
       {/* Meu Perfil */}
       <div className="rounded-xl border border-border bg-card p-6 max-w-2xl">

@@ -29,6 +29,10 @@ import {
   REGISTER_NEW_DOMAIN_VALUE,
 } from "@/components/domain/PurchasedDomainSelectStep";
 import { safeHrefForRender, safeMediaSrc, assertHttpsUrlForHref } from "@/lib/safeExternalUrl";
+import {
+  fetchWebsiteEmbedTemplates,
+  submitWebsiteEmbedBriefing,
+} from "@/lib/websiteEmbedApi";
 
 interface TemplateDB {
   id: string;
@@ -197,8 +201,14 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
+type WebsitePageProps = {
+  /** `embed` = widget WordPress público (sem plano, sem domínio obrigatório). */
+  variant?: "panel" | "embed";
+};
+
 // ══════════════════════════════════════════════════════
-export default function WebsitePage() {
+export default function WebsitePage({ variant = "panel" }: WebsitePageProps) {
+  const isEmbed = variant === "embed";
   const { setActivePage } = useActivePage();
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   const [step, setStep] = useState<"gallery" | "domain_pick" | "briefing" | "acompanhamento">("gallery");
@@ -208,6 +218,9 @@ export default function WebsitePage() {
   const [dbTemplates, setDbTemplates] = useState<TemplateDB[]>([]);
   const { plano, loading: planLoading, refetch: refetchPlano } = useUserPlan();
   const [upgradeOpen, setUpgradeOpen] = useState(false);
+  const [embedSubmitted, setEmbedSubmitted] = useState(false);
+  /** E-mail profissional (modo embed — campo livre). */
+  const [embedProfessionalEmail, setEmbedProfessionalEmail] = useState("");
 
   const WEBSITE_PAGE_ID = "website";
   const websiteTierBlocked = !planLoading && !pageAllowedForPlan(plano, WEBSITE_PAGE_ID);
@@ -295,11 +308,20 @@ export default function WebsitePage() {
   // ── Data fetch ─────────────────────────────────────
   useEffect(() => {
     const fetchTemplates = async () => {
+      if (isEmbed) {
+        try {
+          const list = await fetchWebsiteEmbedTemplates();
+          setDbTemplates(list as TemplateDB[]);
+        } catch (e) {
+          toast.error(e instanceof Error ? e.message : "Erro ao carregar templates.");
+        }
+        return;
+      }
       const { data } = await (supabase.from("templates_website" as any).select("*").eq("ativo", true).order("ordem", { ascending: true }) as any);
       if (data) setDbTemplates(data);
     };
-    fetchTemplates();
-  }, []);
+    void fetchTemplates();
+  }, [isEmbed]);
 
   useEffect(() => {
     setPaginas((p) => p.filter((x) => PAGE_OPTIONS.includes(x)));
@@ -367,8 +389,9 @@ export default function WebsitePage() {
   }, []);
 
   useEffect(() => {
+    if (isEmbed) return;
     void refreshWebsiteSolicitacao();
-  }, [refreshWebsiteSolicitacao]);
+  }, [refreshWebsiteSolicitacao, isEmbed]);
 
   useEffect(() => {
     if (step !== "acompanhamento" || !servicoAtivo?.id) return;
@@ -406,10 +429,15 @@ export default function WebsitePage() {
     setSelectedTemplate(templateId);
   };
 
-  /** Após seleção visual na galeria, avança para a etapa de domínio. */
+  /** Após seleção visual na galeria, avança para domínio (painel) ou briefing (embed). */
   const continueWithSelectedTemplate = () => {
     if (!selectedTemplate) {
       toast.error("Selecione um modelo primeiro.");
+      return;
+    }
+    if (isEmbed) {
+      setStep("briefing");
+      setBs(1);
       return;
     }
     if (plano !== "pro") {
@@ -425,7 +453,18 @@ export default function WebsitePage() {
   };
 
   const handleSubmitSolicitacao = async () => {
-    if (!professionalEmailChoice) {
+    const emailForSubmit = isEmbed
+      ? embedProfessionalEmail.trim()
+      : professionalEmailChoice === EMAIL_LATER_VALUE
+        ? ""
+        : professionalEmailChoice;
+
+    if (isEmbed) {
+      if (!emailForSubmit) {
+        toast.error("Preencha o e-mail profissional.");
+        return;
+      }
+    } else if (!professionalEmailChoice) {
       toast.error("Selecione o e-mail profissional ou uma opção da lista.");
       return;
     }
@@ -437,15 +476,119 @@ export default function WebsitePage() {
       toast.error("Envie o arquivo da logo antes de enviar o briefing.");
       return;
     }
-    const linhasCadastroCheck = veiculosSelecionadosIds
-      .map((id) => cadastroVeiculos.find((c) => c.id === id)?.label)
-      .filter((x): x is string => !!x);
+    const linhasCadastroCheck = isEmbed
+      ? []
+      : veiculosSelecionadosIds
+          .map((id) => cadastroVeiculos.find((c) => c.id === id)?.label)
+          .filter((x): x is string => !!x);
     if (linhasCadastroCheck.length === 0 && !veiculos.trim()) {
-      toast.error("Informe ao menos um veículo (cadastro ou descrição) na etapa Frota.");
+      toast.error(
+        isEmbed
+          ? "Informe ao menos um veículo na etapa Frota."
+          : "Informe ao menos um veículo (cadastro ou descrição) na etapa Frota.",
+      );
       return;
     }
 
     setSubmitting(true);
+
+    if (isEmbed) {
+      try {
+        let logoBase64: string | null = null;
+        let logoMime: string | null = null;
+        if (logoChoice === "sim" && logoFile) {
+          try {
+            const { mime } = await assertUploadMagicBytes(logoFile, "raster-or-pdf", 4 * 1024 * 1024);
+            logoMime = mime;
+            logoBase64 = await new Promise<string>((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onload = () => {
+                const result = String(reader.result || "");
+                const idx = result.indexOf(",");
+                resolve(idx >= 0 ? result.slice(idx + 1) : result);
+              };
+              reader.onerror = () => reject(new Error("Falha ao ler logo."));
+              reader.readAsDataURL(logoFile);
+            });
+          } catch (e) {
+            toast.error(e instanceof Error ? e.message : "Logo inválida");
+            setSubmitting(false);
+            return;
+          }
+        }
+
+        const tmpl = dbTemplates.find((t) => t.id === selectedTemplate);
+        const linhasCadastro = veiculos.trim() ? [veiculos.trim()] : [];
+        const veiculosTextoMerged = linhasCadastro.filter(Boolean).join("\n");
+
+        await submitWebsiteEmbedBriefing({
+          dados_solicitacao: {
+            template: selectedTemplateName,
+            template_id: selectedTemplate,
+            template_imagem_url: tmpl?.imagem_url ?? null,
+            dominio: null,
+            sem_dominio: true,
+            origem: "wordpress_embed",
+            possui_dominio: false,
+            nome_empresa: companyName,
+            responsavel,
+            whatsapp,
+            telefone_secundario: telefoneSecundario,
+            email: emailForSubmit,
+            email_profissional_opcao: "informado_no_embed",
+            cnpj,
+            cidade_sede: cidadeSede,
+            regiao_atendida: regiaoAtendida,
+            possui_logo: logoChoice === "sim",
+            sem_logo_arquivo: logoChoice === "nao",
+            cores_preferidas: preferredColors,
+            estilo: desiredStyle,
+            servicos: selectedServices,
+            servico_outro: servicoOutro,
+            aeroportos,
+            rotas_principais: rotas,
+            veiculos: veiculosTextoMerged,
+            veiculos_cadastro_ids: [],
+            amenidades_veiculos: amenidades,
+            diferenciais,
+            diferencial_principal: diferencialPrincipal,
+            publico_alvo: publicoAlvo,
+            faixa_preco: faixaPreco,
+            pagamentos,
+            formas_reserva: formasReserva,
+            redes_sociais: { instagram, facebook, google_business: googleBusiness, tripadvisor: tripAdvisor },
+            idiomas,
+            paginas_site: paginas,
+            palavras_chave_seo: palavrasChave,
+            integracoes,
+            conteudo: {
+              fotos_cidade: temFotosCidade,
+              fotos_veiculos: temFotosVeiculos,
+              fotos_motorista: temFotosMotorista,
+              videos: temVideos,
+            },
+            plataformas,
+            horario_atendimento: horarioAtendimento,
+            depoimentos,
+          },
+          logo_base64: logoBase64,
+          logo_mime: logoMime,
+          referrer: typeof document !== "undefined" ? document.referrer || null : null,
+        });
+
+        toast.success("Briefing enviado com sucesso!");
+        setEmbedSubmitted(true);
+        setStep("gallery");
+        setBs(1);
+        setSelectedTemplate(null);
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Erro ao enviar briefing.");
+      } finally {
+        setSubmitting(false);
+      }
+      return;
+    }
+
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { toast.error("Não autenticado"); setSubmitting(false); return; }
 
@@ -532,6 +675,31 @@ export default function WebsitePage() {
       void refreshWebsiteSolicitacao();
     }
   };
+
+  // ── Embed: confirmação após envio ─────────────────
+  if (isEmbed && embedSubmitted) {
+    return (
+      <div className="min-w-0 space-y-4 text-center py-8 sm:py-12">
+        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-primary/15">
+          <CheckCircle2 className="h-8 w-8 text-primary" />
+        </div>
+        <h1 className="text-2xl font-bold text-foreground">Briefing recebido!</h1>
+        <p className="text-muted-foreground max-w-md mx-auto text-sm sm:text-base">
+          Obrigado. Nossa equipe analisará suas informações e entrará em contato pelo WhatsApp ou e-mail informado.
+        </p>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => {
+            setEmbedSubmitted(false);
+            setStep("gallery");
+          }}
+        >
+          Escolher outro modelo
+        </Button>
+      </div>
+    );
+  }
 
   // ── Pós-briefing: resumo + mockup (galeria de modelos bloqueada) ──
   if (step === "acompanhamento" && servicoAtivo) {
@@ -734,21 +902,17 @@ export default function WebsitePage() {
 
   // ── Briefing view ──────────────────────────────────
   if (step === "briefing") {
-    return (
-      <>
-        <UpgradePlanDialog open={upgradeOpen} onOpenChange={setUpgradeOpen} />
-        <PlanTierOpaqueGate
-          minimumPlan={websiteTierMinimum}
-          blocked={websiteTierBlocked}
-          title="Website (visualização)"
-          description="Pedidos de site, templates e integração com o seu domínio estão incluídos no plano PRÓ."
-        >
+    const briefingBody = (
         <div className="min-w-0 space-y-6">
           <div>
-            <h1 className="text-2xl font-bold text-foreground">Website — Briefing Completo</h1>
+            <h1 className="text-2xl font-bold text-foreground">
+              {isEmbed ? "Briefing do Website" : "Website — Briefing Completo"}
+            </h1>
             <p className="text-sm text-muted-foreground">
               Modelo escolhido: <span className="font-semibold text-foreground">{selectedTemplateName}</span>
-              <span className="text-muted-foreground"> (definido antes do domínio; após enviar o briefing não será possível trocar o modelo pela galeria)</span>
+              {!isEmbed && (
+                <span className="text-muted-foreground"> (definido antes do domínio; após enviar o briefing não será possível trocar o modelo pela galeria)</span>
+              )}
             </p>
           </div>
 
@@ -769,12 +933,14 @@ export default function WebsitePage() {
             <div className="rounded-xl border border-border bg-card p-8 space-y-0">
               <div className="space-y-4">
                 <h2 className="text-lg font-bold text-foreground">🏷️ Marca</h2>
-                <p className="text-sm text-muted-foreground -mt-2">
-                  Domínio do site: <span className="font-medium text-foreground">{domain || "—"}</span>{" "}
-                  <button type="button" onClick={() => setStep("domain_pick")} className="text-primary hover:underline">
-                    Alterar domínio
-                  </button>
-                </p>
+                {!isEmbed && (
+                  <p className="text-sm text-muted-foreground -mt-2">
+                    Domínio do site: <span className="font-medium text-foreground">{domain || "—"}</span>{" "}
+                    <button type="button" onClick={() => setStep("domain_pick")} className="text-primary hover:underline">
+                      Alterar domínio
+                    </button>
+                  </p>
+                )}
                 <div className="space-y-3">
                   <Label className="text-sm font-medium text-foreground">Possui logotipo? *</Label>
                   <RadioGroup
@@ -854,35 +1020,52 @@ export default function WebsitePage() {
                 <div><label className="text-sm font-medium text-foreground">Telefone secundário</label><Input value={telefoneSecundario} onChange={e => setTelefoneSecundario(e.target.value)} className="mt-1" /></div>
                 <div className="md:col-span-2">
                   <label className="text-sm font-medium text-foreground">E-mail profissional *</label>
-                  <p className="text-xs text-muted-foreground mt-0.5 mb-1.5">
-                    Lista dos e-mails solicitados em Ferramentas → E-mail Business. Você também pode cadastrar depois ou abrir o fluxo de cadastro.
-                  </p>
-                  <Select
-                    value={professionalEmailChoice || undefined}
-                    onValueChange={(v) => {
-                      if (v === EMAIL_REGISTER_VALUE) {
-                        setActivePage("email-business");
-                        toast.message("E-mail Business", {
-                          description: "Após cadastrar, volte ao Website e atualize esta lista (reabra o passo ou a página).",
-                        });
-                        return;
-                      }
-                      setProfessionalEmailChoice(v);
-                    }}
-                  >
-                    <SelectTrigger className="mt-1 w-full max-w-xl">
-                      <SelectValue placeholder="Selecione um e-mail ou uma opção…" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {emailBusinessEmails.map((em) => (
-                        <SelectItem key={em} value={em}>
-                          {em}
-                        </SelectItem>
-                      ))}
-                      <SelectItem value={EMAIL_REGISTER_VALUE}>Cadastrar E-mail Business…</SelectItem>
-                      <SelectItem value={EMAIL_LATER_VALUE}>Vou cadastrar depois</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  {isEmbed ? (
+                    <>
+                      <p className="text-xs text-muted-foreground mt-0.5 mb-1.5">
+                        Informe o e-mail que deseja utilizar no site (não é necessário domínio próprio neste fluxo).
+                      </p>
+                      <Input
+                        type="email"
+                        value={embedProfessionalEmail}
+                        onChange={(e) => setEmbedProfessionalEmail(e.target.value)}
+                        placeholder="contato@suaempresa.com.br"
+                        className="mt-1 max-w-xl"
+                      />
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-xs text-muted-foreground mt-0.5 mb-1.5">
+                        Lista dos e-mails solicitados em Ferramentas → E-mail Business. Você também pode cadastrar depois ou abrir o fluxo de cadastro.
+                      </p>
+                      <Select
+                        value={professionalEmailChoice || undefined}
+                        onValueChange={(v) => {
+                          if (v === EMAIL_REGISTER_VALUE) {
+                            setActivePage("email-business");
+                            toast.message("E-mail Business", {
+                              description: "Após cadastrar, volte ao Website e atualize esta lista (reabra o passo ou a página).",
+                            });
+                            return;
+                          }
+                          setProfessionalEmailChoice(v);
+                        }}
+                      >
+                        <SelectTrigger className="mt-1 w-full max-w-xl">
+                          <SelectValue placeholder="Selecione um e-mail ou uma opção…" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {emailBusinessEmails.map((em) => (
+                            <SelectItem key={em} value={em}>
+                              {em}
+                            </SelectItem>
+                          ))}
+                          <SelectItem value={EMAIL_REGISTER_VALUE}>Cadastrar E-mail Business…</SelectItem>
+                          <SelectItem value={EMAIL_LATER_VALUE}>Vou cadastrar depois</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </>
+                  )}
                 </div>
                 <div><label className="text-sm font-medium text-foreground">CNPJ (opcional)</label><Input value={cnpj} onChange={e => setCnpj(e.target.value)} className="mt-1" /></div>
                 <div><label className="text-sm font-medium text-foreground">Cidade sede *</label><Input value={cidadeSede} onChange={e => setCidadeSede(e.target.value)} className="mt-1" /></div>
@@ -917,6 +1100,7 @@ export default function WebsitePage() {
           {/* ── STEP 5: Frota ── */}
           {bs === 5 && (
             <Section title="🚘 Frota de Veículos">
+              {!isEmbed && (
               <div className="space-y-3">
                 <label className="text-sm font-medium text-foreground">Veículos já cadastrados (Motoristas → Cadastros)</label>
                 <p className="text-xs text-muted-foreground">
@@ -952,10 +1136,15 @@ export default function WebsitePage() {
                   </div>
                 )}
               </div>
+              )}
               <div>
-                <label className="text-sm font-medium text-foreground">Descrição adicional / outros veículos</label>
+                <label className="text-sm font-medium text-foreground">
+                  {isEmbed ? "Descreva sua frota *" : "Descrição adicional / outros veículos"}
+                </label>
                 <Textarea value={veiculos} onChange={e => setVeiculos(e.target.value)} placeholder="Toyota Corolla 2024 — 4 passageiros, 3 malas&#10;Spin 2023 — 6 passageiros, 5 malas" rows={5} className="mt-1" />
-                <p className="text-xs text-muted-foreground mt-1">Use este campo para complementar ou incluir veículos que ainda não estão no cadastro.</p>
+                {!isEmbed && (
+                  <p className="text-xs text-muted-foreground mt-1">Use este campo para complementar ou incluir veículos que ainda não estão no cadastro.</p>
+                )}
               </div>
               <div>
                 <label className="text-sm font-medium text-foreground">Comodidades dos veículos</label>
@@ -1084,15 +1273,17 @@ export default function WebsitePage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
                 {[
                   ["Modelo", selectedTemplateName],
-                  ["Domínio", domain || "—"],
+                  ...(isEmbed ? [] : [["Domínio", domain || "—"] as [string, string]]),
                   ["Empresa", companyName || "—"],
                   ["Responsável", responsavel || "—"],
                   ["WhatsApp", whatsapp || "—"],
                   [
                     "E-mail profissional",
-                    professionalEmailChoice === EMAIL_LATER_VALUE
-                      ? "Vou cadastrar depois"
-                      : professionalEmailChoice || "—",
+                    isEmbed
+                      ? embedProfessionalEmail || "—"
+                      : professionalEmailChoice === EMAIL_LATER_VALUE
+                        ? "Vou cadastrar depois"
+                        : professionalEmailChoice || "—",
                   ],
                   ["Cidade sede", cidadeSede || "—"],
                   ["Região", regiaoAtendida || "—"],
@@ -1118,18 +1309,18 @@ export default function WebsitePage() {
           {/* Navigation */}
           <div className="flex items-center justify-between pt-4">
             <Button variant="outline" onClick={() => {
-              if (bs === 1) setStep("domain_pick"); else setBs(s => s - 1);
+              if (bs === 1) setStep(isEmbed ? "gallery" : "domain_pick"); else setBs(s => s - 1);
             }}>
               <ArrowLeft className="h-4 w-4 mr-2" /> Voltar
             </Button>
             <span className="text-xs text-muted-foreground">{bs} de {STEPS.length}</span>
             <Button onClick={() => {
               if (bs === 1) {
-                if (!domain.trim()) {
+                if (!isEmbed && !domain.trim()) {
                   toast.error("Volte à etapa anterior e selecione um domínio.");
                   return;
                 }
-                if (plano !== "pro") {
+                if (!isEmbed && plano !== "pro") {
                   setUpgradeOpen(true);
                   return;
                 }
@@ -1145,7 +1336,9 @@ export default function WebsitePage() {
               if (bs === 2) {
                 if (!companyName.trim()) { toast.error("Preencha o nome da empresa."); return; }
                 if (!whatsapp.trim()) { toast.error("Preencha o WhatsApp."); return; }
-                if (!professionalEmailChoice) {
+                if (isEmbed) {
+                  if (!embedProfessionalEmail.trim()) { toast.error("Preencha o e-mail profissional."); return; }
+                } else if (!professionalEmailChoice) {
                   toast.error("Selecione o e-mail profissional ou uma das opções da lista.");
                   return;
                 }
@@ -1153,7 +1346,12 @@ export default function WebsitePage() {
                 if (!regiaoAtendida.trim()) { toast.error("Preencha a região atendida."); return; }
               }
               if (bs === 5) {
-                if (veiculosSelecionadosIds.length === 0 && !veiculos.trim()) {
+                if (isEmbed) {
+                  if (!veiculos.trim()) {
+                    toast.error("Descreva ao menos um veículo na frota.");
+                    return;
+                  }
+                } else if (veiculosSelecionadosIds.length === 0 && !veiculos.trim()) {
                   toast.error("Selecione ao menos um veículo cadastrado ou descreva a frota no campo de texto.");
                   return;
                 }
@@ -1165,45 +1363,59 @@ export default function WebsitePage() {
             </Button>
           </div>
         </div>
+    );
+
+    if (isEmbed) {
+      return briefingBody;
+    }
+
+    return (
+      <>
+        <UpgradePlanDialog open={upgradeOpen} onOpenChange={setUpgradeOpen} />
+        <PlanTierOpaqueGate
+          minimumPlan={websiteTierMinimum}
+          blocked={websiteTierBlocked}
+          title="Website (visualização)"
+          description="Pedidos de site, templates e integração com o seu domínio estão incluídos no plano PRÓ."
+        >
+          {briefingBody}
         </PlanTierOpaqueGate>
       </>
     );
   }
 
   // ── Gallery view ───────────────────────────────────
-  return (
-    <>
-      <UpgradePlanDialog open={upgradeOpen} onOpenChange={setUpgradeOpen} />
-      <PlanTierOpaqueGate
-        minimumPlan={websiteTierMinimum}
-        blocked={websiteTierBlocked}
-        title="Website (visualização)"
-        description="Pedidos de site, templates e integração com o seu domínio estão incluídos no plano PRÓ."
-      >
+  const galleryBody = (
     <div className="min-w-0 space-y-6">
-      <SlideCarousel pagina="website" breakoutTop fallbackSlides={[
-        { titulo: "Crie Seu Site Profissional", subtitulo: "Design premium e responsivo para transporte executivo." },
-        { titulo: "Templates Exclusivos", subtitulo: "Modelos desenvolvidos para o segmento de transporte." },
-      ]} />
+      {!isEmbed && (
+        <SlideCarousel pagina="website" breakoutTop fallbackSlides={[
+          { titulo: "Crie Seu Site Profissional", subtitulo: "Design premium e responsivo para transporte executivo." },
+          { titulo: "Templates Exclusivos", subtitulo: "Modelos desenvolvidos para o segmento de transporte." },
+        ]} />
+      )}
       <div>
         <h1 className="text-2xl font-bold text-foreground">Website</h1>
-        <p className="text-muted-foreground">Escolha o modelo ideal para o seu site profissional.</p>
+        <p className="text-muted-foreground">
+          {isEmbed
+            ? "Escolha o modelo ideal e preencha o briefing — domínio próprio não é obrigatório neste fluxo."
+            : "Escolha o modelo ideal para o seu site profissional."}
+        </p>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
         {dbTemplates.map((t) => {
           const isSelected = selectedTemplate === t.id;
           const tmplImg = safeMediaSrc(t.imagem_url);
           const modeloHref = assertHttpsUrlForHref(t.link_modelo);
           return (
-            <div key={t.id} className="flex flex-col">
+            <div key={t.id} className="flex flex-col min-w-0">
               <div
                 className={cn(
-                  "rounded-xl h-48 relative overflow-hidden border bg-muted group text-left w-full p-0",
+                  "rounded-xl h-44 sm:h-48 relative overflow-hidden border bg-muted group text-left w-full p-0",
                   isSelected ? "ring-2 ring-primary" : "border-border",
                 )}
               >
                 {tmplImg ? (
-                  <img src={tmplImg} alt={t.nome} className="w-full object-cover object-top transition-transform duration-[120s] ease-linear group-hover:translate-y-[calc(-100%+12rem)]" style={{ minHeight: "200%" }} />
+                  <img src={tmplImg} alt={t.nome} className="w-full object-cover object-top transition-transform duration-[120s] ease-linear group-hover:translate-y-[calc(-100%+12rem)] max-sm:group-active:translate-y-[calc(-100%+11rem)]" style={{ minHeight: "200%" }} />
                 ) : (
                   <div className="h-full flex items-center justify-center text-muted-foreground">Sem imagem</div>
                 )}
@@ -1235,7 +1447,7 @@ export default function WebsitePage() {
       </div>
 
       {selectedTemplate && dbTemplates.length > 0 && (
-        <div className="sticky bottom-0 z-10 flex flex-col items-center gap-2 border-t border-border bg-background/95 py-4 backdrop-blur supports-[backdrop-filter]:bg-background/80 -mx-4 px-4 sm:-mx-6 sm:px-6">
+        <div className="sticky bottom-0 z-10 flex flex-col items-center gap-2 border-t border-border bg-background/95 py-4 backdrop-blur supports-[backdrop-filter]:bg-background/80 -mx-3 px-3 sm:-mx-6 sm:px-6">
           <p className="text-center text-sm text-muted-foreground">
             Modelo: <span className="font-medium text-foreground">{selectedTemplateName}</span>
           </p>
@@ -1248,6 +1460,22 @@ export default function WebsitePage() {
 
       {dbTemplates.length === 0 && <div className="text-center py-12 text-muted-foreground">Nenhum template disponível no momento.</div>}
     </div>
+  );
+
+  if (isEmbed) {
+    return galleryBody;
+  }
+
+  return (
+    <>
+      <UpgradePlanDialog open={upgradeOpen} onOpenChange={setUpgradeOpen} />
+      <PlanTierOpaqueGate
+        minimumPlan={websiteTierMinimum}
+        blocked={websiteTierBlocked}
+        title="Website (visualização)"
+        description="Pedidos de site, templates e integração com o seu domínio estão incluídos no plano PRÓ."
+      >
+        {galleryBody}
       </PlanTierOpaqueGate>
     </>
   );

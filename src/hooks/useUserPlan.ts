@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useSyncExternalStore } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import {
   normalizeUserPlano as normalizePlano,
@@ -6,6 +6,12 @@ import {
   type PlanType,
 } from "@/lib/painelPlanPolicy";
 import { USER_PLAN_REFETCH_EVENT } from "@/lib/userPlanRefetch";
+import {
+  clearUserPlanCache,
+  getUserPlanCache,
+  isUserPlanCacheReadyFor,
+  setUserPlanCache,
+} from "@/lib/userPlanCache";
 
 export type { PlanType };
 
@@ -40,27 +46,80 @@ export function normalizeUserPlano(raw: string | null | undefined): PlanType {
   return normalizePlano(raw);
 }
 
+type Listener = () => void;
+const listeners = new Set<Listener>();
+let inflight: Promise<void> | null = null;
+
+function emitPlanChange() {
+  listeners.forEach((l) => l());
+}
+
+function subscribePlan(listener: Listener) {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+}
+
+function readCachedPlano(): PlanType {
+  return getUserPlanCache()?.plano ?? "free";
+}
+
+function readCachedLoading(): boolean {
+  return !getUserPlanCache();
+}
+
+async function fetchPlanIntoCache(): Promise<void> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user?.id) {
+    clearUserPlanCache();
+    return;
+  }
+  const { data } = await supabase.from("user_plans").select("plano").eq("user_id", user.id).maybeSingle();
+  setUserPlanCache(user.id, normalizePlano(data?.plano));
+}
+
 export function useUserPlan() {
-  const [plano, setPlano] = useState<PlanType>("free");
-  const [loading, setLoading] = useState(true);
+  const plano = useSyncExternalStore(subscribePlan, readCachedPlano, () => "free" as PlanType);
+  const loading = useSyncExternalStore(subscribePlan, readCachedLoading, () => true);
 
   const refetch = useCallback(async () => {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
-      setPlano("free");
-      setLoading(false);
-      return;
-    }
-    const { data } = await supabase.from("user_plans").select("plano").eq("user_id", user.id).maybeSingle();
-    setPlano(normalizePlano(data?.plano));
-    setLoading(false);
+    await fetchPlanIntoCache();
+    emitPlanChange();
   }, []);
 
   useEffect(() => {
-    setLoading(true);
-    void refetch();
+    let cancelled = false;
+
+    void (async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (cancelled) return;
+
+      if (isUserPlanCacheReadyFor(user?.id)) {
+        emitPlanChange();
+        return;
+      }
+
+      if (!inflight) {
+        inflight = fetchPlanIntoCache()
+          .catch(() => {
+            /* mantém último cache ou free */
+          })
+          .finally(() => {
+            inflight = null;
+            emitPlanChange();
+          });
+      } else {
+        await inflight;
+        if (!cancelled) emitPlanChange();
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [refetch]);
 
   useEffect(() => {
@@ -69,6 +128,22 @@ export function useUserPlan() {
     };
     window.addEventListener(USER_PLAN_REFETCH_EVENT, onRefetch);
     return () => window.removeEventListener(USER_PLAN_REFETCH_EVENT, onRefetch);
+  }, [refetch]);
+
+  useEffect(() => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_OUT") {
+        clearUserPlanCache();
+        emitPlanChange();
+        return;
+      }
+      if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED" || event === "USER_UPDATED") {
+        void refetch();
+      }
+    });
+    return () => subscription.unsubscribe();
   }, [refetch]);
 
   /** Plano alterado no servidor (pagamento, webhook ou admin): UI actualiza sem recarregar a página. */

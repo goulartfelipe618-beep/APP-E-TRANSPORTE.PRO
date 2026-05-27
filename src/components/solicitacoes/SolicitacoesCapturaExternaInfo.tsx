@@ -22,8 +22,13 @@ export function SolicitacoesCapturaExternaInfo({ variant = "lista" }: Props) {
   const { plano, loading: planLoading } = useUserPlan();
   const isCampanhasAtivos = variant === "campanhas-ativos";
 
+  /** Evita “piscada” para PRÓ: não renderizar o alerta até o plano estar resolvido. */
+  if (planLoading) {
+    return null;
+  }
+
   /** Conta PRÓ: o bloco é orientação típica de conta FREE; some após upgrade ou alteração pelo admin. */
-  if (!planLoading && plano === "pro") {
+  if (plano === "pro") {
     return null;
   }
 
