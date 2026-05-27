@@ -56,3 +56,7 @@ verify_jwt = false
 # Registo de login falhado (fingerprint SHA-256 do e-mail; sem JWT de sessão).
 [functions.log-auth-login-failure]
 verify_jwt = false
+
+# Widget WordPress: GET templates + POST briefing público (só apikey; sem Bearer no preflight).
+[functions.website-embed-public]
+verify_jwt = false
