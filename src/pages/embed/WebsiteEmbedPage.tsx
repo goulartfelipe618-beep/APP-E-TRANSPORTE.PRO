@@ -6,10 +6,21 @@ function EmbedHeightReporter() {
   const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    document.documentElement.classList.add("etp-embed-website");
+    document.body.classList.add("etp-embed-website");
+    return () => {
+      document.documentElement.classList.remove("etp-embed-website");
+      document.body.classList.remove("etp-embed-website");
+    };
+  }, []);
+
+  useEffect(() => {
     const post = () => {
       const el = rootRef.current;
       if (!el || typeof window.parent === "undefined") return;
-      const height = Math.ceil(el.getBoundingClientRect().height + 24);
+      const height = Math.ceil(
+        Math.max(el.scrollHeight, el.getBoundingClientRect().height) + 32,
+      );
       window.parent.postMessage({ type: "etp-website-embed-height", height }, window.location.origin);
     };
     post();
@@ -25,7 +36,10 @@ function EmbedHeightReporter() {
   }, []);
 
   return (
-    <div ref={rootRef} className="min-h-[720px] w-full max-w-[1400px] mx-auto bg-background text-foreground px-3 py-4 sm:px-6 sm:py-6">
+    <div
+      ref={rootRef}
+      className="etp-website-embed-root w-full max-w-none min-h-0 bg-background text-foreground px-2 py-3 sm:px-4 sm:py-4"
+    >
       <WebsitePage variant="embed" />
     </div>
   );

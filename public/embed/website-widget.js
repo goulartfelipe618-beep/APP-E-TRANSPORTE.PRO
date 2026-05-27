@@ -35,7 +35,7 @@
   iframe.style.maxWidth = "100%";
   iframe.style.border = "0";
   iframe.style.display = "block";
-  iframe.style.minHeight = "720px";
+  iframe.style.minHeight = "400px";
   iframe.style.background = "transparent";
   iframe.style.overflow = "hidden";
 

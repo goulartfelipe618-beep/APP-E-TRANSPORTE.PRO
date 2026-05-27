@@ -118,4 +118,13 @@
     @apply bg-background text-foreground;
     touch-action: manipulation;
   }
+
+  /* Widget WordPress (/embed/website): altura segue o conteúdo; sem scroll interno no iframe */
+  html.etp-embed-website,
+  html.etp-embed-website body,
+  html.etp-embed-website #root {
+    overflow: visible !important;
+    min-height: auto !important;
+    height: auto !important;
+  }
 }

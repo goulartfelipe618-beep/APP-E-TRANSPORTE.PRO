@@ -1386,7 +1386,7 @@ export default function WebsitePage({ variant = "panel" }: WebsitePageProps) {
 
   // ── Gallery view ───────────────────────────────────
   const galleryBody = (
-    <div className="min-w-0 space-y-6">
+    <div className={cn("min-w-0 w-full", isEmbed ? "space-y-4" : "space-y-6")}>
       {!isEmbed && (
         <SlideCarousel pagina="website" breakoutTop fallbackSlides={[
           { titulo: "Crie Seu Site Profissional", subtitulo: "Design premium e responsivo para transporte executivo." },
@@ -1394,14 +1394,21 @@ export default function WebsitePage({ variant = "panel" }: WebsitePageProps) {
         ]} />
       )}
       <div>
-        <h1 className="text-2xl font-bold text-foreground">Website</h1>
-        <p className="text-muted-foreground">
+        <h1 className={cn("font-bold text-foreground", isEmbed ? "text-xl" : "text-2xl")}>Website</h1>
+        <p className={cn("text-muted-foreground", isEmbed && "text-sm")}>
           {isEmbed
             ? "Escolha o modelo ideal e preencha o briefing — domínio próprio não é obrigatório neste fluxo."
             : "Escolha o modelo ideal para o seu site profissional."}
         </p>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
+      <div
+        className={cn(
+          "w-full",
+          isEmbed
+            ? "grid grid-cols-3 gap-2 sm:gap-3"
+            : "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6",
+        )}
+      >
         {dbTemplates.map((t) => {
           const isSelected = selectedTemplate === t.id;
           const tmplImg = safeMediaSrc(t.imagem_url);
@@ -1410,35 +1417,67 @@ export default function WebsitePage({ variant = "panel" }: WebsitePageProps) {
             <div key={t.id} className="flex flex-col min-w-0">
               <div
                 className={cn(
-                  "rounded-xl h-44 sm:h-48 relative overflow-hidden border bg-muted group text-left w-full p-0",
+                  "relative overflow-hidden border bg-muted group text-left w-full p-0",
+                  isEmbed ? "rounded-lg h-24 sm:h-28" : "rounded-xl h-44 sm:h-48",
                   isSelected ? "ring-2 ring-primary" : "border-border",
                 )}
               >
                 {tmplImg ? (
-                  <img src={tmplImg} alt={t.nome} className="w-full object-cover object-top transition-transform duration-[120s] ease-linear group-hover:translate-y-[calc(-100%+12rem)] max-sm:group-active:translate-y-[calc(-100%+11rem)]" style={{ minHeight: "200%" }} />
+                  <img
+                    src={tmplImg}
+                    alt={t.nome}
+                    className={cn(
+                      "w-full object-cover object-top transition-transform ease-linear",
+                      isEmbed
+                        ? "duration-[80s] group-hover:translate-y-[calc(-100%+7rem)]"
+                        : "duration-[120s] group-hover:translate-y-[calc(-100%+12rem)] max-sm:group-active:translate-y-[calc(-100%+11rem)]",
+                    )}
+                    style={{ minHeight: isEmbed ? "160%" : "200%" }}
+                  />
                 ) : (
-                  <div className="h-full flex items-center justify-center text-muted-foreground">Sem imagem</div>
+                  <div className="h-full flex items-center justify-center text-muted-foreground text-xs">Sem imagem</div>
                 )}
-                {isSelected && <div className="absolute top-3 right-3 w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center z-10"><Check className="h-3.5 w-3.5" /></div>}
+                {isSelected && (
+                  <div
+                    className={cn(
+                      "absolute rounded-full bg-primary text-primary-foreground flex items-center justify-center z-10",
+                      isEmbed ? "top-1.5 right-1.5 w-5 h-5" : "top-3 right-3 w-6 h-6",
+                    )}
+                  >
+                    <Check className={isEmbed ? "h-3 w-3" : "h-3.5 w-3.5"} />
+                  </div>
+                )}
               </div>
-              <p className="font-semibold text-foreground mt-3 text-sm">{t.nome}</p>
+              <p className={cn("font-semibold text-foreground", isEmbed ? "mt-1.5 text-[11px] leading-tight line-clamp-2" : "mt-3 text-sm")}>
+                {t.nome}
+              </p>
               {modeloHref && (
                 <a href={modeloHref} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
-                  <Button variant="outline" size="sm" className="mt-2 w-full gap-2"><Eye className="h-4 w-4" /> Ver Modelo</Button>
+                  <Button
+                    variant="outline"
+                    size={isEmbed ? "sm" : "sm"}
+                    className={cn("w-full gap-1", isEmbed ? "mt-1 h-7 text-[10px] px-1" : "mt-2 gap-2")}
+                  >
+                    <Eye className={isEmbed ? "h-3 w-3 shrink-0" : "h-4 w-4"} />
+                    Ver Modelo
+                  </Button>
                 </a>
               )}
               <Button
                 type="button"
                 size="sm"
-                className="mt-2 w-full gap-2"
+                className={cn("w-full", isEmbed ? "mt-1 h-7 text-[10px] px-1 gap-1" : "mt-2 gap-2")}
                 variant={isSelected ? "secondary" : "outline"}
                 disabled={isSelected}
                 onClick={() => selectTemplateOnly(t.id)}
               >
                 {isSelected ? (
-                  <><Check className="h-4 w-4" /> Modelo selecionado</>
+                  <>
+                    <Check className={isEmbed ? "h-3 w-3 shrink-0" : "h-4 w-4"} />
+                    {isEmbed ? "Selecionado" : "Modelo selecionado"}
+                  </>
                 ) : (
-                  "Usar este modelo"
+                  isEmbed ? "Usar" : "Usar este modelo"
                 )}
               </Button>
             </div>
@@ -1447,11 +1486,23 @@ export default function WebsitePage({ variant = "panel" }: WebsitePageProps) {
       </div>
 
       {selectedTemplate && dbTemplates.length > 0 && (
-        <div className="sticky bottom-0 z-10 flex flex-col items-center gap-2 border-t border-border bg-background/95 py-4 backdrop-blur supports-[backdrop-filter]:bg-background/80 -mx-3 px-3 sm:-mx-6 sm:px-6">
+        <div
+          className={cn(
+            "flex flex-col items-center gap-2 border-t border-border py-3 w-full",
+            isEmbed
+              ? "mt-2"
+              : "sticky bottom-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 -mx-3 px-3 sm:-mx-6 sm:px-6 py-4",
+          )}
+        >
           <p className="text-center text-sm text-muted-foreground">
             Modelo: <span className="font-medium text-foreground">{selectedTemplateName}</span>
           </p>
-          <Button type="button" size="lg" className="w-full max-w-md gap-2" onClick={continueWithSelectedTemplate}>
+          <Button
+            type="button"
+            size={isEmbed ? "default" : "lg"}
+            className={cn("w-full gap-2", isEmbed ? "max-w-full" : "max-w-md")}
+            onClick={continueWithSelectedTemplate}
+          >
             Continuar com modelo escolhido
             <ArrowRight className="h-4 w-4" />
           </Button>
