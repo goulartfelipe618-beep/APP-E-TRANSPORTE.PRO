@@ -9,6 +9,7 @@ import { RESERVA_STATUS_OPTIONS } from "@/lib/reservaStatus";
 import { Loader2 } from "lucide-react";
 import type { FrotaPortalGrupoReserva, FrotaPortalTransferReserva } from "@/lib/frotaPortalReservations";
 import { formatTransferTipoViagemExibicao } from "@/lib/transferPernaViagem";
+import { formatDbCalendarDatePtBr, formatHoraReserva } from "@/lib/painelAgendaReservas";
 
 type Props = {
   transfer: FrotaPortalTransferReserva | null;
@@ -17,6 +18,45 @@ type Props = {
   onOpenChange: (o: boolean) => void;
   onSaved: () => void;
 };
+
+function formatCurrency(value: number | null | undefined): string {
+  if (value == null || !Number.isFinite(value)) return "—";
+  return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
+function DetailRow({ label, value }: { label: string; value: string | number | null | undefined }) {
+  const text = value == null || value === "" ? "—" : String(value);
+  return (
+    <div className="rounded-lg border border-border bg-muted/20 px-3 py-2">
+      <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className="mt-1 break-words text-sm font-medium text-foreground">{text}</p>
+    </div>
+  );
+}
+
+function TransferSchedule({ transfer }: { transfer: FrotaPortalTransferReserva }) {
+  if (transfer.tipo_viagem === "por_hora") {
+    return (
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        <DetailRow label="Data" value={formatDbCalendarDatePtBr(transfer.por_hora_data)} />
+        <DetailRow label="Hora" value={formatHoraReserva(transfer.por_hora_hora)} />
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+      <DetailRow label="Data ida" value={formatDbCalendarDatePtBr(transfer.ida_data)} />
+      <DetailRow label="Hora ida" value={formatHoraReserva(transfer.ida_hora)} />
+      {transfer.volta_data || transfer.volta_hora ? (
+        <>
+          <DetailRow label="Data volta" value={formatDbCalendarDatePtBr(transfer.volta_data)} />
+          <DetailRow label="Hora volta" value={formatHoraReserva(transfer.volta_hora)} />
+        </>
+      ) : null}
+    </div>
+  );
+}
 
 export default function FrotaReservaDetalheSheet({ transfer, grupo, open, onOpenChange, onSaved }: Props) {
   const [status, setStatus] = useState("pendente");
@@ -38,34 +78,66 @@ export default function FrotaReservaDetalheSheet({ transfer, grupo, open, onOpen
         <SheetHeader>
           <SheetTitle>{isTransfer ? "Reserva de transfer" : "Reserva de grupo"}</SheetTitle>
           <p className="text-sm text-muted-foreground">
-            Altere apenas o estado operacional. Dados pessoais do cliente e PDF de confirmação são restritos ao
-            operador da frota.
+            Mini painel isolado do motorista. Dados de contacto do cliente ficam ocultos e restritos ao operador da
+            frota.
           </p>
         </SheetHeader>
         {row ? (
-          <div className="mt-6 space-y-4">
-            <p className="text-sm">
-              <span className="text-muted-foreground">Reserva: </span>
-              <span className="font-medium">#{row.numero_reserva}</span>
-            </p>
+          <div className="mt-6 space-y-5">
+            <div className="rounded-xl border border-border bg-card p-4">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Relatório da viagem</p>
+              <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <DetailRow label="Reserva" value={`#${row.numero_reserva}`} />
+                <DetailRow label="Passageiros" value={row.num_passageiros ?? "—"} />
+                <DetailRow label="Valor total" value={formatCurrency(row.valor_total)} />
+                <DetailRow label="Repasse motorista" value={formatCurrency(row.repasse_motorista)} />
+              </div>
+            </div>
+
             {isTransfer && transfer ? (
-              <p className="text-sm">
-                <span className="text-muted-foreground">Tipo: </span>
-                <span className="font-medium">
-                  {formatTransferTipoViagemExibicao(transfer.tipo_viagem, transfer.perna_viagem)}
-                </span>
-              </p>
+              <div className="space-y-3 rounded-xl border border-border bg-card p-4">
+                <DetailRow label="Tipo" value={formatTransferTipoViagemExibicao(transfer.tipo_viagem, transfer.perna_viagem)} />
+                <TransferSchedule transfer={transfer} />
+                {transfer.tipo_viagem === "por_hora" ? (
+                  <div className="grid grid-cols-1 gap-2">
+                    <DetailRow label="Endereço inicial" value={transfer.por_hora_endereco_inicio} />
+                    <DetailRow label="Ponto de encerramento" value={transfer.por_hora_ponto_encerramento} />
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 gap-2">
+                    <DetailRow label="Embarque ida" value={transfer.ida_embarque} />
+                    <DetailRow label="Desembarque ida" value={transfer.ida_desembarque} />
+                    {transfer.volta_embarque || transfer.volta_desembarque ? (
+                      <>
+                        <DetailRow label="Embarque volta" value={transfer.volta_embarque} />
+                        <DetailRow label="Desembarque volta" value={transfer.volta_desembarque} />
+                      </>
+                    ) : null}
+                  </div>
+                )}
+              </div>
             ) : null}
-            <p className="text-sm">
-              <span className="text-muted-foreground">Trajeto: </span>
-              <span className="font-medium">
-                {isTransfer
-                  ? transfer?.tipo_viagem === "por_hora"
-                    ? `${transfer.por_hora_endereco_inicio ?? "—"} → ${transfer.por_hora_ponto_encerramento ?? "—"}`
-                    : `${transfer?.ida_embarque ?? "—"} → ${transfer?.ida_desembarque ?? "—"}`
-                  : `${grupo?.embarque ?? "—"} → ${grupo?.destino ?? "—"}`}
-              </span>
-            </p>
+
+            {!isTransfer && grupo ? (
+              <div className="space-y-3 rounded-xl border border-border bg-card p-4">
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  <DetailRow label="Data ida" value={formatDbCalendarDatePtBr(grupo.data_ida)} />
+                  <DetailRow label="Hora ida" value={formatHoraReserva(grupo.hora_ida)} />
+                  <DetailRow label="Data retorno" value={formatDbCalendarDatePtBr(grupo.data_retorno)} />
+                  <DetailRow label="Hora retorno" value={formatHoraReserva(grupo.hora_retorno)} />
+                </div>
+                <DetailRow label="Embarque" value={grupo.embarque} />
+                <DetailRow label="Destino" value={grupo.destino} />
+              </div>
+            ) : null}
+
+            <div className="rounded-xl border border-border bg-card p-4">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Observações da reserva</p>
+              <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-foreground">
+                {row.observacoes?.trim() || "Sem observações cadastradas."}
+              </p>
+            </div>
+
             <div className="space-y-2">
               <Label>Estado da reserva</Label>
               <Select

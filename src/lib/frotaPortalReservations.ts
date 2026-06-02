@@ -21,6 +21,12 @@ export type FrotaPortalTransferReserva = {
   volta_desembarque: string | null;
   por_hora_endereco_inicio: string | null;
   por_hora_ponto_encerramento: string | null;
+  num_passageiros: number | null;
+  valor_base: number | null;
+  desconto: number | null;
+  valor_total: number | null;
+  repasse_motorista: number | null;
+  observacoes: string | null;
 };
 
 export type FrotaPortalGrupoReserva = {
@@ -36,6 +42,12 @@ export type FrotaPortalGrupoReserva = {
   hora_retorno: string | null;
   embarque: string | null;
   destino: string | null;
+  num_passageiros: number | null;
+  valor_base: number | null;
+  desconto: number | null;
+  valor_total: number | null;
+  repasse_motorista: number | null;
+  observacoes: string | null;
 };
 
 export type FrotaPortalReserva = FrotaPortalTransferReserva | FrotaPortalGrupoReserva;
@@ -52,6 +64,12 @@ function nullableString(value: unknown): string | null {
 
 function reservaNumber(value: unknown): number {
   return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+
+function nullableNumber(value: unknown): number | null {
+  if (value == null) return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
 }
 
 function parseReserva(raw: unknown): FrotaPortalReserva | null {
@@ -82,6 +100,12 @@ function parseReserva(raw: unknown): FrotaPortalReserva | null {
       volta_desembarque: nullableString(r.volta_desembarque),
       por_hora_endereco_inicio: nullableString(r.por_hora_endereco_inicio),
       por_hora_ponto_encerramento: nullableString(r.por_hora_ponto_encerramento),
+      num_passageiros: nullableNumber(r.num_passageiros),
+      valor_base: nullableNumber(r.valor_base),
+      desconto: nullableNumber(r.desconto),
+      valor_total: nullableNumber(r.valor_total),
+      repasse_motorista: nullableNumber(r.repasse_motorista),
+      observacoes: nullableString(r.observacoes),
     };
   }
 
@@ -98,6 +122,12 @@ function parseReserva(raw: unknown): FrotaPortalReserva | null {
     hora_retorno: nullableString(r.hora_retorno),
     embarque: nullableString(r.embarque),
     destino: nullableString(r.destino),
+    num_passageiros: nullableNumber(r.num_passageiros),
+    valor_base: nullableNumber(r.valor_base),
+    desconto: nullableNumber(r.desconto),
+    valor_total: nullableNumber(r.valor_total),
+    repasse_motorista: nullableNumber(r.repasse_motorista),
+    observacoes: nullableString(r.observacoes),
   };
 }
 
