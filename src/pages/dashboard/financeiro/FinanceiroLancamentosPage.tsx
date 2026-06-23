@@ -11,7 +11,11 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useActivePage } from "@/contexts/ActivePageContext";
-import { useFinancialTransactionsPaginated } from "@/hooks/useFinancialTransactions";
+import { useFinancialTransactions } from "@/hooks/useFinancialTransactions";
+import { useFinanceiroClientesOpts, useFinanceiroReservaIdsPorCliente } from "@/hooks/useFinanceiroFiltroCliente";
+import { usePainelListPagination } from "@/hooks/usePainelListPagination";
+import { PainelPaginationBar } from "@/components/painel/PainelPaginationBar";
+import FinanceiroFiltrosClienteData from "@/components/financeiro/FinanceiroFiltrosClienteData";
 import {
   DESPESA_CATEGORY_PRESETS,
   FINANCEIRO_KIND_LABEL,
@@ -57,8 +61,39 @@ function occurredOnFromLocalDate(d: Date): string {
 export default function FinanceiroLancamentosPage() {
   const { setActivePage } = useActivePage();
   const { from: fromDefault, to: toDefault } = useMemo(() => financeiroListagemRangePadrao(), []);
-  const { rows, loading, error, reload, hasNextPage, hasPrevPage, goNextPage, goPrevPage, pageDisplay } =
-    useFinancialTransactionsPaginated(fromDefault, toDefault, 10);
+  const clientes = useFinanceiroClientesOpts();
+  const [filterDataDe, setFilterDataDe] = useState(fromDefault);
+  const [filterDataAte, setFilterDataAte] = useState(toDefault);
+  const [filterCliente, setFilterCliente] = useState("all");
+  const clienteIdAtivo = filterCliente !== "all" ? filterCliente : null;
+  const { transferIdSet, grupoIdSet, loading: idsClienteLoading } = useFinanceiroReservaIdsPorCliente(clienteIdAtivo);
+
+  const { rows: allRows, loading, error, reload } = useFinancialTransactions(filterDataDe, filterDataAte, {
+    limit: 2000,
+    offset: 0,
+  });
+
+  const rowsFiltradas = useMemo(() => {
+    if (!clienteIdAtivo) return allRows;
+    return allRows.filter(
+      (r) =>
+        (r.reserva_transfer_id != null && transferIdSet.has(r.reserva_transfer_id)) ||
+        (r.reserva_grupo_id != null && grupoIdSet.has(r.reserva_grupo_id)),
+    );
+  }, [allRows, clienteIdAtivo, transferIdSet, grupoIdSet]);
+
+  const { slice: rows, page, setPage, totalPages, totalItems } = usePainelListPagination(rowsFiltradas);
+
+  const filtrosAtivos =
+    filterDataDe !== fromDefault || filterDataAte !== toDefault || filterCliente !== "all";
+
+  const limparFiltros = () => {
+    setFilterDataDe(fromDefault);
+    setFilterDataAte(toDefault);
+    setFilterCliente("all");
+  };
+
+  const listLoading = loading || (Boolean(clienteIdAtivo) && idsClienteLoading);
 
   const [dialogOpen, setDialogOpen] = useState(false);
   /** null = criar novo; definido = editar lançamento manual existente */
@@ -301,6 +336,19 @@ export default function FinanceiroLancamentosPage() {
 
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
+      <FinanceiroFiltrosClienteData
+        filterDataDe={filterDataDe}
+        filterDataAte={filterDataAte}
+        onFilterDataDe={setFilterDataDe}
+        onFilterDataAte={setFilterDataAte}
+        filterCliente={filterCliente}
+        onFilterCliente={setFilterCliente}
+        clientes={clientes}
+        filtrosAtivos={filtrosAtivos}
+        onLimpar={limparFiltros}
+        dataLabel="Data (competência)"
+      />
+
       <div className="flex flex-col gap-2">
       <div className="overflow-x-auto rounded-xl border border-border bg-card">
         <Table>
@@ -319,16 +367,16 @@ export default function FinanceiroLancamentosPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {loading && rows.length === 0 ? (
+            {listLoading && rows.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={10} className="text-center text-sm text-muted-foreground">
                   A carregar…
                 </TableCell>
               </TableRow>
-            ) : rows.length === 0 ? (
+            ) : rowsFiltradas.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={10} className="text-center text-sm text-muted-foreground">
-                  Sem lançamentos neste intervalo.
+                  Sem lançamentos neste intervalo{filtrosAtivos ? " ou para os filtros seleccionados" : ""}.
                 </TableCell>
               </TableRow>
             ) : (
@@ -427,26 +475,8 @@ export default function FinanceiroLancamentosPage() {
           </TableBody>
         </Table>
       </div>
-      {hasPrevPage || hasNextPage ? (
-        <div className="flex flex-col gap-3 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-sm text-muted-foreground">
-            Página <span className="font-medium text-foreground">{pageDisplay}</span>
-            {rows.length > 0 ? (
-              <>
-                {" "}
-                · <span className="font-medium text-foreground">{rows.length}</span> lançamentos nesta página
-              </>
-            ) : null}
-          </p>
-          <div className="flex items-center gap-2">
-            <Button type="button" variant="outline" size="sm" disabled={loading || !hasPrevPage} onClick={goPrevPage}>
-              Anterior
-            </Button>
-            <Button type="button" variant="outline" size="sm" disabled={loading || !hasNextPage} onClick={goNextPage}>
-              Próxima
-            </Button>
-          </div>
-        </div>
+      {totalPages > 1 ? (
+        <PainelPaginationBar page={page} totalPages={totalPages} totalItems={totalItems} onPageChange={setPage} />
       ) : null}
       </div>
 

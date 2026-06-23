@@ -5,13 +5,15 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useActivePage } from "@/contexts/ActivePageContext";
 import { supabase } from "@/integrations/supabase/client";
 import { formatBRL } from "@/lib/financeiroFrota";
-import { formatDbCalendarDatePtBr } from "@/lib/painelAgendaReservas";
+import { formatDbCalendarDatePtBr, toAgendaDayKey } from "@/lib/painelAgendaReservas";
 import { labelReservaStatus } from "@/lib/reservaStatus";
 import { usePainelListPagination } from "@/hooks/usePainelListPagination";
 import { PainelPaginationBar } from "@/components/painel/PainelPaginationBar";
 import { FileText, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Tables } from "@/integrations/supabase/types";
+import FinanceiroFiltrosClienteData from "@/components/financeiro/FinanceiroFiltrosClienteData";
+import { useFinanceiroClientesOpts } from "@/hooks/useFinanceiroFiltroCliente";
 
 type ReservaFaturada = Pick<
   Tables<"reservas_transfer">,
@@ -25,6 +27,7 @@ type ReservaFaturada = Pick<
   | "por_hora_data"
   | "created_at"
   | "faturado"
+  | "cadastro_cliente_id"
 >;
 
 function dataViagemExibicao(r: ReservaFaturada): string {
@@ -32,11 +35,19 @@ function dataViagemExibicao(r: ReservaFaturada): string {
   return formatDbCalendarDatePtBr(raw) || "—";
 }
 
+function reservaFaturadaDayKey(r: ReservaFaturada): string | null {
+  return toAgendaDayKey(r.por_hora_data) ?? toAgendaDayKey(r.ida_data) ?? toAgendaDayKey(r.created_at?.slice(0, 10));
+}
+
 export default function FinanceiroFaturadoPage() {
   const { setActivePage } = useActivePage();
+  const clientes = useFinanceiroClientesOpts();
   const [rows, setRows] = useState<ReservaFaturada[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [filterDataDe, setFilterDataDe] = useState("");
+  const [filterDataAte, setFilterDataAte] = useState("");
+  const [filterCliente, setFilterCliente] = useState("all");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -50,7 +61,9 @@ export default function FinanceiroFaturadoPage() {
     }
     const { data, error: qErr } = await supabase
       .from("reservas_transfer")
-      .select("id,numero_reserva,nome_completo,valor_total,metodo_pagamento,status,ida_data,por_hora_data,created_at,faturado")
+      .select(
+        "id,numero_reserva,nome_completo,valor_total,metodo_pagamento,status,ida_data,por_hora_data,created_at,faturado,cadastro_cliente_id",
+      )
       .eq("user_id", auth.user.id)
       .eq("faturado", true)
       .order("created_at", { ascending: false })
@@ -68,12 +81,33 @@ export default function FinanceiroFaturadoPage() {
     void load();
   }, [load]);
 
+  const rowsFiltradas = useMemo(() => {
+    return rows.filter((r) => {
+      if (filterCliente !== "all") {
+        const cid = (r.cadastro_cliente_id ?? "").trim();
+        if (cid !== filterCliente) return false;
+      }
+      const dayKey = reservaFaturadaDayKey(r);
+      if (filterDataDe && (!dayKey || dayKey < filterDataDe)) return false;
+      if (filterDataAte && (!dayKey || dayKey > filterDataAte)) return false;
+      return true;
+    });
+  }, [rows, filterCliente, filterDataDe, filterDataAte]);
+
   const totalPendente = useMemo(
-    () => rows.reduce((acc, r) => acc + (Number(r.valor_total) || 0), 0),
-    [rows],
+    () => rowsFiltradas.reduce((acc, r) => acc + (Number(r.valor_total) || 0), 0),
+    [rowsFiltradas],
   );
 
-  const { slice: pageRows, page, setPage, totalPages, totalItems } = usePainelListPagination(rows);
+  const { slice: pageRows, page, setPage, totalPages, totalItems } = usePainelListPagination(rowsFiltradas);
+
+  const filtrosAtivos = filterDataDe !== "" || filterDataAte !== "" || filterCliente !== "all";
+
+  const limparFiltros = () => {
+    setFilterDataDe("");
+    setFilterDataAte("");
+    setFilterCliente("all");
+  };
 
   return (
     <div className="min-w-0 space-y-6 pb-8">
@@ -95,10 +129,28 @@ export default function FinanceiroFaturadoPage() {
         </div>
       </div>
 
+      <FinanceiroFiltrosClienteData
+        filterDataDe={filterDataDe}
+        filterDataAte={filterDataAte}
+        onFilterDataDe={setFilterDataDe}
+        onFilterDataAte={setFilterDataAte}
+        filterCliente={filterCliente}
+        onFilterCliente={setFilterCliente}
+        clientes={clientes}
+        filtrosAtivos={filtrosAtivos}
+        onLimpar={limparFiltros}
+        dataLabel="Data da viagem"
+      />
+
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <div className="rounded-xl border border-border bg-card p-4">
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Reservas faturadas</p>
-          <p className="mt-2 text-2xl font-bold text-foreground">{loading ? "…" : totalItems}</p>
+          <p className="mt-2 text-2xl font-bold text-foreground">
+            {loading ? "…" : totalItems}
+            {filtrosAtivos && rows.length !== totalItems ? (
+              <span className="ml-1 text-sm font-normal text-muted-foreground">de {rows.length}</span>
+            ) : null}
+          </p>
         </div>
         <div className="rounded-xl border border-[#FF6600]/30 bg-[#FF6600]/5 p-4">
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Total a receber (faturado)</p>
@@ -128,11 +180,12 @@ export default function FinanceiroFaturadoPage() {
                   A carregar…
                 </TableCell>
               </TableRow>
-            ) : rows.length === 0 ? (
+            ) : rowsFiltradas.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={7} className="text-center text-sm text-muted-foreground">
-                  Nenhuma reserva marcada como faturada. Defina a opção ao criar ou editar uma reserva em Transfer →
-                  Reservas.
+                  {rows.length === 0
+                    ? "Nenhuma reserva marcada como faturada. Defina a opção ao criar ou editar uma reserva em Transfer → Reservas."
+                    : "Nenhuma reserva corresponde aos filtros."}
                 </TableCell>
               </TableRow>
             ) : (
