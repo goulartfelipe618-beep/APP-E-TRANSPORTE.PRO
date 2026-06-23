@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { CalendarDays, ClipboardList, FileText, LogOut, Menu, Moon, Sun } from "lucide-react";
+import { CalendarDays, ClipboardList, FileText, LogOut, Menu, Moon, Sun, Camera } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -14,8 +14,9 @@ import { getPersistedSupabaseUserId } from "@/lib/supabaseSessionUser";
 import FrotaAgendaPage from "@/pages/frota/FrotaAgendaPage";
 import FrotaReservasPage from "@/pages/frota/FrotaReservasPage";
 import FrotaDocumentosPage from "@/pages/frota/FrotaDocumentosPage";
+import FrotaFotosPage from "@/pages/frota/FrotaFotosPage";
 
-type FrotaPage = "agenda" | "reservas" | "documentos";
+type FrotaPage = "agenda" | "reservas" | "documentos" | "fotos";
 
 export default function FrotaMotoristaLayout() {
   const [active, setActive] = useState<FrotaPage>("agenda");
@@ -125,6 +126,17 @@ export default function FrotaMotoristaLayout() {
           <FileText className="h-4 w-4 shrink-0" />
           Documentos
         </button>
+        <button
+          type="button"
+          onClick={() => onNavigate("fotos")}
+          className={cn(
+            "flex min-h-[44px] items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm font-medium transition-colors",
+            active === "fotos" ? "bg-primary/15 text-primary" : "text-muted-foreground hover:bg-muted/60",
+          )}
+        >
+          <Camera className="h-4 w-4 shrink-0" />
+          Minhas fotos
+        </button>
       </nav>
 
       <div className="border-t border-border p-2 space-y-1">
@@ -155,7 +167,7 @@ export default function FrotaMotoristaLayout() {
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold">{nomeProjeto || "Motorista"}</p>
           <p className="truncate text-xs text-muted-foreground">
-            {active === "agenda" ? "Agenda" : active === "reservas" ? "Reservas" : "Documentos"}
+            {active === "agenda" ? "Agenda" : active === "reservas" ? "Reservas" : active === "fotos" ? "Minhas fotos" : "Documentos"}
           </p>
         </div>
       </header>
@@ -181,6 +193,8 @@ export default function FrotaMotoristaLayout() {
           <FrotaAgendaPage />
         ) : active === "reservas" ? (
           <FrotaReservasPage />
+        ) : active === "fotos" ? (
+          <FrotaFotosPage />
         ) : (
           <FrotaDocumentosPage />
         )}

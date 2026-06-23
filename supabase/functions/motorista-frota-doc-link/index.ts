@@ -212,18 +212,30 @@ Deno.serve(async (req) => {
 
   for (const path of paths) {
     const ownerId = path.split("/")[0]!;
+    const motoristaId = path.split("/")[1] ?? "";
     let canAccess = user.id === ownerId;
     if (!canAccess && isMaster === true) {
       canAccess = true;
     }
+    if (!canAccess && motoristaId && UUID_RE.test(motoristaId)) {
+      const { data: sm } = await admin
+        .from("solicitacoes_motoristas")
+        .select("id")
+        .eq("id", motoristaId)
+        .eq("portal_auth_user_id", user.id)
+        .eq("status", "cadastrado")
+        .maybeSingle();
+      if (sm) canAccess = true;
+    }
     if (!canAccess) continue;
 
     let ok = false;
-    if (user.id === ownerId) {
-      const { error } = await supabaseUser.storage.from(BUCKET).download(path);
+    if (user.id === ownerId || isMaster === true) {
+      const client = user.id === ownerId ? supabaseUser : admin;
+      const { error } = await client.storage.from(BUCKET).download(path);
       ok = !error;
-    } else if (isMaster === true) {
-      const { error } = await admin.storage.from(BUCKET).download(path);
+    } else {
+      const { error } = await supabaseUser.storage.from(BUCKET).download(path);
       ok = !error;
     }
     if (!ok) continue;

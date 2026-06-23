@@ -60,6 +60,7 @@ export default function TransferReservasPage() {
   const [filterDataAte, setFilterDataAte] = useState("");
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [filterMotorista, setFilterMotorista] = useState<string>("all");
+  const [filterFaturado, setFilterFaturado] = useState<string>("all");
   const [filterSearch, setFilterSearch] = useState("");
 
   const fetchAll = useCallback(async () => {
@@ -122,6 +123,8 @@ export default function TransferReservasPage() {
           if (mid !== "") return false;
         } else if (mid !== filterMotorista) return false;
       }
+      if (filterFaturado === "sim" && !(r as { faturado?: boolean }).faturado) return false;
+      if (filterFaturado === "nao" && (r as { faturado?: boolean }).faturado) return false;
       const dayKey = transferPrimaryDayKey(r);
       if (filterDataDe) {
         if (!dayKey || dayKey < filterDataDe) return false;
@@ -135,7 +138,7 @@ export default function TransferReservasPage() {
       }
       return true;
     });
-  }, [reservas, filterDataDe, filterDataAte, filterStatus, filterMotorista, filterSearch]);
+  }, [reservas, filterDataDe, filterDataAte, filterStatus, filterMotorista, filterFaturado, filterSearch]);
 
   const { slice: reservasPage, page, setPage, totalPages, totalItems } = usePainelListPagination(reservasFiltradas);
 
@@ -149,6 +152,7 @@ export default function TransferReservasPage() {
     setFilterDataAte("");
     setFilterStatus("all");
     setFilterMotorista("all");
+    setFilterFaturado("all");
     setFilterSearch("");
   };
 
@@ -189,6 +193,7 @@ export default function TransferReservasPage() {
     filterDataAte !== "" ||
     filterStatus !== "all" ||
     filterMotorista !== "all" ||
+    filterFaturado !== "all" ||
     filterSearch.trim() !== "";
 
   return (
@@ -275,7 +280,20 @@ export default function TransferReservasPage() {
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-1.5 sm:col-span-2 xl:col-span-2">
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground">Faturado</Label>
+            <Select value={filterFaturado} onValueChange={setFilterFaturado}>
+              <SelectTrigger className="h-9">
+                <SelectValue placeholder="Todos" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos</SelectItem>
+                <SelectItem value="sim">Sim — faturado</SelectItem>
+                <SelectItem value="nao">Não — não faturado</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5 sm:col-span-2 xl:col-span-1">
             <Label className="text-xs text-muted-foreground">Cliente / contacto / nº</Label>
             <Input
               placeholder="Pesquisar…"
@@ -331,6 +349,11 @@ export default function TransferReservasPage() {
                           className="border-[#FF6600]/60 text-[#FF6600] dark:border-[#FF6600]/50 dark:text-[#FF6600]"
                         >
                           {r.perna_viagem === "volta" ? "VOLTA" : "IDA"}
+                        </Badge>
+                      ) : null}
+                      {(r as { faturado?: boolean }).faturado ? (
+                        <Badge variant="outline" className="border-amber-500/50 text-amber-600 dark:text-amber-400">
+                          Faturado
                         </Badge>
                       ) : null}
                     </div>

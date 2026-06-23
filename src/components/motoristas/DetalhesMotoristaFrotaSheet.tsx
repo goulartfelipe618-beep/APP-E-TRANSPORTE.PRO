@@ -12,6 +12,12 @@ import {
   DOC_PATH_KEYS,
   type MotoristaFrotaDocUrlBundle,
 } from "@/lib/motoristaFrotaStorage";
+import {
+  PORTAL_FOTO_SLOTS,
+  pickPortalFotoPath,
+  signMotoristaPortalFotoUrls,
+  type PortalFotoSignedUrls,
+} from "@/lib/motoristaPortalFotos";
 import { downloadMotoristaDossierPdf } from "@/lib/motoristaDossierPdf";
 import { getMotoristaVerificacaoAppOrigin } from "@/lib/appPublicUrl";
 import { toast } from "sonner";
@@ -90,6 +96,7 @@ export default function DetalhesMotoristaFrotaSheet({
   onRequestResetSenhaPortal,
 }: Props) {
   const [docBundle, setDocBundle] = useState<MotoristaFrotaDocUrlBundle>(emptyDocBundle);
+  const [portalFotoUrls, setPortalFotoUrls] = useState<PortalFotoSignedUrls>({});
   const [upgradeOpen, setUpgradeOpen] = useState(false);
   const { plano, loading: planLoading } = useUserPlan();
   const portalLinkPermitido = !planLoading && canUseMotoristaPortalLink(plano);
@@ -97,15 +104,25 @@ export default function DetalhesMotoristaFrotaSheet({
   useEffect(() => {
     if (!open || !motorista) {
       setDocBundle(emptyDocBundle);
+      setPortalFotoUrls({});
       return;
     }
     let cancelled = false;
     void (async () => {
       try {
-        const u = await signMotoristaFrotaDocUrls(supabase, motorista.dados_webhook, 3600);
-        if (!cancelled) setDocBundle(u);
+        const [u, fotos] = await Promise.all([
+          signMotoristaFrotaDocUrls(supabase, motorista.dados_webhook, 3600),
+          signMotoristaPortalFotoUrls(supabase, motorista.dados_webhook),
+        ]);
+        if (!cancelled) {
+          setDocBundle(u);
+          setPortalFotoUrls(fotos);
+        }
       } catch {
-        if (!cancelled) setDocBundle(emptyDocBundle);
+        if (!cancelled) {
+          setDocBundle(emptyDocBundle);
+          setPortalFotoUrls({});
+        }
       }
     })();
     return () => {
@@ -367,6 +384,51 @@ export default function DetalhesMotoristaFrotaSheet({
                     ) : null}
                   </div>
                 ))}
+              </div>
+            </div>
+
+            <div className="rounded-lg border border-border p-3">
+              <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-foreground">Fotos do mini portal</p>
+              <p className="mb-3 text-xs text-muted-foreground">
+                Enviadas pelo motorista no portal dele. Visíveis apenas para si (operador que cadastrou este motorista).
+              </p>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                {PORTAL_FOTO_SLOTS.map((slot) => {
+                  const preview = portalFotoUrls[slot]?.preview;
+                  const share = portalFotoUrls[slot]?.share;
+                  const ok = Boolean(pickPortalFotoPath(motorista.dados_webhook, slot));
+                  return (
+                    <div key={slot} className="rounded-lg border border-border bg-muted/20 p-2">
+                      <div className="mb-2 flex items-center justify-between gap-2">
+                        <span className="text-xs font-medium text-foreground">Foto {slot}</span>
+                        <Badge
+                          variant="outline"
+                          className={
+                            ok
+                              ? "border-[#FF6600]/40 bg-[#FF6600]/10 text-[#FF6600]"
+                              : ""
+                          }
+                        >
+                          {ok ? "Enviada" : "Vazia"}
+                        </Badge>
+                      </div>
+                      {preview ? (
+                        <a
+                          href={share || preview}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="group block overflow-hidden rounded-md border border-border bg-background"
+                        >
+                          <img src={preview} alt="" className="max-h-36 w-full object-contain transition-opacity group-hover:opacity-90" />
+                        </a>
+                      ) : (
+                        <div className="flex h-24 items-center justify-center rounded-md border border-dashed border-border bg-muted/30 text-xs text-muted-foreground">
+                          {ok ? "Pré-visualização indisponível" : "Motorista ainda não enviou"}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
