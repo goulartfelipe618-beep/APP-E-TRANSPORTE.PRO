@@ -143,6 +143,14 @@ export default function DetalhesReservaTransferSheet({ reserva, open, onOpenChan
                     : "—"
                 }
               />
+              <Field
+                label="Faturado"
+                value={(r as { faturado?: boolean }).faturado === true ? "Sim — cobrança posterior" : "Não"}
+              />
+              <Field
+                label="Esconder valores (motorista)"
+                value={(r as { esconder_valores?: boolean }).esconder_valores === true ? "Sim" : "Não"}
+              />
             </div>
           </Section>
 

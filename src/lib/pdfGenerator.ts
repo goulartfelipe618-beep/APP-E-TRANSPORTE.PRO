@@ -609,8 +609,16 @@ function addTimeRow(doc: jsPDF, entries: { label: string; value: string }[], y: 
 //  TRANSFER PDF
 // ═══════════════════════════════════════════════════════════
 
+type TransferPdfBuildOptions = {
+  /** Oculta valores cobrados ao cliente (PDF operacional / motorista). */
+  ocultarValores?: boolean;
+};
+
 /** Documento de confirmação (mesmo do download); use para base64 no webhook. */
-async function buildTransferReservaPdfDocument(reservaId: string): Promise<{ doc: jsPDF; filename: string } | null> {
+async function buildTransferReservaPdfDocument(
+  reservaId: string,
+  options?: TransferPdfBuildOptions,
+): Promise<{ doc: jsPDF; filename: string } | null> {
   const { data: r } = await supabase.from("reservas_transfer").select("*").eq("id", reservaId).single();
   if (!r) return null;
 
@@ -677,14 +685,33 @@ async function buildTransferReservaPdfDocument(reservaId: string): Promise<{ doc
     if (r.por_hora_hora) y = addTimeRow(doc, [{ label: "Horário:", value: r.por_hora_hora }], y);
   }
 
+  const ocultarValores = options?.ocultarValores === true;
+  const faturado = Boolean((r as { faturado?: boolean }).faturado);
+
   // Section: Price
   y = addSectionTitle(doc, "PREÇO", y);
-  const priceItems = [
-    { label: `Transfer ${tipoStr}`, value: `R$ ${Number(r.valor_base).toFixed(2)}` },
-    { label: `Passageiros: ${r.ida_passageiros || r.por_hora_passageiros || "—"}`, value: "" },
-  ];
-  if (Number(r.desconto) > 0) priceItems.push({ label: "Desconto", value: `${Number(r.desconto).toFixed(0)}%` });
-  y = addPriceBlock(doc, priceItems, `R$ ${Number(r.valor_total).toFixed(2)}`, y);
+  if (ocultarValores) {
+    doc.setFontSize(FS.body);
+    doc.setFont("helvetica", "italic");
+    setColor(doc, CLR.body);
+    y = wrappedText(
+      doc,
+      "Os valores cobrados ao cliente não estão visíveis neste documento (definido pelo operador).",
+      MARGIN,
+      y,
+      CONTENT_W,
+      SP.paraLine,
+    );
+    setColor(doc, CLR.black);
+    y += SP.sectionGap;
+  } else {
+    const priceItems = [
+      { label: `Transfer ${tipoStr}`, value: `R$ ${Number(r.valor_base).toFixed(2)}` },
+      { label: `Passageiros: ${r.ida_passageiros || r.por_hora_passageiros || "—"}`, value: "" },
+    ];
+    if (Number(r.desconto) > 0) priceItems.push({ label: "Desconto", value: `${Number(r.desconto).toFixed(0)}%` });
+    y = addPriceBlock(doc, priceItems, `R$ ${Number(r.valor_total).toFixed(2)}`, y);
+  }
 
   // Section: Payment
   y = addSectionTitle(doc, "INFORMAÇÕES SOBRE PAGAMENTO", y);
@@ -692,7 +719,13 @@ async function buildTransferReservaPdfDocument(reservaId: string): Promise<{ doc
   doc.setFont("helvetica", "normal");
   setColor(doc, CLR.body);
   const pagamento = r.metodo_pagamento || "Não informado";
-  y = wrappedText(doc, `Forma de pagamento: ${pagamento}.\nO valor será cobrado conforme acordo entre as partes.`, MARGIN, y, CONTENT_W, SP.paraLine);
+  const faturadoLinha = faturado
+    ? "Faturado: Sim — serviço prestado com cobrança em data posterior."
+    : "Faturado: Não — pagamento conforme acordo no ato ou data combinada.";
+  const pagamentoTexto = ocultarValores
+    ? `Forma de pagamento: ${pagamento}.\n${faturadoLinha}`
+    : `Forma de pagamento: ${pagamento}.\n${faturadoLinha}\nO valor será cobrado conforme acordo entre as partes.`;
+  y = wrappedText(doc, pagamentoTexto, MARGIN, y, CONTENT_W, SP.paraLine);
   setColor(doc, CLR.black);
   y += SP.sectionGap;
 
@@ -707,6 +740,7 @@ async function buildTransferReservaPdfDocument(reservaId: string): Promise<{ doc
   ];
   const detailsRight = [
     { l: "Pagamento:", v: r.metodo_pagamento || "—" },
+    { l: "Faturado:", v: faturado ? "Sim" : "Não" },
     { l: "Status:", v: r.status },
     { l: "Criada em:", v: new Date(r.created_at).toLocaleString("pt-BR") },
   ];
@@ -754,9 +788,18 @@ async function buildTransferReservaPdfDocument(reservaId: string): Promise<{ doc
 }
 
 export async function generateTransferPDF(reservaId: string) {
-  const built = await buildTransferReservaPdfDocument(reservaId);
+  const built = await buildTransferReservaPdfDocument(reservaId, { ocultarValores: false });
   if (!built) return;
   built.doc.save(built.filename);
+}
+
+/** PDF operacional para motorista (oculta valores quando `esconder_valores` na reserva). */
+export async function generateTransferPDFForMotorista(reservaId: string) {
+  const { data: r } = await supabase.from("reservas_transfer").select("esconder_valores").eq("id", reservaId).single();
+  const ocultarValores = Boolean((r as { esconder_valores?: boolean } | null)?.esconder_valores);
+  const built = await buildTransferReservaPdfDocument(reservaId, { ocultarValores });
+  if (!built) return;
+  built.doc.save(built.filename.replace(".pdf", "-motorista.pdf"));
 }
 
 /** Base64 do PDF de confirmação (para envio no webhook Comunicar — reserva Transfer). */

@@ -64,6 +64,7 @@ import CommunityPage from "@/pages/dashboard/CommunityPage";
 import FinanceiroDashboardPage from "@/pages/dashboard/financeiro/FinanceiroDashboardPage";
 import FinanceiroLancamentosPage from "@/pages/dashboard/financeiro/FinanceiroLancamentosPage";
 import FinanceiroReceberPage from "@/pages/dashboard/financeiro/FinanceiroReceberPage";
+import FinanceiroFaturadoPage from "@/pages/dashboard/financeiro/FinanceiroFaturadoPage";
 import FinanceiroPagarPage from "@/pages/dashboard/financeiro/FinanceiroPagarPage";
 import FinanceiroRelatoriosPage from "@/pages/dashboard/financeiro/FinanceiroRelatoriosPage";
 import PlanosPage from "@/pages/dashboard/PlanosPage";
@@ -111,6 +112,7 @@ const PAGE_MAP: Record<string, React.ComponentType> = {
   financeiro: FinanceiroDashboardPage,
   "financeiro/lancamentos": FinanceiroLancamentosPage,
   "financeiro/receber": FinanceiroReceberPage,
+  "financeiro/faturado": FinanceiroFaturadoPage,
   "financeiro/pagar": FinanceiroPagarPage,
   "financeiro/relatorios": FinanceiroRelatoriosPage,
   planos: PlanosPage,

@@ -107,6 +107,7 @@ function buildHomeSections(
         { title: "Dashboard financeiro", page: "financeiro", desc: "Resumo do mês: faturado, recebido, pendente e lucro estimado.", icon: Wallet2 },
         { title: "Lançamentos", page: "financeiro/lancamentos", desc: "Todas as receitas e despesas; criar lançamentos manuais.", icon: List },
         { title: "Contas a receber", page: "financeiro/receber", desc: "Receitas geradas pelas reservas (transfer e grupos).", icon: Inbox },
+        { title: "Faturado", page: "financeiro/faturado", desc: "Reservas com cobrança em data posterior ao serviço.", icon: FileText },
         { title: "Contas a pagar", page: "financeiro/pagar", desc: "Despesas operacionais registadas.", icon: Banknote },
         { title: "Relatórios", page: "financeiro/relatorios", desc: "Por período e viagens mais rentáveis.", icon: FileBarChart },
       ],

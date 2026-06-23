@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@/components/ui/separator";
 import { ArrowLeftRight, Loader2 } from "lucide-react";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { Json, Tables } from "@/integrations/supabase/types";
@@ -125,6 +126,8 @@ export default function CriarReservaTransferDialog({
   const [porHoraCupom, setPorHoraCupom] = useState("");
   const [porHoraItinerario, setPorHoraItinerario] = useState("");
   const [metodoPagamento, setMetodoPagamento] = useState("");
+  const [faturado, setFaturado] = useState<"sim" | "nao">("nao");
+  const [esconderValores, setEsconderValores] = useState(false);
   const [observacoes, setObservacoes] = useState("");
   const [statusOperacional, setStatusOperacional] = useState("pendente");
   const [repasseMotorista, setRepasseMotorista] = useState("");
@@ -204,6 +207,8 @@ export default function CriarReservaTransferDialog({
       setValorBase(String(row.valor_base ?? 0));
       setDesconto(String(row.desconto ?? 0));
       setMetodoPagamento(row.metodo_pagamento ?? "");
+      setFaturado((row as { faturado?: boolean }).faturado === true ? "sim" : "nao");
+      setEsconderValores((row as { esconder_valores?: boolean }).esconder_valores === true);
       setObservacoes(row.observacoes ?? "");
       const st = (row.status ?? "pendente").trim();
       setStatusOperacional(
@@ -308,7 +313,7 @@ export default function CriarReservaTransferDialog({
     setPorHoraEnderecoInicio(""); setPorHoraPontoEncerramento(""); setPorHoraData("");
     setPorHoraHora(""); setPorHoraPassageiros(""); setPorHoraQtdHoras("");
     setPorHoraCupom(""); setPorHoraItinerario("");
-    setValorBase("0"); setDesconto("0"); setMetodoPagamento(""); setObservacoes("");
+    setValorBase("0"); setDesconto("0"); setMetodoPagamento(""); setFaturado("nao"); setEsconderValores(false); setObservacoes("");
     setStatusOperacional("pendente"); setRepasseMotorista("");
     setMotoristaAtribUid("");
     setModoClienteReserva("novo");
@@ -438,6 +443,8 @@ export default function CriarReservaTransferDialog({
       desconto: parseFloat(desconto) || 0,
       valor_total: valorTotalNum,
       metodo_pagamento: metodoPagamento || null,
+      faturado: faturado === "sim",
+      esconder_valores: esconderValores,
       observacoes: observacoes || null,
       status: statusOperacional,
       repasse_motorista: repasseNum,
@@ -476,6 +483,8 @@ export default function CriarReservaTransferDialog({
         quem_viaja: quemViaja,
         desconto: descNum,
         metodo_pagamento: metodoPagamento || null,
+        faturado: faturado === "sim",
+        esconder_valores: esconderValores,
         observacoes: observacoes || null,
         status: statusOperacional,
         motorista_id: motoristaId,
@@ -865,6 +874,46 @@ export default function CriarReservaTransferDialog({
             <div className="mt-3 flex items-center justify-between rounded-lg bg-muted px-4 py-2">
               <span className="text-sm font-medium text-primary">Valor Total (a receber do cliente)</span>
               <span className="text-lg font-bold text-foreground">{valorTotalFormatted}</span>
+            </div>
+            <div className="mt-4 space-y-4 rounded-lg border border-border bg-muted/20 p-4">
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">
+                  Faturado <span className="text-destructive">*</span>
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Serviço prestado com pagamento a cobrar em outra data (contabiliza no menu Financeiro → Faturado).
+                </p>
+                <RadioGroup
+                  value={faturado}
+                  onValueChange={(v) => setFaturado(v as "sim" | "nao")}
+                  className="flex flex-wrap gap-4"
+                  required
+                >
+                  <label className="flex cursor-pointer items-center gap-2 text-sm">
+                    <RadioGroupItem value="sim" id="fat-sim" />
+                    Sim — faturado (cobrança posterior)
+                  </label>
+                  <label className="flex cursor-pointer items-center gap-2 text-sm">
+                    <RadioGroupItem value="nao" id="fat-nao" />
+                    Não — pagamento no ato ou data já acordada
+                  </label>
+                </RadioGroup>
+              </div>
+              <div className="flex items-start gap-3">
+                <Checkbox
+                  id="esconder-valores"
+                  checked={esconderValores}
+                  onCheckedChange={(c) => setEsconderValores(c === true)}
+                />
+                <div className="space-y-1">
+                  <Label htmlFor="esconder-valores" className="cursor-pointer text-sm font-medium">
+                    Esconder valores
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    O motorista vinculado não verá os valores cobrados ao cliente no mini portal nem no PDF operacional.
+                  </p>
+                </div>
+              </div>
             </div>
             <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-1.5">

@@ -14,6 +14,7 @@ import {
   Banknote,
   ContactRound,
   Library,
+  Receipt,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -94,6 +95,7 @@ const getMenuStructure = (
           { title: "Dashboard", page: "financeiro", icon: Wallet2 },
           { title: "Lançamentos", page: "financeiro/lancamentos", icon: List },
           { title: "Contas a receber", page: "financeiro/receber", icon: Inbox },
+          { title: "Faturado", page: "financeiro/faturado", icon: Receipt },
           { title: "Contas a pagar", page: "financeiro/pagar", icon: Banknote },
           { title: "Relatórios", page: "financeiro/relatorios", icon: BarChart3 },
         ],

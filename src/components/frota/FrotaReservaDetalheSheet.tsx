@@ -6,7 +6,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { RESERVA_STATUS_OPTIONS } from "@/lib/reservaStatus";
-import { Loader2 } from "lucide-react";
+import { Loader2, FileDown } from "lucide-react";
+import { generateTransferPDFForMotorista } from "@/lib/pdfGenerator";
+import { Badge } from "@/components/ui/badge";
 import type { FrotaPortalGrupoReserva, FrotaPortalTransferReserva } from "@/lib/frotaPortalReservations";
 import { formatTransferTipoViagemExibicao } from "@/lib/transferPernaViagem";
 import { formatDbCalendarDatePtBr, formatHoraReserva } from "@/lib/painelAgendaReservas";
@@ -86,10 +88,24 @@ export default function FrotaReservaDetalheSheet({ transfer, grupo, open, onOpen
           <div className="mt-6 space-y-5">
             <div className="rounded-xl border border-border bg-card p-4">
               <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Relatório da viagem</p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {isTransfer && transfer?.faturado ? (
+                  <Badge variant="outline" className="border-[#FF6600]/60 text-[#FF6600]">
+                    Faturado
+                  </Badge>
+                ) : null}
+                {isTransfer && transfer?.esconder_valores ? (
+                  <Badge variant="secondary">Valores ocultos</Badge>
+                ) : null}
+              </div>
               <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
                 <DetailRow label="Reserva" value={`#${row.numero_reserva}`} />
                 <DetailRow label="Passageiros" value={row.num_passageiros ?? "—"} />
-                <DetailRow label="Valor total" value={formatCurrency(row.valor_total)} />
+                {isTransfer && transfer?.esconder_valores ? (
+                  <DetailRow label="Valor total" value="Oculto pelo operador" />
+                ) : (
+                  <DetailRow label="Valor total" value={formatCurrency(row.valor_total)} />
+                )}
                 <DetailRow label="Repasse motorista" value={formatCurrency(row.repasse_motorista)} />
               </div>
             </div>
@@ -157,6 +173,16 @@ export default function FrotaReservaDetalheSheet({ transfer, grupo, open, onOpen
               </Select>
             </div>
             <div className="flex flex-wrap gap-2 pt-2">
+              {isTransfer && transfer ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => void generateTransferPDFForMotorista(transfer.id)}
+                >
+                  <FileDown className="mr-2 h-4 w-4" />
+                  PDF confirmação
+                </Button>
+              ) : null}
               <Button
                 type="button"
                 className="bg-primary text-primary-foreground"

@@ -19,6 +19,7 @@ export const PAGINAS_MOTORISTA: { value: string; label: string }[] = [
   { value: "financeiro", label: "Financeiro — Dashboard" },
   { value: "financeiro/lancamentos", label: "Financeiro — Lançamentos" },
   { value: "financeiro/receber", label: "Financeiro — Contas a receber" },
+  { value: "financeiro/faturado", label: "Financeiro — Faturado" },
   { value: "financeiro/pagar", label: "Financeiro — Contas a pagar" },
   { value: "financeiro/relatorios", label: "Financeiro — Relatórios" },
   { value: "campanhas/ativos", label: "Campanhas — Ativos" },

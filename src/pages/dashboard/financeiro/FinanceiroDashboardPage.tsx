@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Wallet, List, Inbox, Banknote, FileBarChart, ChevronLeft, ChevronRight, User, FilterX } from "lucide-react";
+import { Wallet, List, Inbox, Banknote, FileBarChart, ChevronLeft, ChevronRight, User, FilterX, Receipt } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -469,6 +469,14 @@ export default function FinanceiroDashboardPage() {
           >
             <Inbox className="h-5 w-5 shrink-0 text-primary" />
             <span className="font-medium text-foreground">Contas a receber</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActivePage("financeiro/faturado")}
+            className="flex items-center gap-3 rounded-xl border border-border bg-card p-4 text-left transition-colors hover:border-[#FF6600]/50 hover:bg-muted/40"
+          >
+            <Receipt className="h-5 w-5 shrink-0 text-[#FF6600]" />
+            <span className="font-medium text-foreground">Faturado</span>
           </button>
           <button
             type="button"
