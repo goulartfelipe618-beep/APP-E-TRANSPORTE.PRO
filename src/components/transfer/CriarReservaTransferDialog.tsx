@@ -875,30 +875,32 @@ export default function CriarReservaTransferDialog({
               <span className="text-sm font-medium text-primary">Valor Total (a receber do cliente)</span>
               <span className="text-lg font-bold text-foreground">{valorTotalFormatted}</span>
             </div>
-            <div className="mt-4 space-y-4 rounded-lg border border-border bg-muted/20 p-4">
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">
-                  Faturado <span className="text-destructive">*</span>
-                </Label>
-                <p className="text-xs text-muted-foreground">
-                  Serviço prestado com pagamento a cobrar em outra data (contabiliza no menu Financeiro → Faturado).
-                </p>
-                <RadioGroup
-                  value={faturado}
-                  onValueChange={(v) => setFaturado(v as "sim" | "nao")}
-                  className="flex flex-wrap gap-4"
-                  required
-                >
-                  <label className="flex cursor-pointer items-center gap-2 text-sm">
-                    <RadioGroupItem value="sim" id="fat-sim" />
-                    Sim — faturado (cobrança posterior)
-                  </label>
-                  <label className="flex cursor-pointer items-center gap-2 text-sm">
-                    <RadioGroupItem value="nao" id="fat-nao" />
-                    Não — pagamento no ato ou data já acordada
-                  </label>
-                </RadioGroup>
-              </div>
+
+            <div className="mt-4 rounded-lg border border-[#FF6600]/30 bg-[#FF6600]/5 p-4 space-y-2">
+              <Label className="text-sm font-medium">
+                Faturado <span className="text-destructive">*</span>
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                Indica se o serviço será cobrado em data posterior (contabiliza em Financeiro → Faturado). Independente da opção «Esconder valores».
+              </p>
+              <RadioGroup
+                value={faturado}
+                onValueChange={(v) => setFaturado(v as "sim" | "nao")}
+                className="flex flex-wrap gap-4 pt-1"
+                required
+              >
+                <label className="flex cursor-pointer items-center gap-2 text-sm">
+                  <RadioGroupItem value="sim" id="fat-sim" />
+                  Sim — faturado
+                </label>
+                <label className="flex cursor-pointer items-center gap-2 text-sm">
+                  <RadioGroupItem value="nao" id="fat-nao" />
+                  Não — não faturado
+                </label>
+              </RadioGroup>
+            </div>
+
+            <div className="mt-4 rounded-lg border border-border bg-muted/20 p-4">
               <div className="flex items-start gap-3">
                 <Checkbox
                   id="esconder-valores"
@@ -910,11 +912,14 @@ export default function CriarReservaTransferDialog({
                     Esconder valores
                   </Label>
                   <p className="text-xs text-muted-foreground">
-                    O motorista vinculado não verá os valores cobrados ao cliente no mini portal nem no PDF operacional.
+                    Opcional e separado de «Faturado». Quando activo, oculta os valores cobrados ao cliente no{" "}
+                    <strong className="text-foreground">mini portal do motorista</strong> e no{" "}
+                    <strong className="text-foreground">PDF de confirmação da reserva</strong>.
                   </p>
                 </div>
               </div>
             </div>
+
             <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <Label>Status da reserva</Label>

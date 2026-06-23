@@ -610,7 +610,7 @@ function addTimeRow(doc: jsPDF, entries: { label: string; value: string }[], y: 
 // ═══════════════════════════════════════════════════════════
 
 type TransferPdfBuildOptions = {
-  /** Oculta valores cobrados ao cliente (PDF operacional / motorista). */
+  /** Força ocultar ou exibir valores; omitido = usa `esconder_valores` da reserva. */
   ocultarValores?: boolean;
 };
 
@@ -685,7 +685,10 @@ async function buildTransferReservaPdfDocument(
     if (r.por_hora_hora) y = addTimeRow(doc, [{ label: "Horário:", value: r.por_hora_hora }], y);
   }
 
-  const ocultarValores = options?.ocultarValores === true;
+  const ocultarValores =
+    options?.ocultarValores !== undefined
+      ? options.ocultarValores === true
+      : Boolean((r as { esconder_valores?: boolean }).esconder_valores);
   const faturado = Boolean((r as { faturado?: boolean }).faturado);
 
   // Section: Price
@@ -696,7 +699,7 @@ async function buildTransferReservaPdfDocument(
     setColor(doc, CLR.body);
     y = wrappedText(
       doc,
-      "Os valores cobrados ao cliente não estão visíveis neste documento (definido pelo operador).",
+      "Os valores cobrados ao cliente não estão visíveis neste documento (opção «Esconder valores» activa).",
       MARGIN,
       y,
       CONTENT_W,
@@ -788,16 +791,14 @@ async function buildTransferReservaPdfDocument(
 }
 
 export async function generateTransferPDF(reservaId: string) {
-  const built = await buildTransferReservaPdfDocument(reservaId, { ocultarValores: false });
+  const built = await buildTransferReservaPdfDocument(reservaId);
   if (!built) return;
   built.doc.save(built.filename);
 }
 
-/** PDF operacional para motorista (oculta valores quando `esconder_valores` na reserva). */
+/** PDF de confirmação para o motorista (mesma regra de ocultar valores da reserva). */
 export async function generateTransferPDFForMotorista(reservaId: string) {
-  const { data: r } = await supabase.from("reservas_transfer").select("esconder_valores").eq("id", reservaId).single();
-  const ocultarValores = Boolean((r as { esconder_valores?: boolean } | null)?.esconder_valores);
-  const built = await buildTransferReservaPdfDocument(reservaId, { ocultarValores });
+  const built = await buildTransferReservaPdfDocument(reservaId);
   if (!built) return;
   built.doc.save(built.filename.replace(".pdf", "-motorista.pdf"));
 }
