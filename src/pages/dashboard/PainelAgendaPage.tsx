@@ -15,6 +15,7 @@ import DetalhesReservaGrupoSheet from "@/components/reservas/DetalhesReservaGrup
 import ComunicarDialog from "@/components/comunicar/ComunicarDialog";
 import { generateGrupoPDF, generateTransferPDF, getGrupoReservaPdfBase64, getTransferReservaPdfBase64 } from "@/lib/pdfGenerator";
 import { buildGrupoDadosComunicarCliente, buildTransferDadosComunicarCliente } from "@/lib/comunicarReservaCliente";
+import { fetchAllSupabasePages } from "@/lib/supabaseFetchAll";
 
 const WEEKDAYS_PT = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"] as const;
 
@@ -70,16 +71,24 @@ export default function PainelAgendaPage() {
       }
 
       const [tRes, gRes] = await Promise.all([
-        supabase
-          .from("reservas_transfer")
-          .select(
-            "id, tipo_viagem, perna_viagem, numero_reserva, status, user_id, motorista_id, ida_data, ida_hora, volta_data, volta_hora, por_hora_data, por_hora_hora, ida_embarque, ida_desembarque, volta_embarque, volta_desembarque, por_hora_endereco_inicio, por_hora_ponto_encerramento",
-          ),
-        supabase
-          .from("reservas_grupos")
-          .select(
-            "id, numero_reserva, status, user_id, motorista_id, perna_viagem, data_ida, hora_ida, data_retorno, hora_retorno, embarque, destino",
-          ),
+        fetchAllSupabasePages((from, to) =>
+          supabase
+            .from("reservas_transfer")
+            .select(
+              "id, tipo_viagem, perna_viagem, numero_reserva, status, user_id, motorista_id, ida_data, ida_hora, volta_data, volta_hora, por_hora_data, por_hora_hora, ida_embarque, ida_desembarque, volta_embarque, volta_desembarque, por_hora_endereco_inicio, por_hora_ponto_encerramento",
+            )
+            .order("created_at", { ascending: false })
+            .range(from, to),
+        ),
+        fetchAllSupabasePages((from, to) =>
+          supabase
+            .from("reservas_grupos")
+            .select(
+              "id, numero_reserva, status, user_id, motorista_id, perna_viagem, data_ida, hora_ida, data_retorno, hora_retorno, embarque, destino",
+            )
+            .order("created_at", { ascending: false })
+            .range(from, to),
+        ),
       ]);
 
       if (tRes.error) {

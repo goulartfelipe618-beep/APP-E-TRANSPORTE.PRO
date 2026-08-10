@@ -10,6 +10,7 @@ import type { Json } from "@/integrations/supabase/types";
 import { getCadastroClienteSignedUrl, getFotoPerfilPathFromDocumentos } from "@/lib/cadastroClienteStorage";
 
 import { FINANCEIRO_HIGHLIGHT_CLIENTE_ID_KEY } from "@/lib/sessionKeys";
+import { fetchAllSupabasePages } from "@/lib/supabaseFetchAll";
 
 function parseEnderecos(raw: Json): { rotulo: string; endereco: string }[] {
   if (!raw || !Array.isArray(raw)) return [];
@@ -72,9 +73,23 @@ export default function DetalhesClienteSheet({ row, open, onOpenChange, onEdit }
       const id = row.id;
       const [t1, t2, g1, g2] = await Promise.all([
         supabase.from("reservas_transfer").select("id", { count: "exact", head: true }).eq("cadastro_cliente_id", id),
-        supabase.from("reservas_transfer").select("valor_total").eq("cadastro_cliente_id", id),
+        fetchAllSupabasePages((from, to) =>
+          supabase
+            .from("reservas_transfer")
+            .select("valor_total")
+            .eq("cadastro_cliente_id", id)
+            .order("created_at", { ascending: false })
+            .range(from, to),
+        ),
         supabase.from("reservas_grupos").select("id", { count: "exact", head: true }).eq("cadastro_cliente_id", id),
-        supabase.from("reservas_grupos").select("valor_total").eq("cadastro_cliente_id", id),
+        fetchAllSupabasePages((from, to) =>
+          supabase
+            .from("reservas_grupos")
+            .select("valor_total")
+            .eq("cadastro_cliente_id", id)
+            .order("created_at", { ascending: false })
+            .range(from, to),
+        ),
       ]);
       if (cancelled) return;
       setNTransfer(t1.count ?? 0);

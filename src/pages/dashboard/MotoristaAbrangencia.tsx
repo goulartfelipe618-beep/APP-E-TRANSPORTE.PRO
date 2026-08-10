@@ -12,6 +12,7 @@ import { findCoords, primeiroSegmentoEndereco, sleep } from "@/lib/abrangenciaMa
 import { grupoVisivelMotoristaExecutivo, transferVisivelMotoristaExecutivo } from "@/lib/painelAgendaReservas";
 import { Tables } from "@/integrations/supabase/types";
 import { toast } from "sonner";
+import { fetchAllSupabasePages } from "@/lib/supabaseFetchAll";
 
 /** Ícone verde com ✓ — atendimento realizado (reserva concluída). */
 const iconConcluida = L.divIcon({
@@ -109,15 +110,29 @@ async function loadReservasViaFallback(userId: string): Promise<{
   grupos: Tables<"reservas_grupos">[];
 }> {
   const [tRes, gRes] = await Promise.all([
-    supabase.from("reservas_transfer").select("*").or(`motorista_id.eq.${userId},user_id.eq.${userId}`),
-    supabase.from("reservas_grupos").select("*").or(`motorista_id.eq.${userId},user_id.eq.${userId}`),
+    fetchAllSupabasePages((from, to) =>
+      supabase
+        .from("reservas_transfer")
+        .select("*")
+        .or(`motorista_id.eq.${userId},user_id.eq.${userId}`)
+        .order("created_at", { ascending: false })
+        .range(from, to),
+    ),
+    fetchAllSupabasePages((from, to) =>
+      supabase
+        .from("reservas_grupos")
+        .select("*")
+        .or(`motorista_id.eq.${userId},user_id.eq.${userId}`)
+        .order("created_at", { ascending: false })
+        .range(from, to),
+    ),
   ]);
-  if (tRes.error) throw tRes.error;
-  if (gRes.error) throw gRes.error;
-  const transfers = ((tRes.data || []) as Tables<"reservas_transfer">[]).filter((r) =>
+  if (tRes.error) throw new Error(tRes.error);
+  if (gRes.error) throw new Error(gRes.error);
+  const transfers = (tRes.data as Tables<"reservas_transfer">[]).filter((r) =>
     transferVisivelMotoristaExecutivo(r, userId),
   );
-  const grupos = ((gRes.data || []) as Tables<"reservas_grupos">[]).filter((r) =>
+  const grupos = (gRes.data as Tables<"reservas_grupos">[]).filter((r) =>
     grupoVisivelMotoristaExecutivo(r, userId),
   );
   return { transfers, grupos };

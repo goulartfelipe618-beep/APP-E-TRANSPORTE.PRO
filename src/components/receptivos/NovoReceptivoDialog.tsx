@@ -21,6 +21,7 @@ import {
   getEnderecosReservaParaExibicao,
   RECEPTIVO_PDF_LAYOUT_VERSION,
 } from "@/lib/receptivoTransferPdf";
+import { fetchAllSupabasePages } from "@/lib/supabaseFetchAll";
 
 type Reserva = Tables<"reservas_transfer">;
 
@@ -43,10 +44,13 @@ export default function NovoReceptivoDialog({ open, onOpenChange, onSaved }: Pro
     if (!open) return;
     setLoadingReservas(true);
     void (async () => {
-      const { data, error } = await supabase
-        .from("reservas_transfer")
-        .select("*")
-        .order("created_at", { ascending: false });
+      const { data, error } = await fetchAllSupabasePages((from, to) =>
+        supabase
+          .from("reservas_transfer")
+          .select("*")
+          .order("created_at", { ascending: false })
+          .range(from, to),
+      );
       if (error) {
         toast.error("Erro ao carregar reservas Transfer");
         setReservas([]);

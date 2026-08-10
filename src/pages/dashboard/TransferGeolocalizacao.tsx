@@ -38,6 +38,7 @@ import { currentYearMonthKeySaoPaulo, yearMonthKeySaoPauloFromIso } from "@/lib/
 import { useUserPlan } from "@/hooks/useUserPlan";
 import { freePlanLockedRastreioIdsByCreationMonth } from "@/lib/freePlanLocks";
 import { usePainelListPagination } from "@/hooks/usePainelListPagination";
+import { fetchAllSupabasePages } from "@/lib/supabaseFetchAll";
 import { PainelPaginationBar } from "@/components/painel/PainelPaginationBar";
 import {
   isCategoriaMotorista,
@@ -170,8 +171,22 @@ export default function TransferGeolocalizacaoPage() {
     }
     const filtroDonoOuMotorista = `user_id.eq.${uid},motorista_id.eq.${uid}`;
     const [t, g, mot] = await Promise.all([
-      supabase.from("reservas_transfer").select("*").or(filtroDonoOuMotorista).order("created_at", { ascending: false }),
-      supabase.from("reservas_grupos").select("*").or(filtroDonoOuMotorista).order("created_at", { ascending: false }),
+      fetchAllSupabasePages((from, to) =>
+        supabase
+          .from("reservas_transfer")
+          .select("*")
+          .or(filtroDonoOuMotorista)
+          .order("created_at", { ascending: false })
+          .range(from, to),
+      ),
+      fetchAllSupabasePages((from, to) =>
+        supabase
+          .from("reservas_grupos")
+          .select("*")
+          .or(filtroDonoOuMotorista)
+          .order("created_at", { ascending: false })
+          .range(from, to),
+      ),
       supabase
         .from("solicitacoes_motoristas")
         .select("nome, telefone, portal_auth_user_id")

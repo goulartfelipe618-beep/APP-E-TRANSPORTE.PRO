@@ -22,6 +22,7 @@ import { cn } from "@/lib/utils";
 import { usePainelListPagination } from "@/hooks/usePainelListPagination";
 import { PainelPaginationBar } from "@/components/painel/PainelPaginationBar";
 import { buildGrupoDadosComunicarCliente } from "@/lib/comunicarReservaCliente";
+import { fetchAllSupabasePages } from "@/lib/supabaseFetchAll";
 
 type ReservaGrupo = Tables<"reservas_grupos">;
 
@@ -65,7 +66,13 @@ export default function GruposReservasPage() {
     }
 
     const [res, mot] = await Promise.all([
-      supabase.from("reservas_grupos").select("*").order("created_at", { ascending: false }),
+      fetchAllSupabasePages((from, to) =>
+        supabase
+          .from("reservas_grupos")
+          .select("*")
+          .order("created_at", { ascending: false })
+          .range(from, to),
+      ),
       supabase
         .from("solicitacoes_motoristas")
         .select("id, nome, portal_auth_user_id")

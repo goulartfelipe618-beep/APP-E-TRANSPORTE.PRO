@@ -14,6 +14,7 @@ import {
 import { FINANCEIRO_HIGHLIGHT_CLIENTE_ID_KEY } from "@/lib/sessionKeys";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchAllSupabasePages } from "@/lib/supabaseFetchAll";
 
 function sumRowsForSums(list: FinancialTransaction[]) {
   let faturado = 0;
@@ -149,8 +150,22 @@ export default function FinanceiroDashboardPage() {
     setIdsReservasLoading(true);
     void (async () => {
       const [t, g] = await Promise.all([
-        supabase.from("reservas_transfer").select("id").eq("cadastro_cliente_id", filtroCliente.id),
-        supabase.from("reservas_grupos").select("id").eq("cadastro_cliente_id", filtroCliente.id),
+        fetchAllSupabasePages((from, to) =>
+          supabase
+            .from("reservas_transfer")
+            .select("id")
+            .eq("cadastro_cliente_id", filtroCliente.id)
+            .order("created_at", { ascending: false })
+            .range(from, to),
+        ),
+        fetchAllSupabasePages((from, to) =>
+          supabase
+            .from("reservas_grupos")
+            .select("id")
+            .eq("cadastro_cliente_id", filtroCliente.id)
+            .order("created_at", { ascending: false })
+            .range(from, to),
+        ),
       ]);
       if (cancelled) return;
       setReservaTransferIds((t.data ?? []).map((r: { id: string }) => r.id));
@@ -177,14 +192,22 @@ export default function FinanceiroDashboardPage() {
     setReservasTabelaMesLoading(true);
     void (async () => {
       const [t, g] = await Promise.all([
-        supabase
-          .from("reservas_transfer")
-          .select("valor_total, ida_data, por_hora_data, volta_data")
-          .eq("cadastro_cliente_id", filtroCliente.id),
-        supabase
-          .from("reservas_grupos")
-          .select("valor_total, data_ida, data_retorno")
-          .eq("cadastro_cliente_id", filtroCliente.id),
+        fetchAllSupabasePages((from, to) =>
+          supabase
+            .from("reservas_transfer")
+            .select("valor_total, ida_data, por_hora_data, volta_data")
+            .eq("cadastro_cliente_id", filtroCliente.id)
+            .order("created_at", { ascending: false })
+            .range(from, to),
+        ),
+        fetchAllSupabasePages((from, to) =>
+          supabase
+            .from("reservas_grupos")
+            .select("valor_total, data_ida, data_retorno")
+            .eq("cadastro_cliente_id", filtroCliente.id)
+            .order("created_at", { ascending: false })
+            .range(from, to),
+        ),
       ]);
       if (cancelled) return;
       const dateT = (r: {
