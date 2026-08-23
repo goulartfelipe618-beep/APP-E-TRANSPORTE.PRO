@@ -61,7 +61,15 @@ export async function logUserActivity(
     };
 
     if (ONCE_ACTIONS.has(actionCode)) {
+      const { data: existing } = await supabase
+        .from("user_activity_log")
+        .select("id")
+        .eq("user_id", userId)
+        .eq("action_code", actionCode)
+        .maybeSingle();
+      if (existing) return;
       const { error } = await supabase.from("user_activity_log").insert(row);
+      // Corrida rara: unique (user_id, action_code) → 409/23505; ignorar.
       if (error?.code === "23505") return;
       return;
     }
