@@ -48,6 +48,7 @@ import {
 } from "@/lib/networkNacionalPrefs";
 import { cn } from "@/lib/utils";
 import { usePainelMotoristaEvolutionAtivo } from "@/hooks/usePainelMotoristaEvolutionAtivo";
+import { usePlataformaFerramentasDisponibilidade } from "@/hooks/usePlataformaFerramentasDisponibilidade";
 type ToolDef = { title: string; page: string; desc: string; icon: LucideIcon };
 
 type Subsection = { title: string; items: ToolDef[] };
@@ -63,6 +64,7 @@ type MajorSection = {
 function buildHomeSections(
   showNetwork: boolean,
   exibirComunicadorMotorista: boolean,
+  showMarketing: boolean,
 ): MajorSection[] {
   const principal: Subsection[] = [
     {
@@ -160,12 +162,16 @@ function buildHomeSections(
 
   return [
     { id: "principal", label: "Principal", subsections: principal },
-    {
-      id: "marketing",
-      label: "Marketing",
-      labelTone: "marketing",
-      subsections: [{ title: "Presença e captação", items: marketingItems }],
-    },
+    ...(showMarketing
+      ? [
+          {
+            id: "marketing",
+            label: "Marketing",
+            labelTone: "marketing" as const,
+            subsections: [{ title: "Presença e captação", items: marketingItems }],
+          },
+        ]
+      : []),
     {
       id: "ferramentas",
       label: "Ferramentas",
@@ -212,13 +218,15 @@ export default function HomePage() {
   const onboarding = useMotoristaOnboarding();
   const { painelMotoristaEvolutionAtivo, ready: painelComunicadorReady } = usePainelMotoristaEvolutionAtivo();
   const exibirComunicadorMotorista = !painelComunicadorReady || painelMotoristaEvolutionAtivo;
+  const { flags: ferramentasFlags, loading: ferramentasLoading } = usePlataformaFerramentasDisponibilidade();
+  const showMarketingMenu = !ferramentasLoading && ferramentasFlags.marketing_menu_liberado;
   const [networkAceito, setNetworkAceito] = useState<boolean | null>(null);
   const [mostrarRegras, setMostrarRegras] = useState(false);
   const [menuNetwork, setMenuNetwork] = useState(() => localStorage.getItem("network_nacional_aceito") === "sim");
 
   const sections = useMemo(
-    () => buildHomeSections(menuNetwork, exibirComunicadorMotorista),
-    [menuNetwork, exibirComunicadorMotorista],
+    () => buildHomeSections(menuNetwork, exibirComunicadorMotorista, showMarketingMenu),
+    [menuNetwork, exibirComunicadorMotorista, showMarketingMenu],
   );
 
   useEffect(() => {

@@ -34,6 +34,7 @@ import { useActivePage } from "@/contexts/ActivePageContext";
 import { persistNetworkHighlightDismissed } from "@/lib/networkNacionalPrefs";
 import { usePainelMotoristaEvolutionAtivo } from "@/hooks/usePainelMotoristaEvolutionAtivo";
 import { useUserPlan } from "@/hooks/useUserPlan";
+import { usePlataformaFerramentasDisponibilidade } from "@/hooks/usePlataformaFerramentasDisponibilidade";
 import { sidebarPlanBadgeLabel } from "@/lib/painelPlanPolicy";
 import PainelZoomHeaderButton from "@/components/painel/PainelZoomHeaderButton";
 
@@ -73,6 +74,7 @@ type MenuGroup = {
 const getMenuStructure = (
   showNetwork: boolean,
   exibirComunicadorMotorista: boolean,
+  showMarketing: boolean,
 ): MenuGroup[] => [
   {
     label: "Principal",
@@ -130,25 +132,29 @@ const getMenuStructure = (
       { title: "Veículos", page: "veiculos", icon: Car },
     ],
   },
-  {
-    label: "Marketing",
-    labelTone: "marketing",
-    items: [
-      {
-        title: "Campanhas",
-        icon: Megaphone,
-        children: [
-          { title: "Ativos", page: "campanhas/ativos", icon: Globe },
-          { title: "Leads", page: "campanhas/leads", icon: UserCheck },
-        ],
-      },
-      { title: "E-mail Business", page: "email-business", icon: Mail },
-      { title: "Website", page: "website", icon: Monitor },
-      { title: "Domínios", page: "dominios", icon: Link2 },
-      { title: "Comunidade", page: "comunidade", icon: Users },
-      ...(showNetwork ? [{ title: "Network", page: "network", icon: Globe }] : []),
-    ],
-  },
+  ...(showMarketing
+    ? ([
+        {
+          label: "Marketing",
+          labelTone: "marketing" as const,
+          items: [
+            {
+              title: "Campanhas",
+              icon: Megaphone,
+              children: [
+                { title: "Ativos", page: "campanhas/ativos", icon: Globe },
+                { title: "Leads", page: "campanhas/leads", icon: UserCheck },
+              ],
+            },
+            { title: "E-mail Business", page: "email-business", icon: Mail },
+            { title: "Website", page: "website", icon: Monitor },
+            { title: "Domínios", page: "dominios", icon: Link2 },
+            { title: "Comunidade", page: "comunidade", icon: Users },
+            ...(showNetwork ? [{ title: "Network", page: "network", icon: Globe }] : []),
+          ],
+        },
+      ] satisfies MenuGroup[])
+    : []),
   {
     label: "Ferramentas",
     items: [
@@ -200,6 +206,9 @@ export function AppSidebar() {
   const { painelMotoristaEvolutionAtivo, ready: painelComunicadorReady } = usePainelMotoristaEvolutionAtivo();
   const exibirComunicadorMotorista = !painelComunicadorReady || painelMotoristaEvolutionAtivo;
   const { plano, loading: planLoading } = useUserPlan();
+  const { flags: ferramentasFlags, loading: ferramentasLoading } = usePlataformaFerramentasDisponibilidade();
+  /** Enquanto carrega, não mostrar Marketing (evita flash e exige liberação explícita do master). */
+  const showMarketingMenu = !ferramentasLoading && ferramentasFlags.marketing_menu_liberado;
   const badgeForPage = (page: string) => (planLoading ? null : sidebarPlanBadgeLabel(plano, page));
   const mostrarBadgePlano = (page: string) => badgeForPage(page) !== null;
   const groupMenuBadge = (children: { page: string }[]): "PRÓ" | "ST+" | null => {
@@ -287,7 +296,7 @@ export function AppSidebar() {
       </div>
 
       <SidebarContent className={cn(showNetworkHighlight && "relative z-30")}>
-        {getMenuStructure(networkAceito, exibirComunicadorMotorista).map((group) => (
+        {getMenuStructure(networkAceito, exibirComunicadorMotorista, showMarketingMenu).map((group) => (
           <SidebarGroup key={group.label}>
             <SidebarGroupLabel
               className={cn(

@@ -24,6 +24,7 @@ import { isMapboxConfigured } from "@/lib/mapboxGeocode";
 import { persistNetworkRetornoSolicitado, persistNetworkSair } from "@/lib/networkNacionalPrefs";
 import LoginConfiguracoesSection from "@/pages/dashboard/LoginConfiguracoesSection";
 import WebsiteEmbedSnippetSection from "@/components/admin/WebsiteEmbedSnippetSection";
+import GoogleSheetsBackupSection from "@/components/sistema/GoogleSheetsBackupSection";
 import { assertUploadMagicBytes, extensionForDetectedMime } from "@/lib/validateUploadMagicBytes";
 import { validatePainelStrongPassword } from "@/lib/motoristaPortalPassword";
 import { FONTES_GLOBAIS, FONTE_GLOBAL_PADRAO, resolveFonteCss } from "@/lib/fontesGlobais";
@@ -1532,6 +1533,9 @@ export default function SistemaConfiguracoesPage() {
 
       {/* Network Nacional */}
       <NetworkSection />
+
+      {/* Google Sheets — só empresas (admin_transfer); não Admin Master nem portal motorista */}
+      {!isAdminMaster ? <GoogleSheetsBackupSection /> : null}
 
       {/* Hard Refresh */}
       <div className="rounded-xl border border-border bg-card p-6 max-w-2xl">

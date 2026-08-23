@@ -15,6 +15,8 @@ import { usePainelMotoristaEvolutionAtivo } from "@/hooks/usePainelMotoristaEvol
 import { useMotoristaOnboarding } from "@/hooks/useMotoristaOnboarding";
 import { usePainelErrorReporter } from "@/hooks/usePainelErrorReporter";
 import { useScrollPanelToTop } from "@/hooks/useScrollPanelToTop";
+import { usePlataformaFerramentasDisponibilidade } from "@/hooks/usePlataformaFerramentasDisponibilidade";
+import { isMarketingMenuPage } from "@/lib/marketingMenuPages";
 import { scheduleUserPlanRefetchWithBackoff } from "@/lib/userPlanRefetch";
 import {
   clearDashboardNavSessionStorage,
@@ -134,6 +136,7 @@ function DashboardContent() {
   const { activePage, setActivePage } = useActivePage();
   const onboarding = useMotoristaOnboarding();
   const { painelMotoristaEvolutionAtivo, ready: painelComunicadorReady } = usePainelMotoristaEvolutionAtivo();
+  const { flags: ferramentasFlags, loading: ferramentasLoading } = usePlataformaFerramentasDisponibilidade();
   const mainRef = useRef<HTMLElement>(null);
   useScrollPanelToTop(activePage, mainRef);
   useSlowScrollContainer(mainRef, activePage === "website");
@@ -232,6 +235,14 @@ function DashboardContent() {
       setActivePage("sistema/configuracoes");
     }
   }, [painelComunicadorReady, activePage, painelMotoristaEvolutionAtivo, setActivePage]);
+
+  /** Marketing só se o Admin Master liberar a categoria no painel master. */
+  useEffect(() => {
+    if (ferramentasLoading) return;
+    if (!ferramentasFlags.marketing_menu_liberado && isMarketingMenuPage(activePage)) {
+      setActivePage("home");
+    }
+  }, [ferramentasLoading, ferramentasFlags.marketing_menu_liberado, activePage, setActivePage]);
 
   /** Rotas descontinuadas (Catálogo / Google Maps): evita sessão antiga presa numa página removida. */
   useEffect(() => {

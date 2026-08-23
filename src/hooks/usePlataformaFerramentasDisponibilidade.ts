@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 
 export type PlataformaFerramentasFlags = {
   disparador_consumo_liberado: boolean;
+  marketing_menu_liberado: boolean;
 };
 
 /** Use com `invalidateQueries` após alterar flags no admin. */
@@ -13,12 +14,13 @@ export const PLATAFORMA_FERRAMENTAS_DISPONIBILIDADE_QUERY_KEY = [
 
 const DEFAULT_FLAGS: PlataformaFerramentasFlags = {
   disparador_consumo_liberado: false,
+  marketing_menu_liberado: false,
 };
 
 async function fetchPlataformaFerramentasDisponibilidade(): Promise<PlataformaFerramentasFlags> {
   const { data, error } = await supabase
     .from("plataforma_ferramentas_disponibilidade")
-    .select("disparador_consumo_liberado")
+    .select("disparador_consumo_liberado, marketing_menu_liberado")
     .eq("id", 1)
     .maybeSingle();
 
@@ -28,8 +30,13 @@ async function fetchPlataformaFerramentasDisponibilidade(): Promise<PlataformaFe
   if (!data) {
     return { ...DEFAULT_FLAGS };
   }
+  const row = data as {
+    disparador_consumo_liberado?: boolean;
+    marketing_menu_liberado?: boolean;
+  };
   return {
-    disparador_consumo_liberado: !!data.disparador_consumo_liberado,
+    disparador_consumo_liberado: !!row.disparador_consumo_liberado,
+    marketing_menu_liberado: !!row.marketing_menu_liberado,
   };
 }
 
@@ -62,6 +69,7 @@ export function usePlataformaFerramentasDisponibilidade() {
 
   const flags: PlataformaFerramentasFlags = {
     disparador_consumo_liberado: query.data?.disparador_consumo_liberado ?? false,
+    marketing_menu_liberado: query.data?.marketing_menu_liberado ?? false,
   };
 
   return {
