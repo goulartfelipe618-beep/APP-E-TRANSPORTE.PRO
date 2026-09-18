@@ -1,22 +1,26 @@
-import { supabase } from "@/integrations/supabase/client";
 import { fingerprintNormalizedEmail } from "@/lib/emailFingerprint";
 
 /**
  * Notifica o backend (Edge) de uma tentativa de login falhada.
- * Não envia password nem e-mail em claro — apenas impressão digital SHA-256 do e-mail normalizado.
+ * Usa a chave anon (não o JWT de sessão, que no ecrã de login pode estar expirado → 401 no gateway).
  */
 export async function reportAuthLoginFailure(emailNormalized: string): Promise<void> {
   const trimmed = emailNormalized.trim().toLowerCase();
   if (!trimmed) return;
+  const base = (import.meta.env.VITE_SUPABASE_URL as string | undefined)?.replace(/\/+$/, "");
+  const anon = (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined)?.trim();
+  if (!base || !anon) return;
   try {
     const email_fingerprint = await fingerprintNormalizedEmail(trimmed);
-    const { error } = await supabase.functions.invoke("log-auth-login-failure", {
-      body: { outcome: "failure", email_fingerprint },
+    await fetch(`${base}/functions/v1/log-auth-login-failure`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: anon,
+        Authorization: `Bearer ${anon}`,
+      },
+      body: JSON.stringify({ outcome: "failure", email_fingerprint }),
     });
-    if (error && import.meta.env.DEV) {
-      // eslint-disable-next-line no-console
-      console.warn("[authLoginFailureReporter]", error.message);
-    }
   } catch {
     /* falha silenciosa — não bloquear o fluxo de login */
   }

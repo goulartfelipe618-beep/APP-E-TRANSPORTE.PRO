@@ -106,11 +106,11 @@ Deno.serve(async (req) => {
     });
   }
 
-  const outcome = String(body.outcome ?? "");
+  const outcome = String(body.outcome ?? "failure");
   const fp = String(body.email_fingerprint ?? body.emailFingerprint ?? "").trim().toLowerCase();
   if (outcome !== "failure" || !FP_RE.test(fp)) {
-    return new Response(JSON.stringify({ error: "Payload inválido" }), {
-      status: 400,
+    return new Response(JSON.stringify({ ok: false, skipped: true }), {
+      status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
@@ -125,8 +125,8 @@ Deno.serve(async (req) => {
 
   if (error) {
     console.error("log-auth-login-failure insert:", error.message);
-    return new Response(JSON.stringify({ error: "Falha ao registar" }), {
-      status: 500,
+    return new Response(JSON.stringify({ ok: false }), {
+      status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
