@@ -109,7 +109,13 @@ function parseReserva(raw: unknown): FrotaPortalReserva | null {
       volta_desembarque: nullableString(r.volta_desembarque),
       por_hora_endereco_inicio: nullableString(r.por_hora_endereco_inicio),
       por_hora_ponto_encerramento: nullableString(r.por_hora_ponto_encerramento),
-      num_passageiros: nullableNumber(r.num_passageiros),
+      num_passageiros:
+        nullableNumber(r.num_passageiros) ??
+        (nullableString(r.tipo_viagem) === "por_hora"
+          ? nullableNumber(r.por_hora_passageiros)
+          : nullableString(r.perna_viagem) === "volta"
+            ? nullableNumber(r.volta_passageiros) ?? nullableNumber(r.ida_passageiros)
+            : nullableNumber(r.ida_passageiros)),
       valor_base: nullableNumber(r.valor_base),
       desconto: nullableNumber(r.desconto),
       valor_total: nullableNumber(r.valor_total),

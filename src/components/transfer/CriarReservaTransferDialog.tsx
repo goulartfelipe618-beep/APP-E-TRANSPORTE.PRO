@@ -37,6 +37,21 @@ function toTimeInput(v: string | null | undefined): string {
   return `${m[1].padStart(2, "0")}:${m[2]}`;
 }
 
+function isMissingColumnError(message: string): boolean {
+  return /categoria_veiculo|cadastro_cliente_id|schema cache|PGRST204|42703/i.test(message);
+}
+
+function stripUnknownColumns<T extends Record<string, unknown>>(payload: T, message: string): T {
+  const next = { ...payload };
+  if (/categoria_veiculo|schema cache|PGRST204|42703/i.test(message)) {
+    delete next.categoria_veiculo;
+  }
+  if (/cadastro_cliente_id/i.test(message)) {
+    delete next.cadastro_cliente_id;
+  }
+  return next;
+}
+
 export interface TransferInitialData {
   nome_completo?: string;
   contato?: string;
@@ -471,8 +486,28 @@ export default function CriarReservaTransferDialog({
 
     let error: { message: string } | null = null;
 
+    const writeRow = async (
+      payload: Record<string, unknown>,
+      mode: "insert" | "update",
+      id?: string,
+      selectId?: boolean,
+    ) => {
+      const run = (p: Record<string, unknown>) => {
+        if (mode === "update") {
+          return supabase.from("reservas_transfer").update(p as never).eq("id", id!);
+        }
+        const q = supabase.from("reservas_transfer").insert(p as never);
+        return selectId ? q.select("id").single() : q;
+      };
+      let res = await run(payload);
+      if (res.error && isMissingColumnError(res.error.message)) {
+        res = await run(stripUnknownColumns(payload, res.error.message));
+      }
+      return res;
+    };
+
     if (reservaEdicao?.id) {
-      const res = await supabase.from("reservas_transfer").update(rowPayload).eq("id", reservaEdicao.id);
+      const res = await writeRow(rowPayload as Record<string, unknown>, "update", reservaEdicao.id);
       error = res.error;
     } else if (tipoViagem === "ida_volta") {
       if (!voltaData.trim()) {
@@ -571,18 +606,18 @@ export default function CriarReservaTransferDialog({
         repasse_motorista: r2,
       };
 
-      const first = await supabase.from("reservas_transfer").insert({ user_id: user.id, ...idaRow }).select("id").single();
+      const first = await writeRow({ user_id: user.id, ...idaRow }, "insert", undefined, true);
       if (first.error) {
         error = first.error;
       } else {
-        const second = await supabase.from("reservas_transfer").insert({ user_id: user.id, ...voltaRow });
+        const second = await writeRow({ user_id: user.id, ...voltaRow }, "insert");
         if (second.error && first.data?.id) {
           await supabase.from("reservas_transfer").delete().eq("id", first.data.id);
           error = second.error;
         }
       }
     } else {
-      const res = await supabase.from("reservas_transfer").insert({ user_id: user.id, ...rowPayload });
+      const res = await writeRow({ user_id: user.id, ...rowPayload } as Record<string, unknown>, "insert");
       error = res.error;
     }
 
