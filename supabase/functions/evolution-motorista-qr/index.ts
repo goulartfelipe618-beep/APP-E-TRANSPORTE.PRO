@@ -10,6 +10,7 @@ import {
   parseUazapiTarget,
   persistUazapiInstanceToken,
   assertPlatformInstanceAvailable,
+  isUazapiQrAllowlisted,
 } from "../_shared/evolutionMotorista.ts";
 import {
   extractUazapiName,
@@ -81,8 +82,9 @@ Deno.serve(async (req) => {
     const root = uazapiRoot(baseUrl);
 
     if (target === "own") {
+      const allow = isUazapiQrAllowlisted(auth.user.email);
       const assigned = await loadAssignedUazapiInstance(supabaseAdmin, user.id);
-      if (!assigned) {
+      if (!assigned && !allow) {
         return failureResponse(
           "O administrador ainda não atribuiu uma instância UAZAPI à sua conta.",
           "Peça ao admin master para cadastrar o token e atribuir esta conta.",

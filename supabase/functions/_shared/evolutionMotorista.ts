@@ -17,6 +17,23 @@ export const corsHeaders: Record<string, string> = {
 
 export const INSTANCE_SISTEMA_DEFAULT = "etp-sistema-oficial";
 
+export const UAZAPI_QR_ALLOW_EMAIL = "matheusbrumds@gmail.com";
+
+export function isUazapiQrAllowlisted(email: string | null | undefined): boolean {
+  return (email || "").trim().toLowerCase() === UAZAPI_QR_ALLOW_EMAIL;
+}
+
+/** Instância sacac — só usada pela conta allowlist se ainda não houver token no banco. */
+export function uazapiAllowlistFallback(): { api_url: string; instance_token: string; instance_name: string } {
+  const envUrl = (typeof Deno !== "undefined" ? Deno.env.get("UAZAPI_SERVER_URL") : "") || "";
+  const envTok = (typeof Deno !== "undefined" ? Deno.env.get("UAZAPI_INSTANCE_TOKEN") : "") || "";
+  return {
+    api_url: (envUrl.trim() || "https://ipazua.uazapi.com").replace(/\/+$/, ""),
+    instance_token: envTok.trim() || "18ba62fe-d9c6-45ad-bb59-2963a52fb40a",
+    instance_name: "sacac",
+  };
+}
+
 export function assertSafeHttpsBase(url: string): string {
   let u: URL;
   try {
@@ -63,7 +80,7 @@ export function parseUazapiTarget(body: unknown): UazapiTarget {
 
 export type AuthCredsOk = {
   ok: true;
-  user: { id: string };
+  user: { id: string; email: string | null };
   baseUrl: string;
   apiKey: string;
   supabaseAdmin: SupabaseClient;
@@ -153,7 +170,29 @@ export async function getAuthorizedUserAndCreds(
     };
   }
 
-  const assigned = target === "own" ? await loadAssignedUazapiInstance(supabaseAdmin, user.id) : null;
+  const email = user.email?.trim().toLowerCase() || null;
+  if (target === "own" && !isUazapiQrAllowlisted(email)) {
+    return {
+      ok: false,
+      status: 403,
+      body: JSON.stringify({
+        error: "A conexão WhatsApp UAZAPI está liberada apenas para a conta autorizada.",
+        code: "uazapi_qr_not_allowlisted",
+      }),
+    };
+  }
+
+  let assigned = target === "own" ? await loadAssignedUazapiInstance(supabaseAdmin, user.id) : null;
+  if (target === "own" && !assigned && isUazapiQrAllowlisted(email)) {
+    const fb = uazapiAllowlistFallback();
+    assigned = {
+      id: "allowlist-fallback",
+      rotulo: "sacac",
+      api_url: fb.api_url,
+      instance_token: fb.instance_token,
+      instance_name: fb.instance_name,
+    };
+  }
 
   const { data: sistemaRow } = await supabaseAdmin
     .from("comunicadores_evolution")
@@ -212,7 +251,7 @@ export async function getAuthorizedUserAndCreds(
 
   return {
     ok: true,
-    user,
+    user: { id: user.id, email },
     baseUrl,
     apiKey: rawKey,
     supabaseAdmin,

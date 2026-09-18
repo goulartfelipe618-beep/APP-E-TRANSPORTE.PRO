@@ -10,6 +10,7 @@ import { ComunicadorEvolutionSection } from "@/components/comunicador/Comunicado
 import { useComunicadoresEvolution, qrSrc } from "@/hooks/useComunicadoresEvolution";
 import { isOwnEvolutionConnected } from "@/lib/evolutionConnection";
 import { WHATSAPP_OFICIAL_PLATAFORMA_EXIBICAO } from "@/lib/comunicadorOficial";
+import { isUazapiQrAllowlisted } from "@/lib/uazapiQrAllowlist";
 import {
   fetchEvolutionMotoristaDeleteFromServer,
   fetchEvolutionMotoristaQrFromServer,
@@ -45,6 +46,8 @@ export default function ComunicadorMotoristaExecutivoPage() {
   const [upgradeOpen, setUpgradeOpen] = useState(false);
   const planoSemPro = !planLoading && plano !== "pro";
   const [temInstanciaAtribuida, setTemInstanciaAtribuida] = useState<boolean | null>(null);
+  const [sessionEmail, setSessionEmail] = useState<string | null>(null);
+  const qrLiberado = isUazapiQrAllowlisted(sessionEmail);
 
   const [qrSession, setQrSession] = useState(false);
   const [sessionDeadline, setSessionDeadline] = useState<number | null>(null);
@@ -60,6 +63,9 @@ export default function ComunicadorMotoristaExecutivoPage() {
   const expiryNotifiedRef = useRef(false);
 
   useEffect(() => {
+    void supabase.auth.getUser().then(({ data }) => {
+      setSessionEmail(data.user?.email ?? null);
+    });
     void supabase.rpc("motorista_tem_uazapi_atribuido").then(({ data, error }) => {
       if (error) {
         setTemInstanciaAtribuida(false);
@@ -200,9 +206,8 @@ export default function ComunicadorMotoristaExecutivoPage() {
   }, [qrSession, sessionDeadline, clearTimers]);
 
   const handleConectarAgora = useCallback(async () => {
-    if (plano !== "pro") {
-      toast.message("Conectar o seu WhatsApp próprio está disponível no plano PRÓ (Premium).");
-      setUpgradeOpen(true);
+    if (!qrLiberado) {
+      toast.error("A conexão WhatsApp UAZAPI está liberada apenas para a conta autorizada.");
       return;
     }
     setBusyQr(true);
@@ -240,7 +245,7 @@ export default function ComunicadorMotoristaExecutivoPage() {
     } finally {
       setBusyQr(false);
     }
-  }, [persistOwnPatch, trySync, own, plano]);
+  }, [persistOwnPatch, trySync, own, qrLiberado]);
 
   const handleRemoverOwn = useCallback(async () => {
     setBusyDelete(true);
@@ -359,7 +364,7 @@ export default function ComunicadorMotoristaExecutivoPage() {
 
       <PlanTierOpaqueGate
         minimumPlan="pro"
-        blocked={planoSemPro}
+        blocked={planoSemPro && !qrLiberado}
         title="WhatsApp no seu número (PRÓ)"
         description="Ligue o seu WhatsApp por QR Code para que os envios em Comunicar usem a sua linha. Os dados da ligação mantêm-se na conta; disponível no plano PRÓ."
       >
@@ -428,26 +433,27 @@ export default function ComunicadorMotoristaExecutivoPage() {
           <CardHeader>
             <CardTitle className="text-lg">WhatsApp próprio</CardTitle>
             <CardDescription>
-              {planoSemPro
-                ? "No plano FREE pode consultar a linha oficial acima. Para ligar o seu próprio WhatsApp por QR Code, migre para o plano PRÓ (Premium)."
-                : temInstanciaAtribuida === false
-                  ? "Aguarde o administrador master cadastrar o token UAZAPI e atribuir esta instância à sua conta. Depois o QR conecta automaticamente nessa instância."
-                  : "Clique no botão abaixo para abrir o QR Code e conectar seu WhatsApp na instância UAZAPI atribuída."}
+              {qrLiberado
+                ? "Clique abaixo para gerar o QR Code da instância UAZAPI (sacac) e conectar o WhatsApp."
+                : planoSemPro
+                  ? "No plano FREE pode consultar a linha oficial acima. Para ligar o seu próprio WhatsApp por QR Code, migre para o plano PRÓ (Premium)."
+                  : "A conexão WhatsApp UAZAPI está liberada apenas para a conta autorizada pelo administrador."}
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm text-muted-foreground">
-              {planoSemPro
-                ? "O botão de conexão fica disponível após a migração de plano, apenas na sua conta."
-                : "O QR será exibido nesta tela e ficará válido por "}
-              {!planoSemPro ? (
+              {qrLiberado ? (
                 <>
-                  <strong className="text-foreground">10 minutos</strong>.
+                  O QR será exibido nesta tela e ficará válido por <strong className="text-foreground">10 minutos</strong>.
                 </>
-              ) : null}
+              ) : planoSemPro ? (
+                "O botão de conexão fica disponível após a migração de plano, apenas na sua conta."
+              ) : (
+                "Esta conta não está autorizada a gerar QR Code UAZAPI."
+              )}
             </p>
             <div className="flex shrink-0 flex-wrap gap-2">
-              {planoSemPro ? (
+              {planoSemPro && !qrLiberado ? (
                 <Button type="button" variant="outline" onClick={() => setUpgradeOpen(true)}>
                   Migrar para PRÓ
                 </Button>
@@ -456,7 +462,7 @@ export default function ComunicadorMotoristaExecutivoPage() {
                 type="button"
                 className="bg-[#FF6600] text-white hover:bg-[#FF6600]/90"
                 onClick={() => void handleConectarAgora()}
-                disabled={busyQr || loading || planoSemPro || temInstanciaAtribuida === false}
+                disabled={busyQr || loading || !qrLiberado}
               >
                 {busyQr ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Smartphone className="mr-2 h-4 w-4" />}
                 CONECTAR O QR CODE
