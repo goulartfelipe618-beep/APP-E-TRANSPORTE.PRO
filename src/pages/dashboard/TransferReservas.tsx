@@ -92,8 +92,10 @@ export default function TransferReservasPage() {
         .not("portal_auth_user_id", "is", null),
     ]);
 
-    if (res.error) toast.error("Erro ao carregar reservas");
-    else setReservas((res.data as Reserva[]) || []);
+    if (res.error) {
+      toast.error(`Erro ao carregar reservas: ${res.error}`);
+      setReservas([]);
+    } else setReservas((res.data as Reserva[]) || []);
 
     if (!mot.error && mot.data) {
       setMotoristasOpts(

@@ -75,7 +75,7 @@ export default function PainelAgendaPage() {
           supabase
             .from("reservas_transfer")
             .select(
-              "id, tipo_viagem, perna_viagem, numero_reserva, status, user_id, motorista_id, categoria_veiculo, ida_data, ida_hora, volta_data, volta_hora, por_hora_data, por_hora_hora, ida_embarque, ida_desembarque, volta_embarque, volta_desembarque, por_hora_endereco_inicio, por_hora_ponto_encerramento",
+              "id, tipo_viagem, perna_viagem, numero_reserva, status, user_id, motorista_id, ida_data, ida_hora, volta_data, volta_hora, por_hora_data, por_hora_hora, ida_embarque, ida_desembarque, volta_embarque, volta_desembarque, por_hora_endereco_inicio, por_hora_ponto_encerramento",
             )
             .order("created_at", { ascending: false })
             .range(from, to),

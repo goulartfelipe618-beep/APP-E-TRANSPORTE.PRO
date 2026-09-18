@@ -79,7 +79,13 @@ function parseReserva(raw: unknown): FrotaPortalReserva | null {
   if (!raw || typeof raw !== "object") return null;
   const r = raw as Record<string, unknown>;
   const kind = r.kind === "transfer" || r.kind === "grupo" ? r.kind : null;
-  const id = nullableString(r.id);
+  const idRaw = r.id;
+  const id =
+    typeof idRaw === "string" && idRaw.trim()
+      ? idRaw.trim()
+      : idRaw != null
+        ? String(idRaw)
+        : null;
   if (!kind || !id) return null;
 
   if (kind === "transfer") {
@@ -137,18 +143,44 @@ function parseReserva(raw: unknown): FrotaPortalReserva | null {
   };
 }
 
+async function listFrotaPortalReservationsFallback(): Promise<{
+  transfers: FrotaPortalTransferReserva[];
+  grupos: FrotaPortalGrupoReserva[];
+  error: string | null;
+}> {
+  const { data: auth } = await supabase.auth.getUser();
+  const uid = auth.user?.id;
+  if (!uid) return { transfers: [], grupos: [], error: "Sessão inválida" };
+
+  const [tRes, gRes] = await Promise.all([
+    supabase.from("reservas_transfer").select("*").eq("motorista_id", uid),
+    supabase.from("reservas_grupos").select("*").eq("motorista_id", uid),
+  ]);
+  if (tRes.error) return { transfers: [], grupos: [], error: tRes.error.message };
+  if (gRes.error) return { transfers: [], grupos: [], error: gRes.error.message };
+
+  const transfers = (tRes.data || [])
+    .map((row) => parseReserva({ kind: "transfer", ...row }))
+    .filter((r): r is FrotaPortalTransferReserva => r?.kind === "transfer");
+  const grupos = (gRes.data || [])
+    .map((row) => parseReserva({ kind: "grupo", ...row }))
+    .filter((r): r is FrotaPortalGrupoReserva => r?.kind === "grupo");
+  return { transfers, grupos, error: null };
+}
+
 export async function listFrotaPortalReservations(): Promise<{
   transfers: FrotaPortalTransferReserva[];
   grupos: FrotaPortalGrupoReserva[];
   error: string | null;
 }> {
   const { data, error } = await (supabase as unknown as SupabaseRpcClient).rpc("get_frota_motorista_reservas");
-  if (error) return { transfers: [], grupos: [], error: error.message };
-
-  const rows = Array.isArray(data) ? data.map(parseReserva).filter((r): r is FrotaPortalReserva => r != null) : [];
-  return {
-    transfers: rows.filter((r): r is FrotaPortalTransferReserva => r.kind === "transfer"),
-    grupos: rows.filter((r): r is FrotaPortalGrupoReserva => r.kind === "grupo"),
-    error: null,
-  };
+  if (!error) {
+    const rows = Array.isArray(data) ? data.map(parseReserva).filter((r): r is FrotaPortalReserva => r != null) : [];
+    return {
+      transfers: rows.filter((r): r is FrotaPortalTransferReserva => r.kind === "transfer"),
+      grupos: rows.filter((r): r is FrotaPortalGrupoReserva => r.kind === "grupo"),
+      error: null,
+    };
+  }
+  return listFrotaPortalReservationsFallback();
 }
