@@ -27,6 +27,13 @@ Adiciona manualmente **"+ Add new doc"** com estas URLs para o modelo usar APIs 
 - Supabase (Auth, Postgres, Storage, Edge Functions)
 - TanStack Query onde já estiver em uso
 
+## Banco remoto (não local)
+
+- **Project ref:** `lsfwmbpvithxqerfdlhy`
+- **URL:** `https://lsfwmbpvithxqerfdlhy.supabase.co`
+- SQL Editor: https://supabase.com/dashboard/project/lsfwmbpvithxqerfdlhy/sql
+- Migrações e Edge Functions devem ir para **este** projeto. Não assumir outro ref.
+
 ## Segurança (resumo)
 
 - Ver `README_SECURITY.md` na raiz (RLS, uploads, API Node, `npm run security-check`).

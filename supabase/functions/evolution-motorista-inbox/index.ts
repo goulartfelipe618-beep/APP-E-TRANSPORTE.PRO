@@ -1,12 +1,21 @@
 /**
- * Evolution — inbox do motorista (chats/mensagens/envio texto, ficheiros, áudio).
- * Credenciais só no servidor (comunicador oficial); usa a instância etp-u-* do utilizador.
+ * Inbox do comunicador (chats/mensagens/envio) via UAZAPI.
+ * Credenciais só no servidor; usa o token da instância do utilizador.
  */
 import {
   corsHeaders,
   getAuthorizedUserAndCreds,
-  instanceNameForUser,
+  loadStoredInstanceToken,
 } from "../_shared/evolutionMotorista.ts";
+import {
+  instanceHeaders,
+  uazapiChatFind,
+  uazapiFetch,
+  uazapiMessageFind,
+  uazapiRoot,
+  uazapiSendMedia,
+  uazapiSendText,
+} from "../_shared/uazapi.ts";
 
 function privateJsonHeaders(): Record<string, string> {
   return {
@@ -27,30 +36,6 @@ function isUsuarioRowConnected(status: string | null | undefined, phone: string 
   return CONNECTED_ROW.test(s);
 }
 
-async function evolutionPost(root: string, apiKey: string, path: string, jsonBody?: unknown): Promise<{ status: number; text: string }> {
-  const url = `${root}${path.startsWith("/") ? path : `/${path}`}`;
-  const init: RequestInit = {
-    method: "POST",
-    headers: { apikey: apiKey, "Content-Type": "application/json" },
-    body: JSON.stringify(jsonBody ?? {}),
-  };
-  const res = await fetch(url, init);
-  const text = await res.text();
-  return { status: res.status, text: text.length > MAX_BODY_CHARS ? text.slice(0, MAX_BODY_CHARS) + "\n…" : text };
-}
-
-async function evolutionDeleteJson(root: string, apiKey: string, path: string, jsonBody: unknown): Promise<{ status: number; text: string }> {
-  const url = `${root}${path.startsWith("/") ? path : `/${path}`}`;
-  const init: RequestInit = {
-    method: "DELETE",
-    headers: { apikey: apiKey, "Content-Type": "application/json" },
-    body: JSON.stringify(jsonBody ?? {}),
-  };
-  const res = await fetch(url, init);
-  const text = await res.text();
-  return { status: res.status, text: text.length > MAX_BODY_CHARS ? text.slice(0, MAX_BODY_CHARS) + "\n…" : text };
-}
-
 function parseJsonSafe(text: string): unknown {
   try {
     return JSON.parse(text) as unknown;
@@ -59,7 +44,6 @@ function parseJsonSafe(text: string): unknown {
   }
 }
 
-/** Extrai array de chats de várias formas de resposta Evolution. */
 function normalizeChatsArray(data: unknown): unknown[] {
   if (Array.isArray(data)) return data;
   if (data && typeof data === "object") {
@@ -70,7 +54,6 @@ function normalizeChatsArray(data: unknown): unknown[] {
   return [];
 }
 
-/** Extrai lista de mensagens. */
 function normalizeMessagesArray(data: unknown): unknown[] {
   if (Array.isArray(data)) return data;
   if (data && typeof data === "object") {
@@ -79,6 +62,18 @@ function normalizeMessagesArray(data: unknown): unknown[] {
     if (Array.isArray(a)) return a;
   }
   return [];
+}
+
+function clip(text: string): string {
+  return text.length > MAX_BODY_CHARS ? text.slice(0, MAX_BODY_CHARS) + "\n…" : text;
+}
+
+function mapMediaType(mediatype: string, mimetype: string): string {
+  const t = mediatype.toLowerCase();
+  if (t.includes("image") || mimetype.startsWith("image/")) return "image";
+  if (t.includes("video") || mimetype.startsWith("video/")) return "video";
+  if (t.includes("audio") || mimetype.startsWith("audio/")) return "audio";
+  return "document";
 }
 
 Deno.serve(async (req) => {
@@ -114,9 +109,9 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { user, baseUrl, apiKey, supabaseAdmin } = auth;
-    const instanceName = instanceNameForUser(user.id);
-    const root = baseUrl.replace(/\/+$/, "");
+    const { user, baseUrl, supabaseAdmin } = auth;
+    const root = uazapiRoot(baseUrl);
+    const token = await loadStoredInstanceToken(supabaseAdmin, "own", user.id);
 
     const { data: ownRow, error: ownErr } = await supabaseAdmin
       .from("comunicadores_evolution")
@@ -132,7 +127,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    if (!isUsuarioRowConnected(ownRow?.connection_status ?? null, ownRow?.telefone_conectado ?? null)) {
+    if (!token || !isUsuarioRowConnected(ownRow?.connection_status ?? null, ownRow?.telefone_conectado ?? null)) {
       return new Response(JSON.stringify({ error: "WhatsApp próprio não conectado.", code: "not_connected" }), {
         status: 403,
         headers: privateJsonHeaders(),
@@ -166,11 +161,9 @@ Deno.serve(async (req) => {
       });
     }
 
-    const encInst = encodeURIComponent(instanceName);
-
     if (action === "chats") {
-      const pack = await evolutionPost(root, apiKey, `/chat/findChats/${encInst}`, {});
-      const parsed = parseJsonSafe(pack.text);
+      const pack = await uazapiChatFind(root, token, { limit: 80 });
+      const parsed = pack.json ?? parseJsonSafe(pack.text);
       return new Response(
         JSON.stringify({
           httpStatus: pack.status,
@@ -190,11 +183,11 @@ Deno.serve(async (req) => {
         });
       }
       const limit = Math.min(Math.max(Number(body.limit) || 80, 1), 200);
-      const pack = await evolutionPost(root, apiKey, `/chat/findMessages/${encInst}`, {
-        where: { key: { remoteJid } },
-        limit,
-      });
-      const parsed = parseJsonSafe(pack.text);
+      let pack = await uazapiMessageFind(root, token, { id: remoteJid, chatid: remoteJid, limit });
+      if (pack.status < 200 || pack.status >= 300) {
+        pack = await uazapiMessageFind(root, token, { chatid: remoteJid, limit });
+      }
+      const parsed = pack.json ?? parseJsonSafe(pack.text);
       return new Response(
         JSON.stringify({
           httpStatus: pack.status,
@@ -214,12 +207,8 @@ Deno.serve(async (req) => {
           headers: privateJsonHeaders(),
         });
       }
-      const pack = await evolutionPost(root, apiKey, `/message/sendText/${encInst}`, {
-        number: num,
-        text,
-        linkPreview: false,
-      });
-      return new Response(JSON.stringify({ httpStatus: pack.status, bodyText: pack.text }), {
+      const pack = await uazapiSendText(root, token, num, text);
+      return new Response(JSON.stringify({ httpStatus: pack.status, bodyText: clip(pack.text) }), {
         status: 200,
         headers: privateJsonHeaders(),
       });
@@ -234,15 +223,14 @@ Deno.serve(async (req) => {
           headers: privateJsonHeaders(),
         });
       }
-      const pack = await evolutionPost(root, apiKey, `/message/sendMedia/${encInst}`, {
-        number: num,
-        mediatype: m.mediatype,
-        mimetype: m.mimetype,
-        caption: m.caption ?? "",
-        media: m.base64,
-        fileName: m.fileName,
+      const raw = m.base64.includes(",") ? m.base64 : `data:${m.mimetype};base64,${m.base64}`;
+      const pack = await uazapiSendMedia(root, token, num, {
+        type: mapMediaType(m.mediatype, m.mimetype),
+        file: raw,
+        text: m.caption ?? "",
+        docName: m.fileName,
       });
-      return new Response(JSON.stringify({ httpStatus: pack.status, bodyText: pack.text }), {
+      return new Response(JSON.stringify({ httpStatus: pack.status, bodyText: clip(pack.text) }), {
         status: 200,
         headers: privateJsonHeaders(),
       });
@@ -257,12 +245,12 @@ Deno.serve(async (req) => {
           headers: privateJsonHeaders(),
         });
       }
-      const pack = await evolutionPost(root, apiKey, `/message/sendWhatsAppAudio/${encInst}`, {
-        number: num,
-        audio,
-        encoding: true,
+      const file = audio.includes(",") ? audio : `data:audio/ogg;base64,${audio}`;
+      const pack = await uazapiSendMedia(root, token, num, {
+        type: "audio",
+        file,
       });
-      return new Response(JSON.stringify({ httpStatus: pack.status, bodyText: pack.text }), {
+      return new Response(JSON.stringify({ httpStatus: pack.status, bodyText: clip(pack.text) }), {
         status: 200,
         headers: privateJsonHeaders(),
       });
@@ -272,7 +260,6 @@ Deno.serve(async (req) => {
       const remoteJid = String(body.remoteJid || "").trim();
       const messageId = String(body.messageId || "").trim();
       const fromMe = body.fromMe === true;
-      const participantRaw = typeof body.participant === "string" ? body.participant.trim() : "";
       if (!remoteJid || !messageId) {
         return new Response(JSON.stringify({ error: "remoteJid e messageId são obrigatórios" }), {
           status: 400,
@@ -291,16 +278,12 @@ Deno.serve(async (req) => {
           },
         );
       }
-      const payload: Record<string, unknown> = {
-        id: messageId,
-        remoteJid,
-        fromMe: true,
-      };
-      if (participantRaw && remoteJid.endsWith("@g.us")) {
-        payload.participant = participantRaw;
-      }
-      const pack = await evolutionDeleteJson(root, apiKey, `/chat/deleteMessageForEveryone/${encInst}`, payload);
-      return new Response(JSON.stringify({ httpStatus: pack.status, bodyText: pack.text }), {
+      const pack = await uazapiFetch(`${root}/message/delete`, {
+        method: "POST",
+        headers: instanceHeaders(token, true),
+        body: JSON.stringify({ id: messageId, chatid: remoteJid }),
+      });
+      return new Response(JSON.stringify({ httpStatus: pack.status, bodyText: clip(pack.text) }), {
         status: 200,
         headers: privateJsonHeaders(),
       });

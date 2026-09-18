@@ -5,6 +5,7 @@
  */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { assertHttpsBaseUrl } from "../_shared/ssrfSafeHttps.ts";
+import { corsHeaders } from "../_shared/evolutionMotorista.ts";
 
 const PROXY_JSON_HEADERS: Record<string, string> = {
   ...corsHeaders,
@@ -220,7 +221,8 @@ Deno.serve(async (req) => {
     const target = `${baseUrl.replace(/\/+$/, "")}${upstreamPath}`;
 
     const headers: Record<string, string> = {
-      apikey: apiKey,
+      admintoken: apiKey,
+      token: apiKey,
     };
     if (method === "POST" && jsonBody !== undefined && jsonBody !== null) {
       headers["Content-Type"] = "application/json";

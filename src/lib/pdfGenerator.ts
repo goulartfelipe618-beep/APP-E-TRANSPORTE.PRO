@@ -2,6 +2,7 @@ import jsPDF from "jspdf";
 import { supabase } from "@/integrations/supabase/client";
 import { mergeCabecalhoComPerfilSeNecessario } from "@/lib/cabecalhoContratualResolve";
 import { formatDbCalendarDatePtBr, formatDbCalendarDatePtBrShortMonth } from "@/lib/painelAgendaReservas";
+import { labelCategoriaVeiculoTransfer } from "@/lib/categoriaVeiculoTransfer";
 
 // ─── Layout Constants ───────────────────────────────────────
 const PAGE_W = 210;
@@ -647,6 +648,8 @@ async function buildTransferReservaPdfDocument(
   y += 7;
 
   const serviceFields: { l: string; v: string }[] = [];
+  const catVeiculo = labelCategoriaVeiculoTransfer((r as { categoria_veiculo?: string | null }).categoria_veiculo);
+  if (catVeiculo && catVeiculo !== "—") serviceFields.push({ l: "Categoria:", v: catVeiculo });
   if (r.ida_embarque) serviceFields.push({ l: "Embarque:", v: r.ida_embarque });
   if (r.ida_desembarque) serviceFields.push({ l: "Destino:", v: r.ida_desembarque });
   if (r.telefone) serviceFields.push({ l: "Tel. Cliente:", v: r.telefone });

@@ -209,7 +209,7 @@ export default function FrotaAgendaPage() {
                 <div className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto">
                   {items.map((it) => {
                     const noPassado = agendaItemCodigoNoPassado(it);
-                    const title = `${it.numeroLabel} · ${it.perna} · ${it.horario} — ${it.trajetoResumo}`;
+                    const title = `${it.numeroLabel} · ${it.categoriaAbrev ? `${it.categoriaAbrev} · ` : ""}${it.perna} · ${it.horario} — ${it.trajetoResumo}`;
                     return (
                       <button
                         key={it.key}
@@ -226,6 +226,11 @@ export default function FrotaAgendaPage() {
                         >
                           {it.numeroLabel}
                         </span>
+                        {it.categoriaAbrev ? (
+                          <span className="shrink-0 rounded bg-foreground/10 px-0.5 text-[9px] font-bold uppercase leading-none tracking-tight text-foreground">
+                            {it.categoriaAbrev}
+                          </span>
+                        ) : null}
                         {(it.perna === "Ida" || it.perna === "Volta") && (
                           <span className="shrink-0 rounded px-0.5 text-[9px] font-bold uppercase leading-none text-[#FF6600]">
                             {it.perna}

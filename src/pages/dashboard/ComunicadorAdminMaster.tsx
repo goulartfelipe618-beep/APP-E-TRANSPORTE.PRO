@@ -8,8 +8,13 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { Tables } from "@/integrations/supabase/types";
-import { AlertTriangle, Loader2, Pencil, Save, X } from "lucide-react";
+import { AlertTriangle, Loader2, Pencil, Save, Smartphone, X } from "lucide-react";
 import { sanitizeApiKey } from "@/lib/evolutionApi";
+import {
+  fetchEvolutionMotoristaQrFromServer,
+  fetchEvolutionMotoristaSyncFromServer,
+} from "@/lib/evolutionApi";
+import { qrSrc } from "@/hooks/useComunicadoresEvolution";
 import { cn } from "@/lib/utils";
 
 const EVO_KEY_MASK = "••••••••••••••••••••";
@@ -79,6 +84,9 @@ export default function ComunicadorAdminMasterPage() {
   const [painelMotoristaSaving, setPainelMotoristaSaving] = useState(false);
   /** Só `false` quando há credencial salva e o admin clicou em Editar. */
   const [evoEditing, setEvoEditing] = useState(true);
+  const [oficialQr, setOficialQr] = useState<string | null>(null);
+  const [oficialQrBusy, setOficialQrBusy] = useState(false);
+  const [oficialStatus, setOficialStatus] = useState<string>("");
   const [savingKey, setSavingKey] = useState<UrlKey | null>(null);
   const [server, setServer] = useState<Record<UrlKey, string>>(emptyDraft);
   const [draft, setDraft] = useState<Record<UrlKey, string>>(emptyDraft);
@@ -163,7 +171,7 @@ export default function ComunicadorAdminMasterPage() {
 
       const { data: painelRow, error: painelErr } = await supabase
         .from("comunicadores_evolution")
-        .select("painel_motorista_evolution_ativo")
+        .select("painel_motorista_evolution_ativo, connection_status, qr_code_base64")
         .eq("id", sistemaId)
         .maybeSingle();
       if (!painelErr && painelRow && typeof (painelRow as { painel_motorista_evolution_ativo?: boolean }).painel_motorista_evolution_ativo === "boolean") {
@@ -171,6 +179,8 @@ export default function ComunicadorAdminMasterPage() {
       } else {
         setPainelMotoristaAtivo(true);
       }
+      setOficialStatus(String((painelRow as { connection_status?: string } | null)?.connection_status || ""));
+      setOficialQr((painelRow as { qr_code_base64?: string | null } | null)?.qr_code_base64 || null);
 
       const { data: cr } = await supabase
         .from("comunicador_evolution_credenciais")
@@ -199,12 +209,12 @@ export default function ComunicadorAdminMasterPage() {
     }
     const url = evoUrl.trim();
     if (!url || !url.startsWith("https://")) {
-      toast.error("Informe a URL HTTPS da Evolution API (ex.: https://evo.seudominio.com).");
+      toast.error("Informe a URL HTTPS da UAZAPI (ex.: https://ipazua.uazapi.com).");
       return;
     }
     const keyTrim = evoKey.trim();
     if (!evoCredsExist && !keyTrim) {
-      toast.error("Informe a API Key da Evolution (Authentication API Key).");
+      toast.error("Informe o Token da Instância da UAZAPI.");
       return;
     }
 
@@ -235,7 +245,16 @@ export default function ComunicadorAdminMasterPage() {
         });
         if (error) throw error;
       }
-      toast.success("Credenciais da Evolution salvas. O painel dos motoristas usa apenas o comunicador oficial.");
+      if (keyTrim) {
+        await supabase
+          .from("comunicadores_evolution")
+          .update({
+            uazapi_instance_token: sanitizeApiKey(keyTrim),
+            updated_at: new Date().toISOString(),
+          } as never)
+          .eq("id", comunicadorSistemaId);
+      }
+      toast.success("Credenciais da UAZAPI salvas. Gere o QR Code abaixo para conectar o WhatsApp.");
       setEvoCredsExist(true);
       setEvoKey("");
       setEvoEditing(false);
@@ -286,7 +305,7 @@ export default function ComunicadorAdminMasterPage() {
       toast.success(
         v
           ? "Motoristas executivos voltam a ver o menu e a página Comunicador."
-          : "Comunicador (Evolution) oculto no painel dos motoristas executivos.",
+          : "Comunicador (UAZAPI) oculto no painel dos motoristas executivos.",
       );
       window.dispatchEvent(new Event("painel-motorista-evolution-changed"));
     } catch (e) {
@@ -356,11 +375,11 @@ export default function ComunicadorAdminMasterPage() {
 
       <Card className="border-primary/30 bg-primary/5">
         <CardHeader>
-          <CardTitle className="text-lg">Evolution API (WhatsApp)</CardTitle>
+          <CardTitle className="text-lg">UAZAPI (WhatsApp)</CardTitle>
           <CardDescription>
-            URL e chave do <strong className="text-foreground">mesmo servidor Evolution</strong> que você usa no painel. Com
-            isso, a instância oficial da plataforma pode ser gerida neste painel. O envio pelos motoristas executivos usa
-            sempre esse canal (sem comunicador próprio no painel por enquanto).
+            URL do servidor <strong className="text-foreground">uazapiGO</strong> (ex.: https://ipazua.uazapi.com) e o{" "}
+            <strong className="text-foreground">Token da Instância</strong> (o mesmo que aparece no painel da UAZAPI,
+            junto de Conectar). Depois salve e clique em Gerar QR Code — o WhatsApp é o da instância desconectada.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -389,12 +408,12 @@ export default function ComunicadorAdminMasterPage() {
                   )}
                 >
                   <div className="space-y-2">
-                    <Label htmlFor="evo-url">URL da Evolution API</Label>
+                    <Label htmlFor="evo-url">URL da UAZAPI</Label>
                     <Input
                       id="evo-url"
                       type="url"
                       autoComplete="off"
-                      placeholder="https://seu-servidor-evolution.com"
+                      placeholder="https://seudominio.uazapi.com"
                       value={evoUrl}
                       onChange={(e) => setEvoUrl(e.target.value)}
                       readOnly={evoLocked}
@@ -402,7 +421,7 @@ export default function ComunicadorAdminMasterPage() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="evo-key">API Key (Authentication)</Label>
+                    <Label htmlFor="evo-key">Token da Instância</Label>
                     <Input
                       id="evo-key"
                       type={evoLocked ? "text" : "password"}
@@ -410,7 +429,7 @@ export default function ComunicadorAdminMasterPage() {
                       placeholder={
                         evoEditing && evoCredsExist
                           ? "Deixe em branco para manter a chave atual"
-                          : "Cole a API Key"
+                          : "Cole o Token da Instância (UUID)"
                       }
                       value={evoLocked && evoCredsExist ? EVO_KEY_MASK : evoKey}
                       onChange={(e) => setEvoKey(e.target.value)}
@@ -435,7 +454,7 @@ export default function ComunicadorAdminMasterPage() {
                   <>
                     <Button type="button" onClick={() => void saveEvolutionCreds()} disabled={evoSaving}>
                       {evoSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
-                      Salvar credenciais Evolution
+                      Salvar credenciais UAZAPI
                     </Button>
                     {evoCredsExist && evoUrl.trim() ? (
                       <Button type="button" variant="ghost" onClick={() => void cancelEvoEdit()}>
@@ -446,6 +465,77 @@ export default function ComunicadorAdminMasterPage() {
                   </>
                 )}
               </div>
+              {evoCredsExist && evoUrl.trim() ? (
+                <div className="space-y-3 rounded-lg border border-border p-4">
+                  <p className="text-sm font-medium text-foreground">Conectar WhatsApp oficial (QR Code)</p>
+                  <p className="text-xs text-muted-foreground">
+                    Status: <span className="font-mono text-foreground">{oficialStatus || "desconectado"}</span>
+                  </p>
+                  <div className="flex flex-col items-center gap-3 sm:flex-row sm:items-start">
+                    <div className="flex h-44 w-44 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-muted/30">
+                      {qrSrc(oficialQr) ? (
+                        <img src={qrSrc(oficialQr)!} alt="QR Code WhatsApp" className="max-h-full max-w-full object-contain" />
+                      ) : (
+                        <Smartphone className="h-16 w-16 text-muted-foreground" />
+                      )}
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <Button
+                        type="button"
+                        className="bg-[#FF6600] text-white hover:bg-[#FF6600]/90"
+                        disabled={oficialQrBusy}
+                        onClick={() => {
+                          void (async () => {
+                            setOficialQrBusy(true);
+                            try {
+                              const pack = await fetchEvolutionMotoristaQrFromServer({ target: "sistema" });
+                              if (!pack.base64) {
+                                toast.error(pack.detail || "Não foi possível gerar o QR.");
+                                return;
+                              }
+                              setOficialQr(pack.base64);
+                              setOficialStatus("aguardando_qr");
+                              toast.success("QR gerado. Escaneie no WhatsApp (Aparelhos ligados).");
+                              window.setTimeout(() => {
+                                void fetchEvolutionMotoristaSyncFromServer({ target: "sistema" }).then((s) => {
+                                  if (s.connected) {
+                                    setOficialStatus("conectado");
+                                    setOficialQr(null);
+                                    toast.success("WhatsApp oficial conectado.");
+                                  }
+                                });
+                              }, 4000);
+                            } finally {
+                              setOficialQrBusy(false);
+                            }
+                          })();
+                        }}
+                      >
+                        {oficialQrBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Smartphone className="mr-2 h-4 w-4" />}
+                        Gerar QR Code
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        disabled={oficialQrBusy}
+                        onClick={() => {
+                          void fetchEvolutionMotoristaSyncFromServer({ target: "sistema" }).then((s) => {
+                            if (s.connected) {
+                              setOficialStatus("conectado");
+                              setOficialQr(null);
+                              toast.success("WhatsApp oficial conectado.");
+                            } else {
+                              toast.message(s.detail || s.state || "Ainda não conectado. Escaneie o QR.");
+                            }
+                          });
+                        }}
+                      >
+                        Verificar conexão
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
             </>
           )}
         </CardContent>
@@ -456,14 +546,14 @@ export default function ComunicadorAdminMasterPage() {
           <CardTitle className="text-lg">Painel do motorista executivo</CardTitle>
           <CardDescription>
             Quando desligado, o item <strong className="text-foreground">Comunicador</strong> some do menu (Configurações) e a
-            página deixa de ser acessível — útil enquanto a integração Evolution não estiver disponível ou em manutenção.
+            página deixa de ser acessível — útil enquanto a integração UAZAPI não estiver disponível ou em manutenção.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-lg border border-border bg-muted/20 p-4">
             <div className="min-w-0 space-y-1">
               <Label htmlFor="evo-painel-motorista" className="text-base font-medium text-foreground">
-                Exibir Comunicador (Evolution) para motoristas
+                Exibir Comunicador (UAZAPI) para motoristas
               </Label>
               <p className="text-xs text-muted-foreground">
                 Afeta apenas o painel <span className="font-medium text-foreground">Gestão de Frota</span>. O administrador

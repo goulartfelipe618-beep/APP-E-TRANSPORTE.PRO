@@ -21,6 +21,7 @@ import {
   formatComunicarValorCampo,
 } from "@/lib/comunicarFieldFormat";
 import { COMUNICAR_CLIENTE_CHAVES_CONFIDENCIAIS } from "@/lib/comunicarReservaCliente";
+import { sendUazapiWhatsappCard } from "@/lib/evolutionApi";
 
 interface ComunicarDialogProps {
   open: boolean;
@@ -52,6 +53,7 @@ const labelMap: Record<string, string> = {
   tipo: "Tipo",
   tipo_viagem: "Tipo de Viagem",
   tipo_veiculo: "Tipo de Veículo",
+  categoria_veiculo: "Categoria do Veículo",
   embarque: "Embarque",
   desembarque: "Desembarque",
   ida_embarque: "Embarque (Ida)",
@@ -253,6 +255,7 @@ export default function ComunicarDialog({
       const message = base;
 
       setEnviando(true);
+      let enviadoOk = false;
       try {
         let confirmacaoPdf: { base64: string; filename: string; mime_type: string } | null = null;
         if (isReservaN8n && getConfirmacaoReservaPdfBase64) {
@@ -268,43 +271,72 @@ export default function ComunicarDialog({
           };
         }
 
+        if (!phone) {
+          toast.error("Informe o WhatsApp do destinatário.");
+          return;
+        }
+
+        const sent = await sendUazapiWhatsappCard({
+          number: phone,
+          text: message,
+          title: titulo,
+          buttons: [
+            { id: "recebido", text: "✅ Recebido" },
+            { id: "duvidas", text: "❓ Dúvidas" },
+          ],
+          pdf: confirmacaoPdf
+            ? { base64: confirmacaoPdf.base64, filename: confirmacaoPdf.filename }
+            : null,
+        });
+        if (!sent.ok) {
+          toast.error(sent.error || "Não foi possível enviar no WhatsApp.");
+          return;
+        }
+        if (sent.warning) toast.message(sent.warning);
+
         const motorista = await fetchMotoristaPainelSnapshot();
         const comunicadorSnap = buildComunicadorSnapshot(sistema, own);
-        await dispatchComunicarWebhook(webhookTipo, {
-          evento: isReservaN8n ? "comunicar_reserva_webhook" : "comunicar_envio_webhook",
-          webhook_tipo: webhookTipo,
-          origem: webhookTipo,
-          momento: new Date().toISOString(),
-          titulo_modal: titulo,
-          telefone_cliente: phone || null,
-          telefone_cliente_disponivel: Boolean(phone),
-          dados_registro: dadosRegistroComunicarParaWebhook(row),
-          variaveis_chaves_incluidas: [...selectedVars],
-          mensagem_completa: message,
-          mensagem_partes: {
-            inicial: msgAcima,
-            final: msgAbaixo,
-          },
-          motorista_painel: motorista,
-          comunicador: comunicadorSnap,
-          confirmacao_reserva_pdf: confirmacaoPdf,
-          ...buildN8nEnvioWhatsappCampos(comunicadorSnap, phone, {
-            mensagem: message,
-            tipo: webhookTipo,
-          }),
-          ...(confirmacaoPdf
-            ? { pdf_base64: confirmacaoPdf.base64, pdf_filename: confirmacaoPdf.filename }
-            : {}),
-        });
+        try {
+          await dispatchComunicarWebhook(webhookTipo, {
+            evento: isReservaN8n ? "comunicar_reserva_webhook" : "comunicar_envio_webhook",
+            webhook_tipo: webhookTipo,
+            origem: webhookTipo,
+            momento: new Date().toISOString(),
+            titulo_modal: titulo,
+            telefone_cliente: phone || null,
+            telefone_cliente_disponivel: Boolean(phone),
+            dados_registro: dadosRegistroComunicarParaWebhook(row),
+            variaveis_chaves_incluidas: [...selectedVars],
+            mensagem_completa: message,
+            mensagem_partes: {
+              inicial: msgAcima,
+              final: msgAbaixo,
+            },
+            motorista_painel: motorista,
+            comunicador: comunicadorSnap,
+            confirmacao_reserva_pdf: confirmacaoPdf,
+            ...buildN8nEnvioWhatsappCampos(comunicadorSnap, phone, {
+              mensagem: message,
+              tipo: webhookTipo,
+            }),
+            ...(confirmacaoPdf
+              ? { pdf_base64: confirmacaoPdf.base64, pdf_filename: confirmacaoPdf.filename }
+              : {}),
+          });
+        } catch (webhookErr) {
+          console.warn(webhookErr);
+        }
+        enviadoOk = true;
       } catch (e) {
         console.error(e);
-        toast.error(e instanceof Error ? e.message : "Falha ao enviar ao webhook.");
+        toast.error(e instanceof Error ? e.message : "Falha ao enviar no WhatsApp.");
         return;
       } finally {
         setEnviando(false);
       }
 
-      toast.success(isReservaN8n ? "Dados da reserva enviados." : "Dados enviados.");
+      if (!enviadoOk) return;
+      toast.success(isReservaN8n ? "Reserva enviada no WhatsApp." : "Mensagem enviada no WhatsApp.");
       onOpenChange(false);
     })();
   };
@@ -321,8 +353,9 @@ export default function ComunicarDialog({
 
         <div className="space-y-4">
           <p className="text-sm text-muted-foreground rounded-lg border border-border bg-muted/40 p-3">
-            O envio é feito apenas para o webhook configurado pelo administrador master. Nenhum aplicativo externo (como
-            WhatsApp) será aberto.
+            O envio vai para o WhatsApp do cliente em <strong className="text-foreground">card interativo</strong> pela
+            UAZAPI (número próprio se estiver conectado, senão o oficial). Escaneie o QR em Comunicador antes do primeiro
+            disparo.
           </p>
 
           {isReservaN8n && getConfirmacaoReservaPdfBase64 ? (

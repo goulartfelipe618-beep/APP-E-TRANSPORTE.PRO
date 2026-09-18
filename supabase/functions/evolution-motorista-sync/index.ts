@@ -1,23 +1,18 @@
 import {
   corsHeaders,
   extractPhoneDeep,
-  extractProfileFromInstances,
   getAuthorizedUserAndCreds,
-  instanceNameForUser,
+  loadStoredInstanceToken,
+  parseUazapiTarget,
+  persistUazapiInstanceToken,
 } from "../_shared/evolutionMotorista.ts";
-
-function extractState(data: unknown): string | null {
-  if (!data || typeof data !== "object") return null;
-  const o = data as Record<string, unknown>;
-  const inst = o.instance;
-  if (inst && typeof inst === "object") {
-    const s = (inst as Record<string, unknown>).state;
-    if (typeof s === "string") return s;
-  }
-  const s = o.state;
-  if (typeof s === "string") return s;
-  return null;
-}
+import {
+  extractUazapiQrBase64,
+  extractUazapiStatus,
+  isUazapiConnected,
+  uazapiRoot,
+  uazapiStatus,
+} from "../_shared/uazapi.ts";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -40,11 +35,19 @@ Deno.serve(async (req) => {
       });
     }
 
+    let body: unknown = {};
+    try {
+      body = await req.json();
+    } catch {
+      body = {};
+    }
+    const target = parseUazapiTarget(body);
+
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-    const auth = await getAuthorizedUserAndCreds(authHeader, supabaseUrl, anonKey, serviceKey);
+    const auth = await getAuthorizedUserAndCreds(authHeader, supabaseUrl, anonKey, serviceKey, target);
     if (!auth.ok) {
       return new Response(auth.body, {
         status: auth.status,
@@ -52,65 +55,61 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { user, baseUrl, apiKey } = auth;
-    const instanceName = instanceNameForUser(user.id);
-    const root = baseUrl.replace(/\/+$/, "");
+    const { user, baseUrl, supabaseAdmin, instanceName } = auth;
+    const token = await loadStoredInstanceToken(supabaseAdmin, target, user.id);
+    if (!token) {
+      return new Response(
+        JSON.stringify({
+          instanceName,
+          phone: null,
+          state: "disconnected",
+          profilePicUrl: null,
+          profileName: null,
+          connected: false,
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
 
-    let phone: string | null = null;
-    let state: string | null = null;
+    const st = await uazapiStatus(uazapiRoot(baseUrl), token);
+    const json = st.json;
+    const status = extractUazapiStatus(json);
+    const phone = extractPhoneDeep(json);
     let profilePicUrl: string | null = null;
     let profileName: string | null = null;
-
-    const csRes = await fetch(`${root}/instance/connectionState/${encodeURIComponent(instanceName)}`, {
-      method: "GET",
-      headers: { apikey: apiKey },
-    });
-    const csText = await csRes.text();
-    if (csRes.ok) {
-      try {
-        const csJson = JSON.parse(csText) as unknown;
-        phone = extractPhoneDeep(csJson);
-        state = extractState(csJson) ?? state;
-        if (!phone) phone = extractPhoneDeep(csJson);
-      } catch {
-        /* ignore */
-      }
+    if (json && typeof json === "object") {
+      const o = json as Record<string, unknown>;
+      if (typeof o.profilePicUrl === "string") profilePicUrl = o.profilePicUrl;
+      if (typeof o.profileName === "string") profileName = o.profileName;
     }
+    const connected = isUazapiConnected(status) || Boolean(phone);
+    const qr = extractUazapiQrBase64(json);
 
-    const fiRes = await fetch(`${root}/instance/fetchInstances`, {
-      method: "GET",
-      headers: { apikey: apiKey },
-    });
-    const fiText = await fiRes.text();
-    if (fiRes.ok) {
-      try {
-        const fiJson = JSON.parse(fiText) as unknown;
-        const prof = extractProfileFromInstances(fiJson, instanceName);
-        profilePicUrl = prof.profilePicUrl;
-        profileName = prof.profileName;
-        phone = phone ?? prof.phone;
-        state = state ?? prof.state;
-      } catch {
-        /* ignore */
-      }
+    if (connected) {
+      await persistUazapiInstanceToken(supabaseAdmin, {
+        target,
+        userId: user.id,
+        instanceName,
+        token,
+        extra: {
+          connection_status: "conectado",
+          telefone_conectado: phone,
+          nome_dispositivo: profileName,
+          foto_perfil_url: profilePicUrl,
+          qr_code_base64: null,
+        },
+      });
     }
-
-    const normalizedState = typeof state === "string" ? state.toLowerCase() : "";
-    const connected =
-      Boolean(phone) ||
-      normalizedState === "open" ||
-      normalizedState === "connected" ||
-      normalizedState === "conectado" ||
-      normalizedState === "online";
 
     return new Response(
       JSON.stringify({
         instanceName,
         phone,
-        state,
+        state: status,
         profilePicUrl,
         profileName,
         connected,
+        qrcode: connected ? null : qr,
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );

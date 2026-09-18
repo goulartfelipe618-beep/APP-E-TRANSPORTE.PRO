@@ -40,6 +40,9 @@ verify_jwt = false
 [functions.comunicar-webhook-dispatch]
 verify_jwt = false
 
+[functions.uazapi-send-card]
+verify_jwt = false
+
 # Portal motorista da frota: primeiro acesso sem sessão (token na URL).
 [functions.motorista-frota-portal]
 verify_jwt = false

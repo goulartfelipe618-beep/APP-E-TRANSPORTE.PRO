@@ -20,6 +20,10 @@ import { normalizeUserPlano, FREE_MAX_RESERVAS_DIA } from "@/lib/painelPlanPolic
 import { calendarDayKeySaoPauloFromIso, todayKeySaoPaulo } from "@/lib/spCalendarBr";
 import { splitAmountInTwoHalves, valorTotalFromBaseDiscount } from "@/lib/reservaIdaVoltaSplit";
 import { logUserActivity } from "@/lib/userActivityLog";
+import {
+  CATEGORIAS_VEICULO_TRANSFER,
+  isCategoriaVeiculoTransfer,
+} from "@/lib/categoriaVeiculoTransfer";
 
 function toDateInput(v: string | null | undefined): string {
   return toAgendaDayKey(v) ?? "";
@@ -137,6 +141,7 @@ export default function CriarReservaTransferDialog({
   const [clientesReservaOpts, setClientesReservaOpts] = useState<ClienteReservaOpt[]>([]);
   const [cadastroClienteIdReserva, setCadastroClienteIdReserva] = useState("");
   const [clientSearch, setClientSearch] = useState("");
+  const [categoriaVeiculo, setCategoriaVeiculo] = useState("");
 
   const clientesFiltrados = useMemo(() => {
     const raw = clientSearch.trim();
@@ -219,6 +224,8 @@ export default function CriarReservaTransferDialog({
       );
       const mid = (row.motorista_id ?? "").trim();
       setMotoristaAtribUid(mid);
+      const cat = (row as { categoria_veiculo?: string | null }).categoria_veiculo;
+      setCategoriaVeiculo(isCategoriaVeiculoTransfer(cat) ? cat : "");
       const cid = (row as { cadastro_cliente_id?: string | null }).cadastro_cliente_id;
       if (cid) {
         setModoClienteReserva("cadastrado");
@@ -262,6 +269,7 @@ export default function CriarReservaTransferDialog({
         const tipoMap: Record<string, TipoViagem> = { ida: "somente_ida", somente_ida: "somente_ida", ida_volta: "ida_volta", por_hora: "por_hora" };
         setTipoViagem(tipoMap[initialData.tipo] || "somente_ida");
       }
+      setCategoriaVeiculo("");
       setModoClienteReserva("novo");
       setCadastroClienteIdReserva("");
       return;
@@ -316,6 +324,7 @@ export default function CriarReservaTransferDialog({
     setValorBase("0"); setDesconto("0"); setMetodoPagamento(""); setFaturado("nao"); setEsconderValores(false); setObservacoes("");
     setStatusOperacional("pendente"); setRepasseMotorista("");
     setMotoristaAtribUid("");
+    setCategoriaVeiculo("");
     setModoClienteReserva("novo");
     setCadastroClienteIdReserva("");
     setClientSearch("");
@@ -330,6 +339,12 @@ export default function CriarReservaTransferDialog({
 
     if (modoClienteReserva === "cadastrado" && !cadastroClienteIdReserva.trim()) {
       toast.error("Selecione um cliente cadastrado ou mude para NOVO CLIENTE.");
+      setSaving(false);
+      return;
+    }
+
+    if (!isCategoriaVeiculoTransfer(categoriaVeiculo)) {
+      toast.error("Selecione a categoria do veículo da reserva.");
       setSaving(false);
       return;
     }
@@ -451,6 +466,7 @@ export default function CriarReservaTransferDialog({
       motorista_id:
         quemViaja === "motorista" && motoristaAtribUid.trim() !== "" ? motoristaAtribUid.trim() : null,
       cadastro_cliente_id: cadastroClienteIdOut,
+      categoria_veiculo: categoriaVeiculo,
     };
 
     let error: { message: string } | null = null;
@@ -489,6 +505,7 @@ export default function CriarReservaTransferDialog({
         status: statusOperacional,
         motorista_id: motoristaId,
         cadastro_cliente_id: cadastroClienteIdOut,
+        categoria_veiculo: categoriaVeiculo,
         por_hora_endereco_inicio: null as string | null,
         por_hora_ponto_encerramento: null as string | null,
         por_hora_data: null as string | null,
@@ -822,6 +839,21 @@ export default function CriarReservaTransferDialog({
           <div>
             <h3 className="font-semibold text-foreground mb-3">Veículo e Motorista</h3>
             <div className="space-y-4">
+              <div className="space-y-1.5">
+                <Label>Categoria do veículo *</Label>
+                <Select value={categoriaVeiculo || undefined} onValueChange={setCategoriaVeiculo}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione a categoria" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {CATEGORIAS_VEICULO_TRANSFER.map((c) => (
+                      <SelectItem key={c.value} value={c.value}>
+                        {c.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="space-y-1.5">
                 <Label>Quem fará a viagem? *</Label>
                 <Select value={quemViaja} onValueChange={(v) => setQuemViaja(v as QuemViaja)}>

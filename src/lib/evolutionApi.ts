@@ -168,7 +168,9 @@ async function fetchPhoneFromInstancesList(
  * Cria/recupera instância na Evolution do administrador e retorna o QR (Edge Function).
  * Usa credenciais em `comunicador_evolution_credenciais` — não exige VITE_* no front do motorista.
  */
-export async function fetchEvolutionMotoristaQrFromServer(): Promise<{
+export async function fetchEvolutionMotoristaQrFromServer(opts?: {
+  target?: "own" | "sistema";
+}): Promise<{
   base64: string | null;
   instanceName?: string;
   detail?: string;
@@ -180,7 +182,7 @@ export async function fetchEvolutionMotoristaQrFromServer(): Promise<{
     error?: string;
     detail?: string;
     code?: string;
-  }>("evolution-motorista-qr", { body: {} });
+  }>("evolution-motorista-qr", { body: { target: opts?.target ?? "own" } });
 
   if (error) {
     let detail = error.message;
@@ -213,7 +215,9 @@ export async function fetchEvolutionMotoristaQrFromServer(): Promise<{
 }
 
 /** Sincroniza número, foto e nome do perfil a partir da Evolution (Edge Function). */
-export async function fetchEvolutionMotoristaSyncFromServer(): Promise<{
+export async function fetchEvolutionMotoristaSyncFromServer(opts?: {
+  target?: "own" | "sistema";
+}): Promise<{
   phone: string | null;
   profilePicUrl: string | null;
   profileName: string | null;
@@ -228,7 +232,7 @@ export async function fetchEvolutionMotoristaSyncFromServer(): Promise<{
     state?: string | null;
     connected?: boolean;
     error?: string;
-  }>("evolution-motorista-sync", { body: {} });
+  }>("evolution-motorista-sync", { body: { target: opts?.target ?? "own" } });
 
   if (error) {
     return { phone: null, profilePicUrl: null, profileName: null, state: null, connected: false, detail: error.message };
@@ -256,10 +260,12 @@ export async function fetchEvolutionMotoristaSyncFromServer(): Promise<{
 }
 
 /** Remove a instância na Evolution do motorista (Edge Function). */
-export async function fetchEvolutionMotoristaDeleteFromServer(): Promise<{ ok: boolean; detail?: string }> {
+export async function fetchEvolutionMotoristaDeleteFromServer(opts?: {
+  target?: "own" | "sistema";
+}): Promise<{ ok: boolean; detail?: string }> {
   const { data, error } = await supabase.functions.invoke<{ ok?: boolean; error?: string; detail?: string }>(
     "evolution-motorista-delete",
-    { body: {} },
+    { body: { target: opts?.target ?? "own" } },
   );
 
   if (error) {
@@ -272,6 +278,29 @@ export async function fetchEvolutionMotoristaDeleteFromServer(): Promise<{ ok: b
     return { ok: true };
   }
   return { ok: false, detail: "Resposta inesperada" };
+}
+
+export async function sendUazapiWhatsappCard(opts: {
+  number: string;
+  text: string;
+  title?: string;
+  buttons?: Array<{ id: string; text: string }>;
+  pdf?: { base64: string; filename: string } | null;
+}): Promise<{ ok: boolean; error?: string; canal?: string; warning?: string }> {
+  const { data, error } = await supabase.functions.invoke<{
+    ok?: boolean;
+    error?: string;
+    canal?: string;
+    warning?: string;
+  }>("uazapi-send-card", { body: opts });
+
+  if (error) {
+    return { ok: false, error: error.message };
+  }
+  if (!data?.ok) {
+    return { ok: false, error: data?.error || "Falha ao enviar o card no WhatsApp." };
+  }
+  return { ok: true, canal: data.canal, warning: data.warning };
 }
 
 export async function fetchEvolutionQrCode(

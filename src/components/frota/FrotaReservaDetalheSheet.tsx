@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import type { FrotaPortalGrupoReserva, FrotaPortalTransferReserva } from "@/lib/frotaPortalReservations";
 import { formatTransferTipoViagemExibicao } from "@/lib/transferPernaViagem";
 import { formatDbCalendarDatePtBr, formatHoraReserva } from "@/lib/painelAgendaReservas";
+import { labelCategoriaVeiculoTransfer } from "@/lib/categoriaVeiculoTransfer";
 
 type Props = {
   transfer: FrotaPortalTransferReserva | null;
@@ -113,6 +114,7 @@ export default function FrotaReservaDetalheSheet({ transfer, grupo, open, onOpen
             {isTransfer && transfer ? (
               <div className="space-y-3 rounded-xl border border-border bg-card p-4">
                 <DetailRow label="Tipo" value={formatTransferTipoViagemExibicao(transfer.tipo_viagem, transfer.perna_viagem)} />
+                <DetailRow label="Categoria" value={labelCategoriaVeiculoTransfer(transfer.categoria_veiculo)} />
                 <TransferSchedule transfer={transfer} />
                 {transfer.tipo_viagem === "por_hora" ? (
                   <div className="grid grid-cols-1 gap-2">

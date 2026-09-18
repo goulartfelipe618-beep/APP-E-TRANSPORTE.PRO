@@ -1,4 +1,5 @@
 import { primeiroSegmentoEndereco } from "@/lib/abrangenciaMapHelpers";
+import { abrevCategoriaVeiculoTransfer } from "@/lib/categoriaVeiculoTransfer";
 import { isTransferPernaDividida, transferPernaNormalizada } from "@/lib/transferPernaViagem";
 
 export type TransferAgendaReserva = {
@@ -22,6 +23,7 @@ export type TransferAgendaReserva = {
   volta_desembarque: string | null;
   por_hora_endereco_inicio: string | null;
   por_hora_ponto_encerramento: string | null;
+  categoria_veiculo?: string | null;
 };
 
 export type GrupoAgendaReserva = {
@@ -168,6 +170,8 @@ export type AgendaItem = {
   trajetoResumo: string;
   status: string | null;
   instanteAgendaMs: number;
+  /** Sigla da categoria de veículo (transfer). */
+  categoriaAbrev: string | null;
 };
 
 /** Vermelho no código: já passou o horário do slot ou reserva concluída. */
@@ -195,6 +199,7 @@ function pushItem(
     trajetoResumo: item.trajetoResumo,
     status: item.status,
     instanteAgendaMs,
+    categoriaAbrev: item.categoriaAbrev ?? null,
   });
   map.set(dayKey, list);
 }
@@ -228,6 +233,7 @@ export function buildAgendaItemsPorDiaAtribuidoSomente(
         reservaId: r.id,
         kind: "transfer",
         numeroLabel: num,
+        categoriaAbrev: abrevCategoriaVeiculoTransfer(r.categoria_veiculo),
         perna: "Por hora",
         horario: formatHoraReserva(r.por_hora_hora),
         trajetoResumo: trajetoTransferLeg(r, "por_hora"),
@@ -245,6 +251,7 @@ export function buildAgendaItemsPorDiaAtribuidoSomente(
         reservaId: r.id,
         kind: "transfer",
         numeroLabel: num,
+        categoriaAbrev: abrevCategoriaVeiculoTransfer(r.categoria_veiculo),
         perna: labelPerna,
         horario: formatHoraReserva(r.ida_hora),
         trajetoResumo: trajetoTransferLeg(r, "ida"),
@@ -259,6 +266,7 @@ export function buildAgendaItemsPorDiaAtribuidoSomente(
       reservaId: r.id,
       kind: "transfer",
       numeroLabel: num,
+      categoriaAbrev: abrevCategoriaVeiculoTransfer(r.categoria_veiculo),
       perna: "Ida",
       horario: formatHoraReserva(r.ida_hora),
       trajetoResumo: trajetoTransferLeg(r, "ida"),
@@ -272,6 +280,7 @@ export function buildAgendaItemsPorDiaAtribuidoSomente(
         reservaId: r.id,
         kind: "transfer",
         numeroLabel: num,
+        categoriaAbrev: abrevCategoriaVeiculoTransfer(r.categoria_veiculo),
         perna: "Volta",
         horario: formatHoraReserva(r.volta_hora),
         trajetoResumo: trajetoTransferLeg(r, "volta"),
@@ -295,6 +304,7 @@ export function buildAgendaItemsPorDiaAtribuidoSomente(
         reservaId: g.id,
         kind: "grupo",
         numeroLabel: num,
+        categoriaAbrev: null,
         perna: labelPerna,
         horario: formatHoraReserva(g.hora_ida),
         trajetoResumo: traj,
@@ -309,6 +319,7 @@ export function buildAgendaItemsPorDiaAtribuidoSomente(
       reservaId: g.id,
       kind: "grupo",
       numeroLabel: num,
+      categoriaAbrev: null,
       perna: "Ida",
       horario: formatHoraReserva(g.hora_ida),
       trajetoResumo: traj,
@@ -322,6 +333,7 @@ export function buildAgendaItemsPorDiaAtribuidoSomente(
         reservaId: g.id,
         kind: "grupo",
         numeroLabel: num,
+        categoriaAbrev: null,
         perna: "Volta",
         horario: formatHoraReserva(g.hora_retorno),
         trajetoResumo: traj,
@@ -364,6 +376,7 @@ export function buildAgendaItemsPorDia(
         reservaId: r.id,
         kind: "transfer",
         numeroLabel: num,
+        categoriaAbrev: abrevCategoriaVeiculoTransfer(r.categoria_veiculo),
         perna: "Por hora",
         horario: formatHoraReserva(r.por_hora_hora),
         trajetoResumo: trajetoTransferLeg(r, "por_hora"),
@@ -381,6 +394,7 @@ export function buildAgendaItemsPorDia(
         reservaId: r.id,
         kind: "transfer",
         numeroLabel: num,
+        categoriaAbrev: abrevCategoriaVeiculoTransfer(r.categoria_veiculo),
         perna: labelPerna,
         horario: formatHoraReserva(r.ida_hora),
         trajetoResumo: trajetoTransferLeg(r, "ida"),
@@ -395,6 +409,7 @@ export function buildAgendaItemsPorDia(
       reservaId: r.id,
       kind: "transfer",
       numeroLabel: num,
+      categoriaAbrev: abrevCategoriaVeiculoTransfer(r.categoria_veiculo),
       perna: "Ida",
       horario: formatHoraReserva(r.ida_hora),
       trajetoResumo: trajetoTransferLeg(r, "ida"),
@@ -408,6 +423,7 @@ export function buildAgendaItemsPorDia(
         reservaId: r.id,
         kind: "transfer",
         numeroLabel: num,
+        categoriaAbrev: abrevCategoriaVeiculoTransfer(r.categoria_veiculo),
         perna: "Volta",
         horario: formatHoraReserva(r.volta_hora),
         trajetoResumo: trajetoTransferLeg(r, "volta"),
@@ -430,6 +446,7 @@ export function buildAgendaItemsPorDia(
         reservaId: g.id,
         kind: "grupo",
         numeroLabel: num,
+        categoriaAbrev: null,
         perna: labelPerna,
         horario: formatHoraReserva(g.hora_ida),
         trajetoResumo: traj,
@@ -444,6 +461,7 @@ export function buildAgendaItemsPorDia(
       reservaId: g.id,
       kind: "grupo",
       numeroLabel: num,
+      categoriaAbrev: null,
       perna: "Ida",
       horario: formatHoraReserva(g.hora_ida),
       trajetoResumo: traj,
@@ -457,6 +475,7 @@ export function buildAgendaItemsPorDia(
         reservaId: g.id,
         kind: "grupo",
         numeroLabel: num,
+        categoriaAbrev: null,
         perna: "Volta",
         horario: formatHoraReserva(g.hora_retorno),
         trajetoResumo: traj,

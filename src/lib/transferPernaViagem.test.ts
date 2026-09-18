@@ -76,4 +76,33 @@ describe("buildAgendaItemsPorDia — perna dividida", () => {
     expect(map.get("2026-05-17")?.[0]?.perna).toBe("Ida");
     expect(map.get("2026-05-18")?.[0]?.perna).toBe("Volta");
   });
+
+  it("mostra sigla da categoria na agenda", () => {
+    const map = buildAgendaItemsPorDia(
+      [
+        {
+          id: "c",
+          tipo_viagem: "somente_ida",
+          numero_reserva: 12,
+          status: "pendente",
+          ida_data: "2026-09-17",
+          ida_hora: "09:00",
+          volta_data: null,
+          volta_hora: null,
+          por_hora_data: null,
+          por_hora_hora: null,
+          ida_embarque: "A",
+          ida_desembarque: "B",
+          volta_embarque: null,
+          volta_desembarque: null,
+          por_hora_endereco_inicio: null,
+          por_hora_ponto_encerramento: null,
+          motorista_id: null,
+          categoria_veiculo: "veiculo_07_lugares",
+        },
+      ],
+      [],
+    );
+    expect(map.get("2026-09-17")?.[0]?.categoriaAbrev).toBe("07LUG.");
+  });
 });

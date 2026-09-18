@@ -3,7 +3,7 @@ import type { ComunicadorRow } from "@/hooks/useComunicadoresEvolution";
 
 /**
  * Número público da linha oficial da plataforma (E.164 sem `+`), para metadata no webhook / n8n
- * quando o envio não usa o WhatsApp próprio do motorista na Evolution.
+ * quando o envio não usa o WhatsApp próprio do motorista na UAZAPI.
  */
 export const NUMERO_OFICIAL_PLATAFORMA_E164 = "554796234862";
 
@@ -188,12 +188,15 @@ export function buildN8nEnvioWhatsappCampos(
   return {
     whatsapp_destino_e164,
     canal_whatsapp: canal,
-    /** Instância Evolution do motorista (vazia se só usar oficial). Usada no n8n para `/instance/connectionState/{instance}`. */
+    /** Instância UAZAPI do motorista (vazia se só usar oficial). */
     whatsapp_instance: instanceProprio,
+    provedor_whatsapp: "uazapi",
     numero_oficial_plataforma_e164: NUMERO_OFICIAL_PLATAFORMA_E164,
     numero_remetente_e164: numeroRemetenteE164,
     envio_pela_linha:
       canal === "proprio" ? "whatsapp_proprio_motorista" : "whatsapp_oficial_plataforma",
+    usa_linha_propria_uazapi: canal === "proprio",
+    /** Alias legado para fluxos n8n antigos. */
     usa_linha_propria_evolution: canal === "proprio",
     mensagem,
     mensagem_completa: mensagem,

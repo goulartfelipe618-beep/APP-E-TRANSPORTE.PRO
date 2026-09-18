@@ -12,6 +12,7 @@ import {
   transferMostraTrechoVoltaCampos,
   transferSecaoTrajetoTitulo,
 } from "@/lib/transferPernaViagem";
+import { labelCategoriaVeiculoTransfer } from "@/lib/categoriaVeiculoTransfer";
 
 type Reserva = Tables<"reservas_transfer">;
 
@@ -62,6 +63,7 @@ export default function DetalhesReservaTransferSheet({ reserva, open, onOpenChan
                 label="Tipo de Viagem"
                 value={formatTransferTipoViagemExibicao(r.tipo_viagem, (r as { perna_viagem?: string | null }).perna_viagem)}
               />
+              <Field label="Categoria do veículo" value={labelCategoriaVeiculoTransfer(r.categoria_veiculo)} />
               <Field
                 label="Status"
                 value={<Badge variant={badgeToneReservaStatus(r.status)}>{labelReservaStatus(r.status)}</Badge>}

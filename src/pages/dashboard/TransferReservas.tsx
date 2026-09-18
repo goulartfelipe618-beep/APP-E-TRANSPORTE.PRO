@@ -23,6 +23,7 @@ import { usePainelListPagination } from "@/hooks/usePainelListPagination";
 import { PainelPaginationBar } from "@/components/painel/PainelPaginationBar";
 import { buildTransferDadosComunicarCliente } from "@/lib/comunicarReservaCliente";
 import { fetchAllSupabasePages } from "@/lib/supabaseFetchAll";
+import { abrevCategoriaVeiculoTransfer, labelCategoriaVeiculoTransfer } from "@/lib/categoriaVeiculoTransfer";
 
 type Reserva = Tables<"reservas_transfer">;
 
@@ -140,7 +141,7 @@ export default function TransferReservasPage() {
         if (!dayKey || dayKey > filterDataAte) return false;
       }
       if (q) {
-        const blob = `${r.nome_completo ?? ""} ${r.telefone ?? ""} ${r.email ?? ""} ${r.numero_reserva ?? ""}`.toLowerCase();
+        const blob = `${r.nome_completo ?? ""} ${r.telefone ?? ""} ${r.email ?? ""} ${r.numero_reserva ?? ""} ${labelCategoriaVeiculoTransfer(r.categoria_veiculo)} ${abrevCategoriaVeiculoTransfer(r.categoria_veiculo) ?? ""}`.toLowerCase();
         if (!blob.includes(q)) return false;
       }
       return true;
@@ -328,6 +329,7 @@ export default function TransferReservasPage() {
                   <TableHead>Cliente</TableHead>
                   <TableHead>Contato</TableHead>
                   <TableHead>Tipo</TableHead>
+                  <TableHead>Categoria</TableHead>
                   <TableHead>Trajeto</TableHead>
                   <TableHead>Data</TableHead>
                   <TableHead>Motorista</TableHead>
@@ -364,6 +366,15 @@ export default function TransferReservasPage() {
                         </Badge>
                       ) : null}
                     </div>
+                  </TableCell>
+                  <TableCell className={cn(rowLocked && "opacity-60")}>
+                    {r.categoria_veiculo ? (
+                      <Badge variant="outline" title={labelCategoriaVeiculoTransfer(r.categoria_veiculo)}>
+                        {abrevCategoriaVeiculoTransfer(r.categoria_veiculo) ?? labelCategoriaVeiculoTransfer(r.categoria_veiculo)}
+                      </Badge>
+                    ) : (
+                      "—"
+                    )}
                   </TableCell>
                   <TableCell className={cn("max-w-[200px] truncate text-sm", rowLocked && "opacity-60")}>
                     {r.ida_embarque && r.ida_desembarque ? `${r.ida_embarque} → ${r.ida_desembarque}` : "—"}

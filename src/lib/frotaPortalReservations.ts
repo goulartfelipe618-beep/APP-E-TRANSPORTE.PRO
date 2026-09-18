@@ -29,6 +29,7 @@ export type FrotaPortalTransferReserva = {
   observacoes: string | null;
   faturado: boolean;
   esconder_valores: boolean;
+  categoria_veiculo: string | null;
 };
 
 export type FrotaPortalGrupoReserva = {
@@ -110,6 +111,7 @@ function parseReserva(raw: unknown): FrotaPortalReserva | null {
       observacoes: nullableString(r.observacoes),
       faturado: r.faturado === true,
       esconder_valores: r.esconder_valores === true,
+      categoria_veiculo: nullableString(r.categoria_veiculo),
     };
   }
 
