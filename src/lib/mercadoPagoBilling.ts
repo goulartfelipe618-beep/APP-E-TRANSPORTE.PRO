@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { getBillingCycleTotal, mercadoPagoPlanId, type BillingCycle } from "@/lib/billingCycles";
+import { vercelDeploymentHeaders } from "@/lib/vercelSkewProtection";
 
 export type MercadoPagoPlan = "standart" | "pro";
 
@@ -98,6 +99,7 @@ export async function createMercadoPagoPayment(
     headers: {
       Authorization: `Bearer ${session.access_token}`,
       "Content-Type": "application/json",
+      ...vercelDeploymentHeaders(),
     },
     body: JSON.stringify({ plano, ciclo, ...brickPayload }),
   });

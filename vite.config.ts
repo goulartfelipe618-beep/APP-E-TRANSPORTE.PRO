@@ -52,6 +52,16 @@ export default defineConfig(({ mode }) => {
         "@": path.resolve(__dirname, "./src"),
       },
     },
+    experimental: {
+      renderBuiltUrl(filename) {
+        const dpl = process.env.VERCEL_DEPLOYMENT_ID;
+        const skewOn = process.env.VERCEL_SKEW_PROTECTION_ENABLED === "1";
+        if (!skewOn || !dpl) return;
+        if (/^https?:\/\//i.test(filename) || filename.startsWith("//")) return filename;
+        const assetPath = filename.startsWith("/") ? filename : `/${filename}`;
+        return `${assetPath}?dpl=${encodeURIComponent(dpl)}`;
+      },
+    },
     build: {
       rollupOptions: {
         output: {
@@ -83,6 +93,10 @@ export default defineConfig(({ mode }) => {
       "import.meta.env.NEXT_PUBLIC_MP_PUBLIC_KEY": JSON.stringify(mp.publicKey),
       "import.meta.env.VITE_API_BASE_URL": JSON.stringify(mp.apiBaseUrl),
       "import.meta.env.VITE_MP_BILLING_ENABLED": JSON.stringify(mp.billingEnabled),
+      "import.meta.env.VITE_VERCEL_DEPLOYMENT_ID": JSON.stringify(process.env.VERCEL_DEPLOYMENT_ID ?? ""),
+      "import.meta.env.VITE_VERCEL_SKEW_PROTECTION_ENABLED": JSON.stringify(
+        process.env.VERCEL_SKEW_PROTECTION_ENABLED ?? "",
+      ),
     },
   };
 });

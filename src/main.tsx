@@ -3,6 +3,9 @@ import App from "./App.tsx";
 import "./index.css";
 import { AppErrorBoundary } from "./components/AppErrorBoundary";
 import { installBrowserZoomLock } from "./lib/installBrowserZoomLock";
+import { installVercelSkewProtection } from "./lib/vercelSkewProtection";
+
+installVercelSkewProtection();
 
 /** Chatwoot opcional: só carrega com `VITE_CHATWOOT_ENABLED=true` e URL/token válidos. Nunca no painel Motorista Executivo (`/dashboard`). */
 function initChatwootSupportWidget() {
