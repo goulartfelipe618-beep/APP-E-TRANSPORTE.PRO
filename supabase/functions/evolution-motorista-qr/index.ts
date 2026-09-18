@@ -5,6 +5,7 @@ import {
   corsHeaders,
   ensureUazapiInstanceToken,
   getAuthorizedUserAndCreds,
+  loadAssignedUazapiInstance,
   loadStoredInstanceToken,
   parseUazapiTarget,
   persistUazapiInstanceToken,
@@ -71,13 +72,24 @@ Deno.serve(async (req) => {
     const auth = await getAuthorizedUserAndCreds(authHeader, supabaseUrl, anonKey, serviceKey, target);
     if (!auth.ok) {
       return new Response(auth.body, {
-        status: auth.status,
+        status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const { user, baseUrl, apiKey: adminToken, supabaseAdmin, instanceName } = auth;
+    const { user, baseUrl, apiKey: adminToken, supabaseAdmin, instanceName, assignedInstance } = auth;
     const root = uazapiRoot(baseUrl);
+
+    if (target === "own") {
+      const assigned = await loadAssignedUazapiInstance(supabaseAdmin, user.id);
+      if (!assigned) {
+        return failureResponse(
+          "O administrador ainda não atribuiu uma instância UAZAPI à sua conta.",
+          "Peça ao admin master para cadastrar o token e atribuir esta conta.",
+          "uazapi_not_assigned",
+        );
+      }
+    }
 
     const stored = await loadStoredInstanceToken(supabaseAdmin, target, user.id);
     let ensured;
@@ -88,7 +100,7 @@ Deno.serve(async (req) => {
       return failureResponse("UAZAPI recusou criar a instância.", msg, "uazapi_init");
     }
 
-    if (ensured.token === adminToken) {
+    if (ensured.token === adminToken && !assignedInstance) {
       try {
         await assertPlatformInstanceAvailable(supabaseAdmin, ensured.token, user.id);
       } catch (e) {
@@ -106,19 +118,6 @@ Deno.serve(async (req) => {
       token: ensured.token,
       extra: { connection_status: "aguardando_qr" },
     });
-
-    if (target === "own" && ensured.token === adminToken) {
-      const sistemaTok = await loadStoredInstanceToken(supabaseAdmin, "sistema", user.id);
-      if (!sistemaTok) {
-        await persistUazapiInstanceToken(supabaseAdmin, {
-          target: "sistema",
-          userId: user.id,
-          instanceName: resolvedName,
-          token: ensured.token,
-          extra: { connection_status: "aguardando_qr" },
-        });
-      }
-    }
 
     let b64 = extractUazapiQrBase64(ensured.initJson);
 

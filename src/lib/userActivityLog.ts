@@ -53,13 +53,19 @@ export async function logUserActivity(
     }
 
     const message = USER_ACTIVITY_ACTIONS[actionCode];
-    const row = {
-      user_id: userId,
-      action_code: actionCode,
-      message,
-      metadata: options?.metadata ?? {},
-    };
-
+    const { error } = await supabase.rpc("log_user_activity", {
+      p_action_code: actionCode,
+      p_message: message,
+      p_metadata: options?.metadata ?? {},
+    });
+    if (!error) return;
+    const missingRpc =
+      error.code === "PGRST202" ||
+      /could not find the function|schema cache/i.test(error.message || "");
+    if (!missingRpc) {
+      if (error.code === "23505" || /duplicate|409/i.test(error.message || "")) return;
+      return;
+    }
     if (ONCE_ACTIONS.has(actionCode)) {
       const { data: existing } = await supabase
         .from("user_activity_log")
@@ -68,13 +74,14 @@ export async function logUserActivity(
         .eq("action_code", actionCode)
         .maybeSingle();
       if (existing) return;
-      const { error } = await supabase.from("user_activity_log").insert(row);
-      // Corrida rara: unique (user_id, action_code) → 409/23505; ignorar.
-      if (error?.code === "23505") return;
-      return;
     }
-
-    await supabase.from("user_activity_log").insert(row);
+    const { error: insErr } = await supabase.from("user_activity_log").insert({
+      user_id: userId,
+      action_code: actionCode,
+      message,
+      metadata: options?.metadata ?? {},
+    });
+    if (insErr?.code === "23505" || /duplicate|409/i.test(insErr?.message || "")) return;
   } catch {
     /* não interromper UX do painel transfer */
   }

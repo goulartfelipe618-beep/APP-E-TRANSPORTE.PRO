@@ -51,6 +51,21 @@ export function evolutionEnvConfigured(override?: EvolutionCreds | null): boolea
   return resolveEvolutionCreds(override) !== null;
 }
 
+async function invokeComunicadorFn<T>(name: string, body: Record<string, unknown>): Promise<{
+  data: T | null;
+  error: { message: string; context?: Response } | null;
+}> {
+  const { data: sess } = await supabase.auth.getSession();
+  const access = sess.session?.access_token;
+  if (!access) {
+    return { data: null, error: { message: "Sessão expirada. Entre novamente." } };
+  }
+  return await supabase.functions.invoke<T>(name, {
+    body,
+    headers: { Authorization: `Bearer ${access}` },
+  });
+}
+
 async function evolutionHttp(path: string, opts: { method: "GET" | "POST"; jsonBody?: unknown }): Promise<{ status: number; bodyText: string }> {
   const p = path.startsWith("/") ? path : `/${path}`;
   const { data, error } = await supabase.functions.invoke("evolution-proxy", {
@@ -176,13 +191,13 @@ export async function fetchEvolutionMotoristaQrFromServer(opts?: {
   detail?: string;
   code?: string;
 }> {
-  const { data, error } = await supabase.functions.invoke<{
+  const { data, error } = await invokeComunicadorFn<{
     base64?: string;
     instanceName?: string;
     error?: string;
     detail?: string;
     code?: string;
-  }>("evolution-motorista-qr", { body: { target: opts?.target ?? "own" } });
+  }>("evolution-motorista-qr", { target: opts?.target ?? "own" });
 
   if (error) {
     let detail = error.message;
@@ -225,14 +240,14 @@ export async function fetchEvolutionMotoristaSyncFromServer(opts?: {
   connected: boolean;
   detail?: string;
 }> {
-  const { data, error } = await supabase.functions.invoke<{
+  const { data, error } = await invokeComunicadorFn<{
     phone?: string | null;
     profilePicUrl?: string | null;
     profileName?: string | null;
     state?: string | null;
     connected?: boolean;
     error?: string;
-  }>("evolution-motorista-sync", { body: { target: opts?.target ?? "own" } });
+  }>("evolution-motorista-sync", { target: opts?.target ?? "own" });
 
   if (error) {
     return { phone: null, profilePicUrl: null, profileName: null, state: null, connected: false, detail: error.message };
@@ -263,9 +278,9 @@ export async function fetchEvolutionMotoristaSyncFromServer(opts?: {
 export async function fetchEvolutionMotoristaDeleteFromServer(opts?: {
   target?: "own" | "sistema";
 }): Promise<{ ok: boolean; detail?: string }> {
-  const { data, error } = await supabase.functions.invoke<{ ok?: boolean; error?: string; detail?: string }>(
+  const { data, error } = await invokeComunicadorFn<{ ok?: boolean; error?: string; detail?: string }>(
     "evolution-motorista-delete",
-    { body: { target: opts?.target ?? "own" } },
+    { target: opts?.target ?? "own" },
   );
 
   if (error) {
@@ -287,12 +302,12 @@ export async function sendUazapiWhatsappCard(opts: {
   buttons?: Array<{ id: string; text: string }>;
   pdf?: { base64: string; filename: string } | null;
 }): Promise<{ ok: boolean; error?: string; canal?: string; warning?: string }> {
-  const { data, error } = await supabase.functions.invoke<{
+  const { data, error } = await invokeComunicadorFn<{
     ok?: boolean;
     error?: string;
     canal?: string;
     warning?: string;
-  }>("uazapi-send-card", { body: opts });
+  }>("uazapi-send-card", opts as Record<string, unknown>);
 
   if (error) {
     return { ok: false, error: error.message };

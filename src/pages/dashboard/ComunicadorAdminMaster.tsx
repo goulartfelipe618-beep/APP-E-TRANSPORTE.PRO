@@ -15,6 +15,7 @@ import {
   fetchEvolutionMotoristaSyncFromServer,
 } from "@/lib/evolutionApi";
 import { qrSrc } from "@/hooks/useComunicadoresEvolution";
+import { UazapiInstanciasAdminCard } from "@/components/comunicador/UazapiInstanciasAdminCard";
 import { cn } from "@/lib/utils";
 
 const EVO_KEY_MASK = "••••••••••••••••••••";
@@ -540,6 +541,8 @@ export default function ComunicadorAdminMasterPage() {
           )}
         </CardContent>
       </Card>
+
+      <UazapiInstanciasAdminCard />
 
       <Card className="border-border">
         <CardHeader>

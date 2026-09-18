@@ -104,7 +104,7 @@ Deno.serve(async (req) => {
     const auth = await getAuthorizedUserAndCreds(authHeader, supabaseUrl, anonKey, serviceKey);
     if (!auth.ok) {
       return new Response(auth.body, {
-        status: auth.status,
+        status: 200,
         headers: privateJsonHeaders(),
       });
     }

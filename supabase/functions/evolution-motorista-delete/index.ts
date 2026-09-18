@@ -42,15 +42,15 @@ Deno.serve(async (req) => {
     const auth = await getAuthorizedUserAndCreds(authHeader, supabaseUrl, anonKey, serviceKey, target);
     if (!auth.ok) {
       return new Response(auth.body, {
-        status: auth.status,
+        status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const { user, baseUrl, supabaseAdmin, instanceName } = auth;
+    const { user, baseUrl, supabaseAdmin, instanceName, assignedInstance } = auth;
     const token = await loadStoredInstanceToken(supabaseAdmin, target, user.id);
-    let delStatus = 404;
-    if (token) {
+    let delStatus = 204;
+    if (token && !assignedInstance) {
       const del = await uazapiDeleteInstance(uazapiRoot(baseUrl), token);
       delStatus = del.status;
       if (!del.status.toString().startsWith("2") && del.status !== 404) {

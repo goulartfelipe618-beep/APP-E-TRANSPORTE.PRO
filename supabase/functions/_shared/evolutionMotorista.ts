@@ -70,7 +70,38 @@ export type AuthCredsOk = {
   target: UazapiTarget;
   instanceName: string;
   roles: string[];
+  assignedInstance: boolean;
 };
+
+export type AssignedUazapi = {
+  id: string;
+  rotulo: string;
+  api_url: string;
+  instance_token: string;
+  instance_name: string | null;
+};
+
+export async function loadAssignedUazapiInstance(
+  supabaseAdmin: SupabaseClient,
+  userId: string,
+): Promise<AssignedUazapi | null> {
+  const { data, error } = await supabaseAdmin
+    .from("comunicador_uazapi_instancias")
+    .select("id, rotulo, api_url, instance_token, instance_name")
+    .eq("assigned_user_id", userId)
+    .maybeSingle();
+  if (error || !data) return null;
+  const token = String((data as { instance_token?: string }).instance_token || "").trim();
+  const url = String((data as { api_url?: string }).api_url || "").trim();
+  if (!token || !url) return null;
+  return {
+    id: String((data as { id: string }).id),
+    rotulo: String((data as { rotulo?: string }).rotulo || "Instância UAZAPI"),
+    api_url: url,
+    instance_token: token,
+    instance_name: String((data as { instance_name?: string | null }).instance_name || "").trim() || null,
+  };
+}
 
 export async function getAuthorizedUserAndCreds(
   authHeader: string,
@@ -122,30 +153,42 @@ export async function getAuthorizedUserAndCreds(
     };
   }
 
+  const assigned = target === "own" ? await loadAssignedUazapiInstance(supabaseAdmin, user.id) : null;
+
   const { data: sistemaRow } = await supabaseAdmin
     .from("comunicadores_evolution")
     .select("id")
     .eq("escopo", "sistema")
     .maybeSingle();
 
-  if (!sistemaRow?.id) {
+  if (!sistemaRow?.id && !assigned) {
     return { ok: false, status: 500, body: JSON.stringify({ error: "Comunicador oficial não encontrado." }) };
   }
 
-  const { data: credsRow } = await supabaseAdmin
-    .from("comunicador_evolution_credenciais")
-    .select("api_url, api_key")
-    .eq("comunicador_id", sistemaRow.id)
-    .maybeSingle();
+  let rawUrl = assigned?.api_url || "";
+  let rawKey = assigned?.instance_token || "";
 
-  const rawUrl = credsRow?.api_url?.trim() || "";
-  const rawKey = credsRow?.api_key?.trim() || "";
+  if (!rawUrl || !rawKey) {
+    if (!sistemaRow?.id) {
+      return { ok: false, status: 500, body: JSON.stringify({ error: "Comunicador oficial não encontrado." }) };
+    }
+    const { data: credsRow } = await supabaseAdmin
+      .from("comunicador_evolution_credenciais")
+      .select("api_url, api_key")
+      .eq("comunicador_id", sistemaRow.id)
+      .maybeSingle();
+    rawUrl = credsRow?.api_url?.trim() || "";
+    rawKey = credsRow?.api_key?.trim() || "";
+  }
+
   if (!rawUrl || !rawKey) {
     return {
       ok: false,
       status: 400,
       body: JSON.stringify({
-        error: "UAZAPI não configurada pelo administrador (URL + Admin Token).",
+        error: assigned
+          ? "Instância UAZAPI atribuída está incompleta (URL ou token)."
+          : "UAZAPI não configurada pelo administrador (URL + Token da Instância).",
         code: "missing_evolution_creds",
       }),
     };
@@ -162,9 +205,22 @@ export async function getAuthorizedUserAndCreds(
     };
   }
 
-  const instanceName = target === "sistema" ? INSTANCE_SISTEMA_DEFAULT : instanceNameForUser(user.id);
+  const instanceName =
+    target === "sistema"
+      ? INSTANCE_SISTEMA_DEFAULT
+      : assigned?.instance_name || instanceNameForUser(user.id);
 
-  return { ok: true, user, baseUrl, apiKey: rawKey, supabaseAdmin, target, instanceName, roles };
+  return {
+    ok: true,
+    user,
+    baseUrl,
+    apiKey: rawKey,
+    supabaseAdmin,
+    target,
+    instanceName,
+    roles,
+    assignedInstance: Boolean(assigned),
+  };
 }
 
 export async function loadStoredInstanceToken(
@@ -199,6 +255,8 @@ export async function loadStoredInstanceToken(
       .maybeSingle();
     return creds?.api_key?.trim() || null;
   }
+  const assigned = await loadAssignedUazapiInstance(supabaseAdmin, userId);
+  if (assigned?.instance_token) return assigned.instance_token;
   const full = await supabaseAdmin
     .from("comunicadores_evolution")
     .select("uazapi_instance_token")
