@@ -24,6 +24,7 @@ import { PainelPaginationBar } from "@/components/painel/PainelPaginationBar";
 import { buildTransferDadosComunicarCliente } from "@/lib/comunicarReservaCliente";
 import { fetchAllSupabasePages } from "@/lib/supabaseFetchAll";
 import { abrevCategoriaVeiculoTransfer, labelCategoriaVeiculoTransfer } from "@/lib/categoriaVeiculoTransfer";
+import { motoristaAssignValue, motoristaMatchesAssignment, resolveMotoristaNome } from "@/lib/motoristaReservaAssign";
 
 type Reserva = Tables<"reservas_transfer">;
 
@@ -48,7 +49,7 @@ export default function TransferReservasPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [reservaEdicao, setReservaEdicao] = useState<Reserva | null>(null);
   const [reservas, setReservas] = useState<Reserva[]>([]);
-  const [motoristasOpts, setMotoristasOpts] = useState<{ id: string; nome: string }[]>([]);
+  const [motoristasOpts, setMotoristasOpts] = useState<{ id: string; nome: string; portal_auth_user_id?: string | null }[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Reserva | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -88,8 +89,7 @@ export default function TransferReservasPage() {
         .from("solicitacoes_motoristas")
         .select("id, nome, portal_auth_user_id")
         .eq("user_id", uid)
-        .eq("status", "cadastrado")
-        .not("portal_auth_user_id", "is", null),
+        .eq("status", "cadastrado"),
     ]);
 
     if (res.error) {
@@ -99,9 +99,11 @@ export default function TransferReservasPage() {
 
     if (!mot.error && mot.data) {
       setMotoristasOpts(
-        (mot.data as { portal_auth_user_id: string | null; nome: string }[])
-          .filter((m) => m.portal_auth_user_id != null)
-          .map((m) => ({ id: m.portal_auth_user_id as string, nome: m.nome })),
+        (mot.data as { id: string; portal_auth_user_id: string | null; nome: string }[]).map((m) => ({
+          id: m.id,
+          nome: m.nome,
+          portal_auth_user_id: m.portal_auth_user_id,
+        })),
       );
     } else {
       setMotoristasOpts([]);
@@ -115,11 +117,7 @@ export default function TransferReservasPage() {
   }, [fetchAll]);
 
   const motoristaNome = useCallback(
-    (motoristaId: string | null) => {
-      const mid = (motoristaId ?? "").trim();
-      if (!mid) return "—";
-      return motoristasOpts.find((m) => m.id === mid)?.nome ?? "Motorista atribuído";
-    },
+    (motoristaId: string | null) => resolveMotoristaNome(motoristaId, motoristasOpts),
     [motoristasOpts],
   );
 
@@ -131,7 +129,10 @@ export default function TransferReservasPage() {
         const mid = (r.motorista_id ?? "").trim();
         if (filterMotorista === "__sem__") {
           if (mid !== "") return false;
-        } else if (mid !== filterMotorista) return false;
+        } else if (!motoristaMatchesAssignment(mid, { id: filterMotorista, portal_auth_user_id: filterMotorista })) {
+          const chosen = motoristasOpts.find((m) => motoristaAssignValue(m) === filterMotorista || m.id === filterMotorista);
+          if (!chosen || !motoristaMatchesAssignment(mid, chosen)) return false;
+        }
       }
       if (filterFaturado === "sim" && !(r as { faturado?: boolean }).faturado) return false;
       if (filterFaturado === "nao" && (r as { faturado?: boolean }).faturado) return false;
@@ -148,7 +149,7 @@ export default function TransferReservasPage() {
       }
       return true;
     });
-  }, [reservas, filterDataDe, filterDataAte, filterStatus, filterMotorista, filterFaturado, filterSearch]);
+  }, [reservas, filterDataDe, filterDataAte, filterStatus, filterMotorista, filterFaturado, filterSearch, motoristasOpts]);
 
   const { slice: reservasPage, page, setPage, totalPages, totalItems } = usePainelListPagination(reservasFiltradas);
 
@@ -283,7 +284,7 @@ export default function TransferReservasPage() {
                 <SelectItem value="all">Todos</SelectItem>
                 <SelectItem value="__sem__">Sem motorista</SelectItem>
                 {motoristasOpts.map((m) => (
-                  <SelectItem key={m.id} value={m.id}>
+                  <SelectItem key={m.id} value={motoristaAssignValue(m)}>
                     {m.nome}
                   </SelectItem>
                 ))}

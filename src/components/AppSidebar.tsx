@@ -6,14 +6,13 @@ import {
   FileText, BookOpen, Map, Users, UserCheck,
   ClipboardList, Car, Megaphone, BarChart3,
   Globe, Search, Mail, Monitor, Settings, StickyNote, Link2,
-  Bell, Moon, Sun, LogOut, GraduationCap, Plane, Calendar,
+  Bell, Moon, Sun, LogOut, Calendar,
   Wallet2,
   CreditCard,
   List,
   Inbox,
   Banknote,
   ContactRound,
-  Library,
   Receipt,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -164,18 +163,8 @@ const getMenuStructure = (
     ],
   },
   {
-    label: "Beta",
-    labelTone: "beta",
-    items: [
-      { title: "Disparador", page: "disparador", icon: Megaphone },
-      { title: "Empty Legs", page: "empty-legs", icon: Plane },
-      { title: "Mentoria", page: "mentoria", icon: GraduationCap },
-    ],
-  },
-  {
     label: "Configurações",
     items: [
-      { title: "Documentação", page: "documentacao", icon: Library },
       {
         title: "Sistema",
         icon: Settings,

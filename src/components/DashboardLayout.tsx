@@ -57,9 +57,6 @@ import SistemaConfiguracoesPage from "@/pages/dashboard/SistemaConfiguracoes";
 import SistemaAutomacoesPage from "@/pages/dashboard/SistemaAutomacoes";
 import ComunicadorMotoristaExecutivoPage from "@/pages/dashboard/ComunicadorMotoristaExecutivo";
 import TicketsPage from "@/pages/dashboard/TicketsPage";
-import DisparadorPage from "@/pages/dashboard/DisparadorPage";
-import MentoriaPage from "@/pages/dashboard/MentoriaPage";
-import EmptyLegsPage from "@/pages/dashboard/EmptyLegsPage";
 import AtualizacoesPage from "@/pages/dashboard/AtualizacoesPage";
 import PainelAgendaPage from "@/pages/dashboard/PainelAgendaPage";
 import CommunityPage from "@/pages/dashboard/CommunityPage";
@@ -70,7 +67,6 @@ import FinanceiroFaturadoPage from "@/pages/dashboard/financeiro/FinanceiroFatur
 import FinanceiroPagarPage from "@/pages/dashboard/financeiro/FinanceiroPagarPage";
 import FinanceiroRelatoriosPage from "@/pages/dashboard/financeiro/FinanceiroRelatoriosPage";
 import PlanosPage from "@/pages/dashboard/PlanosPage";
-import DocumentacaoPainelPage from "@/pages/dashboard/DocumentacaoPainelPage";
 import WhatsAppInboxPage from "@/pages/dashboard/WhatsAppInboxPage";
 import PainelAvisoBanner from "@/components/PainelAvisoBanner";
 import FullscreenBannerOverlay from "@/components/FullscreenBannerOverlay";
@@ -108,9 +104,6 @@ const PAGE_MAP: Record<string, React.ComponentType> = {
   "sistema/automacoes": SistemaAutomacoesPage,
   "sistema/comunicador": ComunicadorMotoristaExecutivoPage,
   tickets: TicketsPage,
-  disparador: DisparadorPage,
-  mentoria: MentoriaPage,
-  "empty-legs": EmptyLegsPage,
   financeiro: FinanceiroDashboardPage,
   "financeiro/lancamentos": FinanceiroLancamentosPage,
   "financeiro/receber": FinanceiroReceberPage,
@@ -118,7 +111,6 @@ const PAGE_MAP: Record<string, React.ComponentType> = {
   "financeiro/pagar": FinanceiroPagarPage,
   "financeiro/relatorios": FinanceiroRelatoriosPage,
   planos: PlanosPage,
-  documentacao: DocumentacaoPainelPage,
   whatsapp: WhatsAppInboxPage,
 };
 
@@ -246,7 +238,15 @@ function DashboardContent() {
 
   /** Rotas descontinuadas (Catálogo / Google Maps): evita sessão antiga presa numa página removida. */
   useEffect(() => {
-    if (activePage === "catalogo" || activePage === "google" || activePage === "whatsapp") {
+    if (
+      activePage === "catalogo" ||
+      activePage === "google" ||
+      activePage === "whatsapp" ||
+      activePage === "disparador" ||
+      activePage === "mentoria" ||
+      activePage === "empty-legs" ||
+      activePage === "documentacao"
+    ) {
       setActivePage("entrada");
     }
   }, [activePage, setActivePage]);
@@ -279,7 +279,7 @@ function DashboardContent() {
   /** Primeiro acesso: obriga concluir Sistema > Configurações; depois escolher Network na Home. */
   useEffect(() => {
     if (onboarding.loading) return;
-    if (!onboarding.phase1Complete && activePage !== "sistema/configuracoes" && activePage !== "documentacao") {
+    if (!onboarding.phase1Complete && activePage !== "sistema/configuracoes") {
       setActivePage("sistema/configuracoes");
       return;
     }
@@ -287,8 +287,7 @@ function DashboardContent() {
       onboarding.phase1Complete &&
       !onboarding.networkChosen &&
       activePage !== "home" &&
-      activePage !== "sistema/configuracoes" &&
-      activePage !== "documentacao"
+      activePage !== "sistema/configuracoes"
     ) {
       setActivePage("home");
     }

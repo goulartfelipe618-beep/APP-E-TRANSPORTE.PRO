@@ -94,7 +94,7 @@ const PRO_FEATURE_SECTIONS: FeatureSection[] = [
     lines: [
       { text: "Automações avançadas (filas, formulários, mensagens)", ok: true },
       { text: "Integrações premium e prioridade nas novidades", ok: true },
-      { text: "Ferramentas de escala: disparador, comunidade e operações", ok: true },
+      { text: "Ferramentas de escala: comunidade e operações", ok: true },
     ],
   },
 ];

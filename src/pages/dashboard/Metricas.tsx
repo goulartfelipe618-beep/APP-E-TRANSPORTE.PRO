@@ -585,8 +585,7 @@ export default function MetricasPage() {
                 <Legend wrapperStyle={{ fontSize: 11 }} />
                 <Bar dataKey="Transfer" stackId="a" fill={ACCENT} radius={[0, 0, 0, 0]} isAnimationActive={false} />
                 <Bar dataKey="Grupos" stackId="a" fill="#3b82f6" isAnimationActive={false} />
-                <Bar dataKey="Motoristas" stackId="a" fill="#10b981" isAnimationActive={false} />
-                <Bar dataKey="Empty Legs" stackId="a" fill="#a855f7" radius={[4, 4, 0, 0]} isAnimationActive={false} />
+                <Bar dataKey="Motoristas" stackId="a" fill="#10b981" radius={[4, 4, 0, 0]} isAnimationActive={false} />
               </BarChart>
             </ResponsiveContainer>
           )}

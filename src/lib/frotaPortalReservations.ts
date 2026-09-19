@@ -55,11 +55,16 @@ export type FrotaPortalGrupoReserva = {
 
 export type FrotaPortalReserva = FrotaPortalTransferReserva | FrotaPortalGrupoReserva;
 
-type SupabaseRpcClient = {
-  rpc: (
-    fn: "get_frota_motorista_reservas",
-  ) => Promise<{ data: unknown; error: { message: string } | null }>;
-};
+function parseRpcStatus(data: unknown): string {
+  if (typeof data === "string") return data.trim();
+  if (Array.isArray(data) && typeof data[0] === "string") return data[0].trim();
+  if (data && typeof data === "object") {
+    const rec = data as Record<string, unknown>;
+    const nested = rec.frota_update_reserva_status ?? rec.status;
+    if (typeof nested === "string") return nested.trim();
+  }
+  return "";
+}
 
 function nullableString(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value : null;
@@ -158,9 +163,18 @@ async function listFrotaPortalReservationsFallback(): Promise<{
   const uid = auth.user?.id;
   if (!uid) return { transfers: [], grupos: [], error: "Sessão inválida" };
 
+  const { data: cadastros } = await supabase
+    .from("solicitacoes_motoristas")
+    .select("id")
+    .eq("portal_auth_user_id", uid)
+    .eq("status", "cadastrado");
+  const assignIds = Array.from(
+    new Set([uid, ...(cadastros ?? []).map((row) => String(row.id)).filter(Boolean)]),
+  );
+
   const [tRes, gRes] = await Promise.all([
-    supabase.from("reservas_transfer").select("*").eq("motorista_id", uid),
-    supabase.from("reservas_grupos").select("*").eq("motorista_id", uid),
+    supabase.from("reservas_transfer").select("*").in("motorista_id", assignIds),
+    supabase.from("reservas_grupos").select("*").in("motorista_id", assignIds),
   ]);
   if (tRes.error) return { transfers: [], grupos: [], error: tRes.error.message };
   if (gRes.error) return { transfers: [], grupos: [], error: gRes.error.message };
@@ -179,7 +193,7 @@ export async function listFrotaPortalReservations(): Promise<{
   grupos: FrotaPortalGrupoReserva[];
   error: string | null;
 }> {
-  const { data, error } = await (supabase as unknown as SupabaseRpcClient).rpc("get_frota_motorista_reservas");
+  const { data, error } = await supabase.rpc("get_frota_motorista_reservas");
   if (!error) {
     const rows = Array.isArray(data) ? data.map(parseReserva).filter((r): r is FrotaPortalReserva => r != null) : [];
     return {
@@ -189,4 +203,20 @@ export async function listFrotaPortalReservations(): Promise<{
     };
   }
   return listFrotaPortalReservationsFallback();
+}
+
+export async function updateFrotaReservaStatus(
+  kind: "transfer" | "grupo",
+  id: string,
+  status: string,
+): Promise<{ status: string | null; error: string | null }> {
+  const { data, error } = await supabase.rpc("frota_update_reserva_status", {
+    p_kind: kind,
+    p_id: id,
+    p_status: status,
+  });
+  if (error) return { status: null, error: error.message };
+  const saved = parseRpcStatus(data);
+  if (!saved) return { status: null, error: "O estado não ficou gravado. Tente novamente." };
+  return { status: saved, error: null };
 }

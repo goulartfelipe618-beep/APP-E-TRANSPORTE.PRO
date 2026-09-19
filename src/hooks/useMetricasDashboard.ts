@@ -52,7 +52,6 @@ export interface CanalPonto {
   Transfer: number;
   Grupos: number;
   Motoristas: number;
-  "Empty Legs": number;
 }
 
 export interface TopDestino {
@@ -130,7 +129,6 @@ function parseCanais(raw: unknown): CanalPonto[] {
     Transfer: num(p.Transfer),
     Grupos: num(p.Grupos),
     Motoristas: num(p.Motoristas),
-    "Empty Legs": num(p["Empty Legs"]),
   }));
 }
 

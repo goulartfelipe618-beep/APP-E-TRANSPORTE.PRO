@@ -20,8 +20,6 @@ import AnotacoesPage from "@/pages/dashboard/AnotacoesPage";
 import SistemaConfiguracoesPage from "@/pages/dashboard/SistemaConfiguracoes";
 import ComunicadorAdminMasterPage from "@/pages/dashboard/ComunicadorAdminMaster";
 import AdminTicketsPage from "@/pages/admin/AdminTicketsPage";
-import AdminMentoriaPage from "@/pages/admin/AdminMentoriaPage";
-import AdminEmptyLegsPage from "@/pages/admin/AdminEmptyLegsPage";
 import AdminCommunityPage from "@/pages/admin/AdminCommunityPage";
 import DominiosPage from "@/pages/dashboard/DominiosPage";
 import AdminAvisosPage from "@/pages/admin/AdminAvisosPage";
@@ -48,8 +46,6 @@ const PAGE_MAP: Record<string, React.ComponentType> = {
   "sistema/avisos": AdminAvisosPage,
   "sistema/anotacoes": AnotacoesPage,
   tickets: AdminTicketsPage,
-  mentoria: AdminMentoriaPage,
-  "empty-legs": AdminEmptyLegsPage,
   dominios: DominiosPage,
   logs: AdminLogsPage,
   veiculos: AdminVeiculosPage,
@@ -62,6 +58,9 @@ function AdminContent() {
   useEffect(() => {
     if (activePage === "usuarios/solicitacoes") {
       setActivePage("usuarios/cadastrados");
+    }
+    if (activePage === "mentoria" || activePage === "empty-legs" || activePage === "disparador") {
+      setActivePage("metricas");
     }
   }, [activePage, setActivePage]);
   const { config } = useConfiguracoes();

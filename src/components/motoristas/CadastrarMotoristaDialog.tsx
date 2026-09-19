@@ -250,107 +250,36 @@ export default function CadastrarMotoristaDialog({ open, onOpenChange, onCreated
       else if (sit === "ativo") setStatusMotorista("ativo");
       setTabIndex(0);
       if (!initialData.cadastro_row_id && !initialData.completar_lead_id) {
-        toast.message("Revise os dados (UF → cidade IBGE) e complete o cadastro antes de salvar.", { duration: 5000 });
+        toast.message("Revise os dados. Só nome completo, CPF e telefone são obrigatórios.", { duration: 5000 });
       }
     } else {
       resetEmpty();
     }
   }, [open, initialData, resetEmpty]);
 
-  const validateTab0 = (): string | null => {
+  const validateRequired = (): string | null => {
     if (!nome.trim()) return "Informe o nome completo.";
-    if (!cpf.trim()) return "Informe o CPF.";
-    if (!telefone.trim()) return "Informe o telefone.";
-    if (!emailField.trim()) return "Informe o e-mail.";
-    if (!dataNascimento) return "Informe a data de nascimento.";
-    if (!rg.trim()) return "Informe o RG.";
-    if (!estadoUf) return "Selecione o estado (UF) na lista IBGE.";
-    if (!municipioIbgeId) return "Selecione a cidade (filtrar por nome, mín. 2 letras).";
-    if (!cidade.trim()) return "Cidade inválida — selecione novamente na lista.";
-    const cepDigits = cep.replace(/\D/g, "");
-    if (cepDigits.length !== 8) return "Informe um CEP válido (8 dígitos).";
-    if (!logradouro.trim()) return "Informe o logradouro (rua/avenida).";
-    if (!numero.trim()) return "Informe o número.";
-    if (!bairro.trim()) return "Informe o bairro.";
-    if (!cnh.trim()) return "Informe o número da CNH.";
-    if (!categoriaCnh) return "Selecione a categoria da CNH.";
-    if (!validadeCnh) return "Informe a validade da CNH.";
-    if (!statusMotorista) return "Selecione o status (ativo ou inativo).";
+    if (!cpf.replace(/\D/g, "")) return "Informe o CPF.";
+    if (!telefone.replace(/\D/g, "")) return "Informe o número de telefone.";
     return null;
   };
 
-  const validateTab1 = (): string | null => {
-    if (isEditExisting) return null;
-    if (!arPerfil || !arCnhF || !arCnhV || !arResid) {
-      return "Anexe foto de perfil, CNH (frente e verso) e comprovante de residência.";
-    }
-    return null;
+  const collectedUploads = (): Partial<Record<MotoristaFrotaDocSlug, File>> => {
+    const uploads: Partial<Record<MotoristaFrotaDocSlug, File>> = {};
+    if (arPerfil) uploads.perfil = arPerfil;
+    if (arCnhF) uploads.cnhFrente = arCnhF;
+    if (arCnhV) uploads.cnhVerso = arCnhV;
+    if (arResid) uploads.residencia = arResid;
+    return uploads;
   };
-
-  const validateTab2 = (): string | null => {
-    if (!tipoPagamento) return "Selecione o tipo de pagamento.";
-    if (tipoPagamento === "pix" && !pixChave.trim()) return "Informe a chave PIX.";
-    return null;
-  };
-
-  const validateAll = (): string | null => validateTab0() ?? validateTab1() ?? validateTab2();
 
   const goNext = () => {
-    if (tabIndex === 0) {
-      const e = validateTab0();
-      if (e) {
-        toast.error(e);
-        return;
-      }
-    }
-    if (tabIndex === 1) {
-      const e = validateTab1();
-      if (e) {
-        toast.error(e);
-        return;
-      }
-    }
-    if (tabIndex === 2) {
-      const e = validateTab2();
-      if (e) {
-        toast.error(e);
-        return;
-      }
-    }
     setTabIndex((t) => Math.min(t + 1, TABS.length - 1));
   };
 
-  /** Não permite saltar etapas à frente sem validar as anteriores (cadastro completo obrigatório). */
   const goToTab = (i: number) => {
     if (i === tabIndex) return;
-    if (i < tabIndex) {
-      setTabIndex(i);
-      return;
-    }
-    if (i === 1) {
-      const e = validateTab0();
-      if (e) {
-        toast.error(e);
-        return;
-      }
-      setTabIndex(1);
-      return;
-    }
-    if (i === 2) {
-      const e0 = validateTab0();
-      if (e0) {
-        toast.error(e0);
-        setTabIndex(0);
-        return;
-      }
-      const e1 = validateTab1();
-      if (e1) {
-        toast.error(e1);
-        setTabIndex(1);
-        return;
-      }
-      setTabIndex(2);
-    }
+    setTabIndex(i);
   };
 
   const handleCepBlur = async () => {
@@ -367,17 +296,15 @@ export default function CadastrarMotoristaDialog({ open, onOpenChange, onCreated
   };
 
   const handleSave = async () => {
-    const err = validateAll();
+    const err = validateRequired();
     if (err) {
       toast.error(err);
-      if (validateTab0()) setTabIndex(0);
-      else if (validateTab1()) setTabIndex(1);
-      else setTabIndex(2);
+      setTabIndex(0);
       return;
     }
     setSaving(true);
 
-    const ibgeIdNum = Number(municipioIbgeId);
+    const ibgeIdNum = municipioIbgeId.trim() ? Number(municipioIbgeId) : Number.NaN;
     const baseDw = parseDadosWebhook(initialData?.dados_webhook);
     const dadosWebhookObj = {
       ...baseDw,
@@ -395,7 +322,7 @@ export default function CadastrarMotoristaDialog({ open, onOpenChange, onCreated
       pix_chave: tipoPagamento === "pix" ? pixChave.trim() || null : null,
       observacoes_internas: observacoesInternas || null,
       situacao_frota: statusMotorista,
-      ibge_municipio_id: Number.isFinite(ibgeIdNum) ? ibgeIdNum : null,
+      ibge_municipio_id: Number.isFinite(ibgeIdNum) && ibgeIdNum > 0 ? ibgeIdNum : null,
     };
 
     const { data: authData } = await supabase.auth.getUser();
@@ -428,11 +355,7 @@ export default function CadastrarMotoristaDialog({ open, onOpenChange, onCreated
 
     if (isEditExisting && initialData?.cadastro_row_id) {
       let dadosWebhookFinal: Json = dadosWebhookObj as unknown as Json;
-      const uploads: Partial<Record<MotoristaFrotaDocSlug, File>> = {};
-      if (arPerfil) uploads.perfil = arPerfil;
-      if (arCnhF) uploads.cnhFrente = arCnhF;
-      if (arCnhV) uploads.cnhVerso = arCnhV;
-      if (arResid) uploads.residencia = arResid;
+      const uploads = collectedUploads();
       if (Object.keys(uploads).length > 0) {
         try {
           const paths = await uploadMotoristaFrotaDocs(supabase, user.id, initialData.cadastro_row_id, uploads);
@@ -450,8 +373,8 @@ export default function CadastrarMotoristaDialog({ open, onOpenChange, onCreated
         cnh: cnh.trim() || null,
         telefone: telefone.trim() || null,
         email: emailField.trim() || null,
-        cidade: cidade.trim(),
-        estado: estadoUf,
+        cidade: cidade.trim() || null,
+        estado: estadoUf || null,
         mensagem: observacoesInternas.trim() || null,
         mensagem_observacoes: observacoesInternas.trim() || null,
         dados_webhook: dadosWebhookFinal,
@@ -484,8 +407,8 @@ export default function CadastrarMotoristaDialog({ open, onOpenChange, onCreated
         cnh: cnh.trim() || null,
         telefone: telefone.trim() || null,
         email: emailField.trim() || null,
-        cidade: cidade.trim(),
-        estado: estadoUf,
+        cidade: cidade.trim() || null,
+        estado: estadoUf || null,
         mensagem: observacoesInternas.trim() || null,
         mensagem_observacoes: observacoesInternas.trim() || null,
         dados_webhook: dadosWebhookObj as unknown as Json,
@@ -505,24 +428,22 @@ export default function CadastrarMotoristaDialog({ open, onOpenChange, onCreated
       }
 
       const leadId = initialData.completar_lead_id;
-      try {
-        const paths = await uploadMotoristaFrotaDocs(supabase, user.id, leadId, {
-          perfil: arPerfil!,
-          cnhFrente: arCnhF!,
-          cnhVerso: arCnhV!,
-          residencia: arResid!,
-        });
-        const merged = { ...dadosWebhookObj, ...paths } as unknown as Json;
-        const { error: docErr } = await supabase
-          .from("solicitacoes_motoristas")
-          .update({ dados_webhook: merged })
-          .eq("id", leadId)
-          .eq("user_id", user.id);
-        if (docErr) {
-          toast.warning(`Cadastro concluído, mas os anexos não ficaram ligados: ${docErr.message}`);
+      const leadUploads = collectedUploads();
+      if (Object.keys(leadUploads).length > 0) {
+        try {
+          const paths = await uploadMotoristaFrotaDocs(supabase, user.id, leadId, leadUploads);
+          const merged = { ...dadosWebhookObj, ...paths } as unknown as Json;
+          const { error: docErr } = await supabase
+            .from("solicitacoes_motoristas")
+            .update({ dados_webhook: merged })
+            .eq("id", leadId)
+            .eq("user_id", user.id);
+          if (docErr) {
+            toast.warning(`Cadastro concluído, mas os anexos não ficaram ligados: ${docErr.message}`);
+          }
+        } catch (uploadErr) {
+          toast.warning(`Cadastro concluído, mas o envio de ficheiros falhou: ${(uploadErr as Error).message}`);
         }
-      } catch (uploadErr) {
-        toast.warning(`Cadastro concluído, mas o envio de ficheiros falhou: ${(uploadErr as Error).message}`);
       }
 
       const portalToken = updated?.portal_token as string | undefined;
@@ -555,8 +476,8 @@ export default function CadastrarMotoristaDialog({ open, onOpenChange, onCreated
       cnh: cnh.trim() || null,
       telefone: telefone.trim() || null,
       email: emailField.trim() || null,
-      cidade: cidade.trim(),
-      estado: estadoUf,
+      cidade: cidade.trim() || null,
+      estado: estadoUf || null,
       mensagem: observacoesInternas.trim() || null,
       mensagem_observacoes: observacoesInternas.trim() || null,
       dados_webhook: dadosWebhookObj as unknown as Json,
@@ -571,24 +492,22 @@ export default function CadastrarMotoristaDialog({ open, onOpenChange, onCreated
     }
 
     const novoId = inserted.id as string;
-    try {
-      const paths = await uploadMotoristaFrotaDocs(supabase, user.id, novoId, {
-        perfil: arPerfil!,
-        cnhFrente: arCnhF!,
-        cnhVerso: arCnhV!,
-        residencia: arResid!,
-      });
-      const merged = { ...dadosWebhookObj, ...paths } as unknown as Json;
-      const { error: docErr } = await supabase
-        .from("solicitacoes_motoristas")
-        .update({ dados_webhook: merged })
-        .eq("id", novoId)
-        .eq("user_id", user.id);
-      if (docErr) {
-        toast.warning(`Motorista guardado, mas os anexos não ficaram ligados: ${docErr.message}`);
+    const newUploads = collectedUploads();
+    if (Object.keys(newUploads).length > 0) {
+      try {
+        const paths = await uploadMotoristaFrotaDocs(supabase, user.id, novoId, newUploads);
+        const merged = { ...dadosWebhookObj, ...paths } as unknown as Json;
+        const { error: docErr } = await supabase
+          .from("solicitacoes_motoristas")
+          .update({ dados_webhook: merged })
+          .eq("id", novoId)
+          .eq("user_id", user.id);
+        if (docErr) {
+          toast.warning(`Motorista guardado, mas os anexos não ficaram ligados: ${docErr.message}`);
+        }
+      } catch (uploadErr) {
+        toast.warning(`Motorista guardado, mas o envio de ficheiros falhou: ${(uploadErr as Error).message}`);
       }
-    } catch (uploadErr) {
-      toast.warning(`Motorista guardado, mas o envio de ficheiros falhou: ${(uploadErr as Error).message}`);
     }
 
     const portalToken = inserted?.portal_token as string | undefined;
@@ -627,7 +546,7 @@ export default function CadastrarMotoristaDialog({ open, onOpenChange, onCreated
 
         {initialData && !isEditExisting && (
           <p className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-900 dark:text-amber-100">
-            Confirme <strong>UF</strong> e <strong>cidade (IBGE)</strong> antes de gravar. O registo fica associado à sua conta e visível só para si.
+            Revise os dados da solicitação. Só <strong>nome completo</strong>, <strong>CPF</strong> e <strong>telefone</strong> são obrigatórios para gravar.
           </p>
         )}
         {isCompletarLead && (
@@ -644,8 +563,7 @@ export default function CadastrarMotoristaDialog({ open, onOpenChange, onCreated
 
         {!isEditExisting && (
           <p className="rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-            <strong className="text-foreground">Obrigatório:</strong> conclua as três etapas — <strong className="text-foreground">Pessoal</strong>,{" "}
-            <strong className="text-foreground">Documentos</strong> e <strong className="text-foreground">Pagamento</strong> — antes de guardar. Não é possível saltar para uma etapa seguinte sem validar a anterior.
+            <strong className="text-foreground">Obrigatório:</strong> nome completo, CPF e telefone. Os demais campos, documentos e pagamento são opcionais.
           </p>
         )}
 
@@ -657,7 +575,7 @@ export default function CadastrarMotoristaDialog({ open, onOpenChange, onCreated
               <button
                 key={tab.label}
                 type="button"
-                onClick={() => (isEditExisting ? setTabIndex(i) : goToTab(i))}
+                onClick={() => goToTab(i)}
                 className={`flex flex-1 items-center justify-center gap-1.5 px-2 py-2 text-xs font-medium transition-colors ${
                   active ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground hover:bg-muted"
                 }`}
@@ -683,13 +601,13 @@ export default function CadastrarMotoristaDialog({ open, onOpenChange, onCreated
                   <Input className="mt-1" placeholder="000.000.000-00" value={cpf} onChange={(e) => setCpf(e.target.value)} />
                 </div>
                 <div>
-                  <Label>RG *</Label>
+                  <Label>RG</Label>
                   <Input className="mt-1" value={rg} onChange={(e) => setRg(e.target.value)} />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label>Data de nascimento *</Label>
+                  <Label>Data de nascimento</Label>
                   <Input className="mt-1" type="date" value={dataNascimento} onChange={(e) => setDataNascimento(e.target.value)} />
                 </div>
                 <div>
@@ -698,7 +616,7 @@ export default function CadastrarMotoristaDialog({ open, onOpenChange, onCreated
                 </div>
               </div>
               <div>
-                <Label>E-mail *</Label>
+                <Label>E-mail</Label>
                 <Input className="mt-1" type="email" value={emailField} onChange={(e) => setEmailField(e.target.value)} />
               </div>
             </fieldset>
@@ -709,7 +627,7 @@ export default function CadastrarMotoristaDialog({ open, onOpenChange, onCreated
               </legend>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="sm:col-span-2">
-                  <Label>Estado (UF) *</Label>
+                  <Label>Estado (UF)</Label>
                   <Select
                     value={estadoUf || undefined}
                     disabled={loadingEstados || estadosIbge.length === 0}
@@ -735,7 +653,7 @@ export default function CadastrarMotoristaDialog({ open, onOpenChange, onCreated
                 </div>
 
                 <div className="sm:col-span-2">
-                  <Label>Filtrar cidade *</Label>
+                  <Label>Filtrar cidade</Label>
                   <Input
                     className="mt-1"
                     placeholder="Digite ao menos 2 letras (ex.: cam)"
@@ -750,7 +668,7 @@ export default function CadastrarMotoristaDialog({ open, onOpenChange, onCreated
                 </div>
 
                 <div className="sm:col-span-2">
-                  <Label>Cidade (município IBGE) *</Label>
+                  <Label>Cidade (município IBGE)</Label>
                   <Select
                     value={municipioIbgeId || undefined}
                     disabled={!estadoUf || loadingCidades || municipiosFiltrados.length === 0}
@@ -789,7 +707,7 @@ export default function CadastrarMotoristaDialog({ open, onOpenChange, onCreated
                 </div>
 
                 <div>
-                  <Label>CEP *</Label>
+                  <Label>CEP</Label>
                   <Input
                     className="mt-1"
                     placeholder="00000-000"
@@ -800,11 +718,11 @@ export default function CadastrarMotoristaDialog({ open, onOpenChange, onCreated
                   <p className="mt-1 text-xs text-muted-foreground">ViaCEP preenche rua e bairro quando possível.</p>
                 </div>
                 <div className="sm:col-span-2">
-                  <Label>Logradouro (rua/avenida) *</Label>
+                  <Label>Logradouro (rua/avenida)</Label>
                   <Input className="mt-1" value={logradouro} onChange={(e) => setLogradouro(e.target.value)} />
                 </div>
                 <div>
-                  <Label>Número *</Label>
+                  <Label>Número</Label>
                   <Input className="mt-1" value={numero} onChange={(e) => setNumero(e.target.value)} />
                 </div>
                 <div>
@@ -812,7 +730,7 @@ export default function CadastrarMotoristaDialog({ open, onOpenChange, onCreated
                   <Input className="mt-1" value={complemento} onChange={(e) => setComplemento(e.target.value)} />
                 </div>
                 <div className="sm:col-span-2">
-                  <Label>Bairro *</Label>
+                  <Label>Bairro</Label>
                   <Input className="mt-1" value={bairro} onChange={(e) => setBairro(e.target.value)} />
                 </div>
               </div>
@@ -822,11 +740,11 @@ export default function CadastrarMotoristaDialog({ open, onOpenChange, onCreated
               <legend className="w-full border-b border-border pb-2 text-sm font-semibold text-foreground">CNH</legend>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                 <div>
-                  <Label>Número da CNH *</Label>
+                  <Label>Número da CNH</Label>
                   <Input className="mt-1" value={cnh} onChange={(e) => setCnh(e.target.value)} />
                 </div>
                 <div>
-                  <Label>Categoria *</Label>
+                  <Label>Categoria</Label>
                   <Select value={categoriaCnh || undefined} onValueChange={setCategoriaCnh}>
                     <SelectTrigger className="mt-1">
                       <SelectValue placeholder="Selecione" />
@@ -841,14 +759,14 @@ export default function CadastrarMotoristaDialog({ open, onOpenChange, onCreated
                   </Select>
                 </div>
                 <div>
-                  <Label>Validade *</Label>
+                  <Label>Validade</Label>
                   <Input className="mt-1" type="date" value={validadeCnh} onChange={(e) => setValidadeCnh(e.target.value)} />
                 </div>
               </div>
             </fieldset>
 
             <div>
-              <Label>Situação na frota *</Label>
+              <Label>Situação na frota</Label>
               <Select value={statusMotorista} onValueChange={(v) => setStatusMotorista(v as "ativo" | "inativo")}>
                 <SelectTrigger className="mt-1 w-full max-w-xs">
                   <SelectValue />
@@ -880,21 +798,21 @@ export default function CadastrarMotoristaDialog({ open, onOpenChange, onCreated
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
               {isEditExisting
-                ? "Na edição, os anexos são opcionais. Envie novos ficheiros apenas para substituir documentos já guardados (máx. 5 MB cada; imagem ou PDF)."
-                : "Envie os quatro ficheiros abaixo (obrigatório para concluir o cadastro)."}
+                ? "Os anexos são opcionais. Envie novos ficheiros apenas para substituir documentos já guardados (máx. 5 MB cada; imagem ou PDF)."
+                : "Anexos opcionais. Pode guardar o motorista sem documentos e completar depois (máx. 5 MB cada; imagem ou PDF)."}
             </p>
-            <FileRow label="Foto de perfil" required={!isEditExisting} file={arPerfil} onFile={setArPerfil} />
-            <FileRow label="CNH — frente" required={!isEditExisting} file={arCnhF} onFile={setArCnhF} />
-            <FileRow label="CNH — verso" required={!isEditExisting} file={arCnhV} onFile={setArCnhV} />
-            <FileRow label="Comprovante de residência" required={!isEditExisting} file={arResid} onFile={setArResid} />
+            <FileRow label="Foto de perfil" file={arPerfil} onFile={setArPerfil} />
+            <FileRow label="CNH — frente" file={arCnhF} onFile={setArCnhF} />
+            <FileRow label="CNH — verso" file={arCnhV} onFile={setArCnhV} />
+            <FileRow label="Comprovante de residência" file={arResid} onFile={setArResid} />
           </div>
         )}
 
         {tabIndex === 2 && (
           <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">Dados para repasse *</p>
+            <p className="text-sm text-muted-foreground">Dados para repasse (opcional)</p>
             <div>
-              <Label>Tipo de pagamento *</Label>
+              <Label>Tipo de pagamento</Label>
               <Select value={tipoPagamento || undefined} onValueChange={setTipoPagamento}>
                 <SelectTrigger className="mt-1">
                   <SelectValue placeholder="Selecione" />
@@ -908,7 +826,7 @@ export default function CadastrarMotoristaDialog({ open, onOpenChange, onCreated
             </div>
             {tipoPagamento === "pix" && (
               <div>
-                <Label>Chave PIX *</Label>
+                <Label>Chave PIX</Label>
                 <Input
                   className="mt-1"
                   value={pixChave}
@@ -920,7 +838,7 @@ export default function CadastrarMotoristaDialog({ open, onOpenChange, onCreated
           </div>
         )}
 
-        <div className="flex justify-between pt-2">
+        <div className="flex justify-between gap-2 pt-2">
           {tabIndex > 0 ? (
             <Button type="button" variant="outline" onClick={() => setTabIndex((t) => t - 1)}>
               <ArrowLeft className="mr-2 h-4 w-4" /> Anterior
@@ -928,21 +846,22 @@ export default function CadastrarMotoristaDialog({ open, onOpenChange, onCreated
           ) : (
             <div />
           )}
-          {isLast ? (
+          <div className="flex flex-wrap justify-end gap-2">
+            {!isLast ? (
+              <Button type="button" variant="outline" onClick={goNext}>
+                Próximo <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            ) : null}
             <Button type="button" onClick={() => void handleSave()} disabled={saving}>
               {saving
-              ? "Salvando..."
-              : isEditExisting
-                ? "Guardar alterações"
-                : isCompletarLead
-                  ? "Concluir cadastro na frota"
-                  : "Salvar motorista"}
+                ? "Salvando..."
+                : isEditExisting
+                  ? "Guardar alterações"
+                  : isCompletarLead
+                    ? "Concluir cadastro na frota"
+                    : "Salvar motorista"}
             </Button>
-          ) : (
-            <Button type="button" onClick={goNext}>
-              Próximo <ArrowRight className="ml-2 h-4 w-4" />
-            </Button>
-          )}
+          </div>
         </div>
       </DialogContent>
     </Dialog>

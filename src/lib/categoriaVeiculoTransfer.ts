@@ -1,7 +1,7 @@
 /** Categorias de veículo obrigatórias em reservas de transfer. */
 export const CATEGORIAS_VEICULO_TRANSFER = [
   { value: "van", label: "VAN", abrev: "VAN" },
-  { value: "micro_onibus", label: "MICRO-ÔNIBUS", abrev: "MIC." },
+  { value: "micro_onibus", label: "MICRO-ÔNIBUS", abrev: "MIC.VAN" },
   { value: "veiculo_07_lugares", label: "VEÍCULOS 07 LUGARES", abrev: "07LUG." },
   { value: "mini_van", label: "MINI VAN", abrev: "MINIVAN" },
   { value: "sedan", label: "SEDAN", abrev: "SED" },

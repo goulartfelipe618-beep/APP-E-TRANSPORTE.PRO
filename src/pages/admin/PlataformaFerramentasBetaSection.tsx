@@ -9,7 +9,6 @@ import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 
 type FlagsState = {
-  disparador_consumo_liberado: boolean;
   marketing_menu_liberado: boolean;
 };
 
@@ -18,7 +17,6 @@ export default function PlataformaFerramentasBetaSection() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [flags, setFlags] = useState<FlagsState>({
-    disparador_consumo_liberado: false,
     marketing_menu_liberado: false,
   });
 
@@ -27,7 +25,7 @@ export default function PlataformaFerramentasBetaSection() {
     try {
       const { data, error } = await supabase
         .from("plataforma_ferramentas_disponibilidade")
-        .select("disparador_consumo_liberado, marketing_menu_liberado")
+        .select("marketing_menu_liberado")
         .eq("id", 1)
         .maybeSingle();
       if (error) {
@@ -37,7 +35,6 @@ export default function PlataformaFerramentasBetaSection() {
       if (data) {
         const row = data as FlagsState;
         setFlags({
-          disparador_consumo_liberado: !!row.disparador_consumo_liberado,
           marketing_menu_liberado: !!row.marketing_menu_liberado,
         });
       }
@@ -106,26 +103,6 @@ export default function PlataformaFerramentasBetaSection() {
                 onCheckedChange={(v) => {
                   setFlags((f) => ({ ...f, marketing_menu_liberado: v }));
                   void persist({ marketing_menu_liberado: v });
-                }}
-              />
-            </div>
-
-            <div className="flex items-center justify-between gap-4 rounded-lg border border-border p-3">
-              <div className="min-w-0">
-                <Label htmlFor="flag-disparador" className="text-foreground">
-                  Disparador de mensagens (Beta)
-                </Label>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Permite o botão de acesso e conteúdo utilizável na página Disparador.
-                </p>
-              </div>
-              <Switch
-                id="flag-disparador"
-                disabled={saving}
-                checked={flags.disparador_consumo_liberado}
-                onCheckedChange={(v) => {
-                  setFlags((f) => ({ ...f, disparador_consumo_liberado: v }));
-                  void persist({ disparador_consumo_liberado: v });
                 }}
               />
             </div>

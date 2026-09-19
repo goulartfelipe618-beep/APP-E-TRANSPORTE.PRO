@@ -70,7 +70,7 @@ function ClienteListFoto({ documentos, nome, className }: { documentos: Json; no
 export default function ClientesPage() {
   const [rows, setRows] = useState<CadastroClienteRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [viewMode, setViewMode] = useState<"cards" | "table">("cards");
+  const [viewMode, setViewMode] = useState<"cards" | "table">("table");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editRow, setEditRow] = useState<CadastroClienteRow | null>(null);
   const [detailRow, setDetailRow] = useState<CadastroClienteRow | null>(null);

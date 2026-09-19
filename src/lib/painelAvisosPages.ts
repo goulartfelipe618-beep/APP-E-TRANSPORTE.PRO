@@ -31,15 +31,11 @@ export const PAGINAS_MOTORISTA: { value: string; label: string }[] = [
   { value: "email-business", label: "E-mail Business" },
   { value: "website", label: "Website" },
   { value: "dominios", label: "Domínios" },
-  { value: "disparador", label: "Disparador" },
-  { value: "empty-legs", label: "Empty Legs" },
-  { value: "mentoria", label: "Mentoria" },
   { value: "anotacoes", label: "Anotações" },
   { value: "sistema/configuracoes", label: "Sistema — Configurações" },
   { value: "sistema/automacoes", label: "Sistema — Automações" },
   { value: "sistema/comunicador", label: "Sistema — Comunicador" },
   { value: "tickets", label: "Suporte" },
-  { value: "documentacao", label: "Documentação" },
 ];
 
 export type PainelTipo = "motorista";

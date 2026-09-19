@@ -3,13 +3,16 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { RESERVA_STATUS_OPTIONS } from "@/lib/reservaStatus";
+import { isCatalogReservaStatus, normalizeReservaStatus, RESERVA_STATUS_OPTIONS } from "@/lib/reservaStatus";
 import { Loader2, FileDown } from "lucide-react";
 import { generateTransferPDFForMotorista } from "@/lib/pdfGenerator";
 import { Badge } from "@/components/ui/badge";
-import type { FrotaPortalGrupoReserva, FrotaPortalTransferReserva } from "@/lib/frotaPortalReservations";
+import {
+  updateFrotaReservaStatus,
+  type FrotaPortalGrupoReserva,
+  type FrotaPortalTransferReserva,
+} from "@/lib/frotaPortalReservations";
 import { formatTransferTipoViagemExibicao } from "@/lib/transferPernaViagem";
 import { formatDbCalendarDatePtBr, formatHoraReserva } from "@/lib/painelAgendaReservas";
 import { labelCategoriaVeiculoTransfer } from "@/lib/categoriaVeiculoTransfer";
@@ -19,7 +22,7 @@ type Props = {
   grupo: FrotaPortalGrupoReserva | null;
   open: boolean;
   onOpenChange: (o: boolean) => void;
-  onSaved: () => void;
+  onSaved: (payload: { kind: "transfer" | "grupo"; id: string; status: string }) => void;
 };
 
 function formatCurrency(value: number | null | undefined): string {
@@ -70,7 +73,7 @@ export default function FrotaReservaDetalheSheet({ transfer, grupo, open, onOpen
   useEffect(() => {
     if (!open) return;
     const s = (isTransfer ? transfer?.status : grupo?.status) ?? "pendente";
-    setStatus(s.trim() || "pendente");
+    setStatus(normalizeReservaStatus(s));
   }, [open, isTransfer, transfer, grupo]);
 
   const row = transfer ?? grupo;
@@ -159,7 +162,7 @@ export default function FrotaReservaDetalheSheet({ transfer, grupo, open, onOpen
             <div className="space-y-2">
               <Label>Estado da reserva</Label>
               <Select
-                value={RESERVA_STATUS_OPTIONS.some((o) => o.value === status) ? status : "pendente"}
+                value={isCatalogReservaStatus(status) ? normalizeReservaStatus(status) : "pendente"}
                 onValueChange={setStatus}
               >
                 <SelectTrigger>
@@ -192,21 +195,22 @@ export default function FrotaReservaDetalheSheet({ transfer, grupo, open, onOpen
                 onClick={async () => {
                   setSaving(true);
                   try {
-                    if (isTransfer && transfer) {
-                      const { error } = await supabase.from("reservas_transfer").update({ status }).eq("id", transfer.id);
-                      if (error) {
-                        toast.error(error.message);
-                        return;
-                      }
-                    } else if (grupo) {
-                      const { error } = await supabase.from("reservas_grupos").update({ status }).eq("id", grupo.id);
-                      if (error) {
-                        toast.error(error.message);
-                        return;
-                      }
+                    const next = normalizeReservaStatus(status);
+                    const kind = isTransfer && transfer ? "transfer" : grupo ? "grupo" : null;
+                    const reservaId = transfer?.id ?? grupo?.id ?? null;
+                    if (!kind || !reservaId) {
+                      toast.error("Reserva indisponível.");
+                      return;
                     }
-                    toast.success("Estado atualizado.");
-                    onSaved();
+                    const res = await updateFrotaReservaStatus(kind, reservaId, next);
+                    if (res.error || !res.status) {
+                      toast.error(res.error ?? "O estado não ficou gravado. Tente novamente.");
+                      return;
+                    }
+                    const saved = normalizeReservaStatus(res.status);
+                    setStatus(saved);
+                    toast.success("Estado gravado.");
+                    onSaved({ kind, id: reservaId, status: saved });
                     onOpenChange(false);
                   } finally {
                     setSaving(false);

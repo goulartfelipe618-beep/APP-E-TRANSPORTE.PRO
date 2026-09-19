@@ -227,7 +227,7 @@ export default function FrotaAgendaPage() {
                           {it.numeroLabel}
                         </span>
                         {it.categoriaAbrev ? (
-                          <span className="shrink-0 rounded bg-foreground/10 px-0.5 text-[9px] font-bold uppercase leading-none tracking-tight text-foreground">
+                          <span className="shrink-0 rounded bg-[#FF6600] px-1 py-px text-[9px] font-bold uppercase leading-none tracking-tight text-white">
                             {it.categoriaAbrev}
                           </span>
                         ) : null}
@@ -261,7 +261,9 @@ export default function FrotaAgendaPage() {
             setDetailGrupo(null);
           }
         }}
-        onSaved={() => void load()}
+        onSaved={() => {
+          void load();
+        }}
       />
     </div>
   );

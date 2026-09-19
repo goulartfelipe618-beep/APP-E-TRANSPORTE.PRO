@@ -33,12 +33,9 @@ const PAGES_MIN_STANDART = new Set<string>(["transfer/contrato", "grupos/contrat
 /** Itens de menu onde não mostramos badge de upgrade (acesso no FREE com outras regras ou beta). */
 export const PAGES_SEM_BADGE_PLANO = new Set<string>([
   "transfer/geolocalizacao",
-  "disparador",
-  "empty-legs",
   "sistema/comunicador",
   "network",
   "comunidade",
-  "mentoria",
 ]);
 
 export function normalizeUserPlano(raw: string | null | undefined): PlanType {

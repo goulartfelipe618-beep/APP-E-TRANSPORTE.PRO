@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { computeClienteProfilePercent } from "@/lib/clienteCompleteness";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -14,7 +14,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { Json, Tables } from "@/integrations/supabase/types";
-import { RESERVA_STATUS_OPTIONS } from "@/lib/reservaStatus";
+import { normalizeReservaStatus, RESERVA_STATUS_OPTIONS } from "@/lib/reservaStatus";
 import { toAgendaDayKey } from "@/lib/painelAgendaReservas";
 import { normalizeUserPlano, FREE_MAX_RESERVAS_DIA } from "@/lib/painelPlanPolicy";
 import { calendarDayKeySaoPauloFromIso, todayKeySaoPaulo } from "@/lib/spCalendarBr";
@@ -24,6 +24,7 @@ import {
   CATEGORIAS_VEICULO_TRANSFER,
   isCategoriaVeiculoTransfer,
 } from "@/lib/categoriaVeiculoTransfer";
+import { motoristaAssignValue, motoristaMatchesAssignment } from "@/lib/motoristaReservaAssign";
 
 function toDateInput(v: string | null | undefined): string {
   return toAgendaDayKey(v) ?? "";
@@ -38,14 +39,11 @@ function toTimeInput(v: string | null | undefined): string {
 }
 
 function isMissingColumnError(message: string): boolean {
-  return /categoria_veiculo|cadastro_cliente_id|schema cache|PGRST204|42703/i.test(message);
+  return /cadastro_cliente_id/i.test(message);
 }
 
 function stripUnknownColumns<T extends Record<string, unknown>>(payload: T, message: string): T {
   const next = { ...payload };
-  if (/categoria_veiculo|schema cache|PGRST204|42703/i.test(message)) {
-    delete next.categoria_veiculo;
-  }
   if (/cadastro_cliente_id/i.test(message)) {
     delete next.cadastro_cliente_id;
   }
@@ -150,8 +148,16 @@ export default function CriarReservaTransferDialog({
   const [observacoes, setObservacoes] = useState("");
   const [statusOperacional, setStatusOperacional] = useState("pendente");
   const [repasseMotorista, setRepasseMotorista] = useState("");
-  const [motoristasFrota, setMotoristasFrota] = useState<{ id: string; nome: string; portal_auth_user_id: string }[]>([]);
+  const [motoristasFrota, setMotoristasFrota] = useState<{ id: string; nome: string; portal_auth_user_id: string | null }[]>([]);
   const [motoristaAtribUid, setMotoristaAtribUid] = useState<string>("");
+  const motoristaAtribUidRef = useRef("");
+  const editReservaIdRef = useRef<string | null>(null);
+  const hydratedEditIdRef = useRef<string | null>(null);
+
+  const setMotoristaAtribuido = (uid: string) => {
+    motoristaAtribUidRef.current = uid;
+    setMotoristaAtribUid(uid);
+  };
   const [modoClienteReserva, setModoClienteReserva] = useState<"novo" | "cadastrado">("novo");
   const [clientesReservaOpts, setClientesReservaOpts] = useState<ClienteReservaOpt[]>([]);
   const [cadastroClienteIdReserva, setCadastroClienteIdReserva] = useState("");
@@ -191,9 +197,16 @@ export default function CriarReservaTransferDialog({
 
   // Pre-fill from edição, solicitação ou reset
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      hydratedEditIdRef.current = null;
+      editReservaIdRef.current = null;
+      return;
+    }
 
     if (reservaEdicao) {
+      if (hydratedEditIdRef.current === reservaEdicao.id) return;
+      hydratedEditIdRef.current = reservaEdicao.id;
+      editReservaIdRef.current = reservaEdicao.id;
       const row = reservaEdicao;
       setNomeCompleto(row.nome_completo ?? "");
       setCpfCnpj(row.cpf_cnpj ?? "");
@@ -230,7 +243,7 @@ export default function CriarReservaTransferDialog({
       setFaturado((row as { faturado?: boolean }).faturado === true ? "sim" : "nao");
       setEsconderValores((row as { esconder_valores?: boolean }).esconder_valores === true);
       setObservacoes(row.observacoes ?? "");
-      const st = (row.status ?? "pendente").trim();
+      const st = normalizeReservaStatus(row.status);
       setStatusOperacional(
         RESERVA_STATUS_OPTIONS.some((o) => o.value === st) ? st : "pendente",
       );
@@ -238,7 +251,7 @@ export default function CriarReservaTransferDialog({
         row.repasse_motorista != null && Number(row.repasse_motorista) > 0 ? String(row.repasse_motorista) : "",
       );
       const mid = (row.motorista_id ?? "").trim();
-      setMotoristaAtribUid(mid);
+      setMotoristaAtribuido(mid);
       const cat = (row as { categoria_veiculo?: string | null }).categoria_veiculo;
       setCategoriaVeiculo(isCategoriaVeiculoTransfer(cat) ? cat : "");
       const cid = (row as { cadastro_cliente_id?: string | null }).cadastro_cliente_id;
@@ -306,8 +319,7 @@ export default function CriarReservaTransferDialog({
           .from("solicitacoes_motoristas")
           .select("id, nome, portal_auth_user_id")
           .eq("user_id", auth.user.id)
-          .eq("status", "cadastrado")
-          .not("portal_auth_user_id", "is", null),
+          .eq("status", "cadastrado"),
         supabase
           .from("cadastro_clientes")
           .select("id,nome_exibicao,email,telefone_1,telefone_2,cpf_cnpj")
@@ -315,13 +327,11 @@ export default function CriarReservaTransferDialog({
           .order("nome_exibicao", { ascending: true }),
       ]);
       const rows = (data ?? []) as { id: string; nome: string; portal_auth_user_id: string | null }[];
-      setMotoristasFrota(
-        rows.filter((r) => r.portal_auth_user_id != null).map((r) => ({
-          id: r.id,
-          nome: r.nome,
-          portal_auth_user_id: r.portal_auth_user_id as string,
-        })),
-      );
+      setMotoristasFrota(rows.map((r) => ({
+        id: r.id,
+        nome: r.nome,
+        portal_auth_user_id: r.portal_auth_user_id,
+      })));
       setClientesReservaOpts((cli ?? []) as ClienteReservaOpt[]);
     })();
   }, [open]);
@@ -338,7 +348,7 @@ export default function CriarReservaTransferDialog({
     setPorHoraCupom(""); setPorHoraItinerario("");
     setValorBase("0"); setDesconto("0"); setMetodoPagamento(""); setFaturado("nao"); setEsconderValores(false); setObservacoes("");
     setStatusOperacional("pendente"); setRepasseMotorista("");
-    setMotoristaAtribUid("");
+    setMotoristaAtribuido("");
     setCategoriaVeiculo("");
     setModoClienteReserva("novo");
     setCadastroClienteIdReserva("");
@@ -440,6 +450,17 @@ export default function CriarReservaTransferDialog({
     const repasseNumParsed = parseFloat(String(repasseMotorista).replace(",", "."));
     const repasseNum = Number.isFinite(repasseNumParsed) && repasseNumParsed > 0 ? repasseNumParsed : null;
 
+    const motoristaRaw = (motoristaAtribUidRef.current || motoristaAtribUid).trim();
+    const motoristaHit = motoristasFrota.find(
+      (m) => motoristaMatchesAssignment(motoristaRaw, m) || motoristaAssignValue(m) === motoristaRaw,
+    );
+    const motoristaIdResolved =
+      quemViaja === "motorista" && motoristaRaw
+        ? motoristaHit
+          ? motoristaAssignValue(motoristaHit)
+          : motoristaRaw
+        : null;
+
     const rowPayload = {
       nome_completo: nomeCompleto,
       cpf_cnpj: cpfCnpj,
@@ -478,8 +499,7 @@ export default function CriarReservaTransferDialog({
       observacoes: observacoes || null,
       status: statusOperacional,
       repasse_motorista: repasseNum,
-      motorista_id:
-        quemViaja === "motorista" && motoristaAtribUid.trim() !== "" ? motoristaAtribUid.trim() : null,
+      motorista_id: motoristaIdResolved,
       cadastro_cliente_id: cadastroClienteIdOut,
       categoria_veiculo: categoriaVeiculo,
     };
@@ -494,7 +514,7 @@ export default function CriarReservaTransferDialog({
     ) => {
       const run = (p: Record<string, unknown>) => {
         if (mode === "update") {
-          return supabase.from("reservas_transfer").update(p as never).eq("id", id!);
+          return supabase.from("reservas_transfer").update(p as never).eq("id", id!).select("id, motorista_id, par_reserva_id").maybeSingle();
         }
         const q = supabase.from("reservas_transfer").insert(p as never);
         return selectId ? q.select("id").single() : q;
@@ -506,9 +526,28 @@ export default function CriarReservaTransferDialog({
       return res;
     };
 
-    if (reservaEdicao?.id) {
-      const res = await writeRow(rowPayload as Record<string, unknown>, "update", reservaEdicao.id);
+    const editId = reservaEdicao?.id ?? editReservaIdRef.current;
+    if (editId) {
+      const res = await writeRow(rowPayload as Record<string, unknown>, "update", editId);
       error = res.error;
+      const saved = res.data as { id?: string; motorista_id?: string | null; par_reserva_id?: string | null } | null;
+      if (!error && !saved?.id) {
+        error = { message: "A reserva não foi atualizada. Recarregue a lista e tente novamente." };
+      }
+      if (!error && motoristaIdResolved && (saved?.motorista_id ?? "").trim() !== motoristaIdResolved) {
+        error = { message: "O motorista não ficou gravado na reserva. Tente guardar outra vez." };
+      }
+      const parId = (saved?.par_reserva_id ?? reservaEdicao?.par_reserva_id ?? "").trim();
+      if (!error && parId) {
+        const pair = await supabase
+          .from("reservas_transfer")
+          .update({ motorista_id: motoristaIdResolved, quem_viaja: quemViaja } as never)
+          .eq("par_reserva_id", parId)
+          .neq("id", editId);
+        if (pair.error) {
+          toast.warning("Motorista gravado nesta reserva, mas a perna par (ida/volta) não foi atualizada.");
+        }
+      }
     } else if (tipoViagem === "ida_volta") {
       if (!voltaData.trim()) {
         toast.error("Informe a data da volta para viagens ida e volta.");
@@ -523,8 +562,7 @@ export default function CriarReservaTransferDialog({
       const vt2 = valorTotalFromBaseDiscount(vb2, descNum);
       const [r1, r2] = repasseNum != null ? splitAmountInTwoHalves(repasseNum) : [null, null];
 
-      const motoristaId =
-        quemViaja === "motorista" && motoristaAtribUid.trim() !== "" ? motoristaAtribUid.trim() : null;
+      const motoristaId = motoristaIdResolved;
 
       const baseShared = {
         nome_completo: nomeCompleto,
@@ -623,15 +661,15 @@ export default function CriarReservaTransferDialog({
 
     setSaving(false);
     if (error) {
-      toast.error(reservaEdicao?.id ? "Erro ao atualizar reserva: " + error.message : "Erro ao criar reserva: " + error.message);
+      toast.error(editId ? "Erro ao atualizar reserva: " + error.message : "Erro ao criar reserva: " + error.message);
     } else {
       if (novoClientePct != null) {
         toast.success(`Reserva criada. Novo cliente no menu Clientes — perfil ${novoClientePct}% (complete dados quando quiser).`);
-      } else if (!reservaEdicao?.id && tipoViagem === "ida_volta") {
+      } else if (!editId && tipoViagem === "ida_volta") {
         toast.success("Foram criadas 2 reservas (ida e volta), cada uma com metade do valor e do repasse.");
       } else {
-        toast.success(reservaEdicao?.id ? "Reserva atualizada com sucesso!" : "Reserva criada com sucesso!");
-        if (!reservaEdicao?.id) void logUserActivity("reserva_transfer_criada");
+        toast.success(editId ? "Reserva atualizada com sucesso!" : "Reserva criada com sucesso!");
+        if (!editId) void logUserActivity("reserva_transfer_criada");
       }
       resetForm();
       onOpenChange(false);
@@ -764,16 +802,33 @@ export default function CriarReservaTransferDialog({
               Indique endereços completos (rua, número, bairro e cidade) para facilitar o atendimento.
             </p>
             <div className="space-y-4">
-              <div className="w-1/2 space-y-1.5">
-                <Label>Tipo de Viagem *</Label>
-                <Select value={tipoViagem} onValueChange={(v) => setTipoViagem(v as TipoViagem)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="somente_ida">Somente Ida</SelectItem>
-                    <SelectItem value="ida_volta">Ida e Volta</SelectItem>
-                    <SelectItem value="por_hora">Por Hora</SelectItem>
-                  </SelectContent>
-                </Select>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label>Tipo de Viagem *</Label>
+                  <Select value={tipoViagem} onValueChange={(v) => setTipoViagem(v as TipoViagem)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="somente_ida">Somente Ida</SelectItem>
+                      <SelectItem value="ida_volta">Ida e Volta</SelectItem>
+                      <SelectItem value="por_hora">Por Hora</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Categoria do veículo *</Label>
+                  <Select value={categoriaVeiculo || undefined} onValueChange={setCategoriaVeiculo}>
+                    <SelectTrigger className="border-[#FF6600]/40">
+                      <SelectValue placeholder="Obrigatório — VAN, SEDAN, HATCH…" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {CATEGORIAS_VEICULO_TRANSFER.map((c) => (
+                        <SelectItem key={c.value} value={c.value}>
+                          {c.label} ({c.abrev})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
               {(tipoViagem === "somente_ida" || tipoViagem === "ida_volta") && (
@@ -875,21 +930,6 @@ export default function CriarReservaTransferDialog({
             <h3 className="font-semibold text-foreground mb-3">Veículo e Motorista</h3>
             <div className="space-y-4">
               <div className="space-y-1.5">
-                <Label>Categoria do veículo *</Label>
-                <Select value={categoriaVeiculo || undefined} onValueChange={setCategoriaVeiculo}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione a categoria" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {CATEGORIAS_VEICULO_TRANSFER.map((c) => (
-                      <SelectItem key={c.value} value={c.value}>
-                        {c.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1.5">
                 <Label>Quem fará a viagem? *</Label>
                 <Select value={quemViaja} onValueChange={(v) => setQuemViaja(v as QuemViaja)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
@@ -905,7 +945,7 @@ export default function CriarReservaTransferDialog({
                     <Label>Motorista da frota *</Label>
                     <Select
                       value={motoristaAtribUid || "__none__"}
-                      onValueChange={(v) => setMotoristaAtribUid(v === "__none__" ? "" : v)}
+                      onValueChange={(v) => setMotoristaAtribuido(v === "__none__" ? "" : v)}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Selecione quem executa a viagem" />
@@ -913,14 +953,15 @@ export default function CriarReservaTransferDialog({
                       <SelectContent>
                         <SelectItem value="__none__">— Não atribuir ainda —</SelectItem>
                         {motoristasFrota.map((m) => (
-                          <SelectItem key={m.id} value={m.portal_auth_user_id}>
+                          <SelectItem key={m.id} value={motoristaAssignValue(m)}>
                             {m.nome}
+                            {!m.portal_auth_user_id ? " (portal pendente)" : ""}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                     <p className="text-xs text-muted-foreground">
-                      Só aparecem motoristas com <strong className="text-foreground">portal activo</strong> (definiram senha pelo link). Atribua a reserva para ela surgir na agenda dele.
+                      A atribuição fica gravada na reserva e na agenda do mini portal do motorista. Se o portal ainda estiver pendente, a reserva aparece assim que ele abrir o link e definir a senha.
                     </p>
                   </div>
                 </div>

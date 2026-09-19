@@ -3,7 +3,6 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
 export type PlataformaFerramentasFlags = {
-  disparador_consumo_liberado: boolean;
   marketing_menu_liberado: boolean;
 };
 
@@ -13,14 +12,13 @@ export const PLATAFORMA_FERRAMENTAS_DISPONIBILIDADE_QUERY_KEY = [
 ] as const;
 
 const DEFAULT_FLAGS: PlataformaFerramentasFlags = {
-  disparador_consumo_liberado: false,
   marketing_menu_liberado: false,
 };
 
 async function fetchPlataformaFerramentasDisponibilidade(): Promise<PlataformaFerramentasFlags> {
   const { data, error } = await supabase
     .from("plataforma_ferramentas_disponibilidade")
-    .select("disparador_consumo_liberado, marketing_menu_liberado")
+    .select("marketing_menu_liberado")
     .eq("id", 1)
     .maybeSingle();
 
@@ -31,17 +29,15 @@ async function fetchPlataformaFerramentasDisponibilidade(): Promise<PlataformaFe
     return { ...DEFAULT_FLAGS };
   }
   const row = data as {
-    disparador_consumo_liberado?: boolean;
     marketing_menu_liberado?: boolean;
   };
   return {
-    disparador_consumo_liberado: !!row.disparador_consumo_liberado,
     marketing_menu_liberado: !!row.marketing_menu_liberado,
   };
 }
 
 /**
- * Flags globais de consumo (Disparador). Sem cache persistente entre montagens
+ * Flags globais de menus da plataforma. Sem cache persistente entre montagens
  * (`gcTime: 0`), refetch ao focar a janela e ao montar — evita overlay de bloqueio antes da resposta.
  */
 export function usePlataformaFerramentasDisponibilidade() {
@@ -68,7 +64,6 @@ export function usePlataformaFerramentasDisponibilidade() {
   const loading = !authHydrated || query.isPending;
 
   const flags: PlataformaFerramentasFlags = {
-    disparador_consumo_liberado: query.data?.disparador_consumo_liberado ?? false,
     marketing_menu_liberado: query.data?.marketing_menu_liberado ?? false,
   };
 

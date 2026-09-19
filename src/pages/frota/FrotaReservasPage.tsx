@@ -205,7 +205,14 @@ export default function FrotaReservasPage() {
             setDetailGrupo(null);
           }
         }}
-        onSaved={() => void load()}
+        onSaved={({ kind, id, status }) => {
+          if (kind === "transfer") {
+            setTransfers((rows) => rows.map((row) => (row.id === id ? { ...row, status } : row)));
+          } else {
+            setGrupos((rows) => rows.map((row) => (row.id === id ? { ...row, status } : row)));
+          }
+          void load();
+        }}
       />
     </div>
   );

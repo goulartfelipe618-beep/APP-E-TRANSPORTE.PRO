@@ -16,7 +16,7 @@ describe("categoriaVeiculoTransfer", () => {
 
   it("abreviacões da agenda", () => {
     expect(abrevCategoriaVeiculoTransfer("van")).toBe("VAN");
-    expect(abrevCategoriaVeiculoTransfer("micro_onibus")).toBe("MIC.");
+    expect(abrevCategoriaVeiculoTransfer("micro_onibus")).toBe("MIC.VAN");
     expect(abrevCategoriaVeiculoTransfer("veiculo_07_lugares")).toBe("07LUG.");
     expect(abrevCategoriaVeiculoTransfer("mini_van")).toBe("MINIVAN");
     expect(abrevCategoriaVeiculoTransfer("sedan")).toBe("SED");

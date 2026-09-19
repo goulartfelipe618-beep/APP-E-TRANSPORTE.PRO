@@ -18,8 +18,6 @@ import {
   BookOpen,
   ClipboardList,
   UserCheck,
-  Plane,
-  GraduationCap,
   Megaphone,
   Map,
   Monitor,
@@ -134,12 +132,6 @@ function buildHomeSections(
     { title: "QR Codes", page: "marketing/qrcode", desc: "QR Codes para divulgação e acesso rápido.", icon: Search },
   ];
 
-  const betaItems: ToolDef[] = [
-    { title: "Disparador", page: "disparador", desc: "Envio de mensagens em massa (WhatsApp dedicado).", icon: Megaphone },
-    { title: "Empty Legs", page: "empty-legs", desc: "Trechos e oportunidades de retorno.", icon: Plane },
-    { title: "Mentoria", page: "mentoria", desc: "Conteúdos e trilha de desenvolvimento.", icon: GraduationCap },
-  ];
-
   const configuracao: Subsection[] = [
     {
       title: "Sistema",
@@ -176,12 +168,6 @@ function buildHomeSections(
       id: "ferramentas",
       label: "Ferramentas",
       subsections: [{ title: "Operação e divulgação", items: ferramentasItems }],
-    },
-    {
-      id: "beta",
-      label: "Beta",
-      labelTone: "beta",
-      subsections: [{ title: "Recursos em testes", items: betaItems }],
     },
     { id: "config", label: "Configurações", subsections: configuracao },
   ];
