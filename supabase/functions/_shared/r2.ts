@@ -107,13 +107,32 @@ export async function r2Head(client: AwsClient, key: string): Promise<boolean> {
   return res.ok;
 }
 
+/** URL GET assinada: o browser baixa o objecto no R2, sem o body passar pelo Supabase. */
+export async function r2PresignGet(client: AwsClient, key: string, expiresSeconds = 3600): Promise<string> {
+  const expires = Math.min(Math.max(expiresSeconds, 60), 7 * 24 * 3600);
+  const url = `${r2Endpoint()}/${R2_BUCKET}/${encodeR2Key(key)}?X-Amz-Expires=${expires}`;
+  const signed = await client.sign(url, { method: "GET", aws: { signQuery: true } });
+  return signed.url;
+}
+
+export function r2PublicCdnBase(): string {
+  return (Deno.env.get("R2_PUBLIC_BASE_URL") ?? "").trim().replace(/\/+$/, "");
+}
+
+export function publicObjectUrl(key: string, supabaseUrl: string): string {
+  const rest = key.replace(/^\/+/, "");
+  const cdn = r2PublicCdnBase();
+  if (cdn) return `${cdn}/${rest.split("/").map(encodeURIComponent).join("/")}`;
+  return `${supabaseUrl.replace(/\/+$/, "")}/functions/v1/r2-media/${rest}`;
+}
+
 export function rewritePublicStorageUrl(raw: string, supabaseUrl: string): string {
   const t = raw.trim();
   const marker = "/storage/v1/object/public/";
   const i = t.indexOf(marker);
   if (i < 0) return t;
   const rest = t.slice(i + marker.length);
-  return `${supabaseUrl.replace(/\/+$/, "")}/functions/v1/r2-media/espelho/${rest}`;
+  return publicObjectUrl(`espelho/${rest}`, supabaseUrl);
 }
 
 export const PRIVATE_STORAGE_BUCKETS = new Set(["cadastro-clientes-docs", "motorista-frota-docs"]);

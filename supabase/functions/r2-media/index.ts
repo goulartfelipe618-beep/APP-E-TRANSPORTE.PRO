@@ -1,8 +1,9 @@
 /**
- * Serve objectos públicos já copiados para o R2 (espelho/).
- * GET /r2-media/espelho/{bucket}/{...path}
+ * Imagens públicas: redireciona (302) para URL assinada do R2.
+ * O ficheiro é descarregado no Cloudflare, não atravessa o body da Edge Function.
+ * Se R2_PUBLIC_BASE_URL (domínio custom do bucket) existir, redireciona para esse CDN.
  */
-import { PUBLIC_STORAGE_BUCKETS, r2Client, r2Get } from "../_shared/r2.ts";
+import { PUBLIC_STORAGE_BUCKETS, publicObjectUrl, r2Client, r2PresignGet } from "../_shared/r2.ts";
 
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
@@ -37,6 +38,15 @@ Deno.serve(async (req) => {
     return new Response("Forbidden", { status: 403, headers: corsHeaders });
   }
 
+  const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+  const cdnUrl = publicObjectUrl(key, supabaseUrl);
+  if (!cdnUrl.includes("/functions/v1/r2-media/")) {
+    return new Response(null, {
+      status: 302,
+      headers: { ...corsHeaders, Location: cdnUrl, "Cache-Control": "public, max-age=300" },
+    });
+  }
+
   let r2;
   try {
     r2 = r2Client();
@@ -44,15 +54,17 @@ Deno.serve(async (req) => {
     return new Response("R2 não configurado", { status: 503, headers: corsHeaders });
   }
 
-  const res = await r2Get(r2, key);
-  if (!res.ok) {
+  try {
+    const location = await r2PresignGet(r2, key, 86400);
+    return new Response(null, {
+      status: 302,
+      headers: {
+        ...corsHeaders,
+        Location: location,
+        "Cache-Control": "private, max-age=60",
+      },
+    });
+  } catch {
     return new Response("Not found", { status: 404, headers: corsHeaders });
   }
-
-  const headers = new Headers(corsHeaders);
-  const ct = res.headers.get("content-type");
-  if (ct) headers.set("Content-Type", ct);
-  headers.set("Cache-Control", "public, max-age=86400, immutable");
-  if (req.method === "HEAD") return new Response(null, { status: 200, headers });
-  return new Response(res.body, { status: 200, headers });
 });

@@ -1,4 +1,4 @@
-/** URLs públicas de media no proxy R2 (Edge `r2-media`). */
+/** URLs públicas de media no R2 (CDN directo ou redirect curto via `r2-media`). */
 
 export const PUBLIC_R2_BUCKETS = new Set([
   "catalogo-motorista",
@@ -19,18 +19,54 @@ function supabaseBase(): string {
   return raw.replace(/\/+$/, "");
 }
 
-export function r2PublicMediaUrl(bucket: string, objectPath: string): string {
-  const base = supabaseBase();
-  const rest = objectPath
+/** Domínio público ligado ao bucket R2 (sem secret). Ex.: https://media.e-transporte.pro */
+export function r2PublicCdnBase(): string {
+  const raw =
+    typeof import.meta !== "undefined" && import.meta.env?.VITE_R2_PUBLIC_BASE_URL
+      ? String(import.meta.env.VITE_R2_PUBLIC_BASE_URL)
+      : "";
+  return raw.trim().replace(/\/+$/, "");
+}
+
+function encodeKeyPath(key: string): string {
+  return key
     .replace(/^\/+/, "")
     .split("/")
     .filter(Boolean)
     .map(encodeURIComponent)
     .join("/");
-  return `${base}/functions/v1/r2-media/espelho/${encodeURIComponent(bucket)}/${rest}`;
 }
 
-/** Reescreve URLs públicas do Storage Supabase para o proxy R2. */
+export function r2DirectObjectUrl(objectKey: string): string {
+  const cdn = r2PublicCdnBase();
+  const rest = encodeKeyPath(objectKey);
+  if (cdn) return `${cdn}/${rest}`;
+  const base = supabaseBase();
+  return `${base}/functions/v1/r2-media/${rest}`;
+}
+
+export function r2PublicMediaUrl(bucket: string, objectPath: string): string {
+  const rest = objectPath.replace(/^\/+/, "");
+  return r2DirectObjectUrl(`espelho/${bucket}/${rest}`);
+}
+
+function rewriteR2MediaProxyToCdn(u: URL, supabaseUrl: string): string | null {
+  const cdn = r2PublicCdnBase();
+  if (!cdn) return null;
+  try {
+    if (u.hostname !== new URL(supabaseUrl).hostname) return null;
+  } catch {
+    return null;
+  }
+  const marker = "/functions/v1/r2-media/";
+  const idx = u.pathname.toLowerCase().indexOf(marker);
+  if (idx < 0) return null;
+  const rest = u.pathname.slice(idx + marker.length);
+  if (!rest) return null;
+  return `${cdn}/${rest}${u.search}`;
+}
+
+/** Reescreve Storage público / proxy r2-media para o CDN R2 quando existir. */
 export function rewriteSupabaseStorageUrlToR2(raw: string | null | undefined): string | null {
   const t = raw?.trim();
   if (!t) return null;
@@ -42,6 +78,10 @@ export function rewriteSupabaseStorageUrlToR2(raw: string | null | undefined): s
   }
   const supabaseUrl = supabaseBase();
   if (!supabaseUrl) return null;
+
+  const fromProxy = rewriteR2MediaProxyToCdn(u, supabaseUrl);
+  if (fromProxy) return fromProxy;
+
   try {
     if (u.hostname !== new URL(supabaseUrl).hostname) return null;
   } catch {
@@ -54,5 +94,5 @@ export function rewriteSupabaseStorageUrlToR2(raw: string | null | undefined): s
   if (idx < 0) return null;
   const rest = u.pathname.slice(idx + publicMarker.length);
   if (!rest) return null;
-  return `${supabaseUrl}/functions/v1/r2-media/espelho/${rest}${u.search}`;
+  return r2DirectObjectUrl(`espelho/${rest}`);
 }

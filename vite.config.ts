@@ -97,6 +97,9 @@ export default defineConfig(({ mode }) => {
       "import.meta.env.VITE_VERCEL_SKEW_PROTECTION_ENABLED": JSON.stringify(
         process.env.VERCEL_SKEW_PROTECTION_ENABLED ?? "",
       ),
+      "import.meta.env.VITE_R2_PUBLIC_BASE_URL": JSON.stringify(
+        fileEnv.VITE_R2_PUBLIC_BASE_URL || process.env.VITE_R2_PUBLIC_BASE_URL || "",
+      ),
     },
   };
 });

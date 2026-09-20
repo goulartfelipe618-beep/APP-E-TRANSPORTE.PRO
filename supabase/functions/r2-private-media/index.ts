@@ -4,7 +4,7 @@
  * GET ?b=&p=&exp=&sig= → ficheiro.
  */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { PRIVATE_STORAGE_BUCKETS, espelhoKey, r2Client, r2Get } from "../_shared/r2.ts";
+import { PRIVATE_STORAGE_BUCKETS, espelhoKey, r2Client, r2PresignGet } from "../_shared/r2.ts";
 
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
@@ -89,12 +89,15 @@ Deno.serve(async (req) => {
     } catch {
       return json({ error: "R2 não configurado." }, 503);
     }
-    const res = await r2Get(r2, espelhoKey(bucket, path));
-    if (!res.ok) return json({ error: "Ficheiro indisponível." }, 404);
-    const headers = new Headers(corsHeaders);
-    headers.set("Content-Type", res.headers.get("content-type") || contentTypeForPath(path));
-    headers.set("Cache-Control", "private, max-age=300");
-    return new Response(res.body, { status: 200, headers });
+    try {
+      const location = await r2PresignGet(r2, espelhoKey(bucket, path), 900);
+      return new Response(null, {
+        status: 302,
+        headers: { ...corsHeaders, Location: location, "Cache-Control": "private, no-store" },
+      });
+    } catch {
+      return json({ error: "Ficheiro indisponível." }, 404);
+    }
   }
 
   if (req.method !== "POST") return json({ error: "Método não permitido." }, 405);
@@ -142,7 +145,16 @@ Deno.serve(async (req) => {
   if (!canAccess) return json({ error: "Sem permissão." }, 403);
 
   const exp = Math.floor(Date.now() / 1000) + 3600;
-  const sig = await hmac(signSecret, `${bucket}\n${path}\n${exp}`);
-  const mediaUrl = `${supabaseUrl.replace(/\/+$/, "")}/functions/v1/r2-private-media?b=${encodeURIComponent(bucket)}&p=${encodeURIComponent(path)}&exp=${exp}&sig=${encodeURIComponent(sig)}`;
-  return json({ ok: true, url: mediaUrl });
+  let r2;
+  try {
+    r2 = r2Client();
+  } catch {
+    return json({ error: "R2 não configurado." }, 503);
+  }
+  try {
+    const mediaUrl = await r2PresignGet(r2, espelhoKey(bucket, path), 3600);
+    return json({ ok: true, url: mediaUrl, exp });
+  } catch {
+    return json({ error: "Ficheiro indisponível." }, 404);
+  }
 });

@@ -101,6 +101,25 @@ export function assertSafeHref(raw: string | null | undefined): string | null {
   return assertHttpsUrlForHref(t);
 }
 
+function r2PublicCdnHost(): string | null {
+  const raw = readEnv("VITE_R2_PUBLIC_BASE_URL")?.trim();
+  if (!raw) return null;
+  try {
+    return new URL(raw).hostname.toLowerCase();
+  } catch {
+    return null;
+  }
+}
+
+function isR2DirectObjectUrl(u: URL): boolean {
+  const host = u.hostname.toLowerCase();
+  if (host.endsWith(".r2.cloudflarestorage.com")) return true;
+  if (host.endsWith(".r2.dev")) return true;
+  const cdn = r2PublicCdnHost();
+  if (cdn && host === cdn) return true;
+  return false;
+}
+
 function isR2MediaProxyUrl(u: URL): boolean {
   const project = supabaseProjectHost();
   if (!project || u.hostname.toLowerCase() !== project) return false;
@@ -158,6 +177,7 @@ export function isSafeMediaSrcUrl(raw: string | null | undefined): boolean {
   if (!hasNoUrlCredentials(u)) return false;
   if (isSupabaseStorageObjectUrl(u)) return true;
   if (isR2MediaProxyUrl(u)) return true;
+  if (isR2DirectObjectUrl(u)) return true;
   if (isAllowlistedMediaHost(u.hostname)) return true;
   return false;
 }

@@ -5,7 +5,7 @@
  */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { resolveMotoristaJwtSecret } from "../_shared/motoristaJwtSecret.ts";
-import { espelhoKey, r2Client, r2Get } from "../_shared/r2.ts";
+import { espelhoKey, r2Client, r2PresignGet } from "../_shared/r2.ts";
 
 const BUCKET = "motorista-frota-docs";
 
@@ -138,13 +138,11 @@ Deno.serve(async (req) => {
     }
     try {
       const r2 = r2Client();
-      const r2Res = await r2Get(r2, espelhoKey(BUCKET, claims.p));
-      if (r2Res.ok) {
-        const headers = new Headers(corsHeaders);
-        headers.set("Content-Type", r2Res.headers.get("content-type") || contentTypeForPath(claims.p));
-        headers.set("Cache-Control", "private, max-age=300");
-        return new Response(r2Res.body, { status: 200, headers });
-      }
+      const location = await r2PresignGet(r2, espelhoKey(BUCKET, claims.p), 900);
+      return new Response(null, {
+        status: 302,
+        headers: { ...corsHeaders, Location: location, "Cache-Control": "private, no-store" },
+      });
     } catch {
       /* fallback Storage */
     }
