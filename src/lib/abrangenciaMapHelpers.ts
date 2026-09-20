@@ -74,6 +74,21 @@ const rawCityCoords: Record<string, [number, number]> = {
   "sao jose": [-27.5954, -48.6236],
   tubarão: [-28.4703, -49.0139],
   tubarao: [-28.4703, -49.0139],
+  canasvieiras: [-27.4292, -48.4619],
+  ingleses: [-27.4374, -48.3956],
+  "jurerê": [-27.4368, -48.497],
+  jurere: [-27.4368, -48.497],
+  "jurerê internacional": [-27.4368, -48.497],
+  "hercílio luz": [-27.6703, -48.5525],
+  "hercilio luz": [-27.6703, -48.5525],
+  "aeroporto de florianópolis": [-27.6703, -48.5525],
+  "aeroporto florianopolis": [-27.6703, -48.5525],
+  "costão do santinho": [-27.4506, -48.3784],
+  "costao do santinho": [-27.4506, -48.3784],
+  "praia brava": [-27.4008, -48.424],
+  "barra da lagoa": [-27.574, -48.423],
+  campeche: [-27.678, -48.515],
+  lagoinha: [-27.389, -48.43],
 };
 
 function normalizeCityKey(city: string): string {

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { MapPin, RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
@@ -138,19 +138,56 @@ async function loadReservasViaFallback(userId: string): Promise<{
   return { transfers, grupos };
 }
 
+const OSM_MAX_UNIQUE = 24;
+const GEO_CACHE_KEY = "etp_abrangencia_geocode_v1";
+
+function readGeoCache(): Record<string, [number, number]> {
+  try {
+    const raw = sessionStorage.getItem(GEO_CACHE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as Record<string, [number, number]>;
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeGeoCache(map: Record<string, [number, number]>) {
+  try {
+    sessionStorage.setItem(GEO_CACHE_KEY, JSON.stringify(map));
+  } catch {
+    /* quota */
+  }
+}
+
+function geoKey(addr: string): string {
+  return addr.trim().toLowerCase();
+}
+
+async function rpcAbrangenciaComTimeout() {
+  const timeout = new Promise<never>((_, reject) => {
+    globalThis.setTimeout(() => reject(new Error("rpc-timeout")), 12_000);
+  });
+  return Promise.race([supabase.rpc("get_motorista_abrangencia_reservas"), timeout]);
+}
+
 /** RPC security definer + regras operador/motorista (ver migration). */
 async function loadReservasAtribuidas(userId: string): Promise<{
   transfers: Tables<"reservas_transfer">[];
   grupos: Tables<"reservas_grupos">[];
 }> {
-  const { data: rpcData, error: rpcErr } = await supabase.rpc("get_motorista_abrangencia_reservas");
-  if (!rpcErr && rpcData != null && typeof rpcData === "object") {
-    const raw = rpcData as { transfer?: unknown; grupos?: unknown };
-    const transfers = Array.isArray(raw.transfer) ? (raw.transfer as Tables<"reservas_transfer">[]) : [];
-    const grupos = Array.isArray(raw.grupos) ? (raw.grupos as Tables<"reservas_grupos">[]) : [];
-    if (transfers.length + grupos.length > 0) {
-      return { transfers, grupos };
+  try {
+    const { data: rpcData, error: rpcErr } = await rpcAbrangenciaComTimeout();
+    if (!rpcErr && rpcData != null && typeof rpcData === "object") {
+      const raw = rpcData as { transfer?: unknown; grupos?: unknown };
+      const transfers = Array.isArray(raw.transfer) ? (raw.transfer as Tables<"reservas_transfer">[]) : [];
+      const grupos = Array.isArray(raw.grupos) ? (raw.grupos as Tables<"reservas_grupos">[]) : [];
+      if (transfers.length + grupos.length > 0) {
+        return { transfers, grupos };
+      }
     }
+  } catch {
+    /* timeout ou RPC indisponível — cai no fallback paginado */
   }
   return loadReservasViaFallback(userId);
 }
@@ -166,12 +203,16 @@ export default function MotoristaAbrangencia() {
   const [atribuidasNoBanco, setAtribuidasNoBanco] = useState<number | null>(null);
 
   const jitter = useMemo(() => () => (Math.random() - 0.5) * 0.02, []);
+  const fetchGen = useRef(0);
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
+  const fetchData = useCallback(async (opts?: { silent?: boolean }) => {
+    const myGen = ++fetchGen.current;
+    const alive = () => fetchGen.current === myGen;
+    if (!opts?.silent) setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
+        if (!alive()) return;
         setPins([]);
         setCitySummary([]);
         setTotalReservas(0);
@@ -187,14 +228,18 @@ export default function MotoristaAbrangencia() {
         const loaded = await loadReservasAtribuidas(user.id);
         transfers = loaded.transfers;
         grupos = loaded.grupos;
-        setAtribuidasNoBanco(transfers.length + grupos.length);
+        if (alive()) setAtribuidasNoBanco(transfers.length + grupos.length);
       } catch (e) {
         console.error(e);
-        setAtribuidasNoBanco(null);
-        toast.error("Não foi possível carregar suas reservas.", {
-          description: "Confirme se as migrations do Supabase foram aplicadas (RPC get_motorista_abrangencia_reservas).",
-        });
+        if (alive()) {
+          setAtribuidasNoBanco(null);
+          toast.error("Não foi possível carregar suas reservas.", {
+            description: "Confirme se as migrations do Supabase foram aplicadas (RPC get_motorista_abrangencia_reservas).",
+          });
+        }
       }
+
+      if (!alive()) return;
 
       const pendentes: ReservaPendente[] = [];
 
@@ -236,13 +281,12 @@ export default function MotoristaAbrangencia() {
         });
       }
 
-      setTotalReservas(pendentes.length);
+      if (alive()) setTotalReservas(pendentes.length);
 
       const mapped: ReservaPin[] = [];
       const counts: Record<string, number> = {};
       const pendingOsm: ReservaPendente[] = [];
       let listaCount = 0;
-      let osmCount = 0;
 
       const bumpCity = (label: string) => {
         counts[label] = (counts[label] || 0) + 1;
@@ -288,36 +332,80 @@ export default function MotoristaAbrangencia() {
         pendingOsm.push(p);
       }
 
-      for (const p of pendingOsm) {
-        await sleep(nominatimDelayMs());
-        let pair = await nominatimGeocode(`${p.enderecoGeocode}, Brasil`);
-        if (!pair && p.enderecoGeocode.includes(",")) {
-          await sleep(nominatimDelayMs());
-          pair = await nominatimGeocode(p.enderecoGeocode);
-        }
-        if (pair) {
-          osmCount++;
-          bumpCity(p.cidadeResumo);
-          mapped.push({
-            reservaKey: p.reservaKey,
-            reservaId: p.reservaId,
-            kind: p.kind,
-            numeroReserva: p.numeroReserva,
-            clienteNome: p.clienteNome,
-            status: p.status,
-            concluida: p.concluida,
-            coords: [pair[0] + jitter(), pair[1] + jitter()],
-            locSource: "osm",
-            embarqueReferencia: p.embarqueReferencia,
-            tipoLabel: p.tipoLabel,
-            resumoTrajeto: p.resumoTrajeto,
-            cidadeResumo: p.cidadeResumo,
-          });
-        }
-      }
-
+      if (!alive()) return;
       setPins(mapped);
       setPinsLista(listaCount);
+      setPinsOsm(0);
+      setCitySummary(
+        Object.entries(counts)
+          .map(([cidade, count]) => ({ cidade, count }))
+          .sort((a, b) => b.count - a.count),
+      );
+      setLoading(false);
+
+      if (pendingOsm.length === 0) return;
+
+      const cache = readGeoCache();
+      const uniqueAddrs: string[] = [];
+      const seen = new Set<string>();
+      for (const p of pendingOsm) {
+        const k = geoKey(p.enderecoGeocode);
+        if (seen.has(k)) continue;
+        seen.add(k);
+        uniqueAddrs.push(p.enderecoGeocode);
+      }
+
+      const resolved = new Map<string, [number, number]>();
+      for (const addr of uniqueAddrs.slice(0, OSM_MAX_UNIQUE)) {
+        if (!alive()) return;
+        const k = geoKey(addr);
+        const cached = cache[k];
+        if (cached) {
+          resolved.set(k, cached);
+          continue;
+        }
+        await sleep(nominatimDelayMs());
+        if (!alive()) return;
+        let pair = await nominatimGeocode(`${addr}, Brasil`);
+        if (!pair && addr.includes(",")) {
+          await sleep(nominatimDelayMs());
+          if (!alive()) return;
+          pair = await nominatimGeocode(addr);
+        }
+        if (pair) {
+          cache[k] = pair;
+          resolved.set(k, pair);
+        }
+      }
+      writeGeoCache(cache);
+
+      if (!alive() || resolved.size === 0) return;
+
+      const extras: ReservaPin[] = [];
+      let osmCount = 0;
+      for (const p of pendingOsm) {
+        const pair = resolved.get(geoKey(p.enderecoGeocode));
+        if (!pair) continue;
+        osmCount++;
+        bumpCity(p.cidadeResumo);
+        extras.push({
+          reservaKey: p.reservaKey,
+          reservaId: p.reservaId,
+          kind: p.kind,
+          numeroReserva: p.numeroReserva,
+          clienteNome: p.clienteNome,
+          status: p.status,
+          concluida: p.concluida,
+          coords: [pair[0] + jitter(), pair[1] + jitter()],
+          locSource: "osm",
+          embarqueReferencia: p.embarqueReferencia,
+          tipoLabel: p.tipoLabel,
+          resumoTrajeto: p.resumoTrajeto,
+          cidadeResumo: p.cidadeResumo,
+        });
+      }
+      if (!alive() || extras.length === 0) return;
+      setPins((prev) => [...prev, ...extras]);
       setPinsOsm(osmCount);
       setCitySummary(
         Object.entries(counts)
@@ -325,14 +413,17 @@ export default function MotoristaAbrangencia() {
           .sort((a, b) => b.count - a.count),
       );
     } finally {
-      setLoading(false);
+      if (alive()) setLoading(false);
     }
   }, [jitter]);
 
   useEffect(() => {
     void fetchData();
-    const id = window.setInterval(() => void fetchData(), 90_000);
-    return () => window.clearInterval(id);
+    const id = window.setInterval(() => void fetchData({ silent: true }), 90_000);
+    return () => {
+      fetchGen.current += 1;
+      window.clearInterval(id);
+    };
   }, [fetchData]);
 
   if (loading) {

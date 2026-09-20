@@ -8,6 +8,8 @@ export function nominatimDelayMs(): number {
   return 1100;
 }
 
+const FETCH_TIMEOUT_MS = 4000;
+
 export async function nominatimGeocode(query: string): Promise<[number, number] | null> {
   const q = query.trim();
   if (q.length < 2) return null;
@@ -17,8 +19,11 @@ export async function nominatimGeocode(query: string): Promise<[number, number] 
   url.searchParams.set("limit", "1");
   url.searchParams.set("q", q);
 
+  const ac = new AbortController();
+  const timer = globalThis.setTimeout(() => ac.abort(), FETCH_TIMEOUT_MS);
   try {
     const res = await fetch(url.toString(), {
+      signal: ac.signal,
       headers: {
         Accept: "application/json",
         "Accept-Language": "pt-BR",
@@ -35,5 +40,7 @@ export async function nominatimGeocode(query: string): Promise<[number, number] 
     return [lat, lng];
   } catch {
     return null;
+  } finally {
+    globalThis.clearTimeout(timer);
   }
 }

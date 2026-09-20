@@ -134,6 +134,18 @@ export default function AdminAbrangencia() {
       }
 
       let osmCount = 0;
+
+      setPins(mapped);
+      setTotalMotoristas(allRows.length);
+      setComCoordenadaMapbox(mapboxCount);
+      setPinsOsm(0);
+      setCitySummary(
+        Object.entries(counts)
+          .map(([cidade, count]) => ({ cidade, count }))
+          .sort((a, b) => b.count - a.count)
+      );
+      setLoading(false);
+
       for (const m of pendingOsm) {
         await sleep(nominatimDelayMs());
         const cidade = (m.cidade || "").trim();
@@ -152,15 +164,15 @@ export default function AdminAbrangencia() {
         }
       }
 
-      setPins(mapped);
-      setTotalMotoristas(allRows.length);
-      setComCoordenadaMapbox(mapboxCount);
-      setPinsOsm(osmCount);
-      setCitySummary(
-        Object.entries(counts)
-          .map(([cidade, count]) => ({ cidade, count }))
-          .sort((a, b) => b.count - a.count)
-      );
+      if (osmCount > 0) {
+        setPins([...mapped]);
+        setPinsOsm(osmCount);
+        setCitySummary(
+          Object.entries(counts)
+            .map(([cidade, count]) => ({ cidade, count }))
+            .sort((a, b) => b.count - a.count)
+        );
+      }
     } finally {
       setLoading(false);
     }
