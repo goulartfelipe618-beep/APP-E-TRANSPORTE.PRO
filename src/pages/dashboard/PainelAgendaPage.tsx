@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import {
-  agendaItemCodigoNoPassado,
   buildAgendaItemsPorDia,
   type AgendaItem,
 } from "@/lib/painelAgendaReservas";
@@ -15,9 +14,7 @@ import DetalhesReservaGrupoSheet from "@/components/reservas/DetalhesReservaGrup
 import ComunicarDialog from "@/components/comunicar/ComunicarDialog";
 import { generateGrupoPDF, generateTransferPDF, getGrupoReservaPdfBase64, getTransferReservaPdfBase64 } from "@/lib/pdfGenerator";
 import { buildGrupoDadosComunicarCliente, buildTransferDadosComunicarCliente } from "@/lib/comunicarReservaCliente";
-import { fetchAllSupabasePages } from "@/lib/supabaseFetchAll";
-
-const WEEKDAYS_PT = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"] as const;
+import { AgendaMonthView } from "@/components/agenda/AgendaMonthView";
 
 const MONTHS_PT = [
   "Janeiro",
@@ -33,14 +30,6 @@ const MONTHS_PT = [
   "Novembro",
   "Dezembro",
 ] as const;
-
-function daysInMonth(year: number, monthIndex: number): number {
-  return new Date(year, monthIndex + 1, 0).getDate();
-}
-
-function startWeekdayOfMonth(year: number, monthIndex: number): number {
-  return new Date(year, monthIndex, 1).getDay();
-}
 
 export default function PainelAgendaPage() {
   const today = new Date();
@@ -118,9 +107,6 @@ export default function PainelAgendaPage() {
   }, [transfers, grupos, userId]);
 
   const { y, m } = cursor;
-  const dim = daysInMonth(y, m);
-  const startPad = startWeekdayOfMonth(y, m);
-  const totalSlots = Math.ceil((startPad + dim) / 7) * 7;
   const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
 
   const prevMonth = () => {
@@ -245,89 +231,13 @@ export default function PainelAgendaPage() {
         <div className="w-[88px] sm:w-24" aria-hidden />
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-border bg-card p-3 sm:p-4">
-        <div className="grid min-w-[720px] grid-cols-7 gap-1.5">
-          {WEEKDAYS_PT.map((wd) => (
-            <div
-              key={wd}
-              className="border-b border-border pb-2 text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground"
-            >
-              {wd}
-            </div>
-          ))}
-          {Array.from({ length: totalSlots }, (_, i) => {
-            const dayNum = i - startPad + 1;
-            if (dayNum < 1 || dayNum > dim) {
-              return (
-                <div
-                  key={`empty-${i}`}
-                  className="min-h-[100px] rounded-lg border border-dashed border-border/60 bg-muted/20 sm:min-h-[120px]"
-                />
-              );
-            }
-            const dayKey = `${y}-${String(m + 1).padStart(2, "0")}-${String(dayNum).padStart(2, "0")}`;
-            const items = itemsByDay.get(dayKey) ?? [];
-            const isToday = todayKey === dayKey;
-
-            return (
-              <div
-                key={dayKey}
-                className={cn(
-                  "flex min-h-[100px] flex-col gap-1 rounded-lg border p-1.5 sm:min-h-[120px] sm:p-2",
-                  isToday ? "border-primary/60 bg-primary/5" : "border-border bg-background",
-                )}
-              >
-                <span
-                  className={cn(
-                    "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-sm font-semibold",
-                    isToday ? "bg-primary text-primary-foreground" : "bg-muted text-foreground",
-                  )}
-                >
-                  {dayNum}
-                </span>
-                <div className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto">
-                  {items.map((it) => {
-                    const noPassado = agendaItemCodigoNoPassado(it);
-                    const title = `${it.numeroLabel} · ${it.categoriaAbrev ? `${it.categoriaAbrev} · ` : ""}${it.perna} · ${it.horario} — ${it.trajetoResumo}`;
-                    return (
-                      <button
-                        key={it.key}
-                        type="button"
-                        onClick={() => void openAgendaDetail(it)}
-                        className={cn(
-                          "flex w-full min-w-0 max-w-full items-center gap-1 rounded border border-border/80 bg-muted/40 px-1 py-0.5 text-left text-[10px] leading-tight text-foreground transition-colors hover:bg-muted/70 sm:text-xs",
-                        )}
-                        title={title}
-                      >
-                        <span
-                          className={cn(
-                            "shrink-0 font-mono font-semibold tabular-nums",
-                            noPassado ? "text-red-500" : "text-green-500",
-                          )}
-                        >
-                          {it.numeroLabel}
-                        </span>
-                        {it.categoriaAbrev ? (
-                          <span className="shrink-0 rounded bg-[#FF6600] px-1 py-px text-[9px] font-bold uppercase leading-none tracking-tight text-white">
-                            {it.categoriaAbrev}
-                          </span>
-                        ) : null}
-                        {(it.perna === "Ida" || it.perna === "Volta") && (
-                          <span className="shrink-0 rounded px-0.5 text-[9px] font-bold uppercase leading-none text-[#FF6600]">
-                            {it.perna}
-                          </span>
-                        )}
-                        <span className="min-w-0 flex-1 truncate text-muted-foreground">{it.trajetoResumo}</span>
-                        <span className="shrink-0 whitespace-nowrap text-muted-foreground">· {it.horario}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
+      <AgendaMonthView
+        year={y}
+        monthIndex={m}
+        todayKey={todayKey}
+        itemsByDay={itemsByDay}
+        onItemClick={(it) => void openAgendaDetail(it)}
+      />
 
       {loading ? (
         <p className="text-sm text-muted-foreground">A carregar reservas…</p>
