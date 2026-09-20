@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 import { ConfirmDeleteDialog } from "@/components/ConfirmDeleteDialog";
 import { assertUploadMagicBytes, extensionForDetectedMime } from "@/lib/validateUploadMagicBytes";
 import { assertHttpsUrlForHref, isSafeMediaSrcUrl, safeMediaSrc } from "@/lib/safeExternalUrl";
+import { mirrorUploadToR2 } from "@/lib/mirrorUploadToR2";
 
 interface Slide {
   id: string;
@@ -130,6 +131,7 @@ export default function SlidesPage() {
       setUploading(false);
       return;
     }
+    void mirrorUploadToR2("logos", path, file);
     const { data: urlData } = supabase.storage.from("logos").getPublicUrl(path);
     setForm((f) => ({ ...f, imagem_url: urlData.publicUrl }));
     setUploading(false);

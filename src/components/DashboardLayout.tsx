@@ -26,6 +26,7 @@ import {
 import { PainelContentZoomProvider } from "@/contexts/PainelContentZoomContext";
 import { PainelScaledContent } from "@/components/painel/PainelScaledContent";
 import { logUserActivity } from "@/lib/userActivityLog";
+import { useR2AutoBackupCatchup } from "@/hooks/useR2AutoBackupCatchup";
 
 // Import all page components
 import HomePage from "@/pages/dashboard/Home";
@@ -170,6 +171,8 @@ function DashboardContent() {
     primeiroAcessoLoggedRef.current = true;
     void logUserActivity("primeiro_acesso");
   }, [redirectMotoristaFrota]);
+
+  useR2AutoBackupCatchup();
 
   if (redirectMotoristaFrota) {
     return <Navigate to="/frota" replace />;

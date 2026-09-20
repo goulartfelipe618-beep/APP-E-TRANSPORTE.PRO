@@ -22,6 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { safeMediaSrc } from "@/lib/safeExternalUrl";
+import { mirrorUploadToR2 } from "@/lib/mirrorUploadToR2";
 import {
   Heart,
   MessageCircle,
@@ -1063,6 +1064,7 @@ export default function CommunityFeed({ panel = "motorista" }: CommunityFeedProp
             .from("community-media")
             .upload(filePath, file, { upsert: false, cacheControl: "3600" });
           if (uploadError) throw uploadError;
+          void mirrorUploadToR2("community-media", filePath, file);
 
           const { data: pub } = supabase.storage.from("community-media").getPublicUrl(filePath);
           mediaRows.push({

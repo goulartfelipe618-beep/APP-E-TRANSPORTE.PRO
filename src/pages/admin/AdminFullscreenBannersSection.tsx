@@ -18,6 +18,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { mirrorUploadToR2 } from "@/lib/mirrorUploadToR2";
 import { assertUploadMagicBytes, extensionForDetectedMime } from "@/lib/validateUploadMagicBytes";
 import { isSafeMediaSrcUrl, safeMediaSrc } from "@/lib/safeExternalUrl";
 import { PAGINAS_MOTORISTA } from "@/lib/painelAvisosPages";
@@ -128,6 +129,7 @@ export default function AdminFullscreenBannersSection() {
       toast.error("Erro no upload: " + error.message);
       return null;
     }
+    void mirrorUploadToR2("fullscreen-banners", path, f);
     const { data: pub } = supabase.storage.from("fullscreen-banners").getPublicUrl(path);
     return pub.publicUrl;
   };

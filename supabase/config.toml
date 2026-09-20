@@ -76,3 +76,15 @@ verify_jwt = false
 
 [functions.google-sheets-backup-run]
 verify_jwt = false
+
+[functions.r2-sync-storage]
+verify_jwt = false
+
+[functions.r2-media]
+verify_jwt = false
+
+[functions.r2-upload]
+verify_jwt = true
+
+[functions.r2-auto-backup]
+verify_jwt = false

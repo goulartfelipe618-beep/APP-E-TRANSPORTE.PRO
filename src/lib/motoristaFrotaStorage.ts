@@ -3,6 +3,7 @@ import { assertUploadMagicBytes, extensionForDetectedMime } from "@/lib/validate
 import { parseDadosWebhook, pickStr } from "@/lib/motoristaFromSolicitacao";
 import type { Database } from "@/integrations/supabase/types";
 import { getAppPublicOrigin, getMotoristaVerificacaoAppOrigin } from "@/lib/appPublicUrl";
+import { mirrorUploadToR2 } from "@/lib/mirrorUploadToR2";
 
 export const MOTORISTA_FROTA_DOCS_BUCKET = "motorista-frota-docs" as const;
 
@@ -53,6 +54,7 @@ export async function uploadMotoristaFrotaDocs(
       contentType: mime,
     });
     if (error) throw new Error(error.message);
+    void mirrorUploadToR2(MOTORISTA_FROTA_DOCS_BUCKET, path, file);
     const key = DOC_PATH_KEYS[slug];
     out[key] = path;
   }

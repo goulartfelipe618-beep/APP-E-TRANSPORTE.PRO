@@ -114,6 +114,16 @@ async function submitBriefing(
     const { data: pub } = admin.storage.from("website-briefing").getPublicUrl(path);
     logoUrl = pub.publicUrl;
     dados.logo_url = logoUrl;
+    try {
+      const { espelhoKey, organizedKey, r2Client, r2Put } = await import("../_shared/r2.ts");
+      const r2 = r2Client();
+      const k1 = espelhoKey("website-briefing", path);
+      const k2 = organizedKey("website-briefing", path, {});
+      await r2Put(r2, k1, bytes, logoMime);
+      if (k2 !== k1) await r2Put(r2, k2, bytes, logoMime);
+    } catch (mirrorErr) {
+      console.error("r2 mirror skip:", mirrorErr);
+    }
   }
 
   const referrer = sanitizeText(body.referrer, 500);

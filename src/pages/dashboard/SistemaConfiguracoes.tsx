@@ -23,8 +23,10 @@ import MapboxAddressInput from "@/components/mapbox/MapboxAddressInput";
 import { isMapboxConfigured } from "@/lib/mapboxGeocode";
 import { persistNetworkRetornoSolicitado, persistNetworkSair } from "@/lib/networkNacionalPrefs";
 import LoginConfiguracoesSection from "@/pages/dashboard/LoginConfiguracoesSection";
+import { mirrorUploadToR2 } from "@/lib/mirrorUploadToR2";
 import WebsiteEmbedSnippetSection from "@/components/admin/WebsiteEmbedSnippetSection";
 import GoogleSheetsBackupSection from "@/components/sistema/GoogleSheetsBackupSection";
+import R2AutoBackupSection from "@/components/sistema/R2AutoBackupSection";
 import { assertUploadMagicBytes, extensionForDetectedMime } from "@/lib/validateUploadMagicBytes";
 import { validatePainelStrongPassword } from "@/lib/motoristaPortalPassword";
 import { FONTES_GLOBAIS, FONTE_GLOBAL_PADRAO, resolveFonteCss } from "@/lib/fontesGlobais";
@@ -409,6 +411,7 @@ export default function SistemaConfiguracoesPage() {
     const filePath = `${user.id}/logo-${Date.now()}.${logoExt}`;
     const { error: upErr } = await supabase.storage.from("logos").upload(filePath, logoFile, { upsert: true });
     if (upErr) { toast.error("Erro no upload"); setUploading(false); return; }
+    void mirrorUploadToR2("logos", filePath, logoFile);
 
     const { data: urlData } = supabase.storage.from("logos").getPublicUrl(filePath);
     const publicUrl = urlData.publicUrl;
@@ -603,6 +606,7 @@ export default function SistemaConfiguracoesPage() {
       setUploadingAssinatura(false);
       return;
     }
+    void mirrorUploadToR2("logos", filePath, file);
 
     const { data: urlData } = supabase.storage.from("logos").getPublicUrl(filePath);
     const publicUrl = urlData.publicUrl;
@@ -645,6 +649,7 @@ export default function SistemaConfiguracoesPage() {
     const filePath = `${user.id}/logo-contratual-${Date.now()}.${ext}`;
     const { error: upErr } = await supabase.storage.from("logos").upload(filePath, file, { upsert: true });
     if (upErr) { toast.error("Erro no upload"); setUploadingLogoContratual(""); return; }
+    void mirrorUploadToR2("logos", filePath, file);
 
     const { data: urlData } = supabase.storage.from("logos").getPublicUrl(filePath);
     setLogoContratualUrl(urlData.publicUrl);
@@ -1533,6 +1538,8 @@ export default function SistemaConfiguracoesPage() {
 
       {/* Network Nacional */}
       <NetworkSection />
+
+      {!isAdminMaster ? <R2AutoBackupSection /> : null}
 
       {/* Google Sheets — só empresas (admin_transfer); não Admin Master nem portal motorista */}
       {!isAdminMaster ? <GoogleSheetsBackupSection /> : null}

@@ -14,6 +14,7 @@ import { assertUploadMagicBytes, extensionForDetectedMime } from "@/lib/validate
 import { validateVehicleCoverDimensions, VEHICLE_COVER_DIMENSIONS } from "@/lib/validateVehicleCoverDimensions";
 import { cn } from "@/lib/utils";
 import { logUserActivity } from "@/lib/userActivityLog";
+import { mirrorUploadToR2 } from "@/lib/mirrorUploadToR2";
 
 type Props = {
   open: boolean;
@@ -290,6 +291,7 @@ export default function CadastrarVeiculoDialog({ open, onOpenChange, veiculoId =
     if (error) {
       throw new Error(`Falha ao enviar imagem (${fieldKey}): ${error.message}`);
     }
+    void mirrorUploadToR2("veiculos-imagens", path, file);
     const { data } = supabase.storage.from("veiculos-imagens").getPublicUrl(path);
     return data.publicUrl;
   };

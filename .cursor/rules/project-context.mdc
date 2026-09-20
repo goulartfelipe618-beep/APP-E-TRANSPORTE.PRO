@@ -27,11 +27,19 @@ Adiciona manualmente **"+ Add new doc"** com estas URLs para o modelo usar APIs 
 - Supabase (Auth, Postgres, Storage, Edge Functions)
 - TanStack Query onde já estiver em uso
 
+## Repositório GitHub
+
+- **Owner/repo:** `goulartfelipe618-beep/APP-E-TRANSPORTE.PRO`
+- **Remote:** https://github.com/goulartfelipe618-beep/APP-E-TRANSPORTE.PRO.git
+- Branch principal: `main`. Commits e PRs vão para este remote.
+
 ## Banco remoto (não local)
 
+- **Org Supabase:** `rbbsqyiduwzqwglysotv` — https://supabase.com/dashboard/org/rbbsqyiduwzqwglysotv
 - **Project ref:** `lsfwmbpvithxqerfdlhy`
 - **URL:** `https://lsfwmbpvithxqerfdlhy.supabase.co`
 - SQL Editor: https://supabase.com/dashboard/project/lsfwmbpvithxqerfdlhy/sql
+- MCP: `https://mcp.supabase.com/mcp?project_ref=lsfwmbpvithxqerfdlhy` (ficheiro `.cursor/mcp.json`). No OAuth, escolher a org `rbbsqyiduwzqwglysotv`.
 - Migrações e Edge Functions devem ir para **este** projeto. Não assumir outro ref.
 
 ## Segurança (resumo)

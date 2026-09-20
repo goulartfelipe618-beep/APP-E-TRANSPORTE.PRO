@@ -13,6 +13,7 @@ import { Plus, Pencil, Trash2, Eye, ImageIcon, Upload, X } from "lucide-react";
 import { ConfirmDeleteDialog } from "@/components/ConfirmDeleteDialog";
 import { assertUploadMagicBytes, extensionForDetectedMime } from "@/lib/validateUploadMagicBytes";
 import { assertHttpsUrlForHref, isSafeMediaSrcUrl, safeMediaSrc } from "@/lib/safeExternalUrl";
+import { mirrorUploadToR2 } from "@/lib/mirrorUploadToR2";
 
 interface Template {
   id: string;
@@ -125,6 +126,7 @@ export default function AdminTemplatesPage() {
       toast.error("Erro ao fazer upload: " + error.message);
       return null;
     }
+    void mirrorUploadToR2("templates", filePath, file);
 
     const { data: publicData } = supabase.storage
       .from("templates")

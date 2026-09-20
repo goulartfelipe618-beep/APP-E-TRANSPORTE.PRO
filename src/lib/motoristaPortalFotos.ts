@@ -3,6 +3,7 @@ import { assertUploadMagicBytes, extensionForDetectedMime } from "@/lib/validate
 import { parseDadosWebhook, pickStr } from "@/lib/motoristaFromSolicitacao";
 import type { Database } from "@/integrations/supabase/types";
 import { MOTORISTA_FROTA_DOCS_BUCKET } from "@/lib/motoristaFrotaStorage";
+import { mirrorUploadToR2 } from "@/lib/mirrorUploadToR2";
 import { getAppPublicOrigin, getMotoristaVerificacaoAppOrigin } from "@/lib/appPublicUrl";
 
 export const PORTAL_FOTO_SLOTS = [1, 2, 3, 4] as const;
@@ -52,6 +53,7 @@ export async function uploadMotoristaPortalFoto(
     contentType: mime,
   });
   if (error) throw new Error(error.message);
+  void mirrorUploadToR2(MOTORISTA_FROTA_DOCS_BUCKET, path, file);
 
   const { error: rpcErr } = await (supabase as unknown as { rpc: (fn: string, args: object) => Promise<{ error: { message: string } | null }> }).rpc(
     "merge_motorista_portal_foto_path",

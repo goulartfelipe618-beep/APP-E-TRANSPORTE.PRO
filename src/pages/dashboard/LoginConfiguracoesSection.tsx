@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { mergeLoginPainelConfig, type LoginPainelConfig } from "@/lib/loginPainelConfig";
 import { assertUploadMagicBytes, extensionForDetectedMime } from "@/lib/validateUploadMagicBytes";
+import { mirrorUploadToR2 } from "@/lib/mirrorUploadToR2";
 
 const LANGUAGE_OPTIONS = [
   { value: "pt-BR", label: "Portugues (Brasil)" },
@@ -55,6 +56,7 @@ export default function LoginConfiguracoesSection() {
       toast.error(`Erro no upload da imagem: ${error.message}`);
       return null;
     }
+    void mirrorUploadToR2("login-assets", path, file);
     const { data } = supabase.storage.from("login-assets").getPublicUrl(path);
     return data.publicUrl;
   };

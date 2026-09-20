@@ -24,6 +24,7 @@ test-results/
 .env
 .env.*
 !.env.example
+scripts/r2-storage-inventory.json
 *.pem
 secrets.json
 serviceAccount*.json

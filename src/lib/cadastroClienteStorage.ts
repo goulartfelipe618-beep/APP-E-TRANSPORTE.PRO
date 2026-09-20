@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { mirrorUploadToR2 } from "@/lib/mirrorUploadToR2";
 
 export const CADASTRO_CLIENTES_BUCKET = "cadastro-clientes-docs";
 
@@ -38,7 +39,10 @@ export async function uploadCadastroClienteDocs(
       upsert: true,
       contentType: file.type || undefined,
     });
-    if (!error) paths[safeSlug] = path;
+    if (!error) {
+      paths[safeSlug] = path;
+      void mirrorUploadToR2(CADASTRO_CLIENTES_BUCKET, path, file);
+    }
   }
   return paths;
 }

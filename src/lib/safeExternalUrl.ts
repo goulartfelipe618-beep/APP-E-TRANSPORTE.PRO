@@ -6,6 +6,8 @@
  * Hosts extra (thumbnails YouTube, etc.): VITE_MEDIA_HOST_ALLOWLIST=host1,host2 (sem scheme).
  */
 
+import { rewriteSupabaseStorageUrlToR2 } from "@/lib/r2PublicUrl";
+
 function readEnv(key: string): string | undefined {
   if (typeof import.meta === "undefined" || !import.meta.env) return undefined;
   const v = (import.meta.env as Record<string, unknown>)[key];
@@ -99,6 +101,12 @@ export function assertSafeHref(raw: string | null | undefined): string | null {
   return assertHttpsUrlForHref(t);
 }
 
+function isR2MediaProxyUrl(u: URL): boolean {
+  const project = supabaseProjectHost();
+  if (!project || u.hostname.toLowerCase() !== project) return false;
+  return u.pathname.toLowerCase().includes("/functions/v1/r2-media/");
+}
+
 function isSupabaseStorageObjectUrl(u: URL): boolean {
   const host = u.hostname.toLowerCase();
   const project = supabaseProjectHost();
@@ -144,13 +152,15 @@ export function isSafeMediaSrcUrl(raw: string | null | undefined): boolean {
   if (u.protocol !== "https:") return false;
   if (!hasNoUrlCredentials(u)) return false;
   if (isSupabaseStorageObjectUrl(u)) return true;
+  if (isR2MediaProxyUrl(u)) return true;
   if (isAllowlistedMediaHost(u.hostname)) return true;
   return false;
 }
 
 export function safeMediaSrc(raw: string | null | undefined): string | undefined {
   if (!raw?.trim()) return undefined;
-  return isSafeMediaSrcUrl(raw) ? raw.trim() : undefined;
+  const rewritten = rewriteSupabaseStorageUrlToR2(raw) ?? raw.trim();
+  return isSafeMediaSrcUrl(rewritten) ? rewritten : undefined;
 }
 
 export function safeHrefForRender(raw: string | null | undefined): string | undefined {
