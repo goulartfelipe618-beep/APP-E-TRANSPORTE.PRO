@@ -3,6 +3,16 @@ import { supabase } from "@/integrations/supabase/client";
 import { mergeCabecalhoComPerfilSeNecessario } from "@/lib/cabecalhoContratualResolve";
 import { formatDbCalendarDatePtBr, formatDbCalendarDatePtBrShortMonth } from "@/lib/painelAgendaReservas";
 import { labelCategoriaVeiculoTransfer } from "@/lib/categoriaVeiculoTransfer";
+import { isMotoristaFrotaUser } from "@/lib/motoristaFrotaRole";
+
+/** Mini painel do motorista da frota: sem download/geração de PDF de reservas. */
+async function motoristaFrotaNaoPodeGerarPdfReserva(): Promise<boolean> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return false;
+  return isMotoristaFrotaUser(user.id, user);
+}
 
 // ─── Layout Constants ───────────────────────────────────────
 const PAGE_W = 210;
@@ -794,22 +804,17 @@ async function buildTransferReservaPdfDocument(
 }
 
 export async function generateTransferPDF(reservaId: string) {
+  if (await motoristaFrotaNaoPodeGerarPdfReserva()) return;
   const built = await buildTransferReservaPdfDocument(reservaId);
   if (!built) return;
   built.doc.save(built.filename);
-}
-
-/** PDF de confirmação para o motorista (mesma regra de ocultar valores da reserva). */
-export async function generateTransferPDFForMotorista(reservaId: string) {
-  const built = await buildTransferReservaPdfDocument(reservaId);
-  if (!built) return;
-  built.doc.save(built.filename.replace(".pdf", "-motorista.pdf"));
 }
 
 /** Base64 do PDF de confirmação (para envio no webhook Comunicar — reserva Transfer). */
 export async function getTransferReservaPdfBase64(
   reservaId: string,
 ): Promise<{ base64: string; filename: string } | null> {
+  if (await motoristaFrotaNaoPodeGerarPdfReserva()) return null;
   const built = await buildTransferReservaPdfDocument(reservaId);
   if (!built) return null;
   const dataUri = built.doc.output("datauristring") as string;
@@ -931,6 +936,7 @@ async function buildGrupoReservaPdfDocument(reservaId: string): Promise<{ doc: j
 }
 
 export async function generateGrupoPDF(reservaId: string) {
+  if (await motoristaFrotaNaoPodeGerarPdfReserva()) return;
   const built = await buildGrupoReservaPdfDocument(reservaId);
   if (!built) return;
   built.doc.save(built.filename);
@@ -940,6 +946,7 @@ export async function generateGrupoPDF(reservaId: string) {
 export async function getGrupoReservaPdfBase64(
   reservaId: string,
 ): Promise<{ base64: string; filename: string } | null> {
+  if (await motoristaFrotaNaoPodeGerarPdfReserva()) return null;
   const built = await buildGrupoReservaPdfDocument(reservaId);
   if (!built) return null;
   const dataUri = built.doc.output("datauristring") as string;
@@ -952,6 +959,7 @@ export async function getGrupoReservaPdfBase64(
 // ═══════════════════════════════════════════════════════════
 
 export async function generateSolicitacaoTransferPDF(solicitacao: Record<string, any>) {
+  if (await motoristaFrotaNaoPodeGerarPdfReserva()) return;
   const ownerId = solicitacao.user_id as string | undefined;
   const cabecalho = await fetchCabecalho(ownerId);
   const doc = new jsPDF();
@@ -1055,6 +1063,7 @@ export async function generateSolicitacaoTransferPDF(solicitacao: Record<string,
 // ═══════════════════════════════════════════════════════════
 
 export async function generateSolicitacaoGrupoPDF(solicitacao: Record<string, any>) {
+  if (await motoristaFrotaNaoPodeGerarPdfReserva()) return;
   const ownerId = solicitacao.user_id as string | undefined;
   const cabecalho = await fetchCabecalho(ownerId);
   const doc = new jsPDF();
@@ -1122,6 +1131,7 @@ export async function generateSolicitacaoGrupoPDF(solicitacao: Record<string, an
 // ═══════════════════════════════════════════════════════════
 
 export async function generateSolicitacaoMotoristaPDF(solicitacao: Record<string, any>) {
+  if (await motoristaFrotaNaoPodeGerarPdfReserva()) return;
   const cabecalho = await fetchCabecalho();
   const doc = new jsPDF();
   const s = solicitacao;

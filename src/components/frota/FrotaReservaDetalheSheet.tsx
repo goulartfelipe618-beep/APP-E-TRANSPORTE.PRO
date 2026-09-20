@@ -5,8 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { isCatalogReservaStatus, normalizeReservaStatus, RESERVA_STATUS_OPTIONS } from "@/lib/reservaStatus";
-import { Loader2, FileDown } from "lucide-react";
-import { generateTransferPDFForMotorista } from "@/lib/pdfGenerator";
+import { Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
   updateFrotaReservaStatus,
@@ -178,16 +177,6 @@ export default function FrotaReservaDetalheSheet({ transfer, grupo, open, onOpen
               </Select>
             </div>
             <div className="flex flex-wrap gap-2 pt-2">
-              {isTransfer && transfer ? (
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => void generateTransferPDFForMotorista(transfer.id)}
-                >
-                  <FileDown className="mr-2 h-4 w-4" />
-                  PDF confirmação
-                </Button>
-              ) : null}
               <Button
                 type="button"
                 className="bg-primary text-primary-foreground"
