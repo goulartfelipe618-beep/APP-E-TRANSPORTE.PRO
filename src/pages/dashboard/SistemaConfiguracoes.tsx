@@ -23,7 +23,7 @@ import MapboxAddressInput from "@/components/mapbox/MapboxAddressInput";
 import { isMapboxConfigured } from "@/lib/mapboxGeocode";
 import { persistNetworkRetornoSolicitado, persistNetworkSair } from "@/lib/networkNacionalPrefs";
 import LoginConfiguracoesSection from "@/pages/dashboard/LoginConfiguracoesSection";
-import { mirrorUploadToR2 } from "@/lib/mirrorUploadToR2";
+import { uploadFileToR2 } from "@/lib/mirrorUploadToR2";
 import WebsiteEmbedSnippetSection from "@/components/admin/WebsiteEmbedSnippetSection";
 import GoogleSheetsBackupSection from "@/components/sistema/GoogleSheetsBackupSection";
 import R2AutoBackupSection from "@/components/sistema/R2AutoBackupSection";
@@ -409,20 +409,18 @@ export default function SistemaConfiguracoesPage() {
     }
 
     const filePath = `${user.id}/logo-${Date.now()}.${logoExt}`;
-    const { error: upErr } = await supabase.storage.from("logos").upload(filePath, logoFile, { upsert: true });
-    if (upErr) { toast.error("Erro no upload"); setUploading(false); return; }
-    void mirrorUploadToR2("logos", filePath, logoFile);
-
-    const { data: urlData } = supabase.storage.from("logos").getPublicUrl(filePath);
-    const publicUrl = urlData.publicUrl;
-
-    const ok = await upsertField({ logo_url: publicUrl });
-    if (ok) {
-      setLogoUrl(publicUrl);
-      setLogoFile(null);
-      setLogoEditing(false);
-      toast.success("Logomarca atualizada");
-      await refreshConfig();
+    try {
+      const publicUrl = await uploadFileToR2("logos", filePath, logoFile);
+      const ok = await upsertField({ logo_url: publicUrl });
+      if (ok) {
+        setLogoUrl(publicUrl);
+        setLogoFile(null);
+        setLogoEditing(false);
+        toast.success("Logomarca atualizada");
+        await refreshConfig();
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Erro no upload");
     }
     setUploading(false);
   };
@@ -600,20 +598,15 @@ export default function SistemaConfiguracoesPage() {
     }
 
     const filePath = `${user.id}/assinatura-${Date.now()}.${ext}`;
-    const { error: upErr } = await supabase.storage.from("logos").upload(filePath, file, { upsert: true });
-    if (upErr) {
+    try {
+      const publicUrl = await uploadFileToR2("logos", filePath, file);
+      const ok = await upsertAssinaturaUrl(publicUrl);
+      if (ok) {
+        setAssinaturaUrl(publicUrl);
+        toast.success("Assinatura eletrónica guardada");
+      }
+    } catch {
       toast.error("Erro no upload da assinatura");
-      setUploadingAssinatura(false);
-      return;
-    }
-    void mirrorUploadToR2("logos", filePath, file);
-
-    const { data: urlData } = supabase.storage.from("logos").getPublicUrl(filePath);
-    const publicUrl = urlData.publicUrl;
-    const ok = await upsertAssinaturaUrl(publicUrl);
-    if (ok) {
-      setAssinaturaUrl(publicUrl);
-      toast.success("Assinatura eletrónica guardada");
     }
     setUploadingAssinatura(false);
     if (assinaturaRef.current) assinaturaRef.current.value = "";
@@ -647,13 +640,13 @@ export default function SistemaConfiguracoesPage() {
     }
 
     const filePath = `${user.id}/logo-contratual-${Date.now()}.${ext}`;
-    const { error: upErr } = await supabase.storage.from("logos").upload(filePath, file, { upsert: true });
-    if (upErr) { toast.error("Erro no upload"); setUploadingLogoContratual(""); return; }
-    void mirrorUploadToR2("logos", filePath, file);
-
-    const { data: urlData } = supabase.storage.from("logos").getPublicUrl(filePath);
-    setLogoContratualUrl(urlData.publicUrl);
-    toast.success("Logotipo contratual enviado");
+    try {
+      const publicUrl = await uploadFileToR2("logos", filePath, file);
+      setLogoContratualUrl(publicUrl);
+      toast.success("Logotipo contratual enviado");
+    } catch {
+      toast.error("Erro no upload");
+    }
     setUploadingLogoContratual("");
   };
 

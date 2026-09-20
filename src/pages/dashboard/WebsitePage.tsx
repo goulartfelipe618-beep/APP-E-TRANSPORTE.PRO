@@ -29,7 +29,7 @@ import {
   REGISTER_NEW_DOMAIN_VALUE,
 } from "@/components/domain/PurchasedDomainSelectStep";
 import { safeHrefForRender, safeMediaSrc, assertHttpsUrlForHref } from "@/lib/safeExternalUrl";
-import { mirrorUploadToR2 } from "@/lib/mirrorUploadToR2";
+import { uploadFileToR2 } from "@/lib/mirrorUploadToR2";
 import {
   fetchWebsiteEmbedTemplates,
   submitWebsiteEmbedBriefing,
@@ -605,18 +605,15 @@ export default function WebsitePage({ variant = "panel" }: WebsitePageProps) {
         return;
       }
       const path = `${user.id}/${Date.now()}-logo.${ext}`;
-      const { error: upErr } = await supabase.storage.from("website-briefing").upload(path, logoFile, {
-        upsert: false,
-        cacheControl: "3600",
-      });
-      if (upErr) {
-        toast.error("Não foi possível enviar a logo.", { description: upErr.message });
+      try {
+        logoUrl = await uploadFileToR2("website-briefing", path, logoFile);
+      } catch (upErr) {
+        toast.error("Não foi possível enviar a logo.", {
+          description: upErr instanceof Error ? upErr.message : undefined,
+        });
         setSubmitting(false);
         return;
       }
-      void mirrorUploadToR2("website-briefing", path, logoFile);
-      const { data: pub } = supabase.storage.from("website-briefing").getPublicUrl(path);
-      logoUrl = pub.publicUrl;
     }
 
     const emailProfissional =

@@ -1,5 +1,5 @@
 /**
- * Upload autenticado para o R2 (espelho + organizado). Não remove o ficheiro no Supabase.
+ * Upload autenticado para o R2 (espelho + organizado). Origem exclusiva no R2.
  */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { espelhoKey, organizedKey, r2Client, r2Put } from "../_shared/r2.ts";

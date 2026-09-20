@@ -9,6 +9,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { getPersistedSupabaseUserId } from "@/lib/supabaseSessionUser";
 import { FONTE_GLOBAL_PADRAO, resolveFonteCss } from "@/lib/fontesGlobais";
+import { rewriteSupabaseStorageUrlToR2 } from "@/lib/r2PublicUrl";
 
 interface Configuracoes {
   nome_projeto: string;
@@ -53,7 +54,7 @@ function readConfigCache(): Configuracoes | null {
     return {
       nome_projeto: typeof c.nome_projeto === "string" ? c.nome_projeto : defaultConfig.nome_projeto,
       nome_completo: typeof c.nome_completo === "string" ? c.nome_completo : "",
-      logo_url: typeof c.logo_url === "string" ? c.logo_url : "",
+      logo_url: rewriteSupabaseStorageUrlToR2(typeof c.logo_url === "string" ? c.logo_url : "") || (typeof c.logo_url === "string" ? c.logo_url : ""),
       fonte_global: typeof c.fonte_global === "string" ? c.fonte_global : defaultConfig.fonte_global,
     };
   } catch {
@@ -86,7 +87,7 @@ function mergeConfigFromRow(data: {
   return {
     nome_projeto: data.nome_projeto || defaultConfig.nome_projeto,
     nome_completo: data.nome_completo || "",
-    logo_url: data.logo_url || "",
+    logo_url: rewriteSupabaseStorageUrlToR2(data.logo_url) || data.logo_url || "",
     fonte_global: data.fonte_global || defaultConfig.fonte_global,
   };
 }

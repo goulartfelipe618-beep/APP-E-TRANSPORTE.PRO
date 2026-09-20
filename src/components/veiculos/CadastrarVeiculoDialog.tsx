@@ -14,7 +14,7 @@ import { assertUploadMagicBytes, extensionForDetectedMime } from "@/lib/validate
 import { validateVehicleCoverDimensions, VEHICLE_COVER_DIMENSIONS } from "@/lib/validateVehicleCoverDimensions";
 import { cn } from "@/lib/utils";
 import { logUserActivity } from "@/lib/userActivityLog";
-import { mirrorUploadToR2 } from "@/lib/mirrorUploadToR2";
+import { uploadFileToR2 } from "@/lib/mirrorUploadToR2";
 
 type Props = {
   open: boolean;
@@ -283,17 +283,7 @@ export default function CadastrarVeiculoDialog({ open, onOpenChange, veiculoId =
     const { mime } = await assertUploadMagicBytes(file, "raster-image", 10 * 1024 * 1024);
     const ext = extensionForDetectedMime(mime);
     const path = `${userId}/${id}/${fieldKey}.${ext}`;
-    const { error } = await supabase.storage.from("veiculos-imagens").upload(path, file, {
-      cacheControl: "3600",
-      upsert: true,
-      contentType: mime,
-    });
-    if (error) {
-      throw new Error(`Falha ao enviar imagem (${fieldKey}): ${error.message}`);
-    }
-    void mirrorUploadToR2("veiculos-imagens", path, file);
-    const { data } = supabase.storage.from("veiculos-imagens").getPublicUrl(path);
-    return data.publicUrl;
+    return uploadFileToR2("veiculos-imagens", path, file);
   };
 
   const handleSave = async () => {

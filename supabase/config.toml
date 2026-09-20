@@ -88,3 +88,9 @@ verify_jwt = true
 
 [functions.r2-auto-backup]
 verify_jwt = false
+
+[functions.r2-private-media]
+verify_jwt = false
+
+[functions.r2-purge-storage-images]
+verify_jwt = false

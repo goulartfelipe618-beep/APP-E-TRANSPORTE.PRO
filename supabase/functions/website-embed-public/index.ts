@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { espelhoKey, organizedKey, r2Client, r2Put, rewritePublicStorageUrl } from "../_shared/r2.ts";
 
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
@@ -66,7 +67,15 @@ async function listTemplates(admin: ReturnType<typeof createClient>) {
     console.error("templates_website:", error.message);
     return json(500, { error: "Não foi possível carregar os templates." });
   }
-  return json(200, { templates: data ?? [] });
+  const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+  const templates = (data ?? []).map((row) => ({
+    ...row,
+    imagem_url:
+      typeof row.imagem_url === "string"
+        ? rewritePublicStorageUrl(row.imagem_url, supabaseUrl)
+        : row.imagem_url,
+  }));
+  return json(200, { templates });
 }
 
 async function submitBriefing(
@@ -102,28 +111,19 @@ async function submitBriefing(
       : logoMime === "image/gif" ? "gif"
       : "svg";
     const path = `embed/${crypto.randomUUID()}-logo.${ext}`;
-    const { error: upErr } = await admin.storage.from("website-briefing").upload(path, bytes, {
-      contentType: logoMime,
-      upsert: false,
-      cacheControl: "3600",
-    });
-    if (upErr) {
-      console.error("logo upload:", upErr.message);
-      return json(500, { error: "Não foi possível enviar a logo." });
-    }
-    const { data: pub } = admin.storage.from("website-briefing").getPublicUrl(path);
-    logoUrl = pub.publicUrl;
-    dados.logo_url = logoUrl;
     try {
-      const { espelhoKey, organizedKey, r2Client, r2Put } = await import("../_shared/r2.ts");
       const r2 = r2Client();
       const k1 = espelhoKey("website-briefing", path);
       const k2 = organizedKey("website-briefing", path, {});
       await r2Put(r2, k1, bytes, logoMime);
       if (k2 !== k1) await r2Put(r2, k2, bytes, logoMime);
-    } catch (mirrorErr) {
-      console.error("r2 mirror skip:", mirrorErr);
+    } catch (upErr) {
+      console.error("logo upload r2:", upErr);
+      return json(500, { error: "Não foi possível enviar a logo." });
     }
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+    logoUrl = `${supabaseUrl.replace(/\/+$/, "")}/functions/v1/r2-media/espelho/website-briefing/${path}`;
+    dados.logo_url = logoUrl;
   }
 
   const referrer = sanitizeText(body.referrer, 500);

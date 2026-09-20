@@ -22,7 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { safeMediaSrc } from "@/lib/safeExternalUrl";
-import { mirrorUploadToR2 } from "@/lib/mirrorUploadToR2";
+import { uploadFileToR2 } from "@/lib/mirrorUploadToR2";
 import {
   Heart,
   MessageCircle,
@@ -1059,18 +1059,11 @@ export default function CommunityFeed({ panel = "motorista" }: CommunityFeedProp
           const mediaType = isVideo ? "video" : "image";
           const ext = extensionForDetectedMime(mime);
           const filePath = `${currentUserId}/${postId}/${Date.now()}-${i}.${ext}`;
-
-          const { error: uploadError } = await supabase.storage
-            .from("community-media")
-            .upload(filePath, file, { upsert: false, cacheControl: "3600" });
-          if (uploadError) throw uploadError;
-          void mirrorUploadToR2("community-media", filePath, file);
-
-          const { data: pub } = supabase.storage.from("community-media").getPublicUrl(filePath);
+          const publicUrl = await uploadFileToR2("community-media", filePath, file);
           mediaRows.push({
             post_id: postId,
             media_type: mediaType,
-            media_url: pub.publicUrl,
+            media_url: publicUrl,
             storage_path: filePath,
             position: i,
           });

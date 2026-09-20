@@ -100,3 +100,20 @@ export async function r2Get(client: AwsClient, key: string): Promise<Response> {
   const url = `${r2Endpoint()}/${R2_BUCKET}/${encodeR2Key(key)}`;
   return client.fetch(url, { method: "GET" });
 }
+
+export async function r2Head(client: AwsClient, key: string): Promise<boolean> {
+  const url = `${r2Endpoint()}/${R2_BUCKET}/${encodeR2Key(key)}`;
+  const res = await client.fetch(url, { method: "HEAD" });
+  return res.ok;
+}
+
+export function rewritePublicStorageUrl(raw: string, supabaseUrl: string): string {
+  const t = raw.trim();
+  const marker = "/storage/v1/object/public/";
+  const i = t.indexOf(marker);
+  if (i < 0) return t;
+  const rest = t.slice(i + marker.length);
+  return `${supabaseUrl.replace(/\/+$/, "")}/functions/v1/r2-media/espelho/${rest}`;
+}
+
+export const PRIVATE_STORAGE_BUCKETS = new Set(["cadastro-clientes-docs", "motorista-frota-docs"]);

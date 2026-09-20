@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { mirrorUploadToR2 } from "@/lib/mirrorUploadToR2";
+import { uploadFileToR2 } from "@/lib/mirrorUploadToR2";
 
 export const CADASTRO_CLIENTES_BUCKET = "cadastro-clientes-docs";
 
@@ -15,13 +15,13 @@ export function getFotoPerfilPathFromDocumentos(documentos: unknown): string | n
 export async function getCadastroClienteSignedUrl(
   supabase: SupabaseClient,
   path: string,
-  expiresInSec = 3600,
 ): Promise<string | null> {
-  const { data, error } = await supabase.storage
-    .from(CADASTRO_CLIENTES_BUCKET)
-    .createSignedUrl(path, expiresInSec);
-  if (error || !data?.signedUrl) return null;
-  return data.signedUrl;
+  const { data, error } = await supabase.functions.invoke<{ url?: string; error?: string }>(
+    "r2-private-media" as never,
+    { body: { bucket: CADASTRO_CLIENTES_BUCKET, path } },
+  );
+  if (error || !data?.url) return null;
+  return data.url;
 }
 
 export async function uploadCadastroClienteDocs(
@@ -35,13 +35,11 @@ export async function uploadCadastroClienteDocs(
     const safeSlug = slug.replace(/[^a-z0-9_-]/gi, "_").slice(0, 40) || "doc";
     const ext = (file.name.split(".").pop() || "bin").replace(/[^a-z0-9]/gi, "").slice(0, 8) || "bin";
     const path = `${userId}/${clienteId}/${safeSlug}.${ext}`;
-    const { error } = await supabase.storage.from(CADASTRO_CLIENTES_BUCKET).upload(path, file, {
-      upsert: true,
-      contentType: file.type || undefined,
-    });
-    if (!error) {
+    try {
+      await uploadFileToR2(CADASTRO_CLIENTES_BUCKET, path, file);
       paths[safeSlug] = path;
-      void mirrorUploadToR2(CADASTRO_CLIENTES_BUCKET, path, file);
+    } catch {
+      /* skip this file */
     }
   }
   return paths;

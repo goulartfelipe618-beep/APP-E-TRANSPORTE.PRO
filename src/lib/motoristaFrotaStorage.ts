@@ -3,7 +3,7 @@ import { assertUploadMagicBytes, extensionForDetectedMime } from "@/lib/validate
 import { parseDadosWebhook, pickStr } from "@/lib/motoristaFromSolicitacao";
 import type { Database } from "@/integrations/supabase/types";
 import { getAppPublicOrigin, getMotoristaVerificacaoAppOrigin } from "@/lib/appPublicUrl";
-import { mirrorUploadToR2 } from "@/lib/mirrorUploadToR2";
+import { uploadFileToR2 } from "@/lib/mirrorUploadToR2";
 
 export const MOTORISTA_FROTA_DOCS_BUCKET = "motorista-frota-docs" as const;
 
@@ -48,13 +48,7 @@ export async function uploadMotoristaFrotaDocs(
     const { mime } = await assertUploadMagicBytes(file, "raster-or-pdf", MAX_BYTES);
     const ext = extensionForDetectedMime(mime);
     const path = storagePath(userId, motoristaId, slug, ext);
-    const { error } = await supabase.storage.from(MOTORISTA_FROTA_DOCS_BUCKET).upload(path, file, {
-      upsert: true,
-      cacheControl: "3600",
-      contentType: mime,
-    });
-    if (error) throw new Error(error.message);
-    void mirrorUploadToR2(MOTORISTA_FROTA_DOCS_BUCKET, path, file);
+    await uploadFileToR2(MOTORISTA_FROTA_DOCS_BUCKET, path, file);
     const key = DOC_PATH_KEYS[slug];
     out[key] = path;
   }
@@ -126,17 +120,17 @@ export async function signMotoristaFrotaDocUrls(
       }
       const extracted = extractMotoristaFrotaDocObjectPath(path);
       if (!extracted) return undefined;
-      const { data, error } = await supabase.storage
-        .from(MOTORISTA_FROTA_DOCS_BUCKET)
-        .createSignedUrl(extracted, 3600);
-      if (error || !data?.signedUrl) return undefined;
-      return data.signedUrl;
+      const { data, error } = await supabase.functions.invoke<{ url?: string }>("r2-private-media" as never, {
+        body: { bucket: MOTORISTA_FROTA_DOCS_BUCKET, path: extracted },
+      });
+      if (error || !data?.url) return undefined;
+      return data.url;
     }
-    const { data, error } = await supabase.storage
-      .from(MOTORISTA_FROTA_DOCS_BUCKET)
-      .createSignedUrl(path, 3600);
-    if (error || !data?.signedUrl) return undefined;
-    return data.signedUrl;
+    const { data, error } = await supabase.functions.invoke<{ url?: string }>("r2-private-media" as never, {
+      body: { bucket: MOTORISTA_FROTA_DOCS_BUCKET, path },
+    });
+    if (error || !data?.url) return undefined;
+    return data.url;
   };
 
   /** Path relativo no bucket ou null se for URL externa / vazio. */

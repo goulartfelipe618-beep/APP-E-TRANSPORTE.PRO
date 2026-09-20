@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { mergeLoginPainelConfig, type LoginPainelConfig } from "@/lib/loginPainelConfig";
 import { assertUploadMagicBytes, extensionForDetectedMime } from "@/lib/validateUploadMagicBytes";
-import { mirrorUploadToR2 } from "@/lib/mirrorUploadToR2";
+import { uploadFileToR2 } from "@/lib/mirrorUploadToR2";
 
 const LANGUAGE_OPTIONS = [
   { value: "pt-BR", label: "Portugues (Brasil)" },
@@ -48,17 +48,12 @@ export default function LoginConfiguracoesSection() {
       return null;
     }
     const path = `login/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-    const { error } = await supabase.storage.from("login-assets").upload(path, file, {
-      cacheControl: "3600",
-      upsert: false,
-    });
-    if (error) {
-      toast.error(`Erro no upload da imagem: ${error.message}`);
+    try {
+      return await uploadFileToR2("login-assets", path, file);
+    } catch (err) {
+      toast.error(`Erro no upload da imagem: ${err instanceof Error ? err.message : "falha"}`);
       return null;
     }
-    void mirrorUploadToR2("login-assets", path, file);
-    const { data } = supabase.storage.from("login-assets").getPublicUrl(path);
-    return data.publicUrl;
   };
 
   const handleUploadImage = async (e: React.ChangeEvent<HTMLInputElement>) => {

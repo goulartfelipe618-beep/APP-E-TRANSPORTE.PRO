@@ -1,12 +1,12 @@
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { resolveMotoristaJwtSecret } from "../_shared/motoristaJwtSecret.ts";
+import { rewritePublicStorageUrl } from "../_shared/r2.ts";
 
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const BUCKET = "motorista-frota-docs";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -160,12 +160,20 @@ async function buildVerificationJson(
   const perfilPath = pickStr(dw, "doc_perfil_path", "doc_foto_perfil_path");
   let fotoMotoristaUrl: string | null = null;
   if (perfilPath && !/^https?:\/\//i.test(perfilPath)) {
-    const { data: signed, error: signErr } = await admin.storage
-      .from(BUCKET)
-      .createSignedUrl(perfilPath, 120);
-    if (!signErr && signed?.signedUrl) fotoMotoristaUrl = signed.signedUrl;
+    const secret = await resolveMotoristaJwtSecret();
+    if (secret.length >= 16) {
+      const now = Math.floor(Date.now() / 1000);
+      const token = await signJwtHS256(
+        { typ: "mfd1", p: perfilPath, sub: ownerId, iat: now, exp: now + 120 },
+        secret,
+      );
+      const base = (Deno.env.get("SUPABASE_URL") ?? "").replace(/\/+$/, "");
+      fotoMotoristaUrl = `${base}/functions/v1/motorista-frota-doc-link?t=${encodeURIComponent(token)}`;
+    }
   }
 
+  const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+  const rawLogo = (cfg?.logo_url || "").trim();
   return {
     ok: true as const,
     motorista_nome: String(sm.nome || "").trim() || "Motorista",
@@ -173,7 +181,7 @@ async function buildVerificationJson(
     empresa_regime: empresaRegime,
     cnpj_mascarado: cnpjMascarado,
     regiao,
-    logo_url: (cfg?.logo_url || "").trim() || null,
+    logo_url: rawLogo ? rewritePublicStorageUrl(rawLogo, supabaseUrl) : null,
     foto_motorista_url: fotoMotoristaUrl,
     ref_publica: `AUT-${String(sm.id).replace(/-/g, "").slice(0, 10).toUpperCase()}`,
   };

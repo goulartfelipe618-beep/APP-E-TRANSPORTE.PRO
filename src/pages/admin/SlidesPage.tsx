@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils";
 import { ConfirmDeleteDialog } from "@/components/ConfirmDeleteDialog";
 import { assertUploadMagicBytes, extensionForDetectedMime } from "@/lib/validateUploadMagicBytes";
 import { assertHttpsUrlForHref, isSafeMediaSrcUrl, safeMediaSrc } from "@/lib/safeExternalUrl";
-import { mirrorUploadToR2 } from "@/lib/mirrorUploadToR2";
+import { uploadFileToR2 } from "@/lib/mirrorUploadToR2";
 
 interface Slide {
   id: string;
@@ -125,15 +125,12 @@ export default function SlidesPage() {
 
     setUploading(true);
     const path = `slides/${Date.now()}.${ext}`;
-    const { error } = await supabase.storage.from("logos").upload(path, file, { upsert: true });
-    if (error) {
+    try {
+      const publicUrl = await uploadFileToR2("logos", path, file);
+      setForm((f) => ({ ...f, imagem_url: publicUrl }));
+    } catch {
       toast.error("Erro ao enviar imagem");
-      setUploading(false);
-      return;
     }
-    void mirrorUploadToR2("logos", path, file);
-    const { data: urlData } = supabase.storage.from("logos").getPublicUrl(path);
-    setForm((f) => ({ ...f, imagem_url: urlData.publicUrl }));
     setUploading(false);
     toast.success("Imagem enviada!");
   };

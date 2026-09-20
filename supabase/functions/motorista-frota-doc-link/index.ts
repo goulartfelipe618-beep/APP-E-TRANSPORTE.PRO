@@ -5,6 +5,7 @@
  */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { resolveMotoristaJwtSecret } from "../_shared/motoristaJwtSecret.ts";
+import { espelhoKey, r2Client, r2Get } from "../_shared/r2.ts";
 
 const BUCKET = "motorista-frota-docs";
 
@@ -135,6 +136,18 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+    try {
+      const r2 = r2Client();
+      const r2Res = await r2Get(r2, espelhoKey(BUCKET, claims.p));
+      if (r2Res.ok) {
+        const headers = new Headers(corsHeaders);
+        headers.set("Content-Type", r2Res.headers.get("content-type") || contentTypeForPath(claims.p));
+        headers.set("Cache-Control", "private, max-age=300");
+        return new Response(r2Res.body, { status: 200, headers });
+      }
+    } catch {
+      /* fallback Storage */
+    }
     const admin = createClient(supabaseUrl, serviceKey);
     const { data: blob, error: dlErr } = await admin.storage.from(BUCKET).download(claims.p);
     if (dlErr || !blob) {
@@ -230,13 +243,22 @@ Deno.serve(async (req) => {
     if (!canAccess) continue;
 
     let ok = false;
-    if (user.id === ownerId || isMaster === true) {
-      const client = user.id === ownerId ? supabaseUser : admin;
-      const { error } = await client.storage.from(BUCKET).download(path);
-      ok = !error;
-    } else {
-      const { error } = await supabaseUser.storage.from(BUCKET).download(path);
-      ok = !error;
+    try {
+      const r2 = r2Client();
+      const r2Res = await r2Get(r2, espelhoKey(BUCKET, path));
+      ok = r2Res.ok;
+    } catch {
+      ok = false;
+    }
+    if (!ok) {
+      if (user.id === ownerId || isMaster === true) {
+        const client = user.id === ownerId ? supabaseUser : admin;
+        const { error } = await client.storage.from(BUCKET).download(path);
+        ok = !error;
+      } else {
+        const { error } = await supabaseUser.storage.from(BUCKET).download(path);
+        ok = !error;
+      }
     }
     if (!ok) continue;
 

@@ -3,7 +3,7 @@ import { assertUploadMagicBytes, extensionForDetectedMime } from "@/lib/validate
 import { parseDadosWebhook, pickStr } from "@/lib/motoristaFromSolicitacao";
 import type { Database } from "@/integrations/supabase/types";
 import { MOTORISTA_FROTA_DOCS_BUCKET } from "@/lib/motoristaFrotaStorage";
-import { mirrorUploadToR2 } from "@/lib/mirrorUploadToR2";
+import { uploadFileToR2 } from "@/lib/mirrorUploadToR2";
 import { getAppPublicOrigin, getMotoristaVerificacaoAppOrigin } from "@/lib/appPublicUrl";
 
 export const PORTAL_FOTO_SLOTS = [1, 2, 3, 4] as const;
@@ -47,13 +47,7 @@ export async function uploadMotoristaPortalFoto(
   const { mime } = await assertUploadMagicBytes(file, "raster-image", MAX_BYTES);
   const ext = extensionForDetectedMime(mime);
   const path = portalFotoStoragePath(ownerUserId, motoristaId, slot, ext);
-  const { error } = await supabase.storage.from(MOTORISTA_FROTA_DOCS_BUCKET).upload(path, file, {
-    upsert: true,
-    cacheControl: "3600",
-    contentType: mime,
-  });
-  if (error) throw new Error(error.message);
-  void mirrorUploadToR2(MOTORISTA_FROTA_DOCS_BUCKET, path, file);
+  await uploadFileToR2(MOTORISTA_FROTA_DOCS_BUCKET, path, file);
 
   const { error: rpcErr } = await (supabase as unknown as { rpc: (fn: string, args: object) => Promise<{ error: { message: string } | null }> }).rpc(
     "merge_motorista_portal_foto_path",
@@ -121,11 +115,12 @@ export async function signMotoristaPortalFotoUrls(
       const share = buildViewerUrl(tok);
       if (preview || share) out[slot] = { preview: preview || share, share: share || preview };
     } else {
-      const { data: signed, error: signErr } = await supabase.storage
-        .from(MOTORISTA_FROTA_DOCS_BUCKET)
-        .createSignedUrl(path, 3600);
-      if (!signErr && signed?.signedUrl) {
-        out[slot] = { preview: signed.signedUrl, share: signed.signedUrl };
+      const { data: signed, error: signErr } = await supabase.functions.invoke<{ url?: string }>(
+        "r2-private-media" as never,
+        { body: { bucket: MOTORISTA_FROTA_DOCS_BUCKET, path } },
+      );
+      if (!signErr && signed?.url) {
+        out[slot] = { preview: signed.url, share: signed.url };
       }
     }
   }

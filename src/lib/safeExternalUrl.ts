@@ -104,7 +104,12 @@ export function assertSafeHref(raw: string | null | undefined): string | null {
 function isR2MediaProxyUrl(u: URL): boolean {
   const project = supabaseProjectHost();
   if (!project || u.hostname.toLowerCase() !== project) return false;
-  return u.pathname.toLowerCase().includes("/functions/v1/r2-media/");
+  const p = u.pathname.toLowerCase();
+  return (
+    p.includes("/functions/v1/r2-media/") ||
+    p.includes("/functions/v1/r2-private-media") ||
+    p.includes("/functions/v1/motorista-frota-doc-link")
+  );
 }
 
 function isSupabaseStorageObjectUrl(u: URL): boolean {

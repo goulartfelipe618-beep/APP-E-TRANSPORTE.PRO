@@ -18,7 +18,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { mirrorUploadToR2 } from "@/lib/mirrorUploadToR2";
+import { uploadFileToR2 } from "@/lib/mirrorUploadToR2";
 import { assertUploadMagicBytes, extensionForDetectedMime } from "@/lib/validateUploadMagicBytes";
 import { isSafeMediaSrcUrl, safeMediaSrc } from "@/lib/safeExternalUrl";
 import { PAGINAS_MOTORISTA } from "@/lib/painelAvisosPages";
@@ -121,17 +121,12 @@ export default function AdminFullscreenBannersSection() {
       return null;
     }
     const path = `banners/${crypto.randomUUID()}.${ext}`;
-    const { error } = await supabase.storage.from("fullscreen-banners").upload(path, f, {
-      cacheControl: "3600",
-      upsert: false,
-    });
-    if (error) {
-      toast.error("Erro no upload: " + error.message);
+    try {
+      return await uploadFileToR2("fullscreen-banners", path, f);
+    } catch (err) {
+      toast.error("Erro no upload: " + (err instanceof Error ? err.message : "falha"));
       return null;
     }
-    void mirrorUploadToR2("fullscreen-banners", path, f);
-    const { data: pub } = supabase.storage.from("fullscreen-banners").getPublicUrl(path);
-    return pub.publicUrl;
   };
 
   const validate = (): string | null => {

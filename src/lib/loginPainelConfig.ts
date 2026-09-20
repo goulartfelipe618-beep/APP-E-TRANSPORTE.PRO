@@ -1,4 +1,5 @@
 import luxuryCar from "@/assets/luxury-car.jpg";
+import { rewriteSupabaseStorageUrlToR2 } from "@/lib/r2PublicUrl";
 
 export type LoginPainelConfig = {
   imagem_lateral_url: string;
@@ -46,7 +47,10 @@ export function mergeLoginPainelConfig(data: Partial<LoginPainelConfig> | null |
     : DEFAULT_LOGIN_PAINEL_CONFIG.seguranca_itens;
 
   return {
-    imagem_lateral_url: data?.imagem_lateral_url || DEFAULT_LOGIN_PAINEL_CONFIG.imagem_lateral_url,
+    imagem_lateral_url:
+      rewriteSupabaseStorageUrlToR2(data?.imagem_lateral_url) ||
+      data?.imagem_lateral_url ||
+      DEFAULT_LOGIN_PAINEL_CONFIG.imagem_lateral_url,
     painel_titulo: data?.painel_titulo || DEFAULT_LOGIN_PAINEL_CONFIG.painel_titulo,
     painel_subtitulo: data?.painel_subtitulo || DEFAULT_LOGIN_PAINEL_CONFIG.painel_subtitulo,
     form_titulo: data?.form_titulo || DEFAULT_LOGIN_PAINEL_CONFIG.form_titulo,
