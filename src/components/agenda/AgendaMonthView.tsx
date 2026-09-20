@@ -33,10 +33,12 @@ function AgendaItemButton({
       title={title}
       className={cn(
         "w-full min-w-0 rounded-md border border-border/80 bg-muted/40 text-left text-foreground transition-colors hover:bg-muted/70",
-        stacked ? "flex flex-col gap-1 px-2.5 py-2" : "flex items-start gap-1 px-1 py-0.5 text-[10px] leading-tight xl:text-xs",
+        stacked
+          ? "flex flex-col gap-1 px-2.5 py-2"
+          : "flex min-w-0 items-center gap-0.5 px-1 py-0.5 text-[10px] leading-tight xl:text-[11px]",
       )}
     >
-      <span className={cn("flex min-w-0 flex-wrap items-center gap-1", stacked && "gap-1.5")}>
+      <span className={cn("flex min-w-0 items-center gap-1", stacked ? "flex-wrap gap-1.5" : "min-w-0 flex-1 overflow-hidden")}>
         <span
           className={cn(
             "shrink-0 font-mono font-semibold tabular-nums",
@@ -66,19 +68,15 @@ function AgendaItemButton({
             {it.perna}
           </span>
         )}
-        <span className={cn("shrink-0 font-medium text-muted-foreground", stacked ? "text-xs" : "whitespace-nowrap")}>
+        <span className={cn("shrink-0 font-medium text-muted-foreground", stacked ? "text-xs" : "whitespace-nowrap text-[10px]")}>
           {it.horario}
         </span>
+        {!stacked && it.trajetoResumo ? (
+          <span className="min-w-0 flex-1 truncate text-muted-foreground">{it.trajetoResumo}</span>
+        ) : null}
       </span>
-      {it.trajetoResumo ? (
-        <span
-          className={cn(
-            "min-w-0 text-muted-foreground",
-            stacked ? "break-words text-sm leading-snug" : "line-clamp-2 flex-1",
-          )}
-        >
-          {it.trajetoResumo}
-        </span>
+      {stacked && it.trajetoResumo ? (
+        <span className="min-w-0 break-words text-sm leading-snug text-muted-foreground">{it.trajetoResumo}</span>
       ) : null}
     </button>
   );
@@ -192,50 +190,55 @@ export function AgendaMonthView({
         </div>
       </div>
 
-      <div className="hidden overflow-hidden rounded-xl border border-border bg-card p-4 lg:block">
-        <div className="grid grid-cols-7 gap-1.5">
+      <div className="hidden overflow-hidden rounded-xl border border-border bg-card lg:block">
+        <div className="grid grid-cols-7 border-b border-border bg-muted/40">
           {WEEKDAYS_PT.map((wd) => (
             <div
               key={wd}
-              className="border-b border-border pb-2 text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+              className="px-1 py-2 text-center text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"
             >
               {wd}
             </div>
           ))}
+        </div>
+        <div className="grid grid-cols-7">
           {Array.from({ length: totalSlots }, (_, i) => {
             const dayNum = i - startPad + 1;
-            if (dayNum < 1 || dayNum > dim) {
-              return (
-                <div
-                  key={`empty-${i}`}
-                  className="min-h-[120px] rounded-lg border border-dashed border-border/60 bg-muted/20"
-                />
-              );
-            }
-            const dayKey = `${year}-${String(monthIndex + 1).padStart(2, "0")}-${String(dayNum).padStart(2, "0")}`;
-            const items = itemsByDay.get(dayKey) ?? [];
-            const isToday = todayKey === dayKey;
+            const isPad = dayNum < 1 || dayNum > dim;
+            const dayKey = isPad
+              ? `pad-${i}`
+              : `${year}-${String(monthIndex + 1).padStart(2, "0")}-${String(dayNum).padStart(2, "0")}`;
+            const items = isPad ? [] : (itemsByDay.get(dayKey) ?? []);
+            const isToday = !isPad && todayKey === dayKey;
             return (
               <div
                 key={dayKey}
                 className={cn(
-                  "flex min-h-[120px] min-w-0 flex-col gap-1 rounded-lg border p-2",
-                  isToday ? "border-primary/60 bg-primary/5" : "border-border bg-background",
+                  "flex h-[11.5rem] min-w-0 flex-col border-b border-r border-border p-1.5",
+                  i % 7 === 6 && "border-r-0",
+                  i >= totalSlots - 7 && "border-b-0",
+                  isPad && "bg-muted/15",
+                  !isPad && "bg-background",
+                  isToday && "bg-primary/5 ring-1 ring-inset ring-primary/50",
                 )}
               >
-                <span
-                  className={cn(
-                    "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-sm font-semibold",
-                    isToday ? "bg-primary text-primary-foreground" : "bg-muted text-foreground",
-                  )}
-                >
-                  {dayNum}
-                </span>
-                <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-1 overflow-y-auto">
-                  {items.map((it) => (
-                    <AgendaItemButton key={it.key} it={it} stacked={false} onClick={() => onItemClick(it)} />
-                  ))}
-                </div>
+                {!isPad ? (
+                  <>
+                    <span
+                      className={cn(
+                        "mb-1 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-xs font-semibold",
+                        isToday ? "bg-primary text-primary-foreground" : "text-foreground",
+                      )}
+                    >
+                      {dayNum}
+                    </span>
+                    <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-0.5 overflow-y-auto">
+                      {items.map((it) => (
+                        <AgendaItemButton key={it.key} it={it} stacked={false} onClick={() => onItemClick(it)} />
+                      ))}
+                    </div>
+                  </>
+                ) : null}
               </div>
             );
           })}
