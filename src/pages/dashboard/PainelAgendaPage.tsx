@@ -15,6 +15,7 @@ import ComunicarDialog from "@/components/comunicar/ComunicarDialog";
 import { generateGrupoPDF, generateTransferPDF, getGrupoReservaPdfBase64, getTransferReservaPdfBase64 } from "@/lib/pdfGenerator";
 import { buildGrupoDadosComunicarCliente, buildTransferDadosComunicarCliente } from "@/lib/comunicarReservaCliente";
 import { AgendaMonthView } from "@/components/agenda/AgendaMonthView";
+import { fetchAllSupabasePages } from "@/lib/supabaseFetchAll";
 
 const MONTHS_PT = [
   "Janeiro",
