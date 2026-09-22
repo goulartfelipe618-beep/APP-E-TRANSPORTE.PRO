@@ -1,10 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import {
-  Bolt,
   Check,
-  CreditCard,
   Loader2,
   Lock,
   ShieldCheck,
@@ -23,8 +21,6 @@ import {
   getBillingCycleDisplay,
   type BillingCycle,
 } from "@/lib/billingCycles";
-import { getMercadoPagoPublicKey, isMercadoPagoBillingEnabled } from "@/lib/mercadoPagoBilling";
-import MercadoPagoCardPaymentBrick from "@/components/planos/MercadoPagoCardPaymentBrick";
 
 interface UpgradePlanDialogProps {
   open: boolean;
@@ -244,11 +240,7 @@ export default function UpgradePlanDialog({
   emphasizePaidTiers = false,
 }: UpgradePlanDialogProps) {
   const [submitting, setSubmitting] = useState(false);
-  const [paymentTier, setPaymentTier] = useState<null | "standart" | "pro">(null);
   const [billingCycle, setBillingCycle] = useState<BillingCycle>("monthly");
-  const checkoutAreaRef = useRef<HTMLDivElement | null>(null);
-  const mercadoPagoOn = isMercadoPagoBillingEnabled();
-  const mercadoPagoPublicKey = getMercadoPagoPublicKey();
   const { plano: currentPlano, refetch: refetchPlano } = useUserPlan();
 
   const isFree = currentPlano === "free";
@@ -258,31 +250,8 @@ export default function UpgradePlanDialog({
   const showProColumn = !isPro;
 
   useEffect(() => {
-    if (!open) setSubmitting(false);
-  }, [open]);
-
-  useEffect(() => {
     if (open) void refetchPlano();
   }, [open, refetchPlano]);
-
-  useEffect(() => {
-    if (!open) setPaymentTier(null);
-  }, [open]);
-
-  useEffect(() => {
-    if (!paymentTier) return;
-    window.requestAnimationFrame(() => {
-      checkoutAreaRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
-    });
-  }, [paymentTier]);
-
-  const openMercadoPagoCheckout = (tier: "standart" | "pro") => {
-    if (!mercadoPagoOn || !mercadoPagoPublicKey) {
-      toast.error("Mercado Pago não está configurado. Use o contacto comercial ou configure MP_PUBLIC_KEY.");
-      return;
-    }
-    setPaymentTier((current) => (current === tier ? null : tier));
-  };
 
   const handleMigrar = async (preferPro?: boolean) => {
     setSubmitting(true);
@@ -379,7 +348,7 @@ export default function UpgradePlanDialog({
         <div
           className={cn(
             "overflow-y-auto border-b border-neutral-800 bg-neutral-950 py-5 pl-4 pr-14 sm:px-6",
-            paymentTier ? "max-h-[min(36vh,360px)]" : "max-h-[min(70vh,720px)]",
+            "max-h-[min(70vh,720px)]",
           )}
         >
           {isPro ? (
@@ -431,7 +400,6 @@ export default function UpgradePlanDialog({
                 <CycleSegmentedControl
                   value={billingCycle}
                   onChange={setBillingCycle}
-                  disabled={paymentTier !== null}
                 />
               </div>
 
@@ -482,119 +450,8 @@ export default function UpgradePlanDialog({
           )}
         </div>
 
-        <div
-          ref={checkoutAreaRef}
-          className={cn(
-            "space-y-3 bg-neutral-950 py-4 pl-4 pr-14 sm:px-6 sm:py-5",
-            paymentTier && "max-h-[min(58vh,600px)] overflow-y-auto",
-          )}
-        >
+        <div className="space-y-3 bg-neutral-950 py-4 pl-4 pr-14 sm:px-6 sm:py-5">
           {!isPro ? (
-            <div className="flex gap-2 rounded-lg border border-neutral-800 bg-neutral-900/30 px-3 py-2.5 text-[11px] leading-relaxed text-neutral-400 sm:text-xs">
-              <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-[#FF6600]" aria-hidden />
-              <span>
-                Ao cancelar a subscrição, os seus dados são preservados — o acesso às funções pagas fica suspenso até
-                renovar.
-              </span>
-            </div>
-          ) : null}
-
-          {mercadoPagoOn && !isPro ? (
-            <div className="flex flex-col gap-3">
-              {isFree ? (
-                <>
-                  <Button
-                    type="button"
-                    className="h-12 w-full gap-2 bg-[#FF6600] text-xs font-bold uppercase tracking-wider text-white shadow-lg shadow-[#FF6600]/20 hover:bg-[#e65c00]"
-                    disabled={paymentTier === "standart"}
-                    onClick={() => openMercadoPagoCheckout("pro")}
-                  >
-                    {paymentTier === "pro" ? (
-                      <>
-                        <CreditCard className="h-4 w-4" /> Formulário PRÓ aberto
-                      </>
-                    ) : (
-                      <>
-                        <Bolt className="h-4 w-4" />
-                        Assinar PRÓ agora
-                      </>
-                    )}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="h-11 w-full border-2 border-neutral-600 bg-transparent text-xs font-semibold uppercase tracking-wider text-neutral-100 hover:border-[#FF6600] hover:bg-[#FF6600]/10 hover:text-white"
-                    disabled={paymentTier === "pro" || currentPlano === "standart"}
-                    onClick={() => openMercadoPagoCheckout("standart")}
-                  >
-                    {paymentTier === "standart" ? (
-                      <>
-                        <CreditCard className="mr-2 h-4 w-4" /> Formulário STANDART aberto
-                      </>
-                    ) : (
-                      <>
-                        <CreditCard className="mr-2 h-4 w-4" />
-                        Assinar STANDART
-                      </>
-                    )}
-                  </Button>
-                </>
-              ) : (
-                <Button
-                  type="button"
-                  className="h-12 w-full gap-2 bg-[#FF6600] text-xs font-bold uppercase tracking-wider text-white shadow-lg shadow-[#FF6600]/20 hover:bg-[#e65c00]"
-                  onClick={() => openMercadoPagoCheckout("pro")}
-                >
-                  {paymentTier === "pro" ? (
-                    <>
-                      <CreditCard className="h-4 w-4" /> Formulário PRÓ aberto
-                    </>
-                  ) : (
-                    <>
-                      <Bolt className="h-4 w-4" />
-                      Fazer upgrade para PRÓ
-                    </>
-                  )}
-                </Button>
-              )}
-              <p className="flex items-center justify-center gap-1.5 text-center text-[10px] text-neutral-500 sm:text-[11px]">
-                <Lock className="h-3 w-3 shrink-0" aria-hidden />
-                Pagamento seguro via Mercado Pago · Parcelamento nativo até 12x
-              </p>
-              {paymentTier ? (
-                <MercadoPagoCardPaymentBrick
-                  key={`${paymentTier}-${billingCycle}`}
-                  plano={paymentTier}
-                  ciclo={billingCycle}
-                  onApproved={() => {
-                    void refetchPlano();
-                    onOpenChange(false);
-                  }}
-                />
-              ) : null}
-              <div className="relative py-1 text-center text-[10px] text-neutral-600 sm:text-[11px]">
-                <span className="relative z-10 bg-neutral-950 px-2">ou</span>
-                <span className="absolute left-0 right-0 top-1/2 -z-0 h-px bg-neutral-800" aria-hidden />
-              </div>
-              <Button
-                type="button"
-                variant="outline"
-                className="h-10 w-full border-neutral-600 bg-transparent text-xs font-semibold text-neutral-200 hover:bg-white/5"
-                disabled={submitting}
-                onClick={() => void handleMigrar(!isFree)}
-              >
-                {submitting ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> A enviar…
-                  </>
-                ) : isStandart ? (
-                  "Pedir contacto — upgrade PRÓ (sem cartão)"
-                ) : (
-                  "Pedir contacto comercial (sem cartão)"
-                )}
-              </Button>
-            </div>
-          ) : !isPro ? (
             <div className="flex flex-col gap-2">
               <Button
                 type="button"

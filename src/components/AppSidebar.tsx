@@ -8,7 +8,6 @@ import {
   Globe, Search, Mail, Monitor, Settings, StickyNote, Link2,
   Bell, Moon, Sun, LogOut, Calendar,
   Wallet2,
-  CreditCard,
   List,
   Inbox,
   Banknote,
@@ -178,7 +177,6 @@ const getMenuStructure = (
       },
       { title: "Anotações", page: "anotacoes", icon: StickyNote },
       { title: "Suporte", page: "tickets", icon: ClipboardList },
-      { title: "Planos", page: "planos", icon: CreditCard },
     ],
   },
 ];

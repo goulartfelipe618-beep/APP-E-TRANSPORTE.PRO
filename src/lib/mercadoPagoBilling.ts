@@ -1,6 +1,4 @@
-import { supabase } from "@/integrations/supabase/client";
 import { getBillingCycleTotal, mercadoPagoPlanId, type BillingCycle } from "@/lib/billingCycles";
-import { vercelDeploymentHeaders } from "@/lib/vercelSkewProtection";
 
 export type MercadoPagoPlan = "standart" | "pro";
 
@@ -43,9 +41,7 @@ export function getPaymentsApiBaseUrl(): string {
 }
 
 export function isMercadoPagoBillingEnabled(): boolean {
-  const publicKey = getMercadoPagoPublicKey();
-  const raw = String(import.meta.env.VITE_MP_BILLING_ENABLED ?? "").toLowerCase().trim();
-  return Boolean(publicKey) && (raw === "" || raw === "true" || raw === "1");
+  return false;
 }
 
 export function getMercadoPagoCheckoutAmount(plano: MercadoPagoPlan, ciclo: BillingCycle): number {
@@ -82,33 +78,11 @@ export async function loadMercadoPagoSdk(): Promise<void> {
 }
 
 export async function createMercadoPagoPayment(
-  plano: MercadoPagoPlan,
-  ciclo: BillingCycle,
-  brickPayload: MercadoPagoBrickPayload,
+  _plano: MercadoPagoPlan,
+  _ciclo: BillingCycle,
+  _brickPayload: MercadoPagoBrickPayload,
 ): Promise<MercadoPagoCheckoutResult> {
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  if (!session?.access_token) {
-    throw new Error("Sessão inválida. Inicie sessão novamente.");
-  }
-
-  const base = getPaymentsApiBaseUrl();
-  const res = await fetch(`${base}/api/payments/create-preference`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${session.access_token}`,
-      "Content-Type": "application/json",
-      ...vercelDeploymentHeaders(),
-    },
-    body: JSON.stringify({ plano, ciclo, ...brickPayload }),
-  });
-
-  const data = (await res.json().catch(() => ({}))) as MercadoPagoCheckoutResult & { error?: string };
-  if (!res.ok) {
-    throw new Error(typeof data.error === "string" ? data.error : `Erro ${res.status}`);
-  }
-  return data;
+  throw new Error("Pagamento por cartão/banco está desactivado.");
 }
 
 declare global {

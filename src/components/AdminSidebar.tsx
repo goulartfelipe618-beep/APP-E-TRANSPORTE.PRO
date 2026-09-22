@@ -1,5 +1,5 @@
 import {
-  SlidersHorizontal, LogOut, Shield, BarChart3, MapPin, FileText, ChevronDown, Users, ClipboardList, Building2, LayoutTemplate, Bell, Moon, Sun, Settings, StickyNote, MessageSquare, Zap, Megaphone, Link2, ScrollText, Car,
+  SlidersHorizontal, LogOut, Shield, BarChart3, MapPin, ChevronDown, Users, ClipboardList, Building2, LayoutTemplate, Bell, Moon, Sun, Settings, StickyNote, MessageSquare, Zap, Megaphone, Link2, ScrollText, Car,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -130,16 +130,6 @@ export function AdminSidebar() {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
-
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  onClick={() => goPage("contrato/transfer")}
-                  className={cn("cursor-pointer", isActive("contrato/transfer") && "bg-muted text-primary font-medium")}
-                >
-                  <FileText className="mr-2 h-4 w-4 shrink-0" />
-                  {!collapsed && <span className="min-w-0 truncate">Contrato Planos</span>}
-                </SidebarMenuButton>
-              </SidebarMenuItem>
 
               <SidebarMenuItem>
                 <SidebarMenuButton

@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, useLayoutEffect } from "react";
-import { Navigate, useLocation, useNavigate } from "react-router-dom";
+import { Navigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
 import { syncPanelThemeForCurrentUser } from "@/lib/panelTheme";
 import { useSlowScrollContainer } from "@/hooks/useSlowScrollContainer";
 import PageLoader from "@/components/PageLoader";
@@ -17,7 +16,6 @@ import { usePainelErrorReporter } from "@/hooks/usePainelErrorReporter";
 import { useScrollPanelToTop } from "@/hooks/useScrollPanelToTop";
 import { usePlataformaFerramentasDisponibilidade } from "@/hooks/usePlataformaFerramentasDisponibilidade";
 import { isMarketingMenuPage } from "@/lib/marketingMenuPages";
-import { scheduleUserPlanRefetchWithBackoff } from "@/lib/userPlanRefetch";
 import {
   clearDashboardNavSessionStorage,
   isMotoristaFrotaUser,
@@ -67,7 +65,6 @@ import FinanceiroReceberPage from "@/pages/dashboard/financeiro/FinanceiroRecebe
 import FinanceiroFaturadoPage from "@/pages/dashboard/financeiro/FinanceiroFaturadoPage";
 import FinanceiroPagarPage from "@/pages/dashboard/financeiro/FinanceiroPagarPage";
 import FinanceiroRelatoriosPage from "@/pages/dashboard/financeiro/FinanceiroRelatoriosPage";
-import PlanosPage from "@/pages/dashboard/PlanosPage";
 import WhatsAppInboxPage from "@/pages/dashboard/WhatsAppInboxPage";
 import PainelAvisoBanner from "@/components/PainelAvisoBanner";
 import FullscreenBannerOverlay from "@/components/FullscreenBannerOverlay";
@@ -111,7 +108,6 @@ const PAGE_MAP: Record<string, React.ComponentType> = {
   "financeiro/faturado": FinanceiroFaturadoPage,
   "financeiro/pagar": FinanceiroPagarPage,
   "financeiro/relatorios": FinanceiroRelatoriosPage,
-  planos: PlanosPage,
   whatsapp: WhatsAppInboxPage,
 };
 
@@ -124,8 +120,6 @@ function readNetworkSpotlightActive() {
 
 function DashboardContent() {
   usePainelErrorReporter("motorista_executivo", "etp_nav_dashboard");
-  const location = useLocation();
-  const navigate = useNavigate();
   const { activePage, setActivePage } = useActivePage();
   const onboarding = useMotoristaOnboarding();
   const { painelMotoristaEvolutionAtivo, ready: painelComunicadorReady } = usePainelMotoristaEvolutionAtivo();
@@ -177,19 +171,6 @@ function DashboardContent() {
   if (redirectMotoristaFrota) {
     return <Navigate to="/frota" replace />;
   }
-
-  useEffect(() => {
-    const sp = new URLSearchParams(location.search);
-    if (sp.get("billing") !== "success") return;
-    sp.delete("billing");
-    const q = sp.toString();
-    navigate({ pathname: location.pathname, search: q ? `?${q}` : "" }, { replace: true });
-    toast.success("Pagamento concluído. A actualizar o seu plano…");
-    const cancelBackoff = scheduleUserPlanRefetchWithBackoff();
-    return () => {
-      cancelBackoff();
-    };
-  }, [location.pathname, location.search, navigate]);
 
   useEffect(() => {
     let cancelled = false;
@@ -248,7 +229,8 @@ function DashboardContent() {
       activePage === "disparador" ||
       activePage === "mentoria" ||
       activePage === "empty-legs" ||
-      activePage === "documentacao"
+      activePage === "documentacao" ||
+      activePage === "planos"
     ) {
       setActivePage("entrada");
     }

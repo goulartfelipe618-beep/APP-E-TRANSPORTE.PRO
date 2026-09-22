@@ -10,7 +10,6 @@ import { useConfiguracoes } from "@/contexts/ConfiguracoesContext";
 import AdminSlidesPage from "@/pages/admin/SlidesPage";
 import AdminMetricasPage from "@/pages/admin/AdminMetricas";
 import AdminAbrangenciaPage from "@/pages/admin/AdminAbrangencia";
-import AdminContratoTransferPage from "@/pages/admin/AdminContratoTransfer";
 import AdminUsuariosCadastradosPage from "@/pages/admin/AdminUsuariosCadastrados";
 import AdminNetworkPage from "@/pages/admin/AdminNetworkPage";
 import AdminSolicitacoesServicos from "@/pages/admin/AdminSolicitacoesServicos";
@@ -35,7 +34,6 @@ const PAGE_MAP: Record<string, React.ComponentType> = {
   abrangencia: AdminAbrangenciaPage,
   slides: AdminSlidesPage,
   comunidade: AdminCommunityPage,
-  "contrato/transfer": AdminContratoTransferPage,
   "usuarios/cadastrados": AdminUsuariosCadastradosPage,
   network: AdminNetworkPage,
   "solicitacoes-servicos": AdminSolicitacoesServicos,
@@ -59,7 +57,7 @@ function AdminContent() {
     if (activePage === "usuarios/solicitacoes") {
       setActivePage("usuarios/cadastrados");
     }
-    if (activePage === "mentoria" || activePage === "empty-legs" || activePage === "disparador") {
+    if (activePage === "mentoria" || activePage === "empty-legs" || activePage === "disparador" || activePage === "contrato/transfer") {
       setActivePage("metricas");
     }
   }, [activePage, setActivePage]);
