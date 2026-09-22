@@ -93,10 +93,18 @@ export default function R2AutoBackupSection() {
         ok?: boolean;
         error?: string | null;
         prefix?: string;
+        stats?: { files?: Record<string, number> };
       }>("r2-auto-backup", { body: { mode: "manual" } });
       if (error) throw new Error(error.message);
       if (data?.ok === false) throw new Error(data.error || "Falha no backup.");
-      if (!quiet) toast.success("Cópia de segurança enviada para o R2.");
+      const sent = Object.keys(data?.stats?.files ?? {}).length;
+      if (!quiet) {
+        toast.success(
+          sent > 0
+            ? `Cópia enviada: ${sent} ficheiro(s) novo(s) ou alterado(s).`
+            : "Nada novo para enviar — os dados já estão no R2.",
+        );
+      }
       await loadStatus();
     } catch (e) {
       if (!quiet) toast.error(e instanceof Error ? e.message : "Falha no backup.");
@@ -129,9 +137,10 @@ export default function R2AutoBackupSection() {
         <h3 className="font-semibold text-foreground">AUTO BACK-UP</h3>
       </div>
       <p className="mb-4 text-sm text-muted-foreground">
-        Cópia diária só da <strong className="text-foreground">sua empresa</strong> para o Cloudflare R2. Cada dia gera uma
-        pasta com a data (ex.: 19.09.26) dentro da pasta da empresa. Nada é apagado no painel nem misturado com outros
-        utilizadores.
+        Cópia só da <strong className="text-foreground">sua empresa</strong> para o Cloudflare R2. Depois da primeira
+        cópia, o <strong className="text-foreground">Copiar agora</strong> envia apenas o que foi adicionado ou
+        alterado (ex.: 1 cliente novo, não os 200 já copiados). Cada dia fica numa pasta com a data. Nada é apagado no
+        painel.
       </p>
 
       {loading ? (
@@ -146,7 +155,7 @@ export default function R2AutoBackupSection() {
                 Activar AUTO BACK-UP
               </Label>
               <p className="text-xs text-muted-foreground">
-                Envia Transfer, Grupos, Motoristas, Clientes, Veículos, Configurações e Anotações.
+                Transfer, Grupos, Motoristas, Clientes, Veículos, Configurações e Anotações — só o que mudou.
               </p>
             </div>
             <Switch

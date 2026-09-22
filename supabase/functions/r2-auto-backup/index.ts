@@ -1,10 +1,16 @@
 /**
- * Backup diário por empresa para o R2.
- * Nunca apaga linhas no Postgres nem pastas de outros dias/utilizadores.
+ * Backup R2 por empresa: só envia linhas novas ou alteradas.
  * Prefixo: backups/{empresa}__{userId8}/{dd.mm.yy}/...
  */
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { r2Client, r2Put } from "./r2.ts";
+import {
+  chunkRows,
+  incrementFileName,
+  nextBackupCursor,
+  runStampSp,
+  toBackupIso,
+} from "./incremental.ts";
 
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
@@ -12,6 +18,8 @@ const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type, x-r2-backup-cron-secret",
 };
+
+const CHUNK = 250;
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -62,26 +70,35 @@ function toCsv(rows: Record<string, unknown>[]): Uint8Array {
       }
     }
   }
-  const lines = [
-    keys.join(","),
-    ...rows.map((r) => keys.map((k) => csvEscape(r[k])).join(",")),
-  ];
+  const lines = [keys.join(","), ...rows.map((r) => keys.map((k) => csvEscape(r[k])).join(","))];
   return encoder.encode(`\uFEFF${lines.join("\r\n")}`);
+}
+
+async function sha256Hex(bytes: Uint8Array): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
 async function fetchByUser(
   admin: SupabaseClient,
   table: string,
   userId: string,
-  filter?: { eq?: { col: string; val: string }; neq?: { col: string; val: string } },
+  opts?: {
+    eq?: { col: string; val: string };
+    neq?: { col: string; val: string };
+    since?: string | null;
+  },
 ): Promise<Record<string, unknown>[]> {
-  const pageSize = 1000;
+  const pageSize = 500;
   const out: Record<string, unknown>[] = [];
   let from = 0;
   for (;;) {
     let q = admin.from(table).select("*").eq("user_id", userId);
-    if (filter?.eq) q = q.eq(filter.eq.col, filter.eq.val);
-    if (filter?.neq) q = q.neq(filter.neq.col, filter.neq.val);
+    if (opts?.eq) q = q.eq(opts.eq.col, opts.eq.val);
+    if (opts?.neq) q = q.neq(opts.neq.col, opts.neq.val);
+    if (opts?.since) {
+      q = q.or(`updated_at.gt.${opts.since},created_at.gt.${opts.since}`);
+    }
     q = q.order("created_at", { ascending: true });
     const { data, error } = await q.range(from, from + pageSize - 1);
     if (error) throw new Error(`${table}: ${error.message}`);
@@ -150,136 +167,213 @@ async function downloadOwnMedia(
   return { bytes: buf, contentType: data.type || "application/octet-stream", ext };
 }
 
+function readCursor(cursors: Record<string, unknown>, key: string, fallback: string | null): string | null {
+  return toBackupIso(cursors[key]) ?? fallback;
+}
+
+async function markSettings(
+  admin: SupabaseClient,
+  userId: string,
+  patch: Record<string, unknown>,
+) {
+  const { data: existing } = await admin
+    .from("r2_auto_backup_settings")
+    .select("user_id")
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (existing) {
+    await admin.from("r2_auto_backup_settings").update({ ...patch, updated_at: new Date().toISOString() }).eq(
+      "user_id",
+      userId,
+    );
+    return;
+  }
+  await admin.from("r2_auto_backup_settings").insert({
+    user_id: userId,
+    enabled: true,
+    ...patch,
+  });
+}
+
 async function runForUser(
   admin: SupabaseClient,
   userId: string,
   supabaseUrl: string,
-): Promise<{ ok: boolean; stats: Record<string, unknown>; error?: string; prefix: string }> {
-  const { data: cfg } = await admin
-    .from("configuracoes")
-    .select("*")
-    .eq("user_id", userId)
-    .maybeSingle();
-  const { data: cab } = await admin
-    .from("cabecalho_contratual")
-    .select("*")
-    .eq("user_id", userId)
-    .maybeSingle();
-
+): Promise<{ ok: boolean; stats: Record<string, unknown>; prefix: string }> {
+  const { data: cfg } = await admin.from("configuracoes").select("*").eq("user_id", userId).maybeSingle();
+  const { data: cab } = await admin.from("cabecalho_contratual").select("*").eq("user_id", userId).maybeSingle();
   const cfgRow = (cfg ?? {}) as Record<string, unknown>;
   const cabRow = (cab ?? {}) as Record<string, unknown>;
   const empresaNome = String(
     cfgRow.nome_empresa || cfgRow.nome_projeto || cabRow.razao_social || cabRow.nome || "empresa",
   );
   const dateFolder = dateFolderSp();
+  const stamp = runStampSp();
   const prefix = `backups/${slugEmpresa(empresaNome, userId)}/${dateFolder}`;
-  const r2 = r2Client();
-  const stats: Record<string, unknown> = { prefix, date: dateFolder, files: {} };
-  const files = stats.files as Record<string, number>;
-
-  const putCsv = async (rel: string, rows: Record<string, unknown>[]) => {
-    const key = `${prefix}/${rel}`;
-    await r2Put(r2, key, toCsv(rows), "text/csv; charset=utf-8");
-    files[rel] = rows.length;
+  const stats: Record<string, unknown> = {
+    prefix,
+    date: dateFolder,
+    files: {},
+    skipped: [],
+    incremental: true,
   };
+  const files = stats.files as Record<string, number>;
+  const skipped = stats.skipped as string[];
 
   const { data: existing } = await admin
     .from("r2_auto_backup_settings")
-    .select("enabled")
+    .select("enabled, last_file_hashes, last_row_cursors, last_run_at")
     .eq("user_id", userId)
     .maybeSingle();
-  if (existing) {
-    await admin
-      .from("r2_auto_backup_settings")
-      .update({
-        last_status: "running",
-        last_error: null,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("user_id", userId);
-  } else {
-    await admin.from("r2_auto_backup_settings").insert({
-      user_id: userId,
-      enabled: true,
-      last_status: "running",
-      last_error: null,
-    });
-  }
-
-  const transferSol = await fetchByUser(admin, "solicitacoes_transfer", userId);
-  const transferRes = await fetchByUser(admin, "reservas_transfer", userId);
-  await putCsv("TRANSFER/SOLICITACOES.csv", transferSol);
-  await putCsv("TRANSFER/RESERVAS.csv", transferRes);
-
-  const gruposSol = await fetchByUser(admin, "solicitacoes_grupos", userId);
-  const gruposRes = await fetchByUser(admin, "reservas_grupos", userId);
-  await putCsv("GRUPOS/SOLICITACOES.csv", gruposSol);
-  await putCsv("GRUPOS/RESERVAS.csv", gruposRes);
-
-  const motCad = await fetchByUser(admin, "solicitacoes_motoristas", userId, {
-    eq: { col: "status", val: "cadastrado" },
-  });
-  const motSol = await fetchByUser(admin, "solicitacoes_motoristas", userId, {
-    neq: { col: "status", val: "cadastrado" },
-  });
-  await putCsv("MOTORISTAS/CADASTROS.csv", motCad);
-  await putCsv("MOTORISTAS/SOLICITACOES.csv", motSol);
-
-  const clientes = await fetchByUser(admin, "cadastro_clientes", userId);
-  await putCsv("CLIENTES/CLIENTES.csv", clientes);
-
-  const veiculos = await fetchByUser(admin, "veiculos_frota", userId);
-  await putCsv("VEICULOS/VEICULOS.csv", veiculos);
-
-  const perfil = { ...cfgRow };
-  const projeto = {
-    nome_projeto: cfgRow.nome_projeto ?? "",
-    fonte_global: cfgRow.fonte_global ?? "",
-    logo_url: cfgRow.logo_url ?? "",
+  const hashes: Record<string, string> = {
+    ...(((existing?.last_file_hashes as Record<string, string> | null) ?? {})),
   };
-  await putCsv("CONFIGURACOES/MEU_PERFIL.csv", Object.keys(perfil).length ? [perfil] : []);
-  await putCsv("CONFIGURACOES/NOME_DO_PROJETO.csv", [projeto]);
-  await putCsv(
+  const cursors: Record<string, string | null> = {};
+  const rawCursors = ((existing?.last_row_cursors as Record<string, unknown> | null) ?? {}) as Record<string, unknown>;
+  const fallbackCursor = toBackupIso(existing?.last_run_at ?? null);
+
+  await markSettings(admin, userId, { last_status: "running", last_error: null });
+
+  const r2 = r2Client();
+
+  const putBytes = async (rel: string, bytes: Uint8Array, contentType: string) => {
+    const fp = await sha256Hex(bytes);
+    if (hashes[rel] === fp) {
+      skipped.push(rel);
+      return;
+    }
+    await r2Put(r2, `${prefix}/${rel}`, bytes, contentType);
+    hashes[rel] = fp;
+    files[rel] = bytes.byteLength;
+  };
+
+  const putChangedTable = async (
+    cursorKey: string,
+    relCsv: string,
+    rows: Record<string, unknown>[],
+  ) => {
+    const prev = readCursor(rawCursors, cursorKey, fallbackCursor);
+    if (!rows.length) {
+      skipped.push(relCsv);
+      cursors[cursorKey] = nextBackupCursor(prev, []) ?? prev;
+      return;
+    }
+    const firstFull = !prev;
+    const dest = firstFull ? relCsv : incrementFileName(relCsv, stamp);
+    const parts = chunkRows(rows, CHUNK);
+    for (let i = 0; i < parts.length; i++) {
+      const part = parts[i]!;
+      const rel = parts.length === 1 ? dest : dest.replace(/\.csv$/i, `__parte-${String(i + 1).padStart(3, "0")}.csv`);
+      await r2Put(r2, `${prefix}/${rel}`, toCsv(part), "text/csv; charset=utf-8");
+      files[rel] = part.length;
+    }
+    cursors[cursorKey] = nextBackupCursor(prev, rows);
+  };
+
+  await putChangedTable(
+    "solicitacoes_transfer",
+    "TRANSFER/SOLICITACOES.csv",
+    await fetchByUser(admin, "solicitacoes_transfer", userId, {
+      since: readCursor(rawCursors, "solicitacoes_transfer", fallbackCursor),
+    }),
+  );
+  await putChangedTable(
+    "reservas_transfer",
+    "TRANSFER/RESERVAS.csv",
+    await fetchByUser(admin, "reservas_transfer", userId, {
+      since: readCursor(rawCursors, "reservas_transfer", fallbackCursor),
+    }),
+  );
+  await putChangedTable(
+    "solicitacoes_grupos",
+    "GRUPOS/SOLICITACOES.csv",
+    await fetchByUser(admin, "solicitacoes_grupos", userId, {
+      since: readCursor(rawCursors, "solicitacoes_grupos", fallbackCursor),
+    }),
+  );
+  await putChangedTable(
+    "reservas_grupos",
+    "GRUPOS/RESERVAS.csv",
+    await fetchByUser(admin, "reservas_grupos", userId, {
+      since: readCursor(rawCursors, "reservas_grupos", fallbackCursor),
+    }),
+  );
+  await putChangedTable(
+    "solicitacoes_motoristas_cad",
+    "MOTORISTAS/CADASTROS.csv",
+    await fetchByUser(admin, "solicitacoes_motoristas", userId, {
+      eq: { col: "status", val: "cadastrado" },
+      since: readCursor(rawCursors, "solicitacoes_motoristas_cad", fallbackCursor),
+    }),
+  );
+  await putChangedTable(
+    "solicitacoes_motoristas_sol",
+    "MOTORISTAS/SOLICITACOES.csv",
+    await fetchByUser(admin, "solicitacoes_motoristas", userId, {
+      neq: { col: "status", val: "cadastrado" },
+      since: readCursor(rawCursors, "solicitacoes_motoristas_sol", fallbackCursor),
+    }),
+  );
+  await putChangedTable(
+    "cadastro_clientes",
+    "CLIENTES/CLIENTES.csv",
+    await fetchByUser(admin, "cadastro_clientes", userId, {
+      since: readCursor(rawCursors, "cadastro_clientes", fallbackCursor),
+    }),
+  );
+  await putChangedTable(
+    "veiculos_frota",
+    "VEICULOS/VEICULOS.csv",
+    await fetchByUser(admin, "veiculos_frota", userId, {
+      since: readCursor(rawCursors, "veiculos_frota", fallbackCursor),
+    }),
+  );
+
+  await putBytes(
+    "CONFIGURACOES/MEU_PERFIL.csv",
+    toCsv(Object.keys(cfgRow).length ? [cfgRow] : []),
+    "text/csv; charset=utf-8",
+  );
+  await putBytes(
+    "CONFIGURACOES/NOME_DO_PROJETO.csv",
+    toCsv([{
+      nome_projeto: cfgRow.nome_projeto ?? "",
+      fonte_global: cfgRow.fonte_global ?? "",
+      logo_url: cfgRow.logo_url ?? "",
+    }]),
+    "text/csv; charset=utf-8",
+  );
+  await putBytes(
     "CONFIGURACOES/INFORMACOES_CONTRATUAIS.csv",
-    Object.keys(cabRow).length ? [cabRow] : [],
+    toCsv(Object.keys(cabRow).length ? [cabRow] : []),
+    "text/csv; charset=utf-8",
   );
 
   const logo = await downloadOwnMedia(admin, supabaseUrl, String(cfgRow.logo_url ?? ""), userId);
-  if (logo) {
-    await r2Put(r2, `${prefix}/CONFIGURACOES/Logomarca_Global.${logo.ext}`, logo.bytes, logo.contentType);
-    files["CONFIGURACOES/Logomarca_Global"] = logo.bytes.byteLength;
-  }
-  const assinatura = await downloadOwnMedia(
-    admin,
-    supabaseUrl,
-    String(cabRow.assinatura_url ?? ""),
-    userId,
-  );
+  if (logo) await putBytes(`CONFIGURACOES/Logomarca_Global.${logo.ext}`, logo.bytes, logo.contentType);
+  const assinatura = await downloadOwnMedia(admin, supabaseUrl, String(cabRow.assinatura_url ?? ""), userId);
   if (assinatura) {
-    await r2Put(
-      r2,
-      `${prefix}/CONFIGURACOES/Assinatura_eletronica.${assinatura.ext}`,
-      assinatura.bytes,
-      assinatura.contentType,
-    );
-    files["CONFIGURACOES/Assinatura_eletronica"] = assinatura.bytes.byteLength;
+    await putBytes(`CONFIGURACOES/Assinatura_eletronica.${assinatura.ext}`, assinatura.bytes, assinatura.contentType);
   }
 
-  const anotacoes = await fetchByUser(admin, "anotacoes", userId);
-  await putCsv("ANOTACOES/ANOTACOES.csv", anotacoes);
+  await putChangedTable(
+    "anotacoes",
+    "ANOTACOES/ANOTACOES.csv",
+    await fetchByUser(admin, "anotacoes", userId, {
+      since: readCursor(rawCursors, "anotacoes", fallbackCursor),
+    }),
+  );
 
-  await admin
-    .from("r2_auto_backup_settings")
-    .update({
-      last_run_at: new Date().toISOString(),
-      last_run_date_sp: dateFolder,
-      last_status: "ok",
-      last_error: null,
-      last_stats: stats,
-      last_prefix: prefix,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("user_id", userId);
+  await markSettings(admin, userId, {
+    last_run_at: new Date().toISOString(),
+    last_run_date_sp: dateFolder,
+    last_status: "ok",
+    last_error: null,
+    last_stats: stats,
+    last_prefix: prefix,
+    last_file_hashes: hashes,
+    last_row_cursors: cursors,
+  });
 
   return { ok: true, stats, prefix };
 }
@@ -330,37 +424,18 @@ Deno.serve(async (req) => {
   try {
     if (isCron || body.mode === "cron") {
       if (!isCron) return json({ error: "Cron secret inválido." }, 401);
-      const { data: list, error } = await admin
-        .from("r2_auto_backup_settings")
-        .select("user_id")
-        .eq("enabled", true);
+      const { data: list, error } = await admin.from("r2_auto_backup_settings").select("user_id").eq("enabled", true);
       if (error) return json({ error: error.message }, 500);
       const today = dateFolderSp();
       const results: { user_id: string; ok: boolean; error?: string }[] = [];
       for (const row of list ?? []) {
         const uid = String((row as { user_id: string }).user_id);
-        const { data: st } = await admin
-          .from("r2_auto_backup_settings")
-          .select("last_run_date_sp")
-          .eq("user_id", uid)
-          .maybeSingle();
-        if (st && String((st as { last_run_date_sp: string | null }).last_run_date_sp) === today) {
-          results.push({ user_id: uid, ok: true, error: "já copiado hoje" });
-          continue;
-        }
         try {
           const r = await runForUser(admin, uid, supabaseUrl);
           results.push({ user_id: uid, ok: r.ok });
         } catch (e) {
           const msg = e instanceof Error ? e.message : String(e);
-          await admin
-            .from("r2_auto_backup_settings")
-            .update({
-              last_status: "error",
-              last_error: msg.slice(0, 2000),
-              updated_at: new Date().toISOString(),
-            })
-            .eq("user_id", uid);
+          await markSettings(admin, uid, { last_status: "error", last_error: msg.slice(0, 2000) });
           results.push({ user_id: uid, ok: false, error: msg });
         }
       }
@@ -369,9 +444,14 @@ Deno.serve(async (req) => {
 
     const authz = await requireEmpresa(req.headers.get("Authorization"), admin, supabaseUrl, anon);
     if (!authz.ok) return authz.response;
-
-    const r = await runForUser(admin, authz.userId, supabaseUrl);
-    return json({ ok: r.ok, prefix: r.prefix, stats: r.stats, error: r.error ?? null });
+    try {
+      const r = await runForUser(admin, authz.userId, supabaseUrl);
+      return json({ ok: r.ok, prefix: r.prefix, stats: r.stats, error: null });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      await markSettings(admin, authz.userId, { last_status: "error", last_error: msg.slice(0, 2000) });
+      return json({ ok: false, error: msg }, 500);
+    }
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     return json({ ok: false, error: msg }, 500);
