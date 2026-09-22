@@ -363,14 +363,14 @@ const Login = () => {
 
   if (!gateReady) {
     return (
-      <div className="fixed inset-0 z-0 flex h-[100dvh] w-full max-w-none items-center justify-center bg-white">
+      <div className="flex min-h-[100svh] min-h-[100dvh] w-full items-center justify-center bg-white pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
       </div>
     );
   }
 
   return (
-    <div className="fixed inset-0 z-0 flex h-[100dvh] w-full max-w-none flex-col overflow-hidden bg-white lg:flex-row lg:gap-0 lg:items-stretch">
+    <div className="flex min-h-[100svh] min-h-[100dvh] w-full flex-col bg-white lg:fixed lg:inset-0 lg:h-[100dvh] lg:flex-row lg:items-stretch lg:overflow-hidden">
       <aside className="hidden h-full min-h-0 shrink-0 overflow-hidden bg-white p-0 lg:block lg:w-1/2 lg:max-w-[50%]">
         {loginConfig && lateralImageReady ? (
           <img
@@ -382,14 +382,14 @@ const Login = () => {
         ) : null}
       </aside>
 
-      <section className="h-full min-h-0 w-full shrink-0 overflow-hidden bg-white lg:w-1/2 lg:max-w-[50%]">
-        <div className="flex h-full w-full max-w-xl flex-col px-4 py-3 sm:px-6 lg:pl-6 lg:pr-8">
-          <div className="flex min-h-0 flex-1 flex-col justify-center gap-3">
+      <section className="flex min-h-[100svh] min-h-[100dvh] w-full flex-col overflow-x-hidden overflow-y-auto overscroll-y-contain bg-white lg:h-full lg:min-h-0 lg:w-1/2 lg:max-w-[50%]">
+        <div className="mx-auto flex w-full max-w-xl flex-1 flex-col px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:px-6 lg:h-full lg:justify-center lg:overflow-y-auto lg:pl-6 lg:pr-8">
+          <div className="flex flex-col gap-3">
             <LoginAvisosBanner />
 
             <header className="space-y-1">
-              <p className="text-xs font-semibold tracking-wide text-primary">E-TRANSPORTE.PRO</p>
-              <h1 className="text-2xl font-bold leading-tight text-foreground">{loginConfig?.painel_titulo ?? "Painel E-Transporte.pro"}</h1>
+              <p className="text-xs font-semibold tracking-normal text-primary">E-TRANSPORTE.PRO</p>
+              <h1 className="text-2xl font-bold leading-snug tracking-normal text-foreground">{loginConfig?.painel_titulo ?? "Painel E-Transporte.pro"}</h1>
               <p className="text-xs text-muted-foreground">{loginConfig?.painel_subtitulo ?? ""}</p>
             </header>
 
@@ -460,7 +460,7 @@ const Login = () => {
               ) : (
                 <>
                   <CardHeader className="px-4 pb-2 pt-4">
-                    <CardTitle className="text-xl">{loginConfig?.form_titulo ?? "Faça seu login"}</CardTitle>
+                    <CardTitle className="text-xl leading-snug tracking-normal">{loginConfig?.form_titulo ?? "Faça seu login"}</CardTitle>
                     <p className="text-xs text-muted-foreground">{loginConfig?.form_legenda ?? ""}</p>
                   </CardHeader>
                   <CardContent className="px-4 pb-4 pt-0">
@@ -601,7 +601,7 @@ const Login = () => {
             ) : null}
           </div>
 
-          <footer className="mt-3 text-center text-[11px] text-muted-foreground">{loginConfig?.rodape_texto ?? ""}</footer>
+          <footer className="mt-4 shrink-0 pb-1 text-center text-[11px] leading-relaxed text-muted-foreground">{loginConfig?.rodape_texto ?? ""}</footer>
         </div>
       </section>
     </div>
