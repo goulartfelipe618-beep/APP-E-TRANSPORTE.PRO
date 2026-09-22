@@ -1,32 +1,8 @@
 /**
- * Evolution API via Edge Function `evolution-proxy`: só endpoints /instance/* da **sua**
- * sessão (`auth.uid()` no proxy); credenciais vêm sempre do servidor.
+ * Cliente do comunicador WhatsApp (UAZAPI). Sem chamadas à Evolution API.
  */
 
 import { supabase } from "@/integrations/supabase/client";
-
-export type EvolutionCreds = {
-  baseUrl: string;
-  apiKey: string;
-};
-
-/** Remove barras finais e evita // entre host e path (ex.: https://evo.com/ + /instance → sem //) */
-export function normalizeBase(url: string): string {
-  let u = url.trim();
-  while (u.endsWith("/")) {
-    u = u.slice(0, -1);
-  }
-  return u;
-}
-
-function envBase(): string | undefined {
-  const b = import.meta.env.VITE_EVOLUTION_API_URL as string | undefined;
-  return b ? normalizeBase(b) : undefined;
-}
-
-function envKey(): string | undefined {
-  return import.meta.env.VITE_EVOLUTION_API_KEY as string | undefined;
-}
 
 /** Remove espaços invisíveis e quebras de linha coladas ao copiar a API Key */
 export function sanitizeApiKey(key: string): string {
@@ -34,21 +10,6 @@ export function sanitizeApiKey(key: string): string {
     .trim()
     .replace(/[\u200B-\u200D\uFEFF]/g, "")
     .replace(/\r?\n/g, "");
-}
-
-/** Resolve credenciais: prioridade para as passadas (painel); senão .env */
-export function resolveEvolutionCreds(override?: EvolutionCreds | null): EvolutionCreds | null {
-  if (override?.baseUrl?.trim() && override?.apiKey?.trim()) {
-    return { baseUrl: normalizeBase(override.baseUrl), apiKey: sanitizeApiKey(override.apiKey) };
-  }
-  const b = envBase();
-  const k = envKey();
-  if (b && k) return { baseUrl: b, apiKey: sanitizeApiKey(k) };
-  return null;
-}
-
-export function evolutionEnvConfigured(override?: EvolutionCreds | null): boolean {
-  return resolveEvolutionCreds(override) !== null;
 }
 
 async function invokeComunicadorFn<T>(name: string, body: Record<string, unknown>): Promise<{
@@ -66,31 +27,6 @@ async function invokeComunicadorFn<T>(name: string, body: Record<string, unknown
   });
 }
 
-async function evolutionHttp(path: string, opts: { method: "GET" | "POST"; jsonBody?: unknown }): Promise<{ status: number; bodyText: string }> {
-  const p = path.startsWith("/") ? path : `/${path}`;
-  const { data, error } = await supabase.functions.invoke("evolution-proxy", {
-    body: {
-      path: p,
-      method: opts.method,
-      jsonBody: opts.method === "POST" ? opts.jsonBody ?? null : undefined,
-    },
-  });
-  if (error) {
-    throw new Error(
-      error.message ||
-        "Deploy da função: supabase functions deploy evolution-proxy",
-    );
-  }
-  if (data && typeof data === "object" && "error" in data) {
-    throw new Error(String((data as { error: string }).error));
-  }
-  const pack = data as { status: number; bodyText: string };
-  if (typeof pack?.status !== "number" || typeof pack?.bodyText !== "string") {
-    throw new Error("Resposta inválida do evolution-proxy");
-  }
-  return pack;
-}
-
 /** Extrai número exibível a partir de JID ou string só dígitos */
 export function parseWhatsappPhoneFromJid(jid: string | undefined | null): string | null {
   if (!jid || typeof jid !== "string") return null;
@@ -99,90 +35,7 @@ export function parseWhatsappPhoneFromJid(jid: string | undefined | null): strin
   return digits;
 }
 
-/** Varre objeto JSON da Evolution em busca de telefone / JID */
-function extractPhoneFromUnknown(data: unknown): string | null {
-  if (!data || typeof data !== "object") return null;
-  const stack: unknown[] = [data];
-  const seen = new Set<unknown>();
-  const keys = [
-    "phoneNumber",
-    "phone",
-    "number",
-    "owner",
-    "jid",
-    "jidNormalized",
-    "wuid",
-    "ownerJid",
-  ];
-
-  while (stack.length) {
-    const cur = stack.pop();
-    if (!cur || typeof cur !== "object" || seen.has(cur)) continue;
-    seen.add(cur);
-    const o = cur as Record<string, unknown>;
-    for (const k of keys) {
-      const v = o[k];
-      if (typeof v === "string") {
-        const p = parseWhatsappPhoneFromJid(v.includes("@") ? v : `${v}@s.whatsapp.net`);
-        if (p) return p;
-        if (/^\d{10,15}$/.test(v.replace(/\D/g, ""))) return v.replace(/\D/g, "");
-      }
-    }
-    for (const v of Object.values(o)) {
-      if (v && typeof v === "object") stack.push(v);
-    }
-  }
-  return null;
-}
-
-function extractState(data: unknown): string | null {
-  if (!data || typeof data !== "object") return null;
-  const o = data as Record<string, unknown>;
-  const inst = o.instance;
-  if (inst && typeof inst === "object") {
-    const s = (inst as Record<string, unknown>).state;
-    if (typeof s === "string") return s;
-  }
-  const s = o.state;
-  if (typeof s === "string") return s;
-  return null;
-}
-
-/** Lista instâncias — o proxy já filtra no servidor apenas à instância da sessão. */
-async function fetchPhoneFromInstancesList(
-  instanceName: string,
-): Promise<{ phone: string | null; state: string | null }> {
-  try {
-    const { status, bodyText } = await evolutionHttp("/instance/fetchInstances", { method: "GET" });
-    if (status < 200 || status >= 300) return { phone: null, state: null };
-    const list = JSON.parse(bodyText) as unknown;
-    const arr = Array.isArray(list) ? list : [list];
-    let phone: string | null = null;
-    let state: string | null = null;
-    for (const item of arr) {
-      const o =
-        item && typeof item === "object" && "instance" in (item as object)
-          ? (item as { instance?: unknown }).instance
-          : item;
-      if (o && typeof o === "object") {
-        const name = (o as { instanceName?: string }).instanceName;
-        if (name === instanceName) {
-          phone = extractPhoneFromUnknown(o) ?? phone;
-          state = extractState(o) ?? state;
-        }
-      }
-    }
-    return { phone, state };
-  } catch {
-    return { phone: null, state: null };
-  }
-}
-
-/** Tenta criar instância e retorna QR em base64 */
-/**
- * Cria/recupera instância na Evolution do administrador e retorna o QR (Edge Function).
- * Usa credenciais em `comunicador_evolution_credenciais` — não exige VITE_* no front do motorista.
- */
+/** Cria/recupera instância UAZAPI e retorna o QR. */
 export async function fetchEvolutionMotoristaQrFromServer(opts?: {
   target?: "own" | "sistema";
 }): Promise<{
@@ -229,7 +82,7 @@ export async function fetchEvolutionMotoristaQrFromServer(opts?: {
   return { base64: data.base64, instanceName: data.instanceName };
 }
 
-/** Sincroniza número, foto e nome do perfil a partir da Evolution (Edge Function). */
+/** Sincroniza número, foto e nome do perfil a partir da UAZAPI. */
 export async function fetchEvolutionMotoristaSyncFromServer(opts?: {
   target?: "own" | "sistema";
 }): Promise<{
@@ -274,7 +127,7 @@ export async function fetchEvolutionMotoristaSyncFromServer(opts?: {
   };
 }
 
-/** Remove a instância na Evolution do motorista (Edge Function). */
+/** Remove a instância UAZAPI do motorista. */
 export async function fetchEvolutionMotoristaDeleteFromServer(opts?: {
   target?: "own" | "sistema";
 }): Promise<{ ok: boolean; detail?: string }> {
@@ -316,186 +169,6 @@ export async function sendUazapiWhatsappCard(opts: {
     return { ok: false, error: data?.error || "Falha ao enviar o card no WhatsApp." };
   }
   return { ok: true, canal: data.canal, warning: data.warning };
-}
-
-export async function fetchEvolutionQrCode(
-  instanceName: string,
-  _creds?: EvolutionCreds | null,
-): Promise<{
-  base64: string | null;
-  error?: "missing_env" | "http" | "parse";
-  detail?: string;
-}> {
-  try {
-    const createPack = await evolutionHttp("/instance/create", {
-      method: "POST",
-      jsonBody: {
-        instanceName,
-        qrcode: true,
-        integration: "WHATSAPP-BAILEYS",
-        rejectCall: false,
-        msgCall: "",
-        groupsIgnore: true,
-        readMessages: true,
-        readStatus: true,
-        syncFullHistory: false,
-      },
-    });
-    if (![200, 201, 409].includes(createPack.status)) {
-      return { base64: null, error: "http", detail: `${createPack.status}: ${createPack.bodyText.slice(0, 200)}` };
-    }
-
-    const connectPack = await evolutionHttp(`/instance/connect/${encodeURIComponent(instanceName)}`, {
-      method: "GET",
-    });
-
-    if (connectPack.status < 200 || connectPack.status >= 300) {
-      return { base64: null, error: "http", detail: connectPack.bodyText.slice(0, 240) };
-    }
-
-    const data = JSON.parse(connectPack.bodyText) as Record<string, unknown>;
-    const b64 =
-      (typeof data.base64 === "string" && data.base64.length > 40 && data.base64) ||
-      (typeof (data as { qrcode?: { base64?: string } }).qrcode?.base64 === "string" &&
-        (data as { qrcode: { base64: string } }).qrcode.base64) ||
-      (typeof data.qrOrCode === "string" && data.qrOrCode.startsWith("data:image") ? data.qrOrCode : null) ||
-      null;
-
-    return { base64: b64 };
-  } catch (e) {
-    return { base64: null, error: "parse", detail: e instanceof Error ? e.message : String(e) };
-  }
-}
-
-export type EnsureInstanceResult = {
-  phone: string | null;
-  state: string | null;
-  /** Status HTTP do POST /instance/create (útil para diagnosticar 401) */
-  createHttpStatus?: number;
-  /** Mensagem curta se create falhou */
-  createErrorHint?: string;
-};
-
-/**
- * Registra a instância na Evolution sem solicitar QR no fluxo (qrcode: false)
- * e consulta o estado várias vezes até obter número ou esgotar tentativas.
- */
-export async function ensureInstanceAndPollConnection(
-  instanceName: string,
-  _creds: EvolutionCreds,
-  opts?: { pollAttempts?: number; pollMs?: number; nomeDispositivo?: string | null },
-): Promise<EnsureInstanceResult> {
-  const pollAttempts = opts?.pollAttempts ?? 10;
-  const pollMs = opts?.pollMs ?? 2000;
-
-  let createHttpStatus: number | undefined;
-  let createErrorHint: string | undefined;
-
-  try {
-    const body: Record<string, unknown> = {
-      instanceName,
-      qrcode: false,
-      integration: "WHATSAPP-BAILEYS",
-      rejectCall: false,
-      msgCall: "",
-      groupsIgnore: true,
-      readMessages: true,
-      readStatus: true,
-      syncFullHistory: false,
-    };
-    const nd = opts?.nomeDispositivo?.trim();
-    if (nd) {
-      body.deviceName = nd;
-    }
-    const createPack = await evolutionHttp("/instance/create", {
-      method: "POST",
-      jsonBody: body,
-    });
-    createHttpStatus = createPack.status;
-    if (![200, 201, 409].includes(createPack.status)) {
-      const t = createPack.bodyText;
-      if (createPack.status === 401) {
-        createErrorHint =
-          "401: a Evolution recusou a API Key. Confira AUTHENTICATION_API_KEY no .env da Evolution e o mesmo valor no painel.";
-      } else if (createPack.status === 403) {
-        createErrorHint =
-          "403: a Evolution recusou a requisição. Com a função evolution-proxy no Supabase o tráfego sai do servidor; se persistir, verifique firewall/API Key no servidor Evolution.";
-      } else {
-        createErrorHint = `${createPack.status}: ${t.slice(0, 160)}`;
-      }
-    }
-  } catch (e) {
-    createErrorHint = e instanceof Error ? e.message : String(e);
-  }
-
-  for (let i = 0; i < pollAttempts; i++) {
-    if (i > 0) {
-      await new Promise((r) => setTimeout(r, pollMs));
-    }
-    const { phone, state } = await fetchEvolutionConnectionInfo(instanceName);
-    if (phone) {
-      return { phone, state, createHttpStatus, createErrorHint };
-    }
-    if (state === "open") {
-      const again = await fetchEvolutionConnectionInfo(instanceName);
-      if (again.phone) {
-        return { phone: again.phone, state: again.state, createHttpStatus, createErrorHint };
-      }
-    }
-  }
-
-  const last = await fetchEvolutionConnectionInfo(instanceName);
-  return { ...last, createHttpStatus, createErrorHint };
-}
-
-/** Estado da conexão e número (quando conectado) */
-export async function fetchEvolutionConnectionInfo(
-  instanceName: string,
-  _creds?: EvolutionCreds | null,
-): Promise<{
-  phone: string | null;
-  state: string | null;
-  detail?: string;
-}> {
-  try {
-    const pack = await evolutionHttp(`/instance/connectionState/${encodeURIComponent(instanceName)}`, {
-      method: "GET",
-    });
-    const text = pack.bodyText;
-    const status = pack.status;
-    let data: unknown;
-    try {
-      data = JSON.parse(text) as unknown;
-    } catch {
-      if (status === 404) {
-        return fetchPhoneFromInstancesList(instanceName);
-      }
-      return { phone: null, state: null, detail: text.slice(0, 200) };
-    }
-
-    let phone = extractPhoneFromUnknown(data);
-    let state = extractState(data);
-
-    if (!phone && status >= 200 && status < 300) {
-      const fromList = await fetchPhoneFromInstancesList(instanceName);
-      phone = phone ?? fromList.phone;
-      state = state ?? fromList.state;
-    }
-
-    if (!phone && (status === 404 || status < 200 || status >= 300)) {
-      const fromList = await fetchPhoneFromInstancesList(instanceName);
-      phone = fromList.phone;
-      state = fromList.state ?? state;
-    }
-
-    return { phone, state };
-  } catch (e) {
-    return {
-      phone: null,
-      state: null,
-      detail: e instanceof Error ? e.message : String(e),
-    };
-  }
 }
 
 /** Formata número BR para exibição */

@@ -2,7 +2,6 @@ import { Loader2, MoreVertical, RefreshCw, Smartphone, Trash2 } from "lucide-rea
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -23,8 +22,7 @@ import {
 import { useState } from "react";
 import type { ComunicadorRow } from "@/hooks/useComunicadoresEvolution";
 import { qrSrc } from "@/hooks/useComunicadoresEvolution";
-import type { EvolutionCreds } from "@/lib/evolutionApi";
-import { evolutionEnvConfigured, formatPhoneBrDisplay } from "@/lib/evolutionApi";
+import { formatPhoneBrDisplay } from "@/lib/evolutionApi";
 
 type Props = {
   title: string;
@@ -37,9 +35,7 @@ type Props = {
   onGerarQr: () => void | Promise<void>;
   onRemover?: () => void | Promise<void>;
   showRemover?: boolean;
-  evolutionCreds?: EvolutionCreds | null;
   hideQr?: boolean;
-  hideViteHint?: boolean;
   /** Layout motorista: conectado = foto + número + menu ⋮ para excluir; sem botões grandes de remover/gerar quando conectado. */
   motoristaOwn?: boolean;
   /** Texto do número a mostrar (ex.: oficial fixo), independentemente de `row.telefone_conectado`. */
@@ -62,16 +58,13 @@ export function ComunicadorEvolutionSection({
   onGerarQr,
   onRemover,
   showRemover,
-  evolutionCreds,
   hideQr,
-  hideViteHint,
   motoristaOwn,
   telefoneExibicao,
   forcarDesconectado,
 }: Props) {
   const [removeOpen, setRemoveOpen] = useState(false);
   const img = qrSrc(row?.qr_code_base64 ?? null);
-  const envOk = hideViteHint || evolutionEnvConfigured(evolutionCreds ?? undefined);
 
   const derivedConnected =
     Boolean(row?.telefone_conectado?.trim()) || row?.connection_status === "conectado";
@@ -149,20 +142,9 @@ export function ComunicadorEvolutionSection({
         </Button>
       </CardHeader>
       <CardContent className="space-y-4">
-        {!readOnly && !hideQr && !hideViteHint && !envOk && (
-          <Alert>
-            <Smartphone className="h-4 w-4" />
-            <AlertTitle>Evolution API não configurada no front-end</AlertTitle>
-            <AlertDescription>
-              Para gerar QR Code a partir daqui, defina <code className="text-xs">VITE_EVOLUTION_API_URL</code> e{" "}
-              <code className="text-xs">VITE_EVOLUTION_API_KEY</code> no ambiente de build. Sem isso, use o painel da Evolution
-              diretamente com o mesmo nome de instância exibido abaixo.
-            </AlertDescription>
-          </Alert>
-        )}
         {hideQr && !readOnly && (
           <p className="text-sm text-muted-foreground">
-            A conexão com a Evolution é feita ao salvar os dados acima; o número sincronizado aparece aqui e para todos os motoristas.
+            A conexão WhatsApp é feita pelo comunicador (UAZAPI). O número sincronizado aparece aqui.
           </p>
         )}
         {readOnly && !numeroLinha && !img && !loading && (

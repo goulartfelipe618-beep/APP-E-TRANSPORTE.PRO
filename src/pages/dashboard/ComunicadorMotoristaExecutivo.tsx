@@ -278,13 +278,13 @@ export default function ComunicadorMotoristaExecutivoPage() {
       <div className="max-w-2xl space-y-6">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Comunicador</h1>
-          <p className="text-muted-foreground">Integração Evolution (WhatsApp)</p>
+          <p className="text-muted-foreground">Integração WhatsApp (UAZAPI)</p>
         </div>
         <Alert>
           <Info className="h-4 w-4" />
           <AlertTitle>Funcionalidade indisponível</AlertTitle>
           <AlertDescription className="text-sm">
-            O administrador desativou o Comunicador Evolution no painel dos motoristas. Quando for reativado, o menu
+            O administrador desativou o Comunicador no painel dos motoristas. Quando for reativado, o menu
             voltará a aparecer em Sistema.
           </AlertDescription>
         </Alert>
@@ -338,7 +338,7 @@ export default function ComunicadorMotoristaExecutivoPage() {
             {WHATSAPP_OFICIAL_PLATAFORMA_EXIBICAO}
           </p>
           <p className="mx-auto max-w-md pt-2 text-xs text-muted-foreground">
-            Contacto institucional de referência. Pode divergir do estado da integração Evolution mostrado abaixo.
+            Contacto institucional de referência. Pode divergir do estado da integração WhatsApp mostrado abaixo.
           </p>
         </CardContent>
       </Card>
@@ -356,7 +356,6 @@ export default function ComunicadorMotoristaExecutivoPage() {
         busy={false}
         onRefresh={() => void reload()}
         onGerarQr={() => {}}
-        evolutionCreds={undefined}
         hideQr
         telefoneExibicao={WHATSAPP_OFICIAL_PLATAFORMA_EXIBICAO}
         forcarDesconectado={ownConnected}
@@ -379,7 +378,6 @@ export default function ComunicadorMotoristaExecutivoPage() {
             busy={busyDelete}
             onRefresh={() => void reload()}
             onGerarQr={() => {}}
-            evolutionCreds={undefined}
             hideQr
             motoristaOwn
             showRemover

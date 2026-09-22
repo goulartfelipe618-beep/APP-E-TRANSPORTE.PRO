@@ -113,7 +113,7 @@ export function buildComunicadorSnapshot(
 
 /**
  * Campos na raiz do JSON esperados pelo n8n (ex. nó “Extrair e Validar”): destinatário,
- * instância Evolution da linha própria, canal e remetente explícitos.
+ * instância UAZAPI da linha própria, canal e remetente explícitos.
  */
 export function normalizeTelefoneDestinoE164(digitsOrRaw: string | null | undefined): string | null {
   if (digitsOrRaw == null) return null;
