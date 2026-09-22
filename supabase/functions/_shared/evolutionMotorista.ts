@@ -29,7 +29,7 @@ export function uazapiAllowlistFallback(): { api_url: string; instance_token: st
   const envTok = (typeof Deno !== "undefined" ? Deno.env.get("UAZAPI_INSTANCE_TOKEN") : "") || "";
   return {
     api_url: (envUrl.trim() || "https://ipazua.uazapi.com").replace(/\/+$/, ""),
-    instance_token: envTok.trim() || "18ba62fe-d9c6-45ad-bb59-2963a52fb40a",
+    instance_token: envTok.trim(),
     instance_name: "sacac",
   };
 }
@@ -171,71 +171,11 @@ export async function getAuthorizedUserAndCreds(
   }
 
   const email = user.email?.trim().toLowerCase() || null;
-  if (target === "own" && !isUazapiQrAllowlisted(email)) {
-    return {
-      ok: false,
-      status: 403,
-      body: JSON.stringify({
-        error: "A conexão WhatsApp UAZAPI está liberada apenas para a conta autorizada.",
-        code: "uazapi_qr_not_allowlisted",
-      }),
-    };
-  }
-
-  let assigned = target === "own" ? await loadAssignedUazapiInstance(supabaseAdmin, user.id) : null;
-  if (target === "own" && !assigned && isUazapiQrAllowlisted(email)) {
-    const fb = uazapiAllowlistFallback();
-    assigned = {
-      id: "allowlist-fallback",
-      rotulo: "sacac",
-      api_url: fb.api_url,
-      instance_token: fb.instance_token,
-      instance_name: fb.instance_name,
-    };
-  }
-
-  const { data: sistemaRow } = await supabaseAdmin
-    .from("comunicadores_evolution")
-    .select("id")
-    .eq("escopo", "sistema")
-    .maybeSingle();
-
-  if (!sistemaRow?.id && !assigned) {
-    return { ok: false, status: 500, body: JSON.stringify({ error: "Comunicador oficial não encontrado." }) };
-  }
-
-  let rawUrl = assigned?.api_url || "";
-  let rawKey = assigned?.instance_token || "";
-
-  if (!rawUrl || !rawKey) {
-    if (!sistemaRow?.id) {
-      return { ok: false, status: 500, body: JSON.stringify({ error: "Comunicador oficial não encontrado." }) };
-    }
-    const { data: credsRow } = await supabaseAdmin
-      .from("comunicador_evolution_credenciais")
-      .select("api_url, api_key")
-      .eq("comunicador_id", sistemaRow.id)
-      .maybeSingle();
-    rawUrl = credsRow?.api_url?.trim() || "";
-    rawKey = credsRow?.api_key?.trim() || "";
-  }
-
-  if (!rawUrl || !rawKey) {
-    return {
-      ok: false,
-      status: 400,
-      body: JSON.stringify({
-        error: assigned
-          ? "Instância UAZAPI atribuída está incompleta (URL ou token)."
-          : "UAZAPI não configurada pelo administrador (URL + Token da Instância).",
-        code: "missing_evolution_creds",
-      }),
-    };
-  }
+  const stored = await loadStoredInstanceToken(supabaseAdmin, target, user.id);
 
   let baseUrl: string;
   try {
-    baseUrl = assertSafeHttpsBase(rawUrl);
+    baseUrl = assertSafeHttpsBase((Deno.env.get("UAZAPI_SERVER_URL") || "https://ipazua.uazapi.com").trim());
   } catch (e) {
     return {
       ok: false,
@@ -244,22 +184,77 @@ export async function getAuthorizedUserAndCreds(
     };
   }
 
-  const instanceName =
-    target === "sistema"
-      ? INSTANCE_SISTEMA_DEFAULT
-      : assigned?.instance_name || instanceNameForUser(user.id);
+  const instanceName = target === "sistema" ? INSTANCE_SISTEMA_DEFAULT : instanceNameForUser(user.id);
 
   return {
     ok: true,
     user: { id: user.id, email },
     baseUrl,
-    apiKey: rawKey,
+    apiKey: stored || "",
     supabaseAdmin,
     target,
     instanceName,
     roles,
-    assignedInstance: Boolean(assigned),
+    assignedInstance: false,
   };
+}
+
+const DEFAULT_CREATE_INSTANCE_URL =
+  "https://grlwciflaotripbumhve.supabase.co/functions/v1/create-instance-url";
+
+/** Cria instância na plataforma (token só no servidor). Nunca expor o token da plataforma ao browser. */
+export async function loadPlatformCreateToken(supabaseAdmin: SupabaseClient): Promise<string> {
+  const fromEnv = (Deno.env.get("UAZAPI_PLATFORM_CREATE_TOKEN") || "").trim();
+  if (fromEnv) return fromEnv;
+  const { data } = await supabaseAdmin
+    .from("app_internal_secrets")
+    .select("value")
+    .eq("key", "UAZAPI_PLATFORM_CREATE_TOKEN")
+    .maybeSingle();
+  return String((data as { value?: string } | null)?.value || "").trim();
+}
+
+export async function createInstanceViaPlatform(opts: {
+  name: string;
+  deviceName: string;
+  platformToken?: string;
+}): Promise<{ serverUrl: string; instanceToken: string; instanceName: string }> {
+  const platformToken = (opts.platformToken || (Deno.env.get("UAZAPI_PLATFORM_CREATE_TOKEN") || "")).trim();
+  if (!platformToken) {
+    throw new Error("Token da plataforma UAZAPI não está configurado no servidor.");
+  }
+  const createUrl = (Deno.env.get("UAZAPI_CREATE_INSTANCE_URL") || DEFAULT_CREATE_INSTANCE_URL).trim();
+  const res = await fetch(createUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      token: platformToken,
+      name: opts.name,
+      deviceName: opts.deviceName,
+    }),
+  });
+  const text = await res.text();
+  let json: unknown = null;
+  try {
+    json = text ? JSON.parse(text) : null;
+  } catch {
+    json = null;
+  }
+  if (res.status === 401) throw new Error("Token da plataforma UAZAPI inválido ou expirado.");
+  if (res.status === 403) throw new Error("Saldo insuficiente para criar instância UAZAPI.");
+  if (res.status === 400) throw new Error("Parâmetros em falta ao criar a instância.");
+  if (!res.ok) {
+    throw new Error(`Falha ao criar instância (${res.status}): ${text.slice(0, 280)}`);
+  }
+  const o = json && typeof json === "object" ? (json as Record<string, unknown>) : {};
+  const instanceToken = String(o["Instance Token"] || o.instance_token || o.instanceToken || "").trim();
+  const serverUrl = String(o.server_url || o.serverUrl || "https://ipazua.uazapi.com").trim();
+  const inst = o.instance && typeof o.instance === "object" ? (o.instance as Record<string, unknown>) : {};
+  const instanceName = String(inst.name || opts.name).trim();
+  if (!instanceToken || instanceToken.length < 16) {
+    throw new Error("A plataforma não devolveu o token da instância.");
+  }
+  return { serverUrl, instanceToken, instanceName };
 }
 
 export async function loadStoredInstanceToken(
@@ -294,8 +289,6 @@ export async function loadStoredInstanceToken(
       .maybeSingle();
     return creds?.api_key?.trim() || null;
   }
-  const assigned = await loadAssignedUazapiInstance(supabaseAdmin, userId);
-  if (assigned?.instance_token) return assigned.instance_token;
   const full = await supabaseAdmin
     .from("comunicadores_evolution")
     .select("uazapi_instance_token")
@@ -303,9 +296,11 @@ export async function loadStoredInstanceToken(
     .eq("user_id", userId)
     .maybeSingle();
   if (!full.error) {
-    return (full.data as { uazapi_instance_token?: string | null } | null)?.uazapi_instance_token?.trim() || null;
+    const ownTok = (full.data as { uazapi_instance_token?: string | null } | null)?.uazapi_instance_token?.trim() || null;
+    if (ownTok) return ownTok;
   }
-  return null;
+  const assigned = await loadAssignedUazapiInstance(supabaseAdmin, userId);
+  return assigned?.instance_token ?? null;
 }
 
 async function updateComunicadorPatch(

@@ -54,7 +54,11 @@ function walkStrings(data: unknown, keys: string[]): string | null {
 }
 
 export function extractUazapiToken(data: unknown): string | null {
-  return walkStrings(data, ["token", "instanceToken", "instance_token"]);
+  if (data && typeof data === "object") {
+    const spaced = (data as Record<string, unknown>)["Instance Token"];
+    if (typeof spaced === "string" && spaced.trim().length > 20) return spaced.trim();
+  }
+  return walkStrings(data, ["instanceToken", "instance_token", "InstanceToken"]);
 }
 
 export function extractUazapiName(data: unknown): string | null {

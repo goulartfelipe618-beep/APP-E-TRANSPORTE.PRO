@@ -354,9 +354,8 @@ export default function ComunicarDialog({
 
         <div className="space-y-4">
           <p className="text-sm text-muted-foreground rounded-lg border border-border bg-muted/40 p-3">
-            O envio vai para o WhatsApp do cliente em <strong className="text-foreground">card interativo</strong> pela
-            UAZAPI (número próprio se estiver conectado, senão o oficial). Escaneie o QR em Comunicador antes do primeiro
-            disparo.
+            O envio vai para o WhatsApp do cliente pela <strong className="text-foreground">UAZAPI</strong>.
+            Conecte o QR em <strong className="text-foreground">Comunicador</strong> antes do primeiro disparo.
           </p>
 
           {isReservaN8n && getConfirmacaoReservaPdfBase64 ? (
