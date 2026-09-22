@@ -57,3 +57,16 @@ export function transferMostraTrechoIdaCampos(
 export function transferMostraTrechoVoltaCampos(tipoViagem: string | null | undefined): boolean {
   return (tipoViagem ?? "").trim().toLowerCase() === "ida_volta";
 }
+
+export type MotoristaAtribPerna = "ambas" | "ida" | "volta";
+
+/** Quem recebe `motorista_id` ao criar um par ida/volta. Edição de uma linha nunca usa isto no irmão. */
+export function resolveMotoristaIdsPorPerna(
+  motoristaId: string | null,
+  atribPerna: MotoristaAtribPerna,
+): { ida: string | null; volta: string | null } {
+  if (!motoristaId) return { ida: null, volta: null };
+  if (atribPerna === "ida") return { ida: motoristaId, volta: null };
+  if (atribPerna === "volta") return { ida: null, volta: motoristaId };
+  return { ida: motoristaId, volta: motoristaId };
+}

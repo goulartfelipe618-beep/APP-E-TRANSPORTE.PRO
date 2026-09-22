@@ -26,6 +26,12 @@ import {
 } from "@/lib/categoriaVeiculoTransfer";
 import { motoristaAssignValue, motoristaMatchesAssignment } from "@/lib/motoristaReservaAssign";
 import {
+  isTransferPernaDividida,
+  resolveMotoristaIdsPorPerna,
+  transferPernaNormalizada,
+  type MotoristaAtribPerna,
+} from "@/lib/transferPernaViagem";
+import {
   defaultMultiplosTrajetosForm,
   emptyTrajetoForm,
   MAX_TRAJETOS_TRANSFER,
@@ -108,7 +114,6 @@ interface CriarReservaTransferDialogProps {
 
 type TipoViagem = "somente_ida" | "ida_volta" | "por_hora" | "multiplos_trajetos";
 type QuemViaja = "motorista" | "eu_mesmo";
-type MotoristaAtribPerna = "ambas" | "ida" | "volta";
 
 type ClienteReservaOpt = {
   id: string;
@@ -181,7 +186,7 @@ export default function CriarReservaTransferDialog({
   const [clientSearch, setClientSearch] = useState("");
   const [listaClientesAberta, setListaClientesAberta] = useState(true);
   const [categoriaVeiculo, setCategoriaVeiculo] = useState("");
-  const [motoristaAtribPerna, setMotoristaAtribPerna] = useState<MotoristaAtribPerna>("ambas");
+  const [motoristaAtribPerna, setMotoristaAtribPerna] = useState<MotoristaAtribPerna>("ida");
   const [trajetosForm, setTrajetosForm] = useState<TrajetoTransferForm[]>(defaultMultiplosTrajetosForm);
 
   const clientesFiltrados = useMemo(() => {
@@ -237,7 +242,7 @@ export default function CriarReservaTransferDialog({
         tv === "ida_volta" || tv === "por_hora" || tv === "multiplos_trajetos" ? tv : "somente_ida",
       );
       setTrajetosForm(trajetosToForm((row as { trajetos?: unknown }).trajetos));
-      setMotoristaAtribPerna("ambas");
+      setMotoristaAtribPerna(transferPernaNormalizada(row.perna_viagem) ?? "ida");
       setQuemViaja(row.quem_viaja === "eu_mesmo" ? "eu_mesmo" : "motorista");
       setIdaEmbarque(row.ida_embarque ?? "");
       setIdaDesembarque(row.ida_desembarque ?? "");
@@ -382,7 +387,7 @@ export default function CriarReservaTransferDialog({
     setValorBase("0"); setDesconto("0"); setMetodoPagamento(""); setFaturado("nao"); setEsconderValores(false); setObservacoes("");
     setStatusOperacional("pendente"); setRepasseMotorista("");
     setMotoristaAtribuido("");
-    setMotoristaAtribPerna("ambas");
+    setMotoristaAtribPerna("ida");
     setTrajetosForm(defaultMultiplosTrajetosForm());
     setCategoriaVeiculo("");
     setModoClienteReserva("novo");
@@ -506,14 +511,10 @@ export default function CriarReservaTransferDialog({
           : motoristaRaw
         : null;
 
-    const motoristaIda =
-      motoristaIdResolved && (tipoViagem !== "ida_volta" || motoristaAtribPerna !== "volta")
-        ? motoristaIdResolved
-        : null;
-    const motoristaVolta =
-      motoristaIdResolved && tipoViagem === "ida_volta" && motoristaAtribPerna !== "ida"
-        ? motoristaIdResolved
-        : null;
+    const { ida: motoristaIda, volta: motoristaVolta } = resolveMotoristaIdsPorPerna(
+      motoristaIdResolved,
+      tipoViagem === "ida_volta" ? motoristaAtribPerna : "ida",
+    );
 
     const trajetosSerialized =
       tipoViagem === "multiplos_trajetos" ? serializeTrajetosForm(trajetosForm) : [];
@@ -587,6 +588,7 @@ export default function CriarReservaTransferDialog({
 
     const editId = reservaEdicao?.id ?? editReservaIdRef.current;
     if (editId) {
+      // Só esta linha: nunca copiar motorista_id para o par (IDA/VOLTA).
       const res = await writeRow(rowPayload as Record<string, unknown>, "update", editId);
       error = res.error;
       const saved = res.data as { id?: string; motorista_id?: string | null; par_reserva_id?: string | null } | null;
@@ -882,6 +884,7 @@ export default function CriarReservaTransferDialog({
                     onValueChange={(v) => {
                       const next = v as TipoViagem;
                       setTipoViagem(next);
+                      if (next === "ida_volta") setMotoristaAtribPerna("ida");
                       if (next === "multiplos_trajetos") setTrajetosForm((prev) => (prev.length >= 2 ? prev : defaultMultiplosTrajetosForm()));
                     }}
                   >
@@ -1135,10 +1138,17 @@ export default function CriarReservaTransferDialog({
                       </SelectContent>
                     </Select>
                     <p className="text-xs text-muted-foreground">
-                      A atribuição fica gravada na reserva e na agenda do mini portal do motorista. Se o portal ainda estiver pendente, a reserva aparece assim que ele abrir o link e definir a senha.
+                      A atribuição fica gravada só nesta reserva. Ida e volta são linhas separadas — mudar o motorista da VOLTA não altera a IDA.
                     </p>
                   </div>
-                  {tipoViagem === "ida_volta" && motoristaAtribUid ? (
+                  {reservaEdicao && isTransferPernaDividida(reservaEdicao.tipo_viagem, reservaEdicao.perna_viagem) ? (
+                    <p className="text-xs text-muted-foreground sm:col-span-2">
+                      Motorista apenas na{" "}
+                      {transferPernaNormalizada(reservaEdicao.perna_viagem) === "volta" ? "VOLTA" : "IDA"}.
+                      A outra perna do par não é alterada.
+                    </p>
+                  ) : null}
+                  {tipoViagem === "ida_volta" && !reservaEdicao && motoristaAtribUid ? (
                     <div className="space-y-2 sm:col-span-2 rounded-lg border border-border bg-muted/20 p-3">
                       <Label>Atribuir este motorista em</Label>
                       <RadioGroup
@@ -1147,16 +1157,16 @@ export default function CriarReservaTransferDialog({
                         className="flex flex-col gap-2 pt-1"
                       >
                         <label className="flex cursor-pointer items-center gap-2 text-sm">
-                          <RadioGroupItem value="ambas" id="mot-ambas" />
-                          Ida e volta
-                        </label>
-                        <label className="flex cursor-pointer items-center gap-2 text-sm">
                           <RadioGroupItem value="ida" id="mot-ida" />
                           Somente na viagem de ida
                         </label>
                         <label className="flex cursor-pointer items-center gap-2 text-sm">
                           <RadioGroupItem value="volta" id="mot-volta" />
                           Somente na viagem de volta
+                        </label>
+                        <label className="flex cursor-pointer items-center gap-2 text-sm">
+                          <RadioGroupItem value="ambas" id="mot-ambas" />
+                          Ida e volta (mesmo motorista nas duas)
                         </label>
                       </RadioGroup>
                     </div>

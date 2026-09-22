@@ -3,6 +3,7 @@ import { buildAgendaItemsPorDia } from "@/lib/painelAgendaReservas";
 import {
   formatTransferTipoViagemExibicao,
   isTransferPernaDividida,
+  resolveMotoristaIdsPorPerna,
   transferSecaoTrajetoTitulo,
 } from "@/lib/transferPernaViagem";
 
@@ -21,6 +22,13 @@ describe("transferPernaViagem", () => {
 
   it("formata 2 ou mais trajetos", () => {
     expect(formatTransferTipoViagemExibicao("multiplos_trajetos")).toBe("2 ou mais trajetos");
+  });
+
+  it("atribui motorista só na perna escolhida", () => {
+    expect(resolveMotoristaIdsPorPerna("m1", "ida")).toEqual({ ida: "m1", volta: null });
+    expect(resolveMotoristaIdsPorPerna("m1", "volta")).toEqual({ ida: null, volta: "m1" });
+    expect(resolveMotoristaIdsPorPerna("m1", "ambas")).toEqual({ ida: "m1", volta: "m1" });
+    expect(resolveMotoristaIdsPorPerna(null, "ambas")).toEqual({ ida: null, volta: null });
   });
 });
 
