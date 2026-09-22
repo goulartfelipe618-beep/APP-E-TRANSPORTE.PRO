@@ -173,7 +173,8 @@ export async function reportPainelError(payload: {
   componentStack?: string | null;
   extra?: Record<string, unknown>;
 }): Promise<void> {
-  if (!cfg) return;
+  const current = cfg;
+  if (!current) return;
   if (isSupabaseAuthLockNoise(payload.message)) return;
 
   const now = Date.now();
@@ -183,8 +184,9 @@ export async function reportPainelError(payload: {
 
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return;
+  if (!cfg) return;
 
-  const activePage = readActivePage(cfg.navStorageKey);
+  const activePage = readActivePage(current.navStorageKey);
   const routePath = typeof window !== "undefined" ? window.location.pathname : null;
   const userAgent = typeof navigator !== "undefined" ? navigator.userAgent : null;
 
@@ -197,7 +199,7 @@ export async function reportPainelError(payload: {
 
   const row: TablesInsert<"painel_client_error_logs"> = {
     user_id: user.id,
-    painel: cfg.painel,
+    painel: current.painel,
     active_page: activePage,
     route_path: routePath,
     kind: payload.kind,

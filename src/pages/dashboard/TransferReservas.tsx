@@ -25,6 +25,7 @@ import { buildTransferDadosComunicarCliente } from "@/lib/comunicarReservaClient
 import { fetchAllSupabasePages } from "@/lib/supabaseFetchAll";
 import { abrevCategoriaVeiculoTransfer, labelCategoriaVeiculoTransfer } from "@/lib/categoriaVeiculoTransfer";
 import { formatTransferTipoViagemExibicao } from "@/lib/transferPernaViagem";
+import { motoristaAssignValue, motoristaMatchesAssignment, resolveMotoristaNome } from "@/lib/motoristaReservaAssign";
 
 type Reserva = Tables<"reservas_transfer">;
 

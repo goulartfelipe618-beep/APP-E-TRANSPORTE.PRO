@@ -179,6 +179,7 @@ export default function CriarReservaTransferDialog({
   const [clientesReservaOpts, setClientesReservaOpts] = useState<ClienteReservaOpt[]>([]);
   const [cadastroClienteIdReserva, setCadastroClienteIdReserva] = useState("");
   const [clientSearch, setClientSearch] = useState("");
+  const [listaClientesAberta, setListaClientesAberta] = useState(true);
   const [categoriaVeiculo, setCategoriaVeiculo] = useState("");
   const [motoristaAtribPerna, setMotoristaAtribPerna] = useState<MotoristaAtribPerna>("ambas");
   const [trajetosForm, setTrajetosForm] = useState<TrajetoTransferForm[]>(defaultMultiplosTrajetosForm);
@@ -281,9 +282,11 @@ export default function CriarReservaTransferDialog({
       if (cid) {
         setModoClienteReserva("cadastrado");
         setCadastroClienteIdReserva(String(cid));
+        setListaClientesAberta(false);
       } else {
         setModoClienteReserva("novo");
         setCadastroClienteIdReserva("");
+        setListaClientesAberta(true);
       }
       return;
     }
@@ -329,6 +332,7 @@ export default function CriarReservaTransferDialog({
       setCategoriaVeiculo("");
       setModoClienteReserva("novo");
       setCadastroClienteIdReserva("");
+      setListaClientesAberta(true);
       return;
     }
 
@@ -384,6 +388,7 @@ export default function CriarReservaTransferDialog({
     setModoClienteReserva("novo");
     setCadastroClienteIdReserva("");
     setClientSearch("");
+    setListaClientesAberta(true);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -752,8 +757,10 @@ export default function CriarReservaTransferDialog({
                   if (m === "novo") {
                     setCadastroClienteIdReserva("");
                     setClientSearch("");
+                    setListaClientesAberta(true);
                   } else {
                     setClientSearch("");
+                    setListaClientesAberta(true);
                   }
                 }}
                 className="flex flex-wrap gap-4"
@@ -773,54 +780,68 @@ export default function CriarReservaTransferDialog({
                   <Input
                     placeholder="Nome, e-mail, telefone ou CPF…"
                     value={clientSearch}
-                    onChange={(e) => setClientSearch(e.target.value)}
+                    onChange={(e) => {
+                      setClientSearch(e.target.value);
+                      setListaClientesAberta(true);
+                    }}
+                    onFocus={() => setListaClientesAberta(true)}
                     className="h-9"
                     autoComplete="off"
                   />
-                  <p className="text-[11px] text-muted-foreground">
-                    Lista com rolagem (~10 visíveis). Digite para filtrar entre todos os clientes.
-                    {clientesReservaOpts.length > 0 ? (
-                      <span className="text-foreground/80">
-                        {" "}
-                        ({clientesFiltrados.length}
-                        {clientSearch.trim() ? ` de ${clientesReservaOpts.length}` : ""})
-                      </span>
-                    ) : null}
-                  </p>
-                  <div
-                    className="max-h-[min(22rem,45vh)] min-h-0 overflow-y-auto overscroll-y-contain rounded-md border border-border bg-background [scrollbar-gutter:stable]"
-                    role="listbox"
-                    aria-label="Clientes cadastrados"
-                  >
-                    {clientesReservaOpts.length === 0 ? (
-                      <p className="px-3 py-2 text-xs text-muted-foreground">Nenhum cliente — cadastre no menu Clientes.</p>
-                    ) : clientesFiltrados.length === 0 ? (
-                      <p className="px-3 py-2 text-xs text-muted-foreground">Sem resultados.</p>
-                    ) : (
-                      <ul className="divide-y divide-border">
-                        {clientesFiltrados.map((c) => (
-                          <li key={c.id}>
-                            <button
-                              type="button"
-                              className={cn(
-                                "w-full px-3 py-2 text-left text-sm hover:bg-muted/80",
-                                cadastroClienteIdReserva === c.id && "bg-muted font-medium",
-                              )}
-                              onClick={() => {
-                                setCadastroClienteIdReserva(c.id);
-                                setNomeCompleto(c.nome_exibicao);
-                                setEmail(c.email ?? "");
-                                setTelefone(c.telefone_1 ?? "");
-                                setCpfCnpj(c.cpf_cnpj ?? "");
-                              }}
-                            >
-                              {c.nome_exibicao}
-                            </button>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
+                  {listaClientesAberta ? (
+                    <>
+                      <p className="text-[11px] text-muted-foreground">
+                        Lista com rolagem (~10 visíveis). Digite para filtrar entre todos os clientes.
+                        {clientesReservaOpts.length > 0 ? (
+                          <span className="text-foreground/80">
+                            {" "}
+                            ({clientesFiltrados.length}
+                            {clientSearch.trim() ? ` de ${clientesReservaOpts.length}` : ""})
+                          </span>
+                        ) : null}
+                      </p>
+                      <div
+                        className="max-h-[min(22rem,45vh)] min-h-0 overflow-y-auto overscroll-y-contain rounded-md border border-border bg-background [scrollbar-gutter:stable]"
+                        role="listbox"
+                        aria-label="Clientes cadastrados"
+                      >
+                        {clientesReservaOpts.length === 0 ? (
+                          <p className="px-3 py-2 text-xs text-muted-foreground">Nenhum cliente — cadastre no menu Clientes.</p>
+                        ) : clientesFiltrados.length === 0 ? (
+                          <p className="px-3 py-2 text-xs text-muted-foreground">Sem resultados.</p>
+                        ) : (
+                          <ul className="divide-y divide-border">
+                            {clientesFiltrados.map((c) => (
+                              <li key={c.id}>
+                                <button
+                                  type="button"
+                                  className={cn(
+                                    "w-full px-3 py-2 text-left text-sm hover:bg-muted/80",
+                                    cadastroClienteIdReserva === c.id && "bg-muted font-medium",
+                                  )}
+                                  onClick={() => {
+                                    setCadastroClienteIdReserva(c.id);
+                                    setNomeCompleto(c.nome_exibicao);
+                                    setEmail(c.email ?? "");
+                                    setTelefone(c.telefone_1 ?? "");
+                                    setCpfCnpj(c.cpf_cnpj ?? "");
+                                    setClientSearch(c.nome_exibicao);
+                                    setListaClientesAberta(false);
+                                  }}
+                                >
+                                  {c.nome_exibicao}
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    </>
+                  ) : cadastroClienteIdReserva ? (
+                    <p className="text-[11px] text-muted-foreground">
+                      Cliente selecionado. Clique na busca para alterar.
+                    </p>
+                  ) : null}
                 </div>
               ) : null}
             </div>
