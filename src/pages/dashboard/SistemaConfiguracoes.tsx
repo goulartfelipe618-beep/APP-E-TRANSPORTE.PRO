@@ -25,7 +25,6 @@ import { persistNetworkRetornoSolicitado, persistNetworkSair } from "@/lib/netwo
 import LoginConfiguracoesSection from "@/pages/dashboard/LoginConfiguracoesSection";
 import { uploadFileToR2 } from "@/lib/mirrorUploadToR2";
 import WebsiteEmbedSnippetSection from "@/components/admin/WebsiteEmbedSnippetSection";
-import GoogleSheetsBackupSection from "@/components/sistema/GoogleSheetsBackupSection";
 import R2AutoBackupSection from "@/components/sistema/R2AutoBackupSection";
 import { assertUploadMagicBytes, extensionForDetectedMime } from "@/lib/validateUploadMagicBytes";
 import { validatePainelStrongPassword } from "@/lib/motoristaPortalPassword";
@@ -1533,9 +1532,6 @@ export default function SistemaConfiguracoesPage() {
       <NetworkSection />
 
       {!isAdminMaster ? <R2AutoBackupSection /> : null}
-
-      {/* Google Sheets — só empresas (admin_transfer); não Admin Master nem portal motorista */}
-      {!isAdminMaster ? <GoogleSheetsBackupSection /> : null}
 
       {/* Hard Refresh */}
       <div className="rounded-xl border border-border bg-card p-6 max-w-2xl">

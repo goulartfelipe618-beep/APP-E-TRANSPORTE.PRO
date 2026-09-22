@@ -64,19 +64,6 @@ verify_jwt = false
 [functions.website-embed-public]
 verify_jwt = false
 
-# Google Sheets backup — OAuth + sync (JWT validado no corpo; callback sem JWT do utilizador).
-[functions.google-sheets-oauth-start]
-verify_jwt = false
-
-[functions.google-sheets-oauth-callback]
-verify_jwt = false
-
-[functions.google-sheets-oauth-disconnect]
-verify_jwt = false
-
-[functions.google-sheets-backup-run]
-verify_jwt = false
-
 [functions.r2-sync-storage]
 verify_jwt = false
 
