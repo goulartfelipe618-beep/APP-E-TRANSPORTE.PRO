@@ -24,15 +24,9 @@ import { PainelPaginationBar } from "@/components/painel/PainelPaginationBar";
 import { buildTransferDadosComunicarCliente } from "@/lib/comunicarReservaCliente";
 import { fetchAllSupabasePages } from "@/lib/supabaseFetchAll";
 import { abrevCategoriaVeiculoTransfer, labelCategoriaVeiculoTransfer } from "@/lib/categoriaVeiculoTransfer";
-import { motoristaAssignValue, motoristaMatchesAssignment, resolveMotoristaNome } from "@/lib/motoristaReservaAssign";
+import { formatTransferTipoViagemExibicao } from "@/lib/transferPernaViagem";
 
 type Reserva = Tables<"reservas_transfer">;
-
-const tipoLabel: Record<string, string> = {
-  somente_ida: "Somente Ida",
-  ida_volta: "Ida e Volta",
-  por_hora: "Por Hora",
-};
 
 function transferPrimaryDayKey(r: Reserva): string | null {
   if (r.tipo_viagem === "por_hora") return toAgendaDayKey(r.por_hora_data) ?? toAgendaDayKey(r.ida_data);
@@ -354,7 +348,9 @@ export default function TransferReservasPage() {
                   </TableCell>
                   <TableCell className={cn(rowLocked && "opacity-60")}>
                     <div className="flex flex-wrap items-center gap-1">
-                      <Badge variant="secondary">{tipoLabel[r.tipo_viagem] || r.tipo_viagem}</Badge>
+                      <Badge variant="secondary">
+                        {formatTransferTipoViagemExibicao(r.tipo_viagem, r.perna_viagem)}
+                      </Badge>
                       {r.perna_viagem === "ida" || r.perna_viagem === "volta" ? (
                         <Badge
                           variant="outline"

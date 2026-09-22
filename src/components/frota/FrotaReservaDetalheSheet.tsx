@@ -15,6 +15,7 @@ import {
 import { formatTransferTipoViagemExibicao } from "@/lib/transferPernaViagem";
 import { formatDbCalendarDatePtBr, formatHoraReserva } from "@/lib/painelAgendaReservas";
 import { labelCategoriaVeiculoTransfer } from "@/lib/categoriaVeiculoTransfer";
+import { parseTrajetosTransfer } from "@/lib/transferTrajetos";
 
 type Props = {
   transfer: FrotaPortalTransferReserva | null;
@@ -118,6 +119,15 @@ export default function FrotaReservaDetalheSheet({ transfer, grupo, open, onOpen
                 <DetailRow label="Tipo" value={formatTransferTipoViagemExibicao(transfer.tipo_viagem, transfer.perna_viagem)} />
                 <DetailRow label="Categoria" value={labelCategoriaVeiculoTransfer(transfer.categoria_veiculo)} />
                 <TransferSchedule transfer={transfer} />
+                {transfer.tipo_viagem === "multiplos_trajetos"
+                  ? parseTrajetosTransfer(transfer.trajetos).map((t, i) => (
+                      <DetailRow
+                        key={i}
+                        label={`Trecho ${i + 1}`}
+                        value={`${t.embarque || "—"} → ${t.desembarque || "—"} (${formatDbCalendarDatePtBr(t.data)} ${formatHoraReserva(t.hora)})`}
+                      />
+                    ))
+                  : null}
                 {transfer.tipo_viagem === "por_hora" ? (
                   <div className="grid grid-cols-1 gap-2">
                     <DetailRow label="Endereço inicial" value={transfer.por_hora_endereco_inicio} />

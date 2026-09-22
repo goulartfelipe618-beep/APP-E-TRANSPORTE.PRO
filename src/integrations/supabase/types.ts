@@ -1801,6 +1801,7 @@ export type Database = {
         Row: {
           cadastro_cliente_id: string | null
           categoria_veiculo: string | null
+          trajetos: Json
           cpf_cnpj: string
           created_at: string
           desconto: number
@@ -1851,6 +1852,7 @@ export type Database = {
         Insert: {
           cadastro_cliente_id?: string | null
           categoria_veiculo?: string | null
+          trajetos?: Json
           cpf_cnpj: string
           created_at?: string
           desconto?: number
@@ -1901,6 +1903,7 @@ export type Database = {
         Update: {
           cadastro_cliente_id?: string | null
           categoria_veiculo?: string | null
+          trajetos?: Json
           cpf_cnpj?: string
           created_at?: string
           desconto?: number
@@ -2696,6 +2699,7 @@ export type Database = {
         Args: never
         Returns: {
           categoria_veiculo: string | null
+          trajetos: Json
           data_ida: string | null
           data_retorno: string | null
           desconto: number | null

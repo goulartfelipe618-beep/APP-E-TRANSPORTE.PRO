@@ -18,6 +18,7 @@ const TIPO_VIAGEM_LABEL: Record<string, string> = {
   somente_ida: "Somente Ida",
   ida_volta: "Ida e Volta",
   por_hora: "Por Hora",
+  multiplos_trajetos: "2 ou mais trajetos",
 };
 
 /** Rótulo de tipo para tabelas, detalhes e Comunicar (não altera payload agregado). */
@@ -48,7 +49,7 @@ export function transferMostraTrechoIdaCampos(
   pernaViagem?: string | null,
 ): boolean {
   const tv = (tipoViagem ?? "").trim().toLowerCase();
-  if (tv === "por_hora") return false;
+  if (tv === "por_hora" || tv === "multiplos_trajetos") return false;
   if (tv === "ida_volta" || tv === "somente_ida") return true;
   return isTransferPernaDividida(tipoViagem, pernaViagem);
 }

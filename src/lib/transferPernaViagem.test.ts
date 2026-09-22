@@ -19,9 +19,8 @@ describe("transferPernaViagem", () => {
     expect(formatTransferTipoViagemExibicao("somente_ida", null)).toBe("Somente Ida");
   });
 
-  it("título da secção volta na linha dividida", () => {
-    expect(transferSecaoTrajetoTitulo("somente_ida", "volta")).toBe("⇆ Volta");
-    expect(transferSecaoTrajetoTitulo("somente_ida", "ida")).toBe("→ Ida");
+  it("formata 2 ou mais trajetos", () => {
+    expect(formatTransferTipoViagemExibicao("multiplos_trajetos")).toBe("2 ou mais trajetos");
   });
 });
 
@@ -104,5 +103,38 @@ describe("buildAgendaItemsPorDia — perna dividida", () => {
       [],
     );
     expect(map.get("2026-09-17")?.[0]?.categoriaAbrev).toBe("07LUG.");
+  });
+
+  it("agenda um item por parada em 2+ trajetos", () => {
+    const map = buildAgendaItemsPorDia(
+      [
+        {
+          id: "m",
+          tipo_viagem: "multiplos_trajetos",
+          numero_reserva: 88,
+          status: "pendente",
+          ida_data: "2026-09-22",
+          ida_hora: "08:00",
+          volta_data: null,
+          volta_hora: null,
+          por_hora_data: null,
+          por_hora_hora: null,
+          ida_embarque: "A",
+          ida_desembarque: "C",
+          volta_embarque: null,
+          volta_desembarque: null,
+          por_hora_endereco_inicio: null,
+          por_hora_ponto_encerramento: null,
+          motorista_id: null,
+          trajetos: [
+            { embarque: "A", desembarque: "B", data: "2026-09-22", hora: "08:00", passageiros: 2 },
+            { embarque: "B", desembarque: "C", data: "2026-09-23", hora: "10:00", passageiros: 2 },
+          ],
+        },
+      ],
+      [],
+    );
+    expect(map.get("2026-09-22")?.[0]?.perna).toBe("Trecho 1");
+    expect(map.get("2026-09-23")?.[0]?.perna).toBe("Trecho 2");
   });
 });

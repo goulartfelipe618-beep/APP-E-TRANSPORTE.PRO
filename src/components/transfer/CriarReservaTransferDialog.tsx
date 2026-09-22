@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import { ArrowLeftRight, Loader2 } from "lucide-react";
+import { ArrowLeftRight, Loader2, Plus, Trash2 } from "lucide-react";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
@@ -25,6 +25,16 @@ import {
   isCategoriaVeiculoTransfer,
 } from "@/lib/categoriaVeiculoTransfer";
 import { motoristaAssignValue, motoristaMatchesAssignment } from "@/lib/motoristaReservaAssign";
+import {
+  defaultMultiplosTrajetosForm,
+  emptyTrajetoForm,
+  MAX_TRAJETOS_TRANSFER,
+  mirrorPrimeiroUltimoTrajeto,
+  serializeTrajetosForm,
+  trajetosToForm,
+  validateTrajetosForm,
+  type TrajetoTransferForm,
+} from "@/lib/transferTrajetos";
 
 function toDateInput(v: string | null | undefined): string {
   return toAgendaDayKey(v) ?? "";
@@ -39,13 +49,19 @@ function toTimeInput(v: string | null | undefined): string {
 }
 
 function isMissingColumnError(message: string): boolean {
-  return /cadastro_cliente_id/i.test(message);
+  return /categoria_veiculo|cadastro_cliente_id|trajetos|schema cache|PGRST204|42703/i.test(message);
 }
 
 function stripUnknownColumns<T extends Record<string, unknown>>(payload: T, message: string): T {
   const next = { ...payload };
+  if (/categoria_veiculo|schema cache|PGRST204|42703/i.test(message)) {
+    delete next.categoria_veiculo;
+  }
   if (/cadastro_cliente_id/i.test(message)) {
     delete next.cadastro_cliente_id;
+  }
+  if (/trajetos/i.test(message)) {
+    delete next.trajetos;
   }
   return next;
 }
@@ -90,8 +106,9 @@ interface CriarReservaTransferDialogProps {
   reservaEdicao?: Tables<"reservas_transfer"> | null;
 }
 
-type TipoViagem = "somente_ida" | "ida_volta" | "por_hora";
+type TipoViagem = "somente_ida" | "ida_volta" | "por_hora" | "multiplos_trajetos";
 type QuemViaja = "motorista" | "eu_mesmo";
+type MotoristaAtribPerna = "ambas" | "ida" | "volta";
 
 type ClienteReservaOpt = {
   id: string;
@@ -163,6 +180,8 @@ export default function CriarReservaTransferDialog({
   const [cadastroClienteIdReserva, setCadastroClienteIdReserva] = useState("");
   const [clientSearch, setClientSearch] = useState("");
   const [categoriaVeiculo, setCategoriaVeiculo] = useState("");
+  const [motoristaAtribPerna, setMotoristaAtribPerna] = useState<MotoristaAtribPerna>("ambas");
+  const [trajetosForm, setTrajetosForm] = useState<TrajetoTransferForm[]>(defaultMultiplosTrajetosForm);
 
   const clientesFiltrados = useMemo(() => {
     const raw = clientSearch.trim();
@@ -213,7 +232,11 @@ export default function CriarReservaTransferDialog({
       setEmail(row.email ?? "");
       setTelefone(row.telefone ?? "");
       const tv = row.tipo_viagem;
-      setTipoViagem(tv === "ida_volta" || tv === "por_hora" ? tv : "somente_ida");
+      setTipoViagem(
+        tv === "ida_volta" || tv === "por_hora" || tv === "multiplos_trajetos" ? tv : "somente_ida",
+      );
+      setTrajetosForm(trajetosToForm((row as { trajetos?: unknown }).trajetos));
+      setMotoristaAtribPerna("ambas");
       setQuemViaja(row.quem_viaja === "eu_mesmo" ? "eu_mesmo" : "motorista");
       setIdaEmbarque(row.ida_embarque ?? "");
       setIdaDesembarque(row.ida_desembarque ?? "");
@@ -294,7 +317,13 @@ export default function CriarReservaTransferDialog({
       setPorHoraItinerario(initialData.por_hora_itinerario || "");
 
       if (initialData.tipo) {
-        const tipoMap: Record<string, TipoViagem> = { ida: "somente_ida", somente_ida: "somente_ida", ida_volta: "ida_volta", por_hora: "por_hora" };
+        const tipoMap: Record<string, TipoViagem> = {
+          ida: "somente_ida",
+          somente_ida: "somente_ida",
+          ida_volta: "ida_volta",
+          por_hora: "por_hora",
+          multiplos_trajetos: "multiplos_trajetos",
+        };
         setTipoViagem(tipoMap[initialData.tipo] || "somente_ida");
       }
       setCategoriaVeiculo("");
@@ -349,6 +378,8 @@ export default function CriarReservaTransferDialog({
     setValorBase("0"); setDesconto("0"); setMetodoPagamento(""); setFaturado("nao"); setEsconderValores(false); setObservacoes("");
     setStatusOperacional("pendente"); setRepasseMotorista("");
     setMotoristaAtribuido("");
+    setMotoristaAtribPerna("ambas");
+    setTrajetosForm(defaultMultiplosTrajetosForm());
     setCategoriaVeiculo("");
     setModoClienteReserva("novo");
     setCadastroClienteIdReserva("");
@@ -372,6 +403,15 @@ export default function CriarReservaTransferDialog({
       toast.error("Selecione a categoria do veículo da reserva.");
       setSaving(false);
       return;
+    }
+
+    if (tipoViagem === "multiplos_trajetos") {
+      const trajErr = validateTrajetosForm(trajetosForm);
+      if (trajErr) {
+        toast.error(trajErr);
+        setSaving(false);
+        return;
+      }
     }
 
     if (!reservaEdicao?.id) {
@@ -461,6 +501,19 @@ export default function CriarReservaTransferDialog({
           : motoristaRaw
         : null;
 
+    const motoristaIda =
+      motoristaIdResolved && (tipoViagem !== "ida_volta" || motoristaAtribPerna !== "volta")
+        ? motoristaIdResolved
+        : null;
+    const motoristaVolta =
+      motoristaIdResolved && tipoViagem === "ida_volta" && motoristaAtribPerna !== "ida"
+        ? motoristaIdResolved
+        : null;
+
+    const trajetosSerialized =
+      tipoViagem === "multiplos_trajetos" ? serializeTrajetosForm(trajetosForm) : [];
+    const mirrored = tipoViagem === "multiplos_trajetos" ? mirrorPrimeiroUltimoTrajeto(trajetosSerialized) : null;
+
     const rowPayload = {
       nome_completo: nomeCompleto,
       cpf_cnpj: cpfCnpj,
@@ -468,11 +521,11 @@ export default function CriarReservaTransferDialog({
       telefone,
       tipo_viagem: tipoViagem,
       quem_viaja: quemViaja,
-      ida_embarque: idaEmbarque || null,
-      ida_desembarque: idaDesembarque || null,
-      ida_data: idaData || null,
-      ida_hora: idaHora || null,
-      ida_passageiros: idaPassageiros ? parseInt(idaPassageiros, 10) : null,
+      ida_embarque: mirrored?.ida_embarque ?? (idaEmbarque || null),
+      ida_desembarque: mirrored?.ida_desembarque ?? (idaDesembarque || null),
+      ida_data: mirrored?.ida_data ?? (idaData || null),
+      ida_hora: mirrored?.ida_hora ?? (idaHora || null),
+      ida_passageiros: mirrored?.ida_passageiros ?? (idaPassageiros ? parseInt(idaPassageiros, 10) : null),
       ida_cupom: idaCupom || null,
       ida_mensagem: idaMensagem || null,
       volta_embarque: voltaEmbarque || null,
@@ -502,6 +555,7 @@ export default function CriarReservaTransferDialog({
       motorista_id: motoristaIdResolved,
       cadastro_cliente_id: cadastroClienteIdOut,
       categoria_veiculo: categoriaVeiculo,
+      trajetos: tipoViagem === "multiplos_trajetos" ? trajetosSerialized : [],
     };
 
     let error: { message: string } | null = null;
@@ -537,17 +591,6 @@ export default function CriarReservaTransferDialog({
       if (!error && motoristaIdResolved && (saved?.motorista_id ?? "").trim() !== motoristaIdResolved) {
         error = { message: "O motorista não ficou gravado na reserva. Tente guardar outra vez." };
       }
-      const parId = (saved?.par_reserva_id ?? reservaEdicao?.par_reserva_id ?? "").trim();
-      if (!error && parId) {
-        const pair = await supabase
-          .from("reservas_transfer")
-          .update({ motorista_id: motoristaIdResolved, quem_viaja: quemViaja } as never)
-          .eq("par_reserva_id", parId)
-          .neq("id", editId);
-        if (pair.error) {
-          toast.warning("Motorista gravado nesta reserva, mas a perna par (ida/volta) não foi atualizada.");
-        }
-      }
     } else if (tipoViagem === "ida_volta") {
       if (!voltaData.trim()) {
         toast.error("Informe a data da volta para viagens ida e volta.");
@@ -560,9 +603,9 @@ export default function CriarReservaTransferDialog({
       const [vb1, vb2] = splitAmountInTwoHalves(baseNum);
       const vt1 = valorTotalFromBaseDiscount(vb1, descNum);
       const vt2 = valorTotalFromBaseDiscount(vb2, descNum);
-      const [r1, r2] = repasseNum != null ? splitAmountInTwoHalves(repasseNum) : [null, null];
-
-      const motoristaId = motoristaIdResolved;
+      const [rSplit1, rSplit2] = repasseNum != null ? splitAmountInTwoHalves(repasseNum) : [null, null];
+      const r1 = motoristaAtribPerna === "volta" ? null : motoristaAtribPerna === "ida" ? repasseNum : rSplit1;
+      const r2 = motoristaAtribPerna === "ida" ? null : motoristaAtribPerna === "volta" ? repasseNum : rSplit2;
 
       const baseShared = {
         nome_completo: nomeCompleto,
@@ -576,9 +619,9 @@ export default function CriarReservaTransferDialog({
         esconder_valores: esconderValores,
         observacoes: observacoes || null,
         status: statusOperacional,
-        motorista_id: motoristaId,
         cadastro_cliente_id: cadastroClienteIdOut,
         categoria_veiculo: categoriaVeiculo,
+        trajetos: [] as unknown[],
         por_hora_endereco_inicio: null as string | null,
         por_hora_ponto_encerramento: null as string | null,
         por_hora_data: null as string | null,
@@ -591,6 +634,7 @@ export default function CriarReservaTransferDialog({
 
       const idaRow = {
         ...baseShared,
+        motorista_id: motoristaIda,
         tipo_viagem: "somente_ida" as const,
         perna_viagem: "ida" as const,
         par_reserva_id: parReservaId,
@@ -618,6 +662,7 @@ export default function CriarReservaTransferDialog({
 
       const voltaRow = {
         ...baseShared,
+        motorista_id: motoristaVolta,
         tipo_viagem: "somente_ida" as const,
         perna_viagem: "volta" as const,
         par_reserva_id: parReservaId,
@@ -666,7 +711,13 @@ export default function CriarReservaTransferDialog({
       if (novoClientePct != null) {
         toast.success(`Reserva criada. Novo cliente no menu Clientes — perfil ${novoClientePct}% (complete dados quando quiser).`);
       } else if (!editId && tipoViagem === "ida_volta") {
-        toast.success("Foram criadas 2 reservas (ida e volta), cada uma com metade do valor e do repasse.");
+        const pernaTxt =
+          motoristaAtribPerna === "ida"
+            ? " Motorista atribuído somente na ida."
+            : motoristaAtribPerna === "volta"
+              ? " Motorista atribuído somente na volta."
+              : "";
+        toast.success(`Foram criadas 2 reservas (ida e volta), cada uma com metade do valor.${pernaTxt}`);
       } else {
         toast.success(editId ? "Reserva atualizada com sucesso!" : "Reserva criada com sucesso!");
         if (!editId) void logUserActivity("reserva_transfer_criada");
@@ -805,11 +856,19 @@ export default function CriarReservaTransferDialog({
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="space-y-1.5">
                   <Label>Tipo de Viagem *</Label>
-                  <Select value={tipoViagem} onValueChange={(v) => setTipoViagem(v as TipoViagem)}>
+                  <Select
+                    value={tipoViagem}
+                    onValueChange={(v) => {
+                      const next = v as TipoViagem;
+                      setTipoViagem(next);
+                      if (next === "multiplos_trajetos") setTrajetosForm((prev) => (prev.length >= 2 ? prev : defaultMultiplosTrajetosForm()));
+                    }}
+                  >
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="somente_ida">Somente Ida</SelectItem>
                       <SelectItem value="ida_volta">Ida e Volta</SelectItem>
+                      <SelectItem value="multiplos_trajetos">2 ou mais trajetos</SelectItem>
                       <SelectItem value="por_hora">Por Hora</SelectItem>
                     </SelectContent>
                   </Select>
@@ -891,6 +950,100 @@ export default function CriarReservaTransferDialog({
                 </div>
               )}
 
+              {tipoViagem === "multiplos_trajetos" && (
+                <div className="space-y-3">
+                  <p className="text-xs text-muted-foreground">
+                    Cada trajeto é uma parada com preço fixo da reserva — sem cobrança por hora. Mínimo 2 trajetos.
+                  </p>
+                  {trajetosForm.map((t, i) => (
+                    <div key={i} className="rounded-lg border border-border p-4 space-y-4">
+                      <div className="flex items-center justify-between gap-2">
+                        <h4 className="text-sm font-semibold text-foreground">Trajeto {i + 1}</h4>
+                        {trajetosForm.length > 2 ? (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="text-destructive"
+                            onClick={() => setTrajetosForm((prev) => prev.filter((_, idx) => idx !== i))}
+                          >
+                            <Trash2 className="mr-1 h-4 w-4" />
+                            Remover
+                          </Button>
+                        ) : null}
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1.5">
+                          <Label>Embarque *</Label>
+                          <Input
+                            required
+                            placeholder="Endereço completo de embarque"
+                            value={t.embarque}
+                            onChange={(e) =>
+                              setTrajetosForm((prev) => prev.map((row, idx) => (idx === i ? { ...row, embarque: e.target.value } : row)))
+                            }
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label>Desembarque *</Label>
+                          <Input
+                            required
+                            placeholder="Endereço completo de destino"
+                            value={t.desembarque}
+                            onChange={(e) =>
+                              setTrajetosForm((prev) => prev.map((row, idx) => (idx === i ? { ...row, desembarque: e.target.value } : row)))
+                            }
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label>Data *</Label>
+                          <Input
+                            type="date"
+                            required
+                            value={t.data}
+                            onChange={(e) =>
+                              setTrajetosForm((prev) => prev.map((row, idx) => (idx === i ? { ...row, data: e.target.value } : row)))
+                            }
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label>Hora</Label>
+                          <Input
+                            type="time"
+                            value={t.hora}
+                            onChange={(e) =>
+                              setTrajetosForm((prev) => prev.map((row, idx) => (idx === i ? { ...row, hora: e.target.value } : row)))
+                            }
+                          />
+                        </div>
+                        <div className="space-y-1.5 col-span-2 sm:col-span-1">
+                          <Label>Passageiros *</Label>
+                          <Input
+                            type="number"
+                            min="1"
+                            required
+                            value={t.passageiros}
+                            onChange={(e) =>
+                              setTrajetosForm((prev) => prev.map((row, idx) => (idx === i ? { ...row, passageiros: e.target.value } : row)))
+                            }
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  {trajetosForm.length < MAX_TRAJETOS_TRANSFER ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setTrajetosForm((prev) => [...prev, emptyTrajetoForm()])}
+                    >
+                      <Plus className="mr-2 h-4 w-4" />
+                      Adicionar trajeto
+                    </Button>
+                  ) : null}
+                </div>
+              )}
+
               {tipoViagem === "por_hora" && (
                 <div className="rounded-lg border border-border p-4 space-y-4">
                   <h4 className="text-sm font-semibold text-foreground">⏱ Por Hora</h4>
@@ -964,6 +1117,29 @@ export default function CriarReservaTransferDialog({
                       A atribuição fica gravada na reserva e na agenda do mini portal do motorista. Se o portal ainda estiver pendente, a reserva aparece assim que ele abrir o link e definir a senha.
                     </p>
                   </div>
+                  {tipoViagem === "ida_volta" && motoristaAtribUid ? (
+                    <div className="space-y-2 sm:col-span-2 rounded-lg border border-border bg-muted/20 p-3">
+                      <Label>Atribuir este motorista em</Label>
+                      <RadioGroup
+                        value={motoristaAtribPerna}
+                        onValueChange={(v) => setMotoristaAtribPerna(v as MotoristaAtribPerna)}
+                        className="flex flex-col gap-2 pt-1"
+                      >
+                        <label className="flex cursor-pointer items-center gap-2 text-sm">
+                          <RadioGroupItem value="ambas" id="mot-ambas" />
+                          Ida e volta
+                        </label>
+                        <label className="flex cursor-pointer items-center gap-2 text-sm">
+                          <RadioGroupItem value="ida" id="mot-ida" />
+                          Somente na viagem de ida
+                        </label>
+                        <label className="flex cursor-pointer items-center gap-2 text-sm">
+                          <RadioGroupItem value="volta" id="mot-volta" />
+                          Somente na viagem de volta
+                        </label>
+                      </RadioGroup>
+                    </div>
+                  ) : null}
                 </div>
               )}
             </div>

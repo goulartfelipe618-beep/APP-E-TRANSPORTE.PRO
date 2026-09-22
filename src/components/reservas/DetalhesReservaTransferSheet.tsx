@@ -13,6 +13,7 @@ import {
   transferSecaoTrajetoTitulo,
 } from "@/lib/transferPernaViagem";
 import { labelCategoriaVeiculoTransfer } from "@/lib/categoriaVeiculoTransfer";
+import { parseTrajetosTransfer } from "@/lib/transferTrajetos";
 
 type Reserva = Tables<"reservas_transfer">;
 
@@ -105,6 +106,23 @@ export default function DetalhesReservaTransferSheet({ reserva, open, onOpenChan
                   <Field label="Cupom" value={r.volta_cupom} />
                 </div>
                 {r.volta_mensagem && <Field label="Mensagem" value={r.volta_mensagem} full />}
+              </Section>
+            </>
+          )}
+
+          {r.tipo_viagem === "multiplos_trajetos" && (
+            <>
+              <Separator />
+              <Section title="2 ou mais trajetos">
+                {parseTrajetosTransfer((r as { trajetos?: unknown }).trajetos).map((t, i) => (
+                  <div key={i} className="mb-3 grid grid-cols-2 gap-3">
+                    <Field label={`Trecho ${i + 1} embarque`} value={t.embarque} />
+                    <Field label="Desembarque" value={t.desembarque} />
+                    <Field label="Data" value={formatDate(t.data)} />
+                    <Field label="Hora" value={t.hora} />
+                    <Field label="Passageiros" value={t.passageiros?.toString()} />
+                  </div>
+                ))}
               </Section>
             </>
           )}

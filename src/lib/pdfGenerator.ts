@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { mergeCabecalhoComPerfilSeNecessario } from "@/lib/cabecalhoContratualResolve";
 import { formatDbCalendarDatePtBr, formatDbCalendarDatePtBrShortMonth } from "@/lib/painelAgendaReservas";
 import { labelCategoriaVeiculoTransfer } from "@/lib/categoriaVeiculoTransfer";
+import { parseTrajetosTransfer } from "@/lib/transferTrajetos";
 import { isMotoristaFrotaUser } from "@/lib/motoristaFrotaRole";
 
 /** Mini painel do motorista da frota: sem download/geração de PDF de reservas. */
@@ -648,7 +649,12 @@ async function buildTransferReservaPdfDocument(
   // Section: Service Info
   y = addSectionTitle(doc, "INFORMAÇÕES DO SERVIÇO", y);
 
-  const tipoLabel: Record<string, string> = { somente_ida: "Somente Ida", ida_volta: "Ida e Volta", por_hora: "Por Hora" };
+  const tipoLabel: Record<string, string> = {
+    somente_ida: "Somente Ida",
+    ida_volta: "Ida e Volta",
+    por_hora: "Por Hora",
+    multiplos_trajetos: "2 ou mais trajetos",
+  };
   const tipoStr = tipoLabel[r.tipo_viagem] || r.tipo_viagem;
 
   doc.setFontSize(FS.subtitle);
@@ -680,6 +686,12 @@ async function buildTransferReservaPdfDocument(
     }
     const passCol = r.tipo_viagem === "ida_volta" ? 2 : 1;
     addInfoCard(doc, MARGIN + passCol * (cardW + SP.cardGap), y, cardW, "PASSAGEIROS", String(r.ida_passageiros || "—"));
+  } else if (r.tipo_viagem === "multiplos_trajetos") {
+    const fmtDate = (d: string | null) => formatDbCalendarDatePtBrShortMonth(d);
+    const tr = parseTrajetosTransfer((r as { trajetos?: unknown }).trajetos);
+    addInfoCard(doc, MARGIN, y, cardW, "TRAJETOS", String(tr.length || "—"));
+    addInfoCard(doc, MARGIN + cardW + SP.cardGap, y, cardW, "1º DATA", fmtDate(tr[0]?.data ?? r.ida_data));
+    addInfoCard(doc, MARGIN + 2 * (cardW + SP.cardGap), y, cardW, "PASSAGEIROS", String(tr[0]?.passageiros || r.ida_passageiros || "—"));
   } else if (r.tipo_viagem === "por_hora") {
     const fmtDate = (d: string | null) => formatDbCalendarDatePtBrShortMonth(d);
     addInfoCard(doc, MARGIN, y, cardW, "DATA", fmtDate(r.por_hora_data));
@@ -774,6 +786,19 @@ async function buildTransferReservaPdfDocument(
     ];
     y = addFieldRows(doc, voltaFields, MARGIN, y, 34);
     y += 4;
+  }
+
+  if (r.tipo_viagem === "multiplos_trajetos") {
+    y = addSectionTitle(doc, "TRAJETOS / PARADAS", y);
+    const tr = parseTrajetosTransfer((r as { trajetos?: unknown }).trajetos);
+    const fields = tr.flatMap((t, i) => [
+      { l: `Trecho ${i + 1}:`, v: `${t.embarque || "—"} → ${t.desembarque || "—"}` },
+      { l: `Data ${i + 1}:`, v: `${t.data || "—"} ${t.hora || ""}`.trim() },
+    ]);
+    if (fields.length) {
+      y = addFieldRows(doc, fields, MARGIN, y, 34);
+      y += 4;
+    }
   }
 
   // Por hora details

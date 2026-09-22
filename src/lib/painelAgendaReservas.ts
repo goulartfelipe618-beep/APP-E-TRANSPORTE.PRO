@@ -1,6 +1,7 @@
 import { primeiroSegmentoEndereco } from "@/lib/abrangenciaMapHelpers";
 import { abrevCategoriaVeiculoTransfer } from "@/lib/categoriaVeiculoTransfer";
 import { isTransferPernaDividida, transferPernaNormalizada } from "@/lib/transferPernaViagem";
+import { parseTrajetosTransfer } from "@/lib/transferTrajetos";
 
 export type TransferAgendaReserva = {
   id: string;
@@ -24,6 +25,7 @@ export type TransferAgendaReserva = {
   por_hora_endereco_inicio: string | null;
   por_hora_ponto_encerramento: string | null;
   categoria_veiculo?: string | null;
+  trajetos?: unknown;
 };
 
 export type GrupoAgendaReserva = {
@@ -214,6 +216,94 @@ export function grupoVisivelSomenteAtribuido(g: GrupoAgendaReserva, motoristaAut
   return g.motorista_id != null && g.motorista_id === motoristaAuthId;
 }
 
+function appendTransferAgendaItems(map: Map<string, AgendaItem[]>, r: TransferAgendaReserva): void {
+  if (isReservaCanceladaAgenda(r.status)) return;
+  const num = formatNumeroReservaPad(r.numero_reserva);
+  const cat = abrevCategoriaVeiculoTransfer(r.categoria_veiculo);
+
+  if (r.tipo_viagem === "por_hora") {
+    const dk = toAgendaDayKey(r.por_hora_data);
+    pushItem(map, dk, {
+      reservaId: r.id,
+      kind: "transfer",
+      numeroLabel: num,
+      categoriaAbrev: cat,
+      perna: "Por hora",
+      horario: formatHoraReserva(r.por_hora_hora),
+      trajetoResumo: trajetoTransferLeg(r, "por_hora"),
+      status: r.status,
+      key: `transfer:${r.id}:por_hora`,
+    });
+    return;
+  }
+
+  const trajetos = parseTrajetosTransfer(r.trajetos);
+  if (r.tipo_viagem === "multiplos_trajetos" && trajetos.length >= 2) {
+    trajetos.forEach((t, i) => {
+      const a = primeiroSegmentoEndereco(t.embarque) || "—";
+      const b = (t.desembarque || "").trim() || "—";
+      pushItem(map, toAgendaDayKey(t.data), {
+        reservaId: r.id,
+        kind: "transfer",
+        numeroLabel: num,
+        categoriaAbrev: cat,
+        perna: `Trecho ${i + 1}`,
+        horario: formatHoraReserva(t.hora),
+        trajetoResumo: `${a} → ${b}`,
+        status: r.status,
+        key: `transfer:${r.id}:trecho:${i + 1}`,
+      });
+    });
+    return;
+  }
+
+  const pernaMeta = transferPernaNormalizada(r.perna_viagem);
+  if (isTransferPernaDividida(r.tipo_viagem, r.perna_viagem) && pernaMeta) {
+    const dk = toAgendaDayKey(r.ida_data);
+    const labelPerna = pernaMeta === "volta" ? "Volta" : "Ida";
+    pushItem(map, dk, {
+      reservaId: r.id,
+      kind: "transfer",
+      numeroLabel: num,
+      categoriaAbrev: cat,
+      perna: labelPerna,
+      horario: formatHoraReserva(r.ida_hora),
+      trajetoResumo: trajetoTransferLeg(r, "ida"),
+      status: r.status,
+      key: `transfer:${r.id}:perna:${pernaMeta}`,
+    });
+    return;
+  }
+
+  const dkIda = toAgendaDayKey(r.ida_data);
+  pushItem(map, dkIda, {
+    reservaId: r.id,
+    kind: "transfer",
+    numeroLabel: num,
+    categoriaAbrev: cat,
+    perna: "Ida",
+    horario: formatHoraReserva(r.ida_hora),
+    trajetoResumo: trajetoTransferLeg(r, "ida"),
+    status: r.status,
+    key: `transfer:${r.id}:ida`,
+  });
+
+  if (r.tipo_viagem === "ida_volta") {
+    const dkVolta = toAgendaDayKey(r.volta_data);
+    pushItem(map, dkVolta, {
+      reservaId: r.id,
+      kind: "transfer",
+      numeroLabel: num,
+      categoriaAbrev: cat,
+      perna: "Volta",
+      horario: formatHoraReserva(r.volta_hora),
+      trajetoResumo: trajetoTransferLeg(r, "volta"),
+      status: r.status,
+      key: `transfer:${r.id}:volta`,
+    });
+  }
+}
+
 /** Agenda do submotorista: apenas serviços atribuídos a ele (auth uid). */
 export function buildAgendaItemsPorDiaAtribuidoSomente(
   transfers: TransferAgendaReserva[],
@@ -224,70 +314,7 @@ export function buildAgendaItemsPorDiaAtribuidoSomente(
 
   for (const r of transfers) {
     if (!transferVisivelSomenteAtribuido(r, motoristaAuthId)) continue;
-    if (isReservaCanceladaAgenda(r.status)) continue;
-    const num = formatNumeroReservaPad(r.numero_reserva);
-
-    if (r.tipo_viagem === "por_hora") {
-      const dk = toAgendaDayKey(r.por_hora_data);
-      pushItem(map, dk, {
-        reservaId: r.id,
-        kind: "transfer",
-        numeroLabel: num,
-        categoriaAbrev: abrevCategoriaVeiculoTransfer(r.categoria_veiculo),
-        perna: "Por hora",
-        horario: formatHoraReserva(r.por_hora_hora),
-        trajetoResumo: trajetoTransferLeg(r, "por_hora"),
-        status: r.status,
-        key: `transfer:${r.id}:por_hora`,
-      });
-      continue;
-    }
-
-    const pernaMeta = transferPernaNormalizada(r.perna_viagem);
-    if (isTransferPernaDividida(r.tipo_viagem, r.perna_viagem) && pernaMeta) {
-      const dk = toAgendaDayKey(r.ida_data);
-      const labelPerna = pernaMeta === "volta" ? "Volta" : "Ida";
-      pushItem(map, dk, {
-        reservaId: r.id,
-        kind: "transfer",
-        numeroLabel: num,
-        categoriaAbrev: abrevCategoriaVeiculoTransfer(r.categoria_veiculo),
-        perna: labelPerna,
-        horario: formatHoraReserva(r.ida_hora),
-        trajetoResumo: trajetoTransferLeg(r, "ida"),
-        status: r.status,
-        key: `transfer:${r.id}:perna:${pernaMeta}`,
-      });
-      continue;
-    }
-
-    const dkIda = toAgendaDayKey(r.ida_data);
-    pushItem(map, dkIda, {
-      reservaId: r.id,
-      kind: "transfer",
-      numeroLabel: num,
-      categoriaAbrev: abrevCategoriaVeiculoTransfer(r.categoria_veiculo),
-      perna: "Ida",
-      horario: formatHoraReserva(r.ida_hora),
-      trajetoResumo: trajetoTransferLeg(r, "ida"),
-      status: r.status,
-      key: `transfer:${r.id}:ida`,
-    });
-
-    if (r.tipo_viagem === "ida_volta") {
-      const dkVolta = toAgendaDayKey(r.volta_data);
-      pushItem(map, dkVolta, {
-        reservaId: r.id,
-        kind: "transfer",
-        numeroLabel: num,
-        categoriaAbrev: abrevCategoriaVeiculoTransfer(r.categoria_veiculo),
-        perna: "Volta",
-        horario: formatHoraReserva(r.volta_hora),
-        trajetoResumo: trajetoTransferLeg(r, "volta"),
-        status: r.status,
-        key: `transfer:${r.id}:volta`,
-      });
-    }
+    appendTransferAgendaItems(map, r);
   }
 
   for (const g of grupos) {
@@ -367,70 +394,7 @@ export function buildAgendaItemsPorDia(
   const map = new Map<string, AgendaItem[]>();
 
   for (const r of transfers) {
-    if (isReservaCanceladaAgenda(r.status)) continue;
-    const num = formatNumeroReservaPad(r.numero_reserva);
-
-    if (r.tipo_viagem === "por_hora") {
-      const dk = toAgendaDayKey(r.por_hora_data);
-      pushItem(map, dk, {
-        reservaId: r.id,
-        kind: "transfer",
-        numeroLabel: num,
-        categoriaAbrev: abrevCategoriaVeiculoTransfer(r.categoria_veiculo),
-        perna: "Por hora",
-        horario: formatHoraReserva(r.por_hora_hora),
-        trajetoResumo: trajetoTransferLeg(r, "por_hora"),
-        status: r.status,
-        key: `transfer:${r.id}:por_hora`,
-      });
-      continue;
-    }
-
-    const pernaMeta = transferPernaNormalizada(r.perna_viagem);
-    if (isTransferPernaDividida(r.tipo_viagem, r.perna_viagem) && pernaMeta) {
-      const dk = toAgendaDayKey(r.ida_data);
-      const labelPerna = pernaMeta === "volta" ? "Volta" : "Ida";
-      pushItem(map, dk, {
-        reservaId: r.id,
-        kind: "transfer",
-        numeroLabel: num,
-        categoriaAbrev: abrevCategoriaVeiculoTransfer(r.categoria_veiculo),
-        perna: labelPerna,
-        horario: formatHoraReserva(r.ida_hora),
-        trajetoResumo: trajetoTransferLeg(r, "ida"),
-        status: r.status,
-        key: `transfer:${r.id}:perna:${pernaMeta}`,
-      });
-      continue;
-    }
-
-    const dkIda = toAgendaDayKey(r.ida_data);
-    pushItem(map, dkIda, {
-      reservaId: r.id,
-      kind: "transfer",
-      numeroLabel: num,
-      categoriaAbrev: abrevCategoriaVeiculoTransfer(r.categoria_veiculo),
-      perna: "Ida",
-      horario: formatHoraReserva(r.ida_hora),
-      trajetoResumo: trajetoTransferLeg(r, "ida"),
-      status: r.status,
-      key: `transfer:${r.id}:ida`,
-    });
-
-    if (r.tipo_viagem === "ida_volta") {
-      const dkVolta = toAgendaDayKey(r.volta_data);
-      pushItem(map, dkVolta, {
-        reservaId: r.id,
-        kind: "transfer",
-        numeroLabel: num,
-        categoriaAbrev: abrevCategoriaVeiculoTransfer(r.categoria_veiculo),
-        perna: "Volta",
-        horario: formatHoraReserva(r.volta_hora),
-        trajetoResumo: trajetoTransferLeg(r, "volta"),
-        status: r.status,
-        key: `transfer:${r.id}:volta`,
-      });
-    }
+    appendTransferAgendaItems(map, r);
   }
 
   for (const g of grupos) {

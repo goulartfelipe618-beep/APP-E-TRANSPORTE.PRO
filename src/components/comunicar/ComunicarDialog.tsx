@@ -54,6 +54,7 @@ const labelMap: Record<string, string> = {
   tipo_viagem: "Tipo de Viagem",
   tipo_veiculo: "Tipo de Veículo",
   categoria_veiculo: "Categoria do Veículo",
+  trajetos: "Trajetos / paradas",
   embarque: "Embarque",
   desembarque: "Desembarque",
   ida_embarque: "Embarque (Ida)",
