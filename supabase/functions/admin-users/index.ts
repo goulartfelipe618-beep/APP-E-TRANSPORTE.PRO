@@ -129,7 +129,7 @@ Deno.serve(async (req) => {
     // CREATE USER (apenas admin_master — verificado acima)
     if (req.method === "POST" && action === "create") {
       const body = await req.json();
-      const { email, password, role, plano } = body;
+      const { email, password, role } = body;
 
       if (!email || !password || !role) {
         return new Response(JSON.stringify({ error: "Email, senha e função são obrigatórios" }), { status: 400, headers: corsHeaders });
@@ -188,16 +188,10 @@ Deno.serve(async (req) => {
 
       // Create plan record (only for non-admin_master)
       if (role !== "admin_master") {
-        const validPlans = ["free", "standart", "pro"] as const;
-        const rawPlano = String(plano ?? "").toLowerCase().trim();
-        const norm = rawPlano === "standard" ? "standart" : rawPlano;
-        const userPlano = (validPlans as readonly string[]).includes(norm)
-          ? norm
-          : "free";
         await supabaseAdmin.from("user_plans").insert({
           user_id: newUser.user.id,
-          plano: userPlano,
-          billing_manual_override: userPlano !== "free",
+          plano: "pro",
+          billing_manual_override: true,
         });
       }
 

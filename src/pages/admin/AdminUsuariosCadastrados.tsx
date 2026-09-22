@@ -6,12 +6,10 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Users, Search, RefreshCw, Crown, Activity } from "lucide-react";
+import { Plus, Users, Search, RefreshCw, Activity } from "lucide-react";
 import UserActivityTerminalDialog from "@/components/admin/UserActivityTerminalDialog";
-import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { PLAN_LABELS, PLAN_COLORS, PlanType, PLAN_ORDER, normalizeUserPlano } from "@/hooks/useUserPlan";
 import { validatePainelStrongPassword } from "@/lib/motoristaPortalPassword";
 
 interface UserItem {
@@ -41,18 +39,12 @@ export default function AdminUsuariosCadastrados() {
   const [users, setUsers] = useState<UserItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [planDialogOpen, setPlanDialogOpen] = useState(false);
-  const [selectedUser, setSelectedUser] = useState<UserItem | null>(null);
-  const [selectedPlan, setSelectedPlan] = useState<PlanType>("free");
   const [filter, setFilter] = useState("todos");
   const [searchTerm, setSearchTerm] = useState("");
   const [formEmail, setFormEmail] = useState("");
   const [formPassword, setFormPassword] = useState("");
   const [formRole, setFormRole] = useState("");
-  const [formPlano, setFormPlano] = useState<PlanType>("free");
   const [creating, setCreating] = useState(false);
-  const [updatingPlan, setUpdatingPlan] = useState(false);
-  const [allowMercadoPagoSync, setAllowMercadoPagoSync] = useState(true);
   const [activityDialogOpen, setActivityDialogOpen] = useState(false);
   const [activityUser, setActivityUser] = useState<UserItem | null>(null);
 
@@ -94,8 +86,6 @@ export default function AdminUsuariosCadastrados() {
     return () => window.removeEventListener("admin-master-cadastrados-refresh", onCadastradosRefresh);
   }, [fetchUsers]);
 
-  const showPlanField = formRole === "admin_transfer";
-
   const handleCreate = async () => {
     if (!formEmail.trim() || !formPassword || !formRole) {
       toast.error("Preencha e-mail, senha e tipo de utilizador.");
@@ -126,7 +116,6 @@ export default function AdminUsuariosCadastrados() {
           email: formEmail.trim(),
           password: formPassword,
           role: formRole,
-          plano: showPlanField ? formPlano : undefined,
         }),
       }
     );
@@ -139,7 +128,6 @@ export default function AdminUsuariosCadastrados() {
       setFormEmail("");
       setFormPassword("");
       setFormRole("");
-      setFormPlano("free");
       fetchUsers();
     }
     setCreating(false);
@@ -148,46 +136,6 @@ export default function AdminUsuariosCadastrados() {
   const handleOpenActivityDialog = (user: UserItem) => {
     setActivityUser(user);
     setActivityDialogOpen(true);
-  };
-
-  const handleOpenPlanDialog = (user: UserItem) => {
-    setSelectedUser(user);
-    const p = normalizeUserPlano(user.plano);
-    setSelectedPlan(p);
-    setAllowMercadoPagoSync(user.plano_bloqueado_mp !== true);
-    setPlanDialogOpen(true);
-  };
-
-  const handleUpdatePlan = async () => {
-    if (!selectedUser) return;
-    setUpdatingPlan(true);
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) { setUpdatingPlan(false); return; }
-
-    const res = await fetch(
-      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-users?action=update_plan`,
-      {
-        method: "POST",
-        headers: {
-          ...edgeFunctionHeaders(session.access_token),
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          user_id: selectedUser.id,
-          plano: selectedPlan,
-          allow_mp_billing: allowMercadoPagoSync,
-        }),
-      }
-    );
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok || data.error) {
-      toast.error(typeof data?.error === "string" ? data.error : `Erro ao atualizar plano (${res.status})`);
-    } else {
-      toast.success(`Plano atualizado para ${PLAN_LABELS[selectedPlan]}`);
-      setPlanDialogOpen(false);
-      fetchUsers();
-    }
-    setUpdatingPlan(false);
   };
 
   const filtered = users.filter((u) => {
@@ -205,9 +153,8 @@ export default function AdminUsuariosCadastrados() {
             Usuários Cadastrados
           </h1>
           <p className="text-muted-foreground text-sm max-w-xl">
-            Crie contas com e-mail e senha, e altere o plano entre <strong className="text-foreground">FREE</strong> e{" "}
-            <strong className="text-foreground">PRÓ</strong> para motoristas executivos (ícone da coroa na tabela). A remoção de
-            utilizadores faz-se no Supabase (Auth e dados). Apenas o administrador master acede a esta página.
+            Crie contas com e-mail e senha. O sistema é único (R$ 69,90/mês) — sem planos FREE, STANDART ou PRÓ.
+            A remoção de utilizadores faz-se no Supabase (Auth e dados). Apenas o administrador master acede a esta página.
           </p>
         </div>
         <div className="flex gap-2">
@@ -239,16 +186,15 @@ export default function AdminUsuariosCadastrados() {
             <TableRow>
               <TableHead>E-mail</TableHead>
               <TableHead>Função</TableHead>
-              <TableHead>Plano</TableHead>
               <TableHead>Data de Cadastro</TableHead>
               <TableHead className="w-28 text-right">Ações</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
-              <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">Carregando...</TableCell></TableRow>
+              <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-8">Carregando...</TableCell></TableRow>
             ) : filtered.length === 0 ? (
-              <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">Nenhum usuário encontrado.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-8">Nenhum usuário encontrado.</TableCell></TableRow>
             ) : filtered.map((u) => (
               <TableRow key={u.id}>
                 <TableCell className="font-medium text-foreground">{u.email}</TableCell>
@@ -265,22 +211,6 @@ export default function AdminUsuariosCadastrados() {
                     {roleLabels[u.role] || u.role}
                   </Badge>
                 </TableCell>
-                <TableCell>
-                  {u.role === "admin_master" || u.plano === "n/a" ? (
-                    <span className="text-sm text-muted-foreground">—</span>
-                  ) : (
-                    <div className="flex flex-col gap-1 items-start">
-                      <Badge variant="outline" className={PLAN_COLORS[normalizeUserPlano(u.plano)]}>
-                        {PLAN_LABELS[normalizeUserPlano(u.plano)]}
-                      </Badge>
-                      {u.plano_bloqueado_mp ? (
-                        <span className="text-[10px] text-muted-foreground uppercase tracking-wide">
-                          Plano manual (MP off)
-                        </span>
-                      ) : null}
-                    </div>
-                  )}
-                </TableCell>
                 <TableCell className="text-muted-foreground text-sm">
                   {new Date(u.created_at).toLocaleDateString("pt-BR")}
                 </TableCell>
@@ -296,9 +226,6 @@ export default function AdminUsuariosCadastrados() {
                       >
                         <Activity className="h-4 w-4" />
                       </Button>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={() => handleOpenPlanDialog(u)} title="Alterar plano">
-                        <Crown className="h-4 w-4" />
-                      </Button>
                     </div>
                   ) : (
                     <span className="text-xs text-muted-foreground pr-2">Protegido</span>
@@ -312,7 +239,7 @@ export default function AdminUsuariosCadastrados() {
 
       {/* Create Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Novo utilizador</DialogTitle>
             <DialogDescription>
@@ -343,11 +270,7 @@ export default function AdminUsuariosCadastrados() {
             </div>
             <div>
               <Label>Tipo de Usuário *</Label>
-              <Select value={formRole} onValueChange={(v) => {
-                setFormRole(v);
-                if (v === "admin_master") setFormPlano("free");
-                if (v === "admin_transfer") setFormPlano("free");
-              }}>
+              <Select value={formRole} onValueChange={setFormRole}>
                 <SelectTrigger><SelectValue placeholder="Selecione o tipo" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="admin_transfer">Motorista Executivo</SelectItem>
@@ -355,19 +278,25 @@ export default function AdminUsuariosCadastrados() {
                 </SelectContent>
               </Select>
             </div>
-            {showPlanField && (
-              <div>
-                <Label>Plano *</Label>
-                <Select value={formPlano} onValueChange={(v) => setFormPlano(v as PlanType)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {PLAN_ORDER.map((p) => (
-                      <SelectItem key={p} value={p}>{PLAN_LABELS[p]}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+            {formRole === "admin_transfer" ? (
+              <div className="space-y-2 rounded-lg border border-border bg-muted/30 p-3 text-xs text-muted-foreground leading-relaxed">
+                <p>
+                  O valor do sistema é de <strong className="text-foreground">R$ 69,90/mês</strong>.
+                </p>
+                <p>
+                  Comunicador (vouchers, confirmações, cobranças e mensagens no WhatsApp com botões e cards): adicional de{" "}
+                  <strong className="text-foreground">R$ 40,00/mês</strong>.
+                </p>
+                <p>
+                  Reservas manuais e reservas externas (ex.: pelo site). Site integrado ao sistema, se ainda não tiver:{" "}
+                  <strong className="text-foreground">R$ 100,00</strong>.
+                </p>
+                <p>
+                  Inclui motoristas parceiros com painel de agenda, clientes, veículos, receptivos e financeiro — tudo
+                  no mesmo sistema. Sem planos FREE, STANDART ou PRÓ.
+                </p>
               </div>
-            )}
+            ) : null}
             <Button onClick={handleCreate} disabled={creating} className="w-full">
               {creating ? "A criar…" : "Criar utilizador"}
             </Button>
@@ -381,59 +310,6 @@ export default function AdminUsuariosCadastrados() {
         userId={activityUser?.id ?? null}
         userEmail={activityUser?.email ?? null}
       />
-
-      {/* Change Plan Dialog */}
-      <Dialog open={planDialogOpen} onOpenChange={setPlanDialogOpen}>
-        <DialogContent className="sm:max-w-sm">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Crown className="h-5 w-5 text-primary" />
-              Alterar plano (FREE, STANDART ou PRÓ)
-            </DialogTitle>
-            <DialogDescription>
-              Atualiza o plano deste utilizador na plataforma. Não está disponível para a conta de administrador master.
-              Com Mercado Pago ativo, desligue a sincronização para impedir que pagamentos alterem o plano deste utilizador.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Utilizador: <span className="text-foreground font-medium">{selectedUser?.email}</span>
-            </p>
-            <div>
-              <Label>Novo plano</Label>
-              <Select value={selectedPlan} onValueChange={(v) => setSelectedPlan(v as PlanType)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {PLAN_ORDER.map((p) => (
-                    <SelectItem key={p} value={p}>{PLAN_LABELS[p]}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground mt-1">
-                Pode atribuir FREE, STANDART ou PRÓ. Alterar o plano não apaga dados — apenas restringe ou liberta o acesso às funções.
-              </p>
-            </div>
-            <div className="flex items-start gap-3 rounded-lg border border-border bg-muted/30 p-3">
-              <Checkbox
-                id="admin-allow-mp"
-                checked={allowMercadoPagoSync}
-                onCheckedChange={(c) => setAllowMercadoPagoSync(c === true)}
-              />
-              <div className="grid gap-1">
-                <Label htmlFor="admin-allow-mp" className="text-sm font-medium leading-none cursor-pointer">
-                  Permitir sincronização Mercado Pago
-                </Label>
-                <p className="text-xs text-muted-foreground">
-                  Se desmarcar, o plano fica sob controlo exclusivo do admin — webhooks de pagamento não alteram esta conta.
-                </p>
-              </div>
-            </div>
-            <Button onClick={handleUpdatePlan} disabled={updatingPlan} className="w-full">
-              {updatingPlan ? "A guardar…" : "Guardar plano"}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
