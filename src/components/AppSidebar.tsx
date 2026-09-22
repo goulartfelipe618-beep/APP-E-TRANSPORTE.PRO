@@ -110,15 +110,6 @@ const getMenuStructure = (
         ],
       },
       {
-        title: "Grupos",
-        icon: Users,
-        children: [
-          { title: "Solicitações", page: "grupos/solicitacoes", icon: FileText },
-          { title: "Reservas", page: "grupos/reservas", icon: BookOpen },
-          { title: "Contrato", page: "grupos/contrato", icon: ClipboardList },
-        ],
-      },
-      {
         title: "Motoristas",
         icon: UserCheck,
         children: [

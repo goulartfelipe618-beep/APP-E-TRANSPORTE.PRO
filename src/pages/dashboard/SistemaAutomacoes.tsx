@@ -975,7 +975,7 @@ export default function SistemaAutomacoesPage() {
             <div>
               <h2 className="text-lg font-semibold text-foreground">Automações da plataforma</h2>
               <p className="text-sm text-muted-foreground">
-                Webhooks que cria manualmente (transfer, motorista, grupo). Pode configurar e excluir.
+                Webhooks que cria manualmente (transfer e motorista). Pode configurar e excluir.
               </p>
             </div>
             <div className="rounded-xl border border-border bg-card overflow-hidden">
@@ -1133,7 +1133,6 @@ export default function SistemaAutomacoesPage() {
                     <SelectLabel>CATEGORIAS DO SISTEMA</SelectLabel>
                     <SelectItem value="transfer">Transfer Executivo</SelectItem>
                     <SelectItem value="motorista">Motorista solicitação</SelectItem>
-                    <SelectItem value="grupo">Solicitação de Grupo</SelectItem>
                   </SelectGroup>
                 </SelectContent>
               </Select>

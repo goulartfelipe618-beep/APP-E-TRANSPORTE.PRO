@@ -83,14 +83,6 @@ function buildHomeSections(
       ],
     },
     {
-      title: "Grupos",
-      items: [
-        { title: "Solicitações", page: "grupos/solicitacoes", desc: "Pedidos para transporte em grupo.", icon: FileText },
-        { title: "Reservas", page: "grupos/reservas", desc: "Reservas e valores de grupos.", icon: BookOpen },
-        { title: "Contrato", page: "grupos/contrato", desc: "Contrato e termos para grupos.", icon: ClipboardList },
-      ],
-    },
-    {
       title: "Motoristas",
       items: [
         { title: "Cadastros", page: "motoristas/cadastros", desc: "Motoristas parceiros e fichas completas.", icon: UserCheck },

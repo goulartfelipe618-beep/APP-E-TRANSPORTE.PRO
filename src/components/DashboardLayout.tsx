@@ -35,9 +35,6 @@ import TransferSolicitacoesPage from "@/pages/dashboard/TransferSolicitacoes";
 import TransferReservasPage from "@/pages/dashboard/TransferReservas";
 import TransferContratoPage from "@/pages/dashboard/TransferContrato";
 import TransferGeolocalizacaoPage from "@/pages/dashboard/TransferGeolocalizacao";
-import GruposSolicitacoesPage from "@/pages/dashboard/GruposSolicitacoes";
-import GruposReservasPage from "@/pages/dashboard/GruposReservas";
-import GruposContratoPage from "@/pages/dashboard/GruposContrato";
 import MotoristaCadastrosPage from "@/pages/dashboard/MotoristaCadastros";
 import ClientesPage from "@/pages/dashboard/ClientesPage";
 import MotoristaSolicitacoesPage from "@/pages/dashboard/MotoristaSolicitacoes";
@@ -80,9 +77,6 @@ const PAGE_MAP: Record<string, React.ComponentType> = {
   "transfer/reservas": TransferReservasPage,
   "transfer/contrato": TransferContratoPage,
   "transfer/geolocalizacao": TransferGeolocalizacaoPage,
-  "grupos/solicitacoes": GruposSolicitacoesPage,
-  "grupos/reservas": GruposReservasPage,
-  "grupos/contrato": GruposContratoPage,
   "motoristas/cadastros": MotoristaCadastrosPage,
   clientes: ClientesPage,
   "motoristas/solicitacoes": MotoristaSolicitacoesPage,
@@ -230,7 +224,10 @@ function DashboardContent() {
       activePage === "mentoria" ||
       activePage === "empty-legs" ||
       activePage === "documentacao" ||
-      activePage === "planos"
+      activePage === "planos" ||
+      activePage === "grupos/solicitacoes" ||
+      activePage === "grupos/reservas" ||
+      activePage === "grupos/contrato"
     ) {
       setActivePage("entrada");
     }
