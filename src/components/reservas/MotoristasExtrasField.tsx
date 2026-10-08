@@ -1,6 +1,6 @@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { motoristaAssignValue } from "@/lib/motoristaReservaAssign";
+import { motoristaAssignValue, motoristaMatchesAssignment } from "@/lib/motoristaReservaAssign";
 
 type Motorista = { id: string; nome: string; portal_auth_user_id?: string | null };
 
@@ -34,7 +34,10 @@ export function MotoristasExtrasField({
           const value = motoristaAssignValue(m);
           return (
             <label key={m.id} className="flex cursor-pointer items-center gap-2 text-sm">
-              <Checkbox checked={selected.includes(value)} onCheckedChange={(checked) => toggle(value, checked === true)} />
+              <Checkbox
+                checked={selected.some((id) => id === value || motoristaMatchesAssignment(id, m))}
+                onCheckedChange={(checked) => toggle(value, checked === true)}
+              />
               <span>
                 {m.nome}
                 {!m.portal_auth_user_id ? " (portal pendente)" : ""}

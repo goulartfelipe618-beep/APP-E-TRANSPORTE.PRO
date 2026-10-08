@@ -78,7 +78,7 @@ export default function ComunicadorWhatsappPage() {
       const { error } = await supabase.from("comunicadores_evolution").insert({
         escopo: "usuario",
         user_id: user.id,
-        rotulo: "WhatsApp UAZAPI",
+        rotulo: "WhatsApp",
         connection_status: "desconectado",
         ...patch,
       });

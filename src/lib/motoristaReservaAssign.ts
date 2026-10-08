@@ -13,6 +13,17 @@ export function motoristaMatchesAssignment(
   return a === m.id || a === (m.portal_auth_user_id ?? "").trim();
 }
 
+/** Valor do Select: o mesmo que os itens usam, mesmo se a reserva guardou o outro id. */
+export function selectValueForMotorista(
+  assignment: string | null | undefined,
+  motoristas: { id: string; portal_auth_user_id?: string | null }[],
+): string {
+  const a = (assignment ?? "").trim();
+  if (!a) return "__none__";
+  const hit = motoristas.find((m) => motoristaMatchesAssignment(a, m));
+  return hit ? motoristaAssignValue(hit) : a;
+}
+
 export function resolveMotoristaNome(
   assignment: string | null | undefined,
   motoristas: { id: string; nome: string; portal_auth_user_id?: string | null }[],

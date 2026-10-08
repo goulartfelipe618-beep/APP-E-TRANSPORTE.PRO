@@ -144,7 +144,7 @@ export function ComunicadorEvolutionSection({
       <CardContent className="space-y-4">
         {hideQr && !readOnly && (
           <p className="text-sm text-muted-foreground">
-            A conexão WhatsApp é feita pelo comunicador (UAZAPI). O número sincronizado aparece aqui.
+            A conexão WhatsApp é feita no Comunicador. O número sincronizado aparece aqui.
           </p>
         )}
         {readOnly && !numeroLinha && !img && !loading && (
@@ -202,8 +202,7 @@ export function ComunicadorEvolutionSection({
             <AlertDialogHeader>
               <AlertDialogTitle>Desconectar WhatsApp?</AlertDialogTitle>
               <AlertDialogDescription>
-                Isso remove a instância na Evolution automaticamente e desvincula seu WhatsApp desta conta. Você poderá
-                conectar de novo ao gerar um novo QR Code.
+                Isso desvincula seu WhatsApp desta conta. Você poderá conectar de novo ao gerar um novo QR Code.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>

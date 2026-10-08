@@ -19,7 +19,7 @@ import { normalizeUserPlano, FREE_MAX_RESERVAS_DIA } from "@/lib/painelPlanPolic
 import { calendarDayKeySaoPauloFromIso, todayKeySaoPaulo } from "@/lib/spCalendarBr";
 import { splitAmountInTwoHalves, valorTotalFromBaseDiscount } from "@/lib/reservaIdaVoltaSplit";
 import { logUserActivity } from "@/lib/userActivityLog";
-import { motoristaAssignValue, motoristaMatchesAssignment } from "@/lib/motoristaReservaAssign";
+import { motoristaAssignValue, motoristaMatchesAssignment, selectValueForMotorista } from "@/lib/motoristaReservaAssign";
 import { listReservaMotoristasExtra, replaceReservaMotoristasExtra } from "@/lib/reservaMotoristasExtra";
 import { MotoristasExtrasField } from "@/components/reservas/MotoristasExtrasField";
 
@@ -691,8 +691,10 @@ export default function CriarReservaGrupoDialog({
               <div className="space-y-1.5 lg:col-span-2">
                 <Label>Motorista da frota (portal)</Label>
                 <Select
-                  value={motoristaAtribUid || "__none__"}
+                  key={selectValueForMotorista(motoristaAtribUid, motoristasFrota)}
+                  value={selectValueForMotorista(motoristaAtribUid, motoristasFrota)}
                   onValueChange={(v) => {
+                    if (!v) return;
                     const uid = v === "__none__" ? "" : v;
                     setMotoristaAtribUid(uid);
                     const hit = motoristasFrota.find((m) => motoristaMatchesAssignment(uid, m));

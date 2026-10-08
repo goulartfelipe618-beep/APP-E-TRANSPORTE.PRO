@@ -24,7 +24,7 @@ import {
   CATEGORIAS_VEICULO_TRANSFER,
   isCategoriaVeiculoTransfer,
 } from "@/lib/categoriaVeiculoTransfer";
-import { motoristaAssignValue, motoristaMatchesAssignment } from "@/lib/motoristaReservaAssign";
+import { motoristaAssignValue, motoristaMatchesAssignment, selectValueForMotorista } from "@/lib/motoristaReservaAssign";
 import { listReservaMotoristasExtra, replaceReservaMotoristasExtra } from "@/lib/reservaMotoristasExtra";
 import { MotoristasExtrasField } from "@/components/reservas/MotoristasExtrasField";
 import {
@@ -1153,8 +1153,12 @@ export default function CriarReservaTransferDialog({
                   <div className="space-y-1.5 sm:col-span-2">
                     <Label>Motorista da frota *</Label>
                     <Select
-                      value={motoristaAtribUid || "__none__"}
-                      onValueChange={(v) => setMotoristaAtribuido(v === "__none__" ? "" : v)}
+                      key={selectValueForMotorista(motoristaAtribUid, motoristasFrota)}
+                      value={selectValueForMotorista(motoristaAtribUid, motoristasFrota)}
+                      onValueChange={(v) => {
+                        if (!v) return;
+                        setMotoristaAtribuido(v === "__none__" ? "" : v);
+                      }}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Selecione quem executa a viagem" />
