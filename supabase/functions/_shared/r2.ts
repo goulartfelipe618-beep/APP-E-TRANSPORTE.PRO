@@ -19,18 +19,25 @@ export function r2Endpoint(): string {
   return `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`;
 }
 
-export function r2Client(): AwsClient {
-  const accessKeyId = Deno.env.get("R2_ACCESS_KEY_ID")?.trim() ?? "";
-  const secretAccessKey = Deno.env.get("R2_SECRET_ACCESS_KEY")?.trim() ?? "";
-  if (!accessKeyId || !secretAccessKey) {
+export function r2ClientWith(accessKeyId: string, secretAccessKey: string): AwsClient {
+  const id = accessKeyId.trim();
+  const secret = secretAccessKey.trim();
+  if (!id || !secret) {
     throw new Error("Credenciais R2 em falta (R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY).");
   }
   return new AwsClient({
-    accessKeyId,
-    secretAccessKey,
+    accessKeyId: id,
+    secretAccessKey: secret,
     service: "s3",
     region: "auto",
   });
+}
+
+export function r2Client(): AwsClient {
+  return r2ClientWith(
+    Deno.env.get("R2_ACCESS_KEY_ID") ?? "",
+    Deno.env.get("R2_SECRET_ACCESS_KEY") ?? "",
+  );
 }
 
 export function encodeR2Key(key: string): string {

@@ -234,7 +234,7 @@ async function runForUser(
 
   await markSettings(admin, userId, { last_status: "running", last_error: null });
 
-  const r2 = r2Client();
+  const r2 = await r2Client();
 
   const putBytes = async (rel: string, bytes: Uint8Array, contentType: string) => {
     const fp = await sha256Hex(bytes);

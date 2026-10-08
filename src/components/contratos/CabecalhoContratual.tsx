@@ -18,7 +18,8 @@ export default function CabecalhoContratual() {
   const [data, setData] = useState<CabecalhoData | null>(null);
 
   useEffect(() => {
-    (async () => {
+    let cancel = false;
+    const load = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
       const [cabRes, cfgRes] = await Promise.all([
@@ -30,8 +31,14 @@ export default function CabecalhoContratual() {
           .maybeSingle(),
       ]);
       const merged = mergeCabecalhoComPerfilSeNecessario(cabRes.data as any, cfgRes.data as any);
-      if (merged) setData(merged as CabecalhoData);
-    })();
+      if (!cancel) setData(merged ? (merged as CabecalhoData) : null);
+    };
+    void load();
+    window.addEventListener("configuracoes-updated", load);
+    return () => {
+      cancel = true;
+      window.removeEventListener("configuracoes-updated", load);
+    };
   }, []);
 
   if (!data || (!data.razao_social && !data.cnpj)) {

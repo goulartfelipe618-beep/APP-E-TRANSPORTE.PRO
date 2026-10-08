@@ -1,9 +1,8 @@
 /**
- * Imagens públicas: redireciona (302) para URL assinada do R2.
- * O ficheiro é descarregado no Cloudflare, não atravessa o body da Edge Function.
- * Se R2_PUBLIC_BASE_URL (domínio custom do bucket) existir, redireciona para esse CDN.
+ * Imagens públicas. Com CDN, redireciona para o domínio público.
+ * Sem CDN, entrega o ficheiro aqui: a URL assinada do R2 responde 403 no browser.
  */
-import { PUBLIC_STORAGE_BUCKETS, publicObjectUrl, r2Client, r2PresignGet } from "../_shared/r2.ts";
+import { PUBLIC_STORAGE_BUCKETS, publicObjectUrl, r2Client, r2ClientWith, r2Get } from "../_shared/r2.ts";
 
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
@@ -49,22 +48,71 @@ Deno.serve(async (req) => {
 
   let r2;
   try {
-    r2 = r2Client();
+    r2 = await openR2();
   } catch {
     return new Response("R2 não configurado", { status: 503, headers: corsHeaders });
   }
 
   try {
-    const location = await r2PresignGet(r2, key, 86400);
-    return new Response(null, {
-      status: 302,
-      headers: {
-        ...corsHeaders,
-        Location: location,
-        "Cache-Control": "private, max-age=60",
-      },
-    });
+    const upstream = await r2Get(r2, key);
+    if (!upstream.ok) {
+      await upstream.body?.cancel();
+      return new Response(req.method === "HEAD" ? null : "Not found", { status: 404, headers: corsHeaders });
+    }
+    const headers: Record<string, string> = {
+      ...corsHeaders,
+      "Content-Type": upstream.headers.get("content-type") || mimeFromKey(key),
+      "Cache-Control": "public, max-age=86400",
+    };
+    const len = upstream.headers.get("content-length");
+    if (len) headers["Content-Length"] = len;
+    if (req.method === "HEAD") {
+      await upstream.body?.cancel();
+      return new Response(null, { status: 200, headers });
+    }
+    return new Response(upstream.body, { status: 200, headers });
   } catch {
     return new Response("Not found", { status: 404, headers: corsHeaders });
   }
 });
+
+let r2Ready: Promise<Awaited<ReturnType<typeof openR2Once>>> | null = null;
+
+async function openR2() {
+  if (!r2Ready) r2Ready = openR2Once().catch((err) => {
+    r2Ready = null;
+    throw err;
+  });
+  return r2Ready;
+}
+
+async function openR2Once() {
+  try {
+    return r2Client();
+  } catch {
+    /* Segredos do projeto podem não estar no ambiente da função. */
+  }
+  const supabaseUrl = (Deno.env.get("SUPABASE_URL") ?? "").replace(/\/+$/, "");
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+  if (!supabaseUrl || !serviceKey) throw new Error("R2 sem credenciais");
+  const res = await fetch(
+    `${supabaseUrl}/rest/v1/app_internal_secrets?key=in.(R2_ACCESS_KEY_ID,R2_SECRET_ACCESS_KEY)&select=key,value`,
+    { headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` } },
+  );
+  if (!res.ok) throw new Error("R2 sem credenciais");
+  const rows = (await res.json()) as { key?: string; value?: string }[];
+  const access = rows.find((row) => row.key === "R2_ACCESS_KEY_ID")?.value ?? "";
+  const secret = rows.find((row) => row.key === "R2_SECRET_ACCESS_KEY")?.value ?? "";
+  return r2ClientWith(access, secret);
+}
+
+function mimeFromKey(key: string): string {
+  const ext = key.split(".").pop()?.toLowerCase() ?? "";
+  if (ext === "jpg" || ext === "jpeg") return "image/jpeg";
+  if (ext === "png") return "image/png";
+  if (ext === "webp") return "image/webp";
+  if (ext === "gif") return "image/gif";
+  if (ext === "ico") return "image/x-icon";
+  if (ext === "svg") return "image/svg+xml";
+  return "application/octet-stream";
+}

@@ -8,18 +8,38 @@ export function r2Endpoint(): string {
   return `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`;
 }
 
-export function r2Client(): AwsClient {
-  const accessKeyId = Deno.env.get("R2_ACCESS_KEY_ID")?.trim() || "";
-  const secretAccessKey = Deno.env.get("R2_SECRET_ACCESS_KEY")?.trim() || "";
-  if (!accessKeyId || !secretAccessKey) {
+function r2ClientWith(accessKeyId: string, secretAccessKey: string): AwsClient {
+  const id = accessKeyId.trim();
+  const secret = secretAccessKey.trim();
+  if (!id || !secret) {
     throw new Error("Credenciais R2 em falta (R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY).");
   }
   return new AwsClient({
-    accessKeyId,
-    secretAccessKey,
+    accessKeyId: id,
+    secretAccessKey: secret,
     service: "s3",
     region: "auto",
   });
+}
+
+export async function r2Client(): Promise<AwsClient> {
+  const fromEnvId = Deno.env.get("R2_ACCESS_KEY_ID")?.trim() || "";
+  const fromEnvSecret = Deno.env.get("R2_SECRET_ACCESS_KEY")?.trim() || "";
+  if (fromEnvId && fromEnvSecret) return r2ClientWith(fromEnvId, fromEnvSecret);
+  const supabaseUrl = (Deno.env.get("SUPABASE_URL") ?? "").replace(/\/+$/, "");
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+  if (!supabaseUrl || !serviceKey) {
+    throw new Error("Credenciais R2 em falta (R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY).");
+  }
+  const res = await fetch(
+    `${supabaseUrl}/rest/v1/app_internal_secrets?key=in.(R2_ACCESS_KEY_ID,R2_SECRET_ACCESS_KEY)&select=key,value`,
+    { headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` } },
+  );
+  if (!res.ok) throw new Error("Credenciais R2 em falta (R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY).");
+  const rows = (await res.json()) as { key?: string; value?: string }[];
+  const access = rows.find((row) => row.key === "R2_ACCESS_KEY_ID")?.value ?? "";
+  const secret = rows.find((row) => row.key === "R2_SECRET_ACCESS_KEY")?.value ?? "";
+  return r2ClientWith(access, secret);
 }
 
 export function encodeR2Key(key: string): string {

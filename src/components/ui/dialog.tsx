@@ -40,6 +40,22 @@ function isPortaledSelectEvent(event: { target: EventTarget | null }): boolean {
   );
 }
 
+function dialogTreeHasDescription(node: React.ReactNode): boolean {
+  let found = false;
+  React.Children.forEach(node, (child) => {
+    if (found || !React.isValidElement(child)) return;
+    const type = child.type as { displayName?: string } | string;
+    const name = typeof type === "function" || typeof type === "object" ? type?.displayName : type;
+    if (name === DialogPrimitive.Description.displayName || name === "DialogDescription") {
+      found = true;
+      return;
+    }
+    const nested = (child.props as { children?: React.ReactNode }).children;
+    if (nested) found = dialogTreeHasDescription(nested);
+  });
+  return found;
+}
+
 const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
   DialogContentProps
@@ -61,6 +77,9 @@ const DialogContent = React.forwardRef<
         onPointerDownOutside?.(e);
       }}
       {...props}
+      {...("aria-describedby" in props || dialogTreeHasDescription(children)
+        ? {}
+        : { "aria-describedby": undefined })}
     >
       {children}
       {showCloseButton ? (

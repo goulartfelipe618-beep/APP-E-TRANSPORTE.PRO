@@ -106,6 +106,32 @@ const ignoredKeys = [
   ...COMUNICAR_CLIENTE_CHAVES_CONFIDENCIAIS,
 ];
 
+function chaveFiltroComunicar(tipo: string | null): string {
+  return `comunicar-filtro-vars:${tipo ?? "geral"}`;
+}
+
+function lerFiltroComunicar(tipo: string | null): string[] | null {
+  if (typeof localStorage === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(chaveFiltroComunicar(tipo));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return null;
+    return parsed.filter((key): key is string => typeof key === "string");
+  } catch {
+    return null;
+  }
+}
+
+function gravarFiltroComunicar(tipo: string | null, keys: Iterable<string>) {
+  if (typeof localStorage === "undefined") return;
+  try {
+    localStorage.setItem(chaveFiltroComunicar(tipo), JSON.stringify([...keys]));
+  } catch {
+    /* armazenamento cheio ou bloqueado */
+  }
+}
+
 function nomeClienteParaComunicar(dados: Record<string, unknown>): string {
   const d = dados as { nome_cliente?: string; nome_completo?: string; nome?: string };
   const raw =
@@ -133,6 +159,8 @@ export default function ComunicarDialog({
   const [msgAcima, setMsgAcima] = useState("");
   const [msgAbaixo, setMsgAbaixo] = useState("");
   const [selectedVars, setSelectedVars] = useState<Set<string>>(new Set());
+  const selectedVarsRef = useRef(selectedVars);
+  selectedVarsRef.current = selectedVars;
 
   const availableVars = useMemo(
     () =>
@@ -157,8 +185,14 @@ export default function ComunicarDialog({
     const keys = Object.entries(dadosRef.current)
       .filter(([key, value]) => !ignoredKeys.includes(key) && value != null && value !== "")
       .map(([key]) => key);
-    setSelectedVars(new Set(keys));
-  }, [open, dadosFingerprint]);
+    const saved = lerFiltroComunicar(webhookTipo);
+    if (!saved) {
+      setSelectedVars(new Set(keys));
+      return;
+    }
+    const keep = new Set(saved);
+    setSelectedVars(new Set(keys.filter((key) => keep.has(key))));
+  }, [open, dadosFingerprint, webhookTipo]);
 
   const solicitacaoPresetKeyRef = useRef<string | null>(null);
   useEffect(() => {
@@ -327,6 +361,7 @@ export default function ComunicarDialog({
         } catch (webhookErr) {
           console.warn(webhookErr);
         }
+        gravarFiltroComunicar(webhookTipo, selectedVarsRef.current);
         enviadoOk = true;
       } catch (e) {
         console.error(e);
@@ -388,7 +423,9 @@ export default function ComunicarDialog({
           <div className="space-y-2">
             <div className="space-y-1">
               <Label>Variáveis do registro</Label>
-              <p className="text-xs text-muted-foreground">Todas vêm incluídas; clique num chip para excluir da mensagem.</p>
+              <p className="text-xs text-muted-foreground">
+                Clique num chip para incluir ou excluir. Depois de enviar, esse mesmo filtro fica fixo na próxima mensagem.
+              </p>
             </div>
             <div className="flex flex-wrap gap-2 max-h-[200px] overflow-y-auto rounded-lg border border-border p-3 bg-muted/30">
               {availableVars.map((v) => (

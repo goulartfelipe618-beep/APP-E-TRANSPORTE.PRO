@@ -11,6 +11,7 @@ interface CabRow {
   whatsapp: string;
   email_oficial: string;
   logo_contratual_url?: string | null;
+  assinatura_url?: string | null;
 }
 
 interface ContratoComoPdfPreviewProps {
@@ -19,6 +20,8 @@ interface ContratoComoPdfPreviewProps {
   clausulas: string;
   /** Mesmo rótulo usado no PDF na área de assinatura (lado cliente). */
   nomeClienteAssinatura?: string;
+  /** Quando o contrato está ativo, o cabeçalho e as imagens das configurações entram na pré-visualização. */
+  incluirIdentidade?: boolean;
 }
 
 /**
@@ -31,11 +34,13 @@ export default function ContratoComoPdfPreview({
   politica,
   clausulas,
   nomeClienteAssinatura = "Nome completo do contratante (como na reserva)",
+  incluirIdentidade = true,
 }: ContratoComoPdfPreviewProps) {
   const [cab, setCab] = useState<CabRow | null>(null);
 
   useEffect(() => {
-    (async () => {
+    let cancel = false;
+    const load = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
       const [cabRes, cfgRes] = await Promise.all([
@@ -47,8 +52,14 @@ export default function ContratoComoPdfPreview({
           .maybeSingle(),
       ]);
       const merged = mergeCabecalhoComPerfilSeNecessario(cabRes.data as any, cfgRes.data as any);
-      if (merged) setCab(merged as CabRow);
-    })();
+      if (!cancel) setCab(merged ? (merged as CabRow) : null);
+    };
+    void load();
+    window.addEventListener("configuracoes-updated", load);
+    return () => {
+      cancel = true;
+      window.removeEventListener("configuracoes-updated", load);
+    };
   }, []);
 
   const temAlgumTexto = Boolean(modelo?.trim() || politica?.trim() || clausulas?.trim());
@@ -64,7 +75,7 @@ export default function ContratoComoPdfPreview({
         className="p-6 md:p-8 max-w-[210mm] mx-auto min-h-[200px]"
         style={{ fontFamily: "Helvetica, Arial, sans-serif" }}
       >
-        {cab?.razao_social ? (
+        {incluirIdentidade && cab?.razao_social ? (
           <div className="-mx-6 md:-mx-8 -mt-6 md:-mt-8 mb-0 flex flex-col gap-3 rounded-t-xl bg-black px-6 py-4 text-white sm:flex-row sm:items-center sm:justify-between sm:gap-5">
             <div className="min-w-0 flex-1">
               <h2 className="text-[13pt] font-bold leading-tight">{cab.razao_social}</h2>
@@ -96,19 +107,19 @@ export default function ContratoComoPdfPreview({
               <img
                 src={cab.logo_contratual_url}
                 alt=""
-                className="mx-auto max-h-[88px] w-auto max-w-[140px] shrink-0 object-contain sm:mx-0"
+                className="mx-auto h-[88px] w-auto max-w-[160px] shrink-0 rounded-md bg-white object-contain p-1 sm:mx-0"
               />
             ) : null}
           </div>
-        ) : (
+        ) : incluirIdentidade ? (
           <p className="text-sm text-neutral-500 italic mb-4">
             Preencha o cabeçalho contratual em Configurações para ver a mesma identidade visual do PDF.
           </p>
-        )}
+        ) : null}
 
         <div
           className={
-            cab?.razao_social
+            incluirIdentidade && cab?.razao_social
               ? "-mx-6 md:-mx-8 mb-6 rounded-b-xl bg-black px-6 py-4 text-white"
               : "-mx-6 md:-mx-8 mb-6 rounded-xl bg-black px-6 py-4 text-white"
           }
@@ -165,6 +176,13 @@ export default function ContratoComoPdfPreview({
               <p className="text-neutral-500 text-[7.5pt] mt-1 whitespace-pre-wrap">{nomeClienteAssinatura}</p>
             </div>
             <div className="text-right">
+              {incluirIdentidade && cab?.assinatura_url ? (
+                <img
+                  src={cab.assinatura_url}
+                  alt="Assinatura"
+                  className="ml-auto mb-1 h-16 w-auto max-w-[180px] bg-white object-contain"
+                />
+              ) : null}
               <div className="border-t border-neutral-900 w-[72px] ml-auto mb-1" />
               <p className="font-bold text-neutral-900">Contratado</p>
               <p className="text-neutral-500 text-[7.5pt] mt-1">{cab?.razao_social || "Razão social (cabecalho)"}</p>

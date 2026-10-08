@@ -169,9 +169,14 @@ export default function TransferContratoPage() {
         </div>
       </div>
 
-      <CabecalhoContratual />
+      {incluirNoPdfConfirmacao ? <CabecalhoContratual /> : null}
 
-      <ContratoComoPdfPreview modelo={modelo} politica={politica} clausulas={clausulas} />
+      <ContratoComoPdfPreview
+        modelo={modelo}
+        politica={politica}
+        clausulas={clausulas}
+        incluirIdentidade={incluirNoPdfConfirmacao}
+      />
 
       <div className="rounded-xl border border-border bg-card p-6">
         <h3 className="font-semibold text-foreground mb-1">Editar textos do contrato</h3>
