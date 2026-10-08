@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { clearAuthStartedAt } from "@/lib/authExpiry";
+import { isTabLeader, onTabLeaderChange } from "@/lib/tabLeader";
 import {
   clearRevokeAck,
   fetchServerRevokedAtIso,
@@ -81,14 +82,20 @@ export default function ClientSessionRevocationGuard() {
       }
     };
 
-    void checkOnce();
+    const tick = () => {
+      if (!isTabLeader()) return;
+      if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
+      void checkOnce();
+    };
+
+    tick();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (!mounted) return;
 
       if (event === "SIGNED_IN" && session?.user) {
         revokeHandledRef.current = false;
-        void syncAckFromServer();
+        if (isTabLeader()) void syncAckFromServer();
       }
 
       if (event === "SIGNED_OUT") {
@@ -97,17 +104,19 @@ export default function ClientSessionRevocationGuard() {
       }
 
       if (session?.user && (event === "TOKEN_REFRESHED" || event === "SIGNED_IN")) {
-        void checkOnce();
+        tick();
       }
     });
 
-    const interval = window.setInterval(() => {
-      void checkOnce();
-    }, CHECK_EVERY_MS);
+    const interval = window.setInterval(tick, CHECK_EVERY_MS);
+    const unsubLeader = onTabLeaderChange((leader) => {
+      if (leader) tick();
+    });
 
     return () => {
       mounted = false;
       window.clearInterval(interval);
+      unsubLeader();
       subscription.unsubscribe();
     };
   }, [navigate]);

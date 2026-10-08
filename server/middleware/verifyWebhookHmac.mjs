@@ -22,6 +22,10 @@ function timingSafeEqualHex(a, b) {
 export function verifyWebhookHmacMiddleware(req, res, next) {
   const secret = process.env.WEBHOOK_INBOUND_HMAC_SECRET?.trim();
   if (!secret) {
+    if (process.env.NODE_ENV === "production") {
+      logger.warn("webhook hmac: secret ausente em produção");
+      return res.status(503).json({ error: "Webhook HMAC não configurado" });
+    }
     return next();
   }
 

@@ -49,13 +49,35 @@ function uaShort(req: Request): string | null {
   return ua.length > 160 ? `${ua.slice(0, 157)}...` : ua;
 }
 
+function jwtRole(token: string): string | null {
+  const part = token.split(".")[1];
+  if (!part) return null;
+  try {
+    const padded = part.replace(/-/g, "+").replace(/_/g, "/") + "=".repeat((4 - (part.length % 4)) % 4);
+    const payload = JSON.parse(atob(padded)) as { role?: unknown };
+    return typeof payload.role === "string" ? payload.role : null;
+  } catch {
+    return null;
+  }
+}
+
+function presentedTokens(req: Request): string[] {
+  const out: string[] = [];
+  const apikey = req.headers.get("apikey")?.trim();
+  if (apikey) out.push(apikey);
+  const m = req.headers.get("Authorization")?.match(/^Bearer\s+(.+)$/i);
+  const bearer = m?.[1]?.trim();
+  if (bearer) out.push(bearer);
+  return out;
+}
+
 function gatewayMatchesAnon(req: Request, anon: string): boolean {
-  const ak = req.headers.get("apikey");
-  if (ak === anon) return true;
-  const auth = req.headers.get("Authorization");
-  if (!auth) return false;
-  const m = auth.match(/^Bearer\s+(.+)$/i);
-  return m?.[1] === anon;
+  const tokens = presentedTokens(req);
+  if (tokens.length === 0) return false;
+  if (tokens.some((token) => token === anon)) return true;
+  // Depois de rotacionar a chave, a env da função pode divergir da chave do app.
+  // O gateway já aceitou a chave do projeto; aqui só confirmamos que é a chave anon.
+  return tokens.some((token) => jwtRole(token) === "anon");
 }
 
 const FP_RE = /^[a-f0-9]{64}$/i;

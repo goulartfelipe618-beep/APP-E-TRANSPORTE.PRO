@@ -1,0 +1,23 @@
+---
+description: A rota do React não autoriza; o banco e a Edge autorizam
+globs: src/**/*.{ts,tsx}
+alwaysApply: false
+---
+
+# Autorização no painel
+
+`ProtectedAdminRoute` / `ProtectedRoute` só escondem UI. O ataque ignora o React.
+
+- Leitura e escrita de dados: RLS. Função privilegiada: checar `user_roles` na Edge.
+- `/admin` e `admin-users`: só `admin_master`. Operador é `admin_transfer`.
+- Não mandar HTML cru (`dangerouslySetInnerHTML`). URLs de mídia: `isSafeMediaSrcUrl`.
+- Upload: MIME allowlist; SVG em logo público é risco de XSS se for servido como script.
+- Cliente nunca chama `service_role`. Webhook n8n: proxy Edge, não URL secreta no browser.
+
+```ts
+// ❌ BAD
+if (path === "/admin") return <Admin />; // e a tabela deixa SELECT a qualquer authenticated
+
+// ✅ GOOD
+// UI esconde /admin; admin-users recusa se role !== admin_master; RLS igual.
+```

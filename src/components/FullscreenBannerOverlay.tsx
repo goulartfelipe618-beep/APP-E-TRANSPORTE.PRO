@@ -105,23 +105,30 @@ export default function FullscreenBannerOverlay({ painel, activePage }: Props) {
 
   useEffect(() => {
     let cancelled = false;
+    let loading = false;
+    let retryAt = 0;
     const load = async () => {
-      const { data, error } = await supabase.from("admin_fullscreen_banners").select("*").eq("ativo", true);
-      if (cancelled) return;
-      if (error) {
-        console.error(error);
-        return;
+      if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
+      if (loading || Date.now() < retryAt) return;
+      loading = true;
+      try {
+        const { data, error } = await supabase.from("admin_fullscreen_banners").select("*").eq("ativo", true);
+        if (cancelled) return;
+        if (error) {
+          retryAt = Date.now() + 120_000;
+          console.error(error);
+          return;
+        }
+        retryAt = 0;
+        setRows((data || []) as BannerRow[]);
+      } finally {
+        loading = false;
       }
-      setRows((data || []) as BannerRow[]);
     };
     void load();
-    // Atualiza ao voltar ao separador / janela (banner criado pelo admin sem F5)
-    const onFocus = () => void load();
-    window.addEventListener("focus", onFocus);
     const interval = window.setInterval(() => void load(), 90_000);
     return () => {
       cancelled = true;
-      window.removeEventListener("focus", onFocus);
       window.clearInterval(interval);
     };
   }, []);

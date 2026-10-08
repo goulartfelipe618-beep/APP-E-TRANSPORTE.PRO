@@ -1,0 +1,24 @@
+---
+description: RLS e migrações sem abrir o banco nem apagar dados
+globs: supabase/migrations/**/*.sql
+alwaysApply: false
+---
+
+# RLS e migrações
+
+- Toda tabela nova: `ENABLE ROW LEVEL SECURITY` + policies por `auth.uid()` (ou staff). Sem policy, o authenticated não lê — não “corrigir” com `USING (true)`.
+- Policies com `(SELECT auth.uid())` (initplan), não `auth.uid()` solto em filtro quente.
+- `SECURITY DEFINER`: `search_path` fixo; checar role (`admin_transfer` / `admin_master`) **dentro** da função. View definer só com filtro `auth.uid()`; não virar invoker sem GRANT+policy.
+- Não recriar tabela para “limpar”. `ALTER` aditivo. Índice em produção: `CONCURRENTLY` quando possível.
+- `REVOKE ALL` de `anon`/`authenticated` em `app_internal_secrets` permanece. Só `service_role`.
+- DELETE de `financial_transactions`: dono (`user_id`); não cascade para `reservas_*`.
+
+```sql
+-- ❌ BAD
+CREATE POLICY p ON public.reservas_transfer FOR SELECT USING (true);
+
+-- ✅ GOOD
+CREATE POLICY p ON public.reservas_transfer
+  FOR SELECT TO authenticated
+  USING ((SELECT auth.uid()) = user_id);
+```

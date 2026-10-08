@@ -1,0 +1,24 @@
+---
+description: Muitas abas não podem saturar o Auth nem o Postgres
+globs: src/**/*.{ts,tsx}
+alwaysApply: false
+---
+
+# Painel com dezenas de abas
+
+Uma aba lidera (`src/lib/tabLeader.ts`). As outras leem a sessão em `localStorage`.
+
+- `autoRefreshToken` só na aba líder. Lock de auth **espera**; não usar `steal: true`.
+- Poll de sessão, banner e flags: só aba visível + líder. Sem `refetchOnWindowFocus` em queries globais.
+- `/auth/v1/token` e `/auth/v1/user` passam por `guardedFetch` (fila + pausa em 502/504/522).
+- `getSession()` para saber quem está logado. `getUser()` bate na rede — não em cada render.
+- Listagens grandes: `fetchAllSupabasePages` (páginas de 1000). Um `.limit(5000)` ainda corta em 1000.
+- Realtime: um canal por ecrã, unsubscribe no unmount. Não abrir websocket novo a cada tick.
+
+```ts
+// ❌ BAD
+setInterval(() => supabase.from("client_session_revocation").select("*"), 1000);
+
+// ✅ GOOD
+if (isTabLeader() && document.visibilityState === "visible") void checkOnce();
+```

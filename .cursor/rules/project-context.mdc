@@ -44,4 +44,6 @@ Adiciona manualmente **"+ Add new doc"** com estas URLs para o modelo usar APIs 
 
 ## Segurança (resumo)
 
-- Ver `README_SECURITY.md` na raiz (RLS, uploads, API Node, `npm run security-check`).
+- Regras em `.cursor/rules/`: `banco-producao`, `segredos`, `edge-functions-auth`, `rls-migrations`, `painel-abas`, `spa-autorizacao`.
+- Ver `README_SECURITY.md` na raiz (`npm run security-check`).
+- Não apagar dados de produção. Não desmontar o banco.

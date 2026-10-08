@@ -81,10 +81,38 @@ Deno.serve(async (req) => {
       return jsonOk({ ok: false, error: "Sessão inválida" }, 401);
     }
 
-    const body = (await req.json()) as { tipo?: string; payload?: unknown };
+    const supabaseAdmin = createClient(supabaseUrl, serviceKey);
+    const { data: roleRows } = await supabaseAdmin
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", user.id);
+    const roles = (roleRows || []).map((r: { role: string }) => r.role);
+    const podeOperar = roles.some((r) =>
+      r === "admin_transfer" || r === "admin_master" || r === "motorista_executivo"
+    );
+    if (!podeOperar) {
+      return jsonOk({ ok: false, error: "Sem permissão para disparar comunicação" }, 403);
+    }
+
+    const rawText = await req.text();
+    if (rawText.length > 400_000) {
+      return jsonOk({ ok: false, error: "Payload demasiado grande" }, 413);
+    }
+
+    let body: { tipo?: string; payload?: unknown };
+    try {
+      body = JSON.parse(rawText || "{}") as { tipo?: string; payload?: unknown };
+    } catch {
+      return jsonOk({ ok: false, error: "JSON inválido" }, 400);
+    }
     const tipo = String(body.tipo || "").trim();
     if (!TIPOS_VALIDOS.has(tipo)) {
       return jsonOk({ ok: false, error: "tipo de webhook inválido" }, 400);
+    }
+
+    const MASTER_ONLY = new Set(["motorista_intake", "motoristas_cadastrados"]);
+    if (MASTER_ONLY.has(tipo) && !roles.includes("admin_master")) {
+      return jsonOk({ ok: false, error: "Só o administrador master dispara este webhook" }, 403);
     }
 
     const col = COL[tipo];
@@ -92,7 +120,6 @@ Deno.serve(async (req) => {
       return jsonOk({ ok: false, error: "tipo não mapeado" }, 400);
     }
 
-    const supabaseAdmin = createClient(supabaseUrl, serviceKey);
     const { data: row, error: rowErr } = await supabaseAdmin
       .from("sistema_webhooks_comunicacao")
       .select("*")
@@ -147,7 +174,12 @@ Deno.serve(async (req) => {
           // Header opcional para o admin distinguir origens no n8n.
           "X-E-Transporte-Tipo": tipo,
         },
-        body: JSON.stringify(body.payload ?? {}),
+        body: JSON.stringify({
+          ...(body.payload && typeof body.payload === "object" && !Array.isArray(body.payload)
+            ? (body.payload as Record<string, unknown>)
+            : {}),
+          remetente_user_id: user.id,
+        }),
         signal: ctrl.signal,
       });
     } catch (fetchErr) {

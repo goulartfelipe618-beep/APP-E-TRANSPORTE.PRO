@@ -1,9 +1,8 @@
 /**
  * HMAC-SHA256 (hex) para webhooks inbound (Edge Functions / Deno).
- * Documentação: API & Webhooks — validação de assinatura HMAC.
  *
- * Variável: WEBHOOK_INBOUND_HMAC_SECRET — se definida, o pedido deve incluir
- * o cabeçalho `x-webhook-signature` com o mesmo digest do corpo bruto (UTF-8).
+ * Secret: WEBHOOK_INBOUND_HMAC_SECRET (env da Edge ou app_internal_secrets).
+ * Cabeçalho: x-webhook-signature = digest hex do corpo bruto UTF-8.
  */
 
 export async function hmacSha256Hex(secret: string, message: string): Promise<string> {
@@ -29,13 +28,30 @@ function timingSafeEqualHex(a: string, b: string): boolean {
   return acc === 0;
 }
 
-export async function requireWebhookHmacIfConfigured(
+export async function resolveWebhookHmacSecret(
+  lookup?: (key: string) => Promise<string | null>,
+): Promise<string> {
+  const fromEnv = Deno.env.get("WEBHOOK_INBOUND_HMAC_SECRET")?.trim() ?? "";
+  if (fromEnv) return fromEnv;
+  if (!lookup) return "";
+  try {
+    return ((await lookup("WEBHOOK_INBOUND_HMAC_SECRET")) ?? "").trim();
+  } catch {
+    return "";
+  }
+}
+
+export async function verifyWebhookHmac(
+  secret: string,
   rawBody: string,
   signatureHeader: string | null,
 ): Promise<{ ok: true } | { ok: false; status: number; body: string }> {
-  const secret = Deno.env.get("WEBHOOK_INBOUND_HMAC_SECRET")?.trim();
   if (!secret) {
-    return { ok: true };
+    return {
+      ok: false,
+      status: 503,
+      body: JSON.stringify({ error: "Webhook HMAC não configurado" }),
+    };
   }
 
   const provided = (signatureHeader || "").trim().toLowerCase();
@@ -57,6 +73,16 @@ export async function requireWebhookHmacIfConfigured(
   }
 
   return { ok: true };
+}
+
+/** Se o secret existir, a assinatura é obrigatória. Sem secret, o caller decide o fail-closed. */
+export async function requireWebhookHmacIfConfigured(
+  rawBody: string,
+  signatureHeader: string | null,
+): Promise<{ ok: true } | { ok: false; status: number; body: string }> {
+  const secret = await resolveWebhookHmacSecret();
+  if (!secret) return { ok: true };
+  return verifyWebhookHmac(secret, rawBody, signatureHeader);
 }
 
 export function timingSafeEqualUtf8(a: string, b: string): boolean {

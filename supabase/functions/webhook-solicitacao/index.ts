@@ -1,6 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { computeLeadPassword } from "../_shared/lead_password.ts";
-import { requireWebhookHmacIfConfigured } from "../_shared/webhook_hmac.ts";
+import { generateLeadPassword } from "../_shared/lead_password.ts";
+import { resolveWebhookHmacSecret, verifyWebhookHmac } from "../_shared/webhook_hmac.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -140,16 +140,6 @@ Deno.serve(async (req) => {
     }
 
     const rawBody = await req.text();
-    const hmacCheck = await requireWebhookHmacIfConfigured(
-      rawBody,
-      req.headers.get("x-webhook-signature"),
-    );
-    if (!hmacCheck.ok) {
-      return new Response(hmacCheck.body, {
-        status: hmacCheck.status,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
 
     let body: Record<string, any>;
     try {
@@ -170,6 +160,25 @@ Deno.serve(async (req) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, serviceRoleKey);
+
+    const hmacSecret = await resolveWebhookHmacSecret(async (key) => {
+      const { data } = await supabase.from("app_internal_secrets").select("value").eq("key", key).maybeSingle();
+      return typeof data?.value === "string" ? data.value : null;
+    });
+    const hmacOk = hmacSecret.length > 0;
+    if (hmacOk) {
+      const hmacCheck = await verifyWebhookHmac(
+        hmacSecret,
+        rawBody,
+        req.headers.get("x-webhook-signature"),
+      );
+      if (!hmacCheck.ok) {
+        return new Response(hmacCheck.body, {
+          status: hmacCheck.status,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
 
     let automacao: any = null;
     let autoError: any = null;
@@ -458,7 +467,7 @@ Deno.serve(async (req) => {
 
       const frotaIntakeRaw = (req.headers.get("x-frota-motorista-intake") || "").trim().toLowerCase();
       const isExplicitFrotaMotoristaIntake =
-        frotaIntakeRaw === "true" || frotaIntakeRaw === "1" || frotaIntakeRaw === "yes";
+        hmacOk && (frotaIntakeRaw === "true" || frotaIntakeRaw === "1" || frotaIntakeRaw === "yes");
 
       /** Sem cabeçalho de frota, nunca gravar em fila do dono do URL (evita leak da landing global). */
       const intakeDestino: "plataforma_landing" | "frota_parceiros" = isPlatformLandingIntake
@@ -484,6 +493,16 @@ Deno.serve(async (req) => {
         return new Response(
           JSON.stringify({ error: "Campos obrigatórios ausentes: email/telefone" }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      if (!hmacOk) {
+        return new Response(
+          JSON.stringify({
+            error:
+              "Cadastro de motorista exige HMAC. Defina WEBHOOK_INBOUND_HMAC_SECRET nas secrets da Edge e envie x-webhook-signature.",
+          }),
+          { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } },
         );
       }
 
@@ -524,7 +543,7 @@ Deno.serve(async (req) => {
       let authUserId = existingUserId;
 
       if (!authUserId) {
-        const computedPassword = computeLeadPassword(leadNome, String(leadTelefone));
+        const computedPassword = generateLeadPassword();
         const { data: newUser, error: createErr } = await supabase.auth.admin.createUser({
           email: leadEmail,
           password: computedPassword,

@@ -1,0 +1,22 @@
+---
+description: Segredos, .env e o que nunca vai para o cliente ou o Git
+alwaysApply: true
+---
+
+# Segredos
+
+- Não commitar `.env`, `body.txt`, YAML enorme da UAZAPI, pasta `APP-E-TRANSPORTE.PRO/`, keystores.
+- Cliente (Vercel/`VITE_*`): só URL do Supabase, chave **anon**, `VITE_R2_PUBLIC_BASE_URL`. Nunca R2 access key, `service_role`, token UAZAPI, `MP_ACCESS_TOKEN`.
+- Servidor: `app_internal_secrets` ou secrets das Edge Functions. Token de plataforma UAZAPI só na chave `UAZAPI_PLATFORM_CREATE_TOKEN`.
+- `.env` local mistura `VITE_*` com `MP_*` e R2 — não copiar isso para o frontend. Não imprimir valores.
+- `R2_SYNC_SECRET` e `R2_BACKUP_CRON_SECRET` não podem ser iguais a `R2_SECRET_ACCESS_KEY`.
+- `MOTORISTA_VERIFICACAO_JWT_SECRET` próprio; não derivar da service role.
+- Gmail: `GOOGLE_GMAIL_CLIENT_ID` / `SECRET` só em `app_internal_secrets`. Não inventar.
+
+```ts
+// ❌ BAD
+const supabase = createClient(url, import.meta.env.VITE_SERVICE_ROLE);
+
+// ✅ GOOD
+const supabase = createClient(url, import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY);
+```

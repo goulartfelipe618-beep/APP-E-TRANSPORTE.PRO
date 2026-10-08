@@ -1,0 +1,27 @@
+---
+description: Autenticação obrigatória em Edge Functions
+globs: supabase/functions/**/*.ts
+alwaysApply: false
+---
+
+# Edge Functions
+
+`verify_jwt = false` no `config.toml` **não** autoriza o pedido. A função valida sozinha.
+
+- Webhook público: HMAC obrigatório em produção (`WEBHOOK_INBOUND_HMAC_SECRET`). Sem secret, recusar. Não identificar só por `automacao_id` na query.
+- Header `x-frota-motorista-intake` não é autenticação. Exigir o mesmo HMAC/secret da automação.
+- Sessão de operador: `getUser()` no Bearer. Ações de plataforma (`comunicar-webhook-dispatch`, admin) exigem `admin_master` ou `is_platform_staff`.
+- Cron R2: header de secret dedicado, não a access key do R2.
+- `self-upgrade-plan`: se Mercado Pago não estiver configurado na Edge, **não** gravar plano pago.
+- `r2-media` só buckets públicos allowlist. Docs de motorista passam por `r2-private-media` com URL assinada.
+- CORS `*` não substitui auth. Deploy MCP inclui **todos** os ficheiros irmãos (`./` não `../_shared` no bundle live).
+- Senha de lead previsível (nome+telefone+ETP) é proibida em código novo.
+
+```ts
+// ❌ BAD
+if (!hmacSecret) { /* segue sem verificar */ }
+
+// ✅ GOOD
+if (!hmacSecret) return new Response("misconfigured", { status: 503 });
+if (!validHmac) return new Response("unauthorized", { status: 401 });
+```

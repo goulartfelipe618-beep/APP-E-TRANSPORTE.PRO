@@ -10,6 +10,7 @@ export function onlyLettersUpper(input: string): string {
   return stripAccents(input).replace(/[^a-zA-Z]/g, "").toUpperCase();
 }
 
+/** Legado: não usar em contas novas. Fórmula previsível a partir do nome e telefone. */
 export function computeLeadPassword(nome: string, telefone: string): string {
   const letters = onlyLettersUpper(nome);
   const first3 = (letters.slice(0, 3) || "").padEnd(3, "X");
@@ -18,4 +19,15 @@ export function computeLeadPassword(nome: string, telefone: string): string {
   const last4 = (digits.slice(-4) || "").padStart(4, "0");
 
   return `${first3}${last4}ETP`;
+}
+
+const PWD_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
+
+/** Senha de primeiro acesso: aleatória. O lead entra com recuperação de senha se não a receber por outro canal. */
+export function generateLeadPassword(): string {
+  const bytes = new Uint8Array(20);
+  crypto.getRandomValues(bytes);
+  let out = "";
+  for (const b of bytes) out += PWD_ALPHABET[b % PWD_ALPHABET.length];
+  return out;
 }

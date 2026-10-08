@@ -1,0 +1,26 @@
+---
+description: Não apagar dados nem desmontar o banco de produção
+alwaysApply: true
+---
+
+# Banco de produção (usuários ativos)
+
+Projeto `lsfwmbpvithxqerfdlhy`. Há milhares de reservas e lançamentos em uso.
+
+- Nunca `DELETE`, `TRUNCATE`, `DROP TABLE`, `DROP SCHEMA`, `DROP DATABASE`.
+- Nunca apagar usuários de `auth.users` nem redefinir senhas em massa.
+- Nunca `RESET` de branch, merge destrutivo, ou `apply_migration` que remova coluna/tabela com dados.
+- Nunca desligar RLS de uma vez em várias tabelas. Nunca `GRANT` amplo a `anon`.
+- View `r2_auto_backup_status`: não ligar `security_invoker=true` sem `GRANT SELECT` + policy na tabela; senão o painel vê zero linhas.
+- Correção de RLS: só `CREATE POLICY` / `ALTER POLICY` aditiva, testada com `COUNT(*)` antes e depois. Se a contagem cair, reverter a policy — não os dados.
+- SQL permitido: `SELECT`, `COUNT`, `EXPLAIN`, `CREATE INDEX CONCURRENTLY`, policy aditiva, `INSERT` pontual pedida pelo dono.
+- Secrets (tokens, chaves, e-mails, ids) não vão para o chat nem para commit.
+
+```sql
+-- ❌ BAD
+DELETE FROM reservas_transfer;
+DROP VIEW public.r2_auto_backup_status;
+
+-- ✅ GOOD
+SELECT count(*) FROM reservas_transfer;
+```
