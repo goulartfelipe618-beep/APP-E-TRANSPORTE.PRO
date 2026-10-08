@@ -81,3 +81,7 @@ verify_jwt = false
 
 [functions.r2-purge-storage-images]
 verify_jwt = false
+
+# O retorno do Google chega sem JWT. A função valida o usuário no POST.
+[functions.gmail-oauth]
+verify_jwt = false

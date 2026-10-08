@@ -14,6 +14,7 @@ import {
 } from "@/lib/transferPernaViagem";
 import { labelCategoriaVeiculoTransfer } from "@/lib/categoriaVeiculoTransfer";
 import { parseTrajetosTransfer } from "@/lib/transferTrajetos";
+import { TextoComLinks } from "@/components/TextoComLinks";
 
 type Reserva = Tables<"reservas_transfer">;
 
@@ -37,7 +38,7 @@ export default function DetalhesReservaTransferSheet({ reserva, open, onOpenChan
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="sm:max-w-lg overflow-y-auto">
+      <SheetContent className="sm:max-w-lg min-w-0 overflow-x-hidden overflow-y-auto">
         <SheetHeader>
           <SheetTitle>Detalhes da Reserva</SheetTitle>
           <p className="text-sm text-muted-foreground">Reserva #{r.numero_reserva}</p>
@@ -178,7 +179,7 @@ export default function DetalhesReservaTransferSheet({ reserva, open, onOpenChan
             <>
               <Separator />
               <Section title="Observações">
-                <p className="text-sm bg-muted/50 rounded-lg p-3">{r.observacoes}</p>
+                <TextoComLinks text={r.observacoes} className="rounded-lg bg-muted/50 p-3 text-sm" />
               </Section>
             </>
           )}
@@ -212,9 +213,9 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 function Field({ label, value, full }: { label: string; value: React.ReactNode | string | null | undefined; full?: boolean }) {
   return (
-    <div className={full ? "col-span-2" : ""}>
+    <div className={full ? "col-span-2 min-w-0" : "min-w-0"}>
       <p className="text-xs text-muted-foreground">{label}</p>
-      <p className="text-sm font-medium">{value || "—"}</p>
+      <p className="break-words text-sm font-medium [overflow-wrap:anywhere]">{value || "—"}</p>
     </div>
   );
 }

@@ -16,6 +16,7 @@ import { formatTransferTipoViagemExibicao } from "@/lib/transferPernaViagem";
 import { formatDbCalendarDatePtBr, formatHoraReserva } from "@/lib/painelAgendaReservas";
 import { labelCategoriaVeiculoTransfer } from "@/lib/categoriaVeiculoTransfer";
 import { parseTrajetosTransfer } from "@/lib/transferTrajetos";
+import { TextoComLinks } from "@/components/TextoComLinks";
 
 type Props = {
   transfer: FrotaPortalTransferReserva | null;
@@ -163,9 +164,10 @@ export default function FrotaReservaDetalheSheet({ transfer, grupo, open, onOpen
 
             <div className="rounded-xl border border-border bg-card p-4">
               <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Observações da reserva</p>
-              <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-foreground">
-                {row.observacoes?.trim() || "Sem observações cadastradas."}
-              </p>
+              <TextoComLinks
+                text={row.observacoes?.trim() || "Sem observações cadastradas."}
+                className="mt-2 text-sm leading-relaxed text-foreground"
+              />
             </div>
 
             <div className="space-y-2">

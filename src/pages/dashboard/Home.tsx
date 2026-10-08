@@ -117,6 +117,7 @@ function buildHomeSections(
   ];
 
   const ferramentasItems: ToolDef[] = [
+    { title: "E-mail", page: "email", desc: "Conecte o Gmail desta operação com um clique.", icon: Mail },
     { title: "Geolocalização", page: "transfer/geolocalizacao", desc: "Rastreamento e envio de posição ao cliente.", icon: Map },
     { title: "Receptivos", page: "marketing/receptivos", desc: "Materiais e páginas para receptivo.", icon: Globe },
     { title: "QR Codes", page: "marketing/qrcode", desc: "QR Codes para divulgação e acesso rápido.", icon: Search },

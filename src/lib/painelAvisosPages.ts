@@ -26,6 +26,7 @@ export const PAGINAS_MOTORISTA: { value: string; label: string }[] = [
   { value: "network", label: "Network" },
   { value: "comunidade", label: "Comunidade" },
   { value: "email-business", label: "E-mail Business" },
+  { value: "email", label: "E-mail" },
   { value: "website", label: "Website" },
   { value: "dominios", label: "Domínios" },
   { value: "anotacoes", label: "Anotações" },

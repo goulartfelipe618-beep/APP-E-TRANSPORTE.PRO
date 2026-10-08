@@ -2804,6 +2804,10 @@ export type Database = {
         }[]
       }
       is_admin_master: { Args: { _user_id: string }; Returns: boolean }
+      gmail_minha_conta: {
+        Args: never
+        Returns: { email: string; updated_at: string }[]
+      }
       criar_token_claude_code: {
         Args: { p_nome?: string }
         Returns: Json

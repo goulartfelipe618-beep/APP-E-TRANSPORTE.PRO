@@ -23,6 +23,7 @@ import {
 import { PainelContentZoomProvider } from "@/contexts/PainelContentZoomContext";
 import { PainelScaledContent } from "@/components/painel/PainelScaledContent";
 import { logUserActivity } from "@/lib/userActivityLog";
+import { toast } from "sonner";
 import { useR2AutoBackupCatchup } from "@/hooks/useR2AutoBackupCatchup";
 
 // Import all page components
@@ -45,6 +46,7 @@ import MarketingReceptivosPage from "@/pages/dashboard/MarketingReceptivos";
 import MarketingQRCodePage from "@/pages/dashboard/MarketingQRCode";
 import NetworkPage from "@/pages/dashboard/NetworkPage";
 import EmailBusinessPage from "@/pages/dashboard/EmailBusinessPage";
+import EmailPage from "@/pages/dashboard/EmailPage";
 import WebsitePage from "@/pages/dashboard/WebsitePage";
 import DominiosPage from "@/pages/dashboard/DominiosPage";
 import AnotacoesPage from "@/pages/dashboard/AnotacoesPage";
@@ -88,6 +90,7 @@ const PAGE_MAP: Record<string, React.ComponentType> = {
   network: NetworkPage,
   comunidade: CommunityPage,
   "email-business": EmailBusinessPage,
+  email: EmailPage,
   website: WebsitePage,
   dominios: DominiosPage,
   anotacoes: AnotacoesPage,
@@ -196,6 +199,18 @@ function DashboardContent() {
     window.addEventListener("network-highlight-dismissed", handler);
     return () => window.removeEventListener("network-highlight-dismissed", handler);
   }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const gmail = params.get("gmail");
+    if (gmail !== "conectado" && gmail !== "erro") return;
+    setActivePage("email");
+    if (gmail === "conectado") toast.success("Gmail conectado.");
+    else toast.error("Não foi possível conectar o Gmail.");
+    params.delete("gmail");
+    const next = params.toString();
+    window.history.replaceState({}, "", `${window.location.pathname}${next ? `?${next}` : ""}`);
+  }, [setActivePage]);
 
   /** Marketing só se o Admin Master liberar a categoria no painel master. */
   useEffect(() => {

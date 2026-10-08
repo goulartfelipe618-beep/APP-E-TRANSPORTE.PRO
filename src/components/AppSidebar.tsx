@@ -145,6 +145,7 @@ const getMenuStructure = (
   {
     label: "Ferramentas",
     items: [
+      { title: "E-mail", page: "email", icon: Mail },
       { title: "Geolocalização", page: "transfer/geolocalizacao", icon: Map },
       { title: "Receptivos", page: "marketing/receptivos", icon: Globe },
       { title: "QR Codes", page: "marketing/qrcode", icon: Search },
