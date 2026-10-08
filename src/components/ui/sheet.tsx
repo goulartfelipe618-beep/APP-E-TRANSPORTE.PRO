@@ -52,6 +52,22 @@ interface SheetContentProps
   extends React.ComponentPropsWithoutRef<typeof SheetPrimitive.Content>,
     VariantProps<typeof sheetVariants> {}
 
+function sheetTreeHasDescription(node: React.ReactNode): boolean {
+  let found = false;
+  React.Children.forEach(node, (child) => {
+    if (found || !React.isValidElement(child)) return;
+    const type = child.type as { displayName?: string } | string;
+    const name = typeof type === "function" || typeof type === "object" ? type?.displayName : type;
+    if (name === SheetPrimitive.Description.displayName || name === "SheetDescription" || name === "DialogDescription") {
+      found = true;
+      return;
+    }
+    const nested = (child.props as { children?: React.ReactNode }).children;
+    if (nested) found = sheetTreeHasDescription(nested);
+  });
+  return found;
+}
+
 function isPortaledSelectEvent(event: { target: EventTarget | null }): boolean {
   const el = event.target;
   if (!(el instanceof Element)) return false;
@@ -76,6 +92,9 @@ const SheetContent = React.forwardRef<React.ElementRef<typeof SheetPrimitive.Con
           onPointerDownOutside?.(e);
         }}
         {...props}
+        {...("aria-describedby" in props || sheetTreeHasDescription(children)
+          ? {}
+          : { "aria-describedby": undefined })}
       >
         {children}
         <SheetPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity data-[state=open]:bg-secondary hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none">

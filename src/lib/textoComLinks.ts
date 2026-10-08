@@ -1,5 +1,16 @@
-const ROTULO_RE =
-  /(?<=\S)\s+(?=(?:Nome|Tipo de Ve[ií]culo|Classe|N[uú]mero de Passageiros|Telefone|N[uú]mero do Voo|N[uú]mero de Confirma[cç][aã]o|Embarque|Desembarque|Hor[aá]rio|Em):)/g;
+const ROTULO =
+  "Nome|Tipo de Ve[ií]culo|Classe|N[uú]mero de Passageiros|Telefone|N[uú]mero do Voo|N[uú]mero de Confirma[cç][aã]o|Embarque|Desembarque|Hor[aá]rio|Em";
+
+const ROTULO_RE = new RegExp(`(?<=\\S)\\s+(?=(?:${ROTULO}):)`, "g");
+
+const ROTULO_LINHA_RE = new RegExp(`^(${ROTULO}):\\s*(.*)$`);
+
+/** Separa "Nome: Ana" em rótulo e valor. O valor depois dos dois-pontos fica intacto. */
+export function separarRotulo(linha: string): { rotulo: string; valor: string } | null {
+  const match = linha.match(ROTULO_LINHA_RE);
+  if (!match) return null;
+  return { rotulo: `${match[1]}:`, valor: match[2] };
+}
 
 /** Mantém Enter do formulário e separa trechos colados com | ou vários espaços. */
 export function organizarTextoReserva(raw: string): string {

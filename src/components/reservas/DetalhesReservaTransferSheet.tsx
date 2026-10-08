@@ -182,7 +182,7 @@ export default function DetalhesReservaTransferSheet({ reserva, open, onOpenChan
               <Field label="Valor Base" value={formatCurrency(r.valor_base)} />
               <Field label="Desconto" value={`${Number(r.desconto)}%`} />
               <Field label="Método de Pagamento" value={r.metodo_pagamento} />
-              <Field label="Valor Total" value={<span className="text-base font-bold text-primary">{formatCurrency(r.valor_total)}</span>} />
+              <Field label="Valor Total" value={<span className="text-base font-normal text-primary">{formatCurrency(r.valor_total)}</span>} />
               <Field
                 label="Repasse ao motorista"
                 value={
@@ -206,7 +206,7 @@ export default function DetalhesReservaTransferSheet({ reserva, open, onOpenChan
             <>
               <Separator />
               <Section title="Motoristas">
-                <TextoComLinks text={motoristasTexto} className="text-sm font-medium" />
+                <TextoComLinks text={motoristasTexto} className="text-sm" />
               </Section>
             </>
           ) : null}
@@ -250,11 +250,11 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 function Field({ label, value, full }: { label: string; value: React.ReactNode | string | null | undefined; full?: boolean }) {
   return (
     <div className={full ? "col-span-2 min-w-0" : "min-w-0"}>
-      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className="text-xs font-bold text-foreground">{label}</p>
       {typeof value === "string" && value.trim() ? (
-        <TextoComLinks text={value} className="text-sm font-medium" />
+        <TextoComLinks text={value} className="text-sm" />
       ) : (
-        <p className="break-words text-sm font-medium [overflow-wrap:anywhere]">{value || "—"}</p>
+        <p className="break-words text-sm font-normal [overflow-wrap:anywhere]">{value || "—"}</p>
       )}
     </div>
   );

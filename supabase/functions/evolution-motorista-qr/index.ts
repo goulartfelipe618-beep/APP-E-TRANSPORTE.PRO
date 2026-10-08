@@ -24,6 +24,10 @@ function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
 
+function tokenRecusado(status: number, text: string): boolean {
+  return status === 401 && /invalid token/i.test(text);
+}
+
 function failureResponse(message: string, detail: string, code?: string) {
   return new Response(
     JSON.stringify({
@@ -81,9 +85,15 @@ Deno.serve(async (req) => {
     let resolvedName = instanceName;
     let root = uazapiRoot(baseUrl);
 
+    if (token) {
+      const probe = await uazapiStatus(root, token);
+      if (tokenRecusado(probe.status, probe.text)) token = null;
+    }
+
     if (!token) {
       const platformToken = await loadPlatformCreateToken(supabaseAdmin);
-      const names = [instanceName, `${instanceName}-${Date.now().toString(36).slice(-6)}`];
+      const suffix = Date.now().toString(36).slice(-6);
+      const names = [`${instanceName}-${suffix}`, instanceName];
       let lastCreateErr = "";
       for (const name of names) {
         try {
@@ -120,6 +130,7 @@ Deno.serve(async (req) => {
     let lastStatus = 0;
     let b64: string | null = null;
     let connectStarted = false;
+    let recriouToken = false;
 
     for (const wait of delaysMs) {
       if (wait > 0) await sleep(wait);
@@ -127,6 +138,29 @@ Deno.serve(async (req) => {
       const st = await uazapiStatus(root, token);
       lastStatus = st.status;
       lastText = st.text;
+      if (!recriouToken && tokenRecusado(st.status, st.text)) {
+        recriouToken = true;
+        token = "";
+        const platformToken = await loadPlatformCreateToken(supabaseAdmin);
+        const created = await createInstanceViaPlatform({
+          name: `${instanceName}-${Date.now().toString(36).slice(-6)}`,
+          deviceName: "E-Transporte.pro",
+          platformToken,
+        });
+        token = created.instanceToken;
+        resolvedName = created.instanceName || resolvedName;
+        root = uazapiRoot(created.serverUrl || baseUrl);
+        connectStarted = false;
+        await persistUazapiInstanceToken(supabaseAdmin, {
+          target,
+          userId: user.id,
+          instanceName: resolvedName,
+          token,
+          serverUrl: root,
+          extra: { connection_status: "aguardando_qr" },
+        });
+        continue;
+      }
       if (isUazapiConnected(extractUazapiStatus(st.json))) {
         return failureResponse(
           "Esta instância já está conectada ao WhatsApp.",
@@ -142,6 +176,28 @@ Deno.serve(async (req) => {
       const conn = await uazapiConnectQr(root, token);
       lastStatus = conn.status;
       lastText = conn.text;
+      if (!recriouToken && tokenRecusado(conn.status, conn.text)) {
+        recriouToken = true;
+        const platformToken = await loadPlatformCreateToken(supabaseAdmin);
+        const created = await createInstanceViaPlatform({
+          name: `${instanceName}-${Date.now().toString(36).slice(-6)}`,
+          deviceName: "E-Transporte.pro",
+          platformToken,
+        });
+        token = created.instanceToken;
+        resolvedName = created.instanceName || resolvedName;
+        root = uazapiRoot(created.serverUrl || baseUrl);
+        connectStarted = false;
+        await persistUazapiInstanceToken(supabaseAdmin, {
+          target,
+          userId: user.id,
+          instanceName: resolvedName,
+          token,
+          serverUrl: root,
+          extra: { connection_status: "aguardando_qr" },
+        });
+        continue;
+      }
       if (conn.status === 409) continue;
       if (isUazapiConnected(extractUazapiStatus(conn.json))) {
         return failureResponse(
