@@ -4,6 +4,7 @@ import "./index.css";
 import { AppErrorBoundary } from "./components/AppErrorBoundary";
 import { installBrowserZoomLock } from "./lib/installBrowserZoomLock";
 import { installVercelSkewProtection } from "./lib/vercelSkewProtection";
+import { isCapacitorNative, primeFrotaLaunchUrl } from "./lib/capacitorFrota";
 
 installVercelSkewProtection();
 
@@ -98,8 +99,20 @@ if (typeof window !== "undefined") {
   initChatwootSupportWidget();
 }
 
-createRoot(document.getElementById("root")!).render(
-  <AppErrorBoundary>
-    <App />
-  </AppErrorBoundary>,
-);
+function renderApp() {
+  createRoot(document.getElementById("root")!).render(
+    <AppErrorBoundary>
+      <App />
+    </AppErrorBoundary>,
+  );
+}
+
+if (!isCapacitorNative()) {
+  renderApp();
+} else {
+  void primeFrotaLaunchUrl()
+    .catch(() => {
+      /* link inválido: abre o portal na rota normal */
+    })
+    .finally(renderApp);
+}

@@ -26,6 +26,7 @@ import LoginConfiguracoesSection from "@/pages/dashboard/LoginConfiguracoesSecti
 import { uploadFileToR2 } from "@/lib/mirrorUploadToR2";
 import WebsiteEmbedSnippetSection from "@/components/admin/WebsiteEmbedSnippetSection";
 import R2AutoBackupSection from "@/components/sistema/R2AutoBackupSection";
+import ClaudeCodeConexaoSection from "@/components/sistema/ClaudeCodeConexaoSection";
 import { assertUploadMagicBytes, extensionForDetectedMime } from "@/lib/validateUploadMagicBytes";
 import { validatePainelStrongPassword } from "@/lib/motoristaPortalPassword";
 import { FONTES_GLOBAIS, FONTE_GLOBAL_PADRAO, resolveFonteCss } from "@/lib/fontesGlobais";
@@ -857,6 +858,8 @@ export default function SistemaConfiguracoesPage() {
         <h1 className="text-2xl font-bold text-foreground">Configurações</h1>
         <p className="text-muted-foreground">Configurações gerais do sistema</p>
       </div>
+
+      <ClaudeCodeConexaoSection />
 
       {isAdminMaster ? <WebsiteEmbedSnippetSection /> : null}
 

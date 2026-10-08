@@ -172,10 +172,13 @@ export async function getAuthorizedUserAndCreds(
 
   const email = user.email?.trim().toLowerCase() || null;
   const stored = await loadStoredInstanceToken(supabaseAdmin, target, user.id);
+  const storedUrl = await loadStoredServerUrl(supabaseAdmin, target, user.id);
 
   let baseUrl: string;
   try {
-    baseUrl = assertSafeHttpsBase((Deno.env.get("UAZAPI_SERVER_URL") || "https://ipazua.uazapi.com").trim());
+    baseUrl = assertSafeHttpsBase(
+      (storedUrl || Deno.env.get("UAZAPI_SERVER_URL") || "https://ipazua.uazapi.com").trim(),
+    );
   } catch (e) {
     return {
       ok: false,
@@ -310,12 +313,14 @@ async function updateComunicadorPatch(
 ): Promise<void> {
   const { error } = await supabaseAdmin.from("comunicadores_evolution").update(patch).eq("id", id);
   if (!error) return;
-  if (!String(error.message || "").includes("uazapi_instance_token")) {
+  const msg = String(error.message || "");
+  if (!msg.includes("uazapi_instance_token") && !msg.includes("uazapi_server_url")) {
     console.error(error.message);
     return;
   }
   const rest = { ...patch };
   delete rest.uazapi_instance_token;
+  delete rest.uazapi_server_url;
   await supabaseAdmin.from("comunicadores_evolution").update(rest).eq("id", id);
 }
 
@@ -326,6 +331,7 @@ export async function persistUazapiInstanceToken(
     userId: string;
     instanceName: string;
     token: string;
+    serverUrl?: string | null;
     extra?: Record<string, unknown>;
   },
 ): Promise<void> {
@@ -335,6 +341,14 @@ export async function persistUazapiInstanceToken(
     updated_at: new Date().toISOString(),
     ...(opts.extra || {}),
   };
+  const server = opts.serverUrl?.trim();
+  if (server) {
+    try {
+      patch.uazapi_server_url = assertSafeHttpsBase(server);
+    } catch {
+      /* mantém o servidor já gravado */
+    }
+  }
   if (opts.target === "sistema") {
     const { data: existing } = await supabaseAdmin
       .from("comunicadores_evolution")
@@ -368,10 +382,25 @@ export async function persistUazapiInstanceToken(
     ...patch,
   };
   const { error: insErr } = await supabaseAdmin.from("comunicadores_evolution").insert(insertRow);
-  if (insErr && String(insErr.message || "").includes("uazapi_instance_token")) {
+  if (insErr && /uazapi_instance_token|uazapi_server_url/.test(String(insErr.message || ""))) {
     delete insertRow.uazapi_instance_token;
+    delete insertRow.uazapi_server_url;
     await supabaseAdmin.from("comunicadores_evolution").insert(insertRow);
   }
+}
+
+export async function loadStoredServerUrl(
+  supabaseAdmin: SupabaseClient,
+  target: UazapiTarget,
+  userId: string,
+): Promise<string | null> {
+  const q = supabaseAdmin.from("comunicadores_evolution").select("uazapi_server_url");
+  const { data, error } = target === "sistema"
+    ? await q.eq("escopo", "sistema").maybeSingle()
+    : await q.eq("escopo", "usuario").eq("user_id", userId).maybeSingle();
+  if (error) return null;
+  const url = String((data as { uazapi_server_url?: string | null } | null)?.uazapi_server_url || "").trim();
+  return url || null;
 }
 
 async function tokenWorksAsInstance(
@@ -457,6 +486,11 @@ export function extractPhoneDeep(data: unknown): string | null {
     if (!cur || typeof cur !== "object" || seen.has(cur)) continue;
     seen.add(cur);
     const o = cur as Record<string, unknown>;
+    const jidUser = o.user;
+    const jidServer = o.server;
+    if (typeof jidUser === "string" && /^\d{10,15}$/.test(jidUser) && String(jidServer || "").includes("whatsapp")) {
+      return jidUser;
+    }
     for (const k of keys) {
       const v = o[k];
       if (typeof v === "string") {

@@ -30,7 +30,6 @@ import { cn } from "@/lib/utils";
 import { useConfiguracoes } from "@/contexts/ConfiguracoesContext";
 import { useActivePage } from "@/contexts/ActivePageContext";
 import { persistNetworkHighlightDismissed } from "@/lib/networkNacionalPrefs";
-import { usePainelMotoristaEvolutionAtivo } from "@/hooks/usePainelMotoristaEvolutionAtivo";
 import { useUserPlan } from "@/hooks/useUserPlan";
 import { usePlataformaFerramentasDisponibilidade } from "@/hooks/usePlataformaFerramentasDisponibilidade";
 import { sidebarPlanBadgeLabel } from "@/lib/painelPlanPolicy";
@@ -71,7 +70,6 @@ type MenuGroup = {
 
 const getMenuStructure = (
   showNetwork: boolean,
-  exibirComunicadorMotorista: boolean,
   showMarketing: boolean,
 ): MenuGroup[] => [
   {
@@ -161,9 +159,7 @@ const getMenuStructure = (
         children: [
           { title: "Configurações", page: "sistema/configuracoes", icon: Settings },
           { title: "Automações", page: "sistema/automacoes", icon: Globe },
-          ...(exibirComunicadorMotorista
-            ? [{ title: "Comunicador", page: "sistema/comunicador", icon: Monitor }]
-            : []),
+          { title: "Comunicador", page: "sistema/comunicador", icon: Monitor },
         ],
       },
       { title: "Anotações", page: "anotacoes", icon: StickyNote },
@@ -181,8 +177,6 @@ export function AppSidebar() {
   const { darkMode, toggle: toggleTheme } = usePanelTheme("frota");
   const [networkAceito, setNetworkAceito] = useState(() => localStorage.getItem("network_nacional_aceito") === "sim");
   const [showNetworkHighlight, setShowNetworkHighlight] = useState(readNetworkSpotlightHighlight);
-  const { painelMotoristaEvolutionAtivo, ready: painelComunicadorReady } = usePainelMotoristaEvolutionAtivo();
-  const exibirComunicadorMotorista = !painelComunicadorReady || painelMotoristaEvolutionAtivo;
   const { plano, loading: planLoading } = useUserPlan();
   const { flags: ferramentasFlags, loading: ferramentasLoading } = usePlataformaFerramentasDisponibilidade();
   /** Enquanto carrega, não mostrar Marketing (evita flash e exige liberação explícita do master). */
@@ -274,7 +268,7 @@ export function AppSidebar() {
       </div>
 
       <SidebarContent className={cn(showNetworkHighlight && "relative z-30")}>
-        {getMenuStructure(networkAceito, exibirComunicadorMotorista, showMarketingMenu).map((group) => (
+        {getMenuStructure(networkAceito, showMarketingMenu).map((group) => (
           <SidebarGroup key={group.label}>
             <SidebarGroupLabel
               className={cn(

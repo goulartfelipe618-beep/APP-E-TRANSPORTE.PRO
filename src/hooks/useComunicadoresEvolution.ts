@@ -4,6 +4,9 @@ import { Tables } from "@/integrations/supabase/types";
 
 export type ComunicadorRow = Tables<"comunicadores_evolution">;
 
+const COMUNICADOR_COLS =
+  "id, escopo, user_id, rotulo, instance_name, qr_code_base64, connection_status, telefone_conectado, created_at, updated_at, nome_dispositivo, foto_perfil_url, painel_motorista_evolution_ativo, inbox_sessao_conectado_em";
+
 export const INSTANCE_SISTEMA_DEFAULT = "etp-sistema-oficial";
 
 export function instanceNameForUser(userId: string) {
@@ -33,7 +36,7 @@ export function useComunicadoresEvolution(opts?: { includeUsuarioComunicador?: b
     }
 
     if (!includeUsuario) {
-      const sysRes = await supabase.from("comunicadores_evolution").select("*").eq("escopo", "sistema").maybeSingle();
+      const sysRes = await supabase.from("comunicadores_evolution").select(COMUNICADOR_COLS).eq("escopo", "sistema").maybeSingle();
       setSistema(sysRes.data ?? null);
       setOwn(null);
       setLoading(false);
@@ -41,8 +44,8 @@ export function useComunicadoresEvolution(opts?: { includeUsuarioComunicador?: b
     }
 
     const [sysRes, ownRes] = await Promise.all([
-      supabase.from("comunicadores_evolution").select("*").eq("escopo", "sistema").maybeSingle(),
-      supabase.from("comunicadores_evolution").select("*").eq("escopo", "usuario").eq("user_id", user.id).maybeSingle(),
+      supabase.from("comunicadores_evolution").select(COMUNICADOR_COLS).eq("escopo", "sistema").maybeSingle(),
+      supabase.from("comunicadores_evolution").select(COMUNICADOR_COLS).eq("escopo", "usuario").eq("user_id", user.id).maybeSingle(),
     ]);
 
     setSistema(sysRes.data ?? null);

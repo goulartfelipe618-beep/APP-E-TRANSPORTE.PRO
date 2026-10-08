@@ -45,7 +45,6 @@ import {
   persistNetworkRetornoSolicitado,
 } from "@/lib/networkNacionalPrefs";
 import { cn } from "@/lib/utils";
-import { usePainelMotoristaEvolutionAtivo } from "@/hooks/usePainelMotoristaEvolutionAtivo";
 import { usePlataformaFerramentasDisponibilidade } from "@/hooks/usePlataformaFerramentasDisponibilidade";
 type ToolDef = { title: string; page: string; desc: string; icon: LucideIcon };
 
@@ -61,7 +60,6 @@ type MajorSection = {
 
 function buildHomeSections(
   showNetwork: boolean,
-  exibirComunicadorMotorista: boolean,
   showMarketing: boolean,
 ): MajorSection[] {
   const principal: Subsection[] = [
@@ -130,9 +128,7 @@ function buildHomeSections(
       items: [
         { title: "Configurações", page: "sistema/configuracoes", desc: "Dados da empresa, perfil e preferências.", icon: Settings },
         { title: "Automações", page: "sistema/automacoes", desc: "Webhooks e integrações automatizadas.", icon: Globe },
-        ...(exibirComunicadorMotorista
-          ? [{ title: "Comunicador", page: "sistema/comunicador", desc: "Canal WhatsApp oficial da plataforma.", icon: Monitor } as ToolDef]
-          : []),
+        { title: "Comunicador", page: "sistema/comunicador", desc: "Ligue o WhatsApp lendo o QR Code. Os envios saem por esta conta.", icon: Monitor },
       ],
     },
     {
@@ -194,8 +190,6 @@ function ToolCard({ tool, onOpen }: { tool: ToolDef; onOpen: (page: string) => v
 export default function HomePage() {
   const { setActivePage } = useActivePage();
   const onboarding = useMotoristaOnboarding();
-  const { painelMotoristaEvolutionAtivo, ready: painelComunicadorReady } = usePainelMotoristaEvolutionAtivo();
-  const exibirComunicadorMotorista = !painelComunicadorReady || painelMotoristaEvolutionAtivo;
   const { flags: ferramentasFlags, loading: ferramentasLoading } = usePlataformaFerramentasDisponibilidade();
   const showMarketingMenu = !ferramentasLoading && ferramentasFlags.marketing_menu_liberado;
   const [networkAceito, setNetworkAceito] = useState<boolean | null>(null);
@@ -203,8 +197,8 @@ export default function HomePage() {
   const [menuNetwork, setMenuNetwork] = useState(() => localStorage.getItem("network_nacional_aceito") === "sim");
 
   const sections = useMemo(
-    () => buildHomeSections(menuNetwork, exibirComunicadorMotorista, showMarketingMenu),
-    [menuNetwork, exibirComunicadorMotorista, showMarketingMenu],
+    () => buildHomeSections(menuNetwork, showMarketingMenu),
+    [menuNetwork, showMarketingMenu],
   );
 
   useEffect(() => {

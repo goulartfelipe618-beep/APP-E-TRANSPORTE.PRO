@@ -19,6 +19,7 @@ import ProtectedFrotaRoute from "./components/ProtectedFrotaRoute";
 import { ConfiguracoesProvider } from "./contexts/ConfiguracoesContext";
 import AuthExpiryGuard from "./components/AuthExpiryGuard";
 import ClientSessionRevocationGuard from "./components/ClientSessionRevocationGuard";
+import CapacitorFrotaBridge from "./components/CapacitorFrotaBridge";
 
 const NotFound = lazy(() => import("./pages/NotFound"));
 const DashboardLayout = lazy(() => import("./components/DashboardLayout"));
@@ -50,6 +51,7 @@ const App = () => (
       <BrowserRouter>
         <AuthExpiryGuard />
         <ClientSessionRevocationGuard />
+        <CapacitorFrotaBridge />
         <Suspense fallback={<RouteFallback />}>
           <Routes>
             <Route path="/" element={<RootToLoginRedirect />} />

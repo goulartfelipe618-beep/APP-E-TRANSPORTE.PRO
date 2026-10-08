@@ -1,17 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useComunicadoresEvolution, qrSrc } from "@/hooks/useComunicadoresEvolution";
 import { isOwnEvolutionConnected } from "@/lib/evolutionConnection";
 import {
-  fetchEvolutionMotoristaDeleteFromServer,
   fetchEvolutionMotoristaQrFromServer,
   fetchEvolutionMotoristaSyncFromServer,
 } from "@/lib/evolutionApi";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Loader2, ShieldAlert, Smartphone } from "lucide-react";
+import { Loader2 } from "lucide-react";
 
 const QR_SESSION_MS = 10 * 60 * 1000;
 const POLL_MS = 3000;
@@ -23,21 +20,12 @@ function isConfirmedSyncConnected(sync: { connected: boolean; phone: string | nu
   return CONNECTED_STATUS.has((sync.state || "").trim().toLowerCase());
 }
 
-function formatMmSs(ms: number): string {
-  const sec = Math.max(0, Math.ceil(ms / 1000));
-  const m = Math.floor(sec / 60);
-  const s = sec % 60;
-  return `${m}:${s.toString().padStart(2, "0")}`;
-}
-
 export default function ComunicadorWhatsappPage() {
-  const { own, loading, reload, setOwn } = useComunicadoresEvolution();
+  const { own, loading, reload } = useComunicadoresEvolution();
   const [qrSession, setQrSession] = useState(false);
   const [sessionDeadline, setSessionDeadline] = useState<number | null>(null);
-  const [remainingMs, setRemainingMs] = useState(0);
   const [sessionQrBase64, setSessionQrBase64] = useState<string | null>(null);
   const [busyQr, setBusyQr] = useState(false);
-  const [busyDelete, setBusyDelete] = useState(false);
 
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -108,7 +96,6 @@ export default function ComunicadorWhatsappPage() {
       expiryNotifiedRef.current = false;
       setQrSession(false);
       setSessionDeadline(null);
-      setRemainingMs(0);
       setSessionQrBase64(null);
       if (!opts?.connected) {
         await persistOwnPatch({
@@ -147,15 +134,12 @@ export default function ComunicadorWhatsappPage() {
       return;
     }
     expiryNotifiedRef.current = false;
-    setRemainingMs(Math.max(0, sessionDeadline - Date.now()));
-
     tickRef.current = setInterval(() => {
       const left = Math.max(0, sessionDeadline - Date.now());
-      setRemainingMs(left);
       if (left <= 0 && !expiryNotifiedRef.current) {
         expiryNotifiedRef.current = true;
         void endQrSessionRef.current({ connected: false });
-        toast.message("Tempo do QR expirou. Toque em Conectar para gerar outro.");
+        toast.message("Tempo do QR expirou. Toque em Comunicar para gerar outro.");
       }
     }, 1000);
 
@@ -187,7 +171,6 @@ export default function ComunicadorWhatsappPage() {
       setSessionQrBase64(pack.base64);
       setSessionDeadline(Date.now() + QR_SESSION_MS);
       setQrSession(true);
-      setRemainingMs(QR_SESSION_MS);
       await persistOwnPatch({
         instance_name: pack.instanceName ?? undefined,
         qr_code_base64: pack.base64,
@@ -199,112 +182,22 @@ export default function ComunicadorWhatsappPage() {
     }
   }, [persistOwnPatch, trySync, own]);
 
-  const handleDesconectar = useCallback(async () => {
-    setBusyDelete(true);
-    try {
-      const del = await fetchEvolutionMotoristaDeleteFromServer();
-      if (!del.ok) {
-        toast.error(del.detail || "Não foi possível desconectar o WhatsApp.");
-        return;
-      }
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) return;
-      const { error } = await supabase.from("comunicadores_evolution").delete().eq("escopo", "usuario").eq("user_id", user.id);
-      if (error) {
-        toast.error(error.message || "Erro ao limpar registro local.");
-        return;
-      }
-      setOwn(null);
-      await reload();
-      wasConnectedRef.current = false;
-      setQrSession(false);
-      setSessionQrBase64(null);
-      toast.success("WhatsApp desconectado.");
-    } finally {
-      setBusyDelete(false);
-    }
-  }, [reload, setOwn]);
-
-  const qrImg = qrSrc(sessionQrBase64 || own?.qr_code_base64 || null);
+  const qrImg = ownConnected ? null : qrSrc(sessionQrBase64);
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
-      <Alert className="border-[#FF6600]/50 bg-[#FF6600]/10 text-foreground">
-        <ShieldAlert className="h-4 w-4 text-[#FF6600]" />
-        <AlertTitle className="text-foreground">Recomendação importante</AlertTitle>
-        <AlertDescription className="text-sm text-muted-foreground">
-          A plataforma recomenda fortemente que utilize um <strong className="text-foreground">número de WhatsApp alternativo</strong>{" "}
-          (não o seu contacto principal ou o WhatsApp Business oficial da empresa) para esta integração. O envio de
-          mensagens utiliza uma API <strong className="text-foreground">não oficial da Meta</strong>, sem garantias da
-          Meta/WhatsApp, com riscos de bloqueio ou indisponibilidade.
-        </AlertDescription>
-      </Alert>
-
-      {ownConnected ? (
-        <Card className="border-border">
-          <CardHeader>
-            <CardTitle className="text-lg">WhatsApp conectado</CardTitle>
-            <CardDescription>
-              Os envios em Comunicar usam este número. Não é necessário colar URL ou token.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {own?.telefone_conectado ? (
-              <p className="font-mono text-lg font-semibold text-foreground">{own.telefone_conectado}</p>
-            ) : (
-              <p className="text-sm text-muted-foreground">Sessão ativa.</p>
-            )}
-            <Button type="button" variant="destructive" onClick={() => void handleDesconectar()} disabled={busyDelete}>
-              {busyDelete ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              Desconectar
-            </Button>
-          </CardContent>
-        </Card>
-      ) : qrSession && qrImg ? (
-        <Card className="border-border">
-          <CardHeader>
-            <CardTitle className="text-lg">Conectar com QR Code</CardTitle>
-            <CardDescription>
-              Escaneie no WhatsApp. Expira em <span className="font-mono text-foreground">{formatMmSs(remainingMs)}</span>.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-col items-center gap-4 sm:flex-row sm:items-start">
-            <div className="flex h-52 w-52 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-muted/30">
-              <img src={qrImg} alt="QR Code WhatsApp" className="max-h-full max-w-full object-contain" />
-            </div>
-            <div className="space-y-3 text-sm text-muted-foreground">
-              <p>
-                WhatsApp → Aparelhos ligados → Ligar um aparelho e aponte a câmara para o QR.
-              </p>
-              <Button type="button" variant="outline" onClick={() => void handleDesconectar()} disabled={busyDelete}>
-                Cancelar
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      ) : (
-        <Card className="border-border">
-          <CardHeader>
-            <CardTitle className="text-lg">Conectar WhatsApp</CardTitle>
-            <CardDescription>
-              Uma instância é criada automaticamente na plataforma. Basta ler o QR — sem URL e sem token.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button
-              type="button"
-              className="bg-[#FF6600] text-white hover:bg-[#FF6600]/90"
-              onClick={() => void handleConectar()}
-              disabled={busyQr || loading}
-            >
-              {busyQr ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Smartphone className="mr-2 h-4 w-4" />}
-              Conectar com QR Code
-            </Button>
-          </CardContent>
-        </Card>
-      )}
+    <div className="flex flex-col items-center gap-6 py-10">
+      <Button
+        type="button"
+        className="bg-[#FF6600] text-white hover:bg-[#FF6600]/90"
+        onClick={() => void handleConectar()}
+        disabled={busyQr || loading}
+      >
+        {busyQr ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+        Comunicar
+      </Button>
+      {qrSession && qrImg ? (
+        <img src={qrImg} alt="QR Code WhatsApp" className="h-52 w-52 object-contain" />
+      ) : null}
     </div>
   );
 }

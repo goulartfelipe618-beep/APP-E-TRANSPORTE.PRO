@@ -22,6 +22,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { Tables } from "@/integrations/supabase/types";
 import { useComunicadoresEvolution } from "@/hooks/useComunicadoresEvolution";
+import { sendUazapiWhatsappCard } from "@/lib/evolutionApi";
 import {
   buildComunicadorSnapshot,
   buildN8nEnvioWhatsappCampos,
@@ -457,7 +458,16 @@ export default function TransferGeolocalizacaoPage() {
       }
 
       const mensagemGeo = `Acompanhe em tempo real: ${url}`;
+      const enviado = await sendUazapiWhatsappCard({
+        number: destinatario.telefone,
+        text: mensagemGeo,
+        title: "Rastreio",
+      });
+      if (!enviado.ok) {
+        throw new Error(enviado.error || "Não foi possível enviar o link pelo WhatsApp.");
+      }
       const comunicadorSnap = buildComunicadorSnapshot(sistema, own);
+      try {
       await dispatchComunicarWebhook("geolocalizacao", {
         evento: "enviar_link_rastreamento",
         momento: new Date().toISOString(),
@@ -480,6 +490,9 @@ export default function TransferGeolocalizacaoPage() {
           tipo: "geolocalizacao",
         }),
       });
+      } catch (webhookErr) {
+        console.warn(webhookErr);
+      }
 
       const { error: updErr } = await supabase
         .from("rastreios_ao_vivo")
@@ -493,8 +506,8 @@ export default function TransferGeolocalizacaoPage() {
 
       toast.success(
         isCategoriaMotorista(r.categoria_rastreamento)
-          ? "Link enviado ao motorista pelo webhook."
-          : "Link enviado ao cliente pelo webhook.",
+          ? "Link enviado ao motorista no WhatsApp."
+          : "Link enviado ao cliente no WhatsApp.",
       );
       void loadRastreios();
     } catch (e) {

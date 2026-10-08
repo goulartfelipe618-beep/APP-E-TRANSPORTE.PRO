@@ -148,20 +148,23 @@ export async function uazapiDeleteInstance(
   });
 }
 
-export async function uazapiSendButtons(
+/** Menu de botões: POST /send/menu type=button, choices "texto|id". */
+export async function uazapiSendMenu(
   root: string,
   instanceToken: string,
   number: string,
   text: string,
   buttons: Array<{ id: string; text: string }>,
 ): Promise<{ status: number; text: string; json: unknown }> {
-  return await uazapiFetch(`${root}/send/buttons`, {
+  return await uazapiFetch(`${root}/send/menu`, {
     method: "POST",
     headers: instanceHeaders(instanceToken, true),
     body: JSON.stringify({
       number,
+      type: "button",
       text,
-      buttons: buttons.map((b) => ({ id: b.id, text: b.text })),
+      choices: buttons.map((b) => `${b.text}|${b.id}`),
+      footerText: "E-TRANSPORTE",
     }),
   });
 }

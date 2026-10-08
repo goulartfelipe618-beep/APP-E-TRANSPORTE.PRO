@@ -14,7 +14,7 @@ verify_jwt = true
 [functions.check-domain]
 verify_jwt = false
 
-# QR/sync/delete do comunicador (UAZAPI). Nomes históricos das funções.
+# QR/sync/delete do comunicador (UAZAPI, create-instance-url). Nomes históricos.
 [functions.evolution-motorista-qr]
 verify_jwt = false
 
@@ -70,6 +70,10 @@ verify_jwt = false
 verify_jwt = true
 
 [functions.r2-auto-backup]
+verify_jwt = false
+
+# Claude Code manda Bearer etp_cc_…, que não é um JWT do Supabase. A função valida a chave.
+[functions.claude-code-mcp]
 verify_jwt = false
 
 [functions.r2-private-media]

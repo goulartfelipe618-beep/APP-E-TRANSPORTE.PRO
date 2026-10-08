@@ -10,7 +10,6 @@ import { Shield } from "lucide-react";
 import { ActivePageProvider, useActivePage } from "@/contexts/ActivePageContext";
 import { NetworkSpotlightProvider } from "@/contexts/NetworkSpotlightContext";
 import { hydrateNetworkNacionalFromDb, persistNetworkHighlightDismissed } from "@/lib/networkNacionalPrefs";
-import { usePainelMotoristaEvolutionAtivo } from "@/hooks/usePainelMotoristaEvolutionAtivo";
 import { useMotoristaOnboarding } from "@/hooks/useMotoristaOnboarding";
 import { usePainelErrorReporter } from "@/hooks/usePainelErrorReporter";
 import { useScrollPanelToTop } from "@/hooks/useScrollPanelToTop";
@@ -116,7 +115,6 @@ function DashboardContent() {
   usePainelErrorReporter("motorista_executivo", "etp_nav_dashboard");
   const { activePage, setActivePage } = useActivePage();
   const onboarding = useMotoristaOnboarding();
-  const { painelMotoristaEvolutionAtivo, ready: painelComunicadorReady } = usePainelMotoristaEvolutionAtivo();
   const { flags: ferramentasFlags, loading: ferramentasLoading } = usePlataformaFerramentasDisponibilidade();
   const mainRef = useRef<HTMLElement>(null);
   useScrollPanelToTop(activePage, mainRef);
@@ -198,13 +196,6 @@ function DashboardContent() {
     window.addEventListener("network-highlight-dismissed", handler);
     return () => window.removeEventListener("network-highlight-dismissed", handler);
   }, []);
-
-  useEffect(() => {
-    if (!painelComunicadorReady) return;
-    if (!painelMotoristaEvolutionAtivo && activePage === "sistema/comunicador") {
-      setActivePage("sistema/configuracoes");
-    }
-  }, [painelComunicadorReady, activePage, painelMotoristaEvolutionAtivo, setActivePage]);
 
   /** Marketing só se o Admin Master liberar a categoria no painel master. */
   useEffect(() => {

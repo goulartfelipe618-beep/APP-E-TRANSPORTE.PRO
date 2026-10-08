@@ -885,6 +885,7 @@ export type Database = {
           id: string
           instance_name: string | null
           uazapi_instance_token: string | null
+          uazapi_server_url: string | null
           nome_dispositivo: string | null
           painel_motorista_evolution_ativo: boolean
           qr_code_base64: string | null
@@ -901,6 +902,7 @@ export type Database = {
           id?: string
           instance_name?: string | null
           uazapi_instance_token?: string | null
+          uazapi_server_url?: string | null
           nome_dispositivo?: string | null
           painel_motorista_evolution_ativo?: boolean
           qr_code_base64?: string | null
@@ -917,6 +919,7 @@ export type Database = {
           id?: string
           instance_name?: string | null
           uazapi_instance_token?: string | null
+          uazapi_server_url?: string | null
           nome_dispositivo?: string | null
           painel_motorista_evolution_ativo?: boolean
           qr_code_base64?: string | null
@@ -2801,6 +2804,12 @@ export type Database = {
         }[]
       }
       is_admin_master: { Args: { _user_id: string }; Returns: boolean }
+      criar_token_claude_code: {
+        Args: { p_nome?: string }
+        Returns: Json
+      }
+      listar_tokens_claude_code: { Args: never; Returns: Json }
+      revogar_token_claude_code: { Args: { p_id: string }; Returns: boolean }
       is_community_member: { Args: { _user_id: string }; Returns: boolean }
       is_platform_staff: { Args: { check_uid?: string }; Returns: boolean }
       list_dominios_motoristas_for_admin: {

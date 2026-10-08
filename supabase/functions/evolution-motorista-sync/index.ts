@@ -14,6 +14,24 @@ import {
   uazapiStatus,
 } from "../_shared/uazapi.ts";
 
+function deepField(data: unknown, key: string): string | null {
+  if (!data || typeof data !== "object") return null;
+  const stack: unknown[] = [data];
+  const seen = new Set<unknown>();
+  while (stack.length) {
+    const cur = stack.pop();
+    if (!cur || typeof cur !== "object" || seen.has(cur)) continue;
+    seen.add(cur);
+    const o = cur as Record<string, unknown>;
+    const v = o[key];
+    if (typeof v === "string" && v.trim()) return v.trim();
+    for (const child of Object.values(o)) {
+      if (child && typeof child === "object") stack.push(child);
+    }
+  }
+  return null;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -75,13 +93,8 @@ Deno.serve(async (req) => {
     const json = st.json;
     const status = extractUazapiStatus(json);
     const phone = extractPhoneDeep(json);
-    let profilePicUrl: string | null = null;
-    let profileName: string | null = null;
-    if (json && typeof json === "object") {
-      const o = json as Record<string, unknown>;
-      if (typeof o.profilePicUrl === "string") profilePicUrl = o.profilePicUrl;
-      if (typeof o.profileName === "string") profileName = o.profileName;
-    }
+    const profilePicUrl = deepField(json, "profilePicUrl");
+    const profileName = deepField(json, "profileName");
     const connected = isUazapiConnected(status) || Boolean(phone);
     const qr = extractUazapiQrBase64(json);
 

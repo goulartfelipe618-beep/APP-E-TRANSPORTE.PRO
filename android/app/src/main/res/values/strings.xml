@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">E-TRANSPORTE Frota</string>
+    <string name="title_activity_main">E-TRANSPORTE Frota</string>
+    <string name="package_name">pro.etransporte.frota</string>
+    <string name="custom_url_scheme">pro.etransporte.frota</string>
+</resources>

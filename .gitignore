@@ -46,3 +46,12 @@ supabase/.temp/
 
 # Payloads locais para deploy (não versionar)
 .tmp-mcp-*.json
+
+# Capacitor — builds e chaves de assinatura (os projetos android/ e ios/ ficam no repo)
+*.keystore
+*.jks
+android/app/google-services.json
+android/app/src/main/assets/public/
+ios/App/App/public/
+ios/App/Pods/
+ios/DerivedData/

@@ -1,5 +1,5 @@
 /**
- * Envia Comunicar via UAZAPI POST /send/buttons (fallback /send/text).
+ * Envia Comunicar via UAZAPI POST /send/menu (fallback /send/text).
  */
 import {
   corsHeaders,
@@ -8,7 +8,7 @@ import {
 } from "../_shared/evolutionMotorista.ts";
 import {
   uazapiRoot,
-  uazapiSendButtons,
+  uazapiSendMenu,
   uazapiSendDocument,
   uazapiSendText,
 } from "../_shared/uazapi.ts";
@@ -81,15 +81,8 @@ Deno.serve(async (req) => {
 
     if (authOwn.ok) {
       baseUrl = authOwn.baseUrl;
-      const ownTok = await loadStoredInstanceToken(authOwn.supabaseAdmin, "own", authOwn.user.id);
-      if (ownTok) {
-        token = ownTok;
-        canal = "proprio";
-      }
-      if (!token) {
-        token = await loadStoredInstanceToken(authOwn.supabaseAdmin, "sistema", authOwn.user.id);
-        canal = "oficial";
-      }
+      token = await loadStoredInstanceToken(authOwn.supabaseAdmin, "own", authOwn.user.id);
+      canal = "proprio";
     } else {
       const authSys = await getAuthorizedUserAndCreds(authHeader, supabaseUrl, anonKey, serviceKey, "sistema");
       if (!authSys.ok) {
@@ -108,7 +101,7 @@ Deno.serve(async (req) => {
     }
 
     const root = uazapiRoot(baseUrl);
-    let send = await uazapiSendButtons(root, token, number, text, buttons);
+    let send = await uazapiSendMenu(root, token, number, text, buttons);
     if (send.status < 200 || send.status >= 300) {
       send = await uazapiSendText(root, token, number, text);
     }

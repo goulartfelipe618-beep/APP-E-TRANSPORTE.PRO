@@ -79,6 +79,7 @@ Deno.serve(async (req) => {
     const { user, baseUrl, supabaseAdmin, instanceName } = auth;
     let token = await loadStoredInstanceToken(supabaseAdmin, target, user.id);
     let resolvedName = instanceName;
+    let root = uazapiRoot(baseUrl);
 
     if (!token) {
       const platformToken = await loadPlatformCreateToken(supabaseAdmin);
@@ -93,6 +94,7 @@ Deno.serve(async (req) => {
           });
           token = created.instanceToken;
           resolvedName = created.instanceName || name;
+          root = uazapiRoot(created.serverUrl || baseUrl);
           lastCreateErr = "";
           break;
         } catch (e) {
@@ -104,20 +106,20 @@ Deno.serve(async (req) => {
       }
     }
 
-    const root = uazapiRoot(baseUrl);
-
     await persistUazapiInstanceToken(supabaseAdmin, {
       target,
       userId: user.id,
       instanceName: resolvedName,
       token,
+      serverUrl: root,
       extra: { connection_status: "aguardando_qr" },
     });
 
-    const delaysMs = [0, 800, 1600];
+    const delaysMs = [0, 900, 1800];
     let lastText = "";
     let lastStatus = 0;
     let b64: string | null = null;
+    let connectStarted = false;
 
     for (const wait of delaysMs) {
       if (wait > 0) await sleep(wait);
@@ -135,9 +137,12 @@ Deno.serve(async (req) => {
       b64 = extractUazapiQrBase64(st.json);
       if (b64) break;
 
+      if (connectStarted) continue;
+      connectStarted = true;
       const conn = await uazapiConnectQr(root, token);
       lastStatus = conn.status;
       lastText = conn.text;
+      if (conn.status === 409) continue;
       if (isUazapiConnected(extractUazapiStatus(conn.json))) {
         return failureResponse(
           "Esta instância já está conectada ao WhatsApp.",
@@ -162,6 +167,7 @@ Deno.serve(async (req) => {
       userId: user.id,
       instanceName: resolvedName,
       token,
+      serverUrl: root,
       extra: { qr_code_base64: b64, connection_status: "aguardando_qr" },
     });
 

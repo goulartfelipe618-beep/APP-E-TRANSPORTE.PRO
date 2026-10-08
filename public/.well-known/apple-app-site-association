@@ -1,0 +1,24 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appIDs": ["APPLE_TEAM_ID.pro.etransporte.frota"],
+        "components": [
+          {
+            "/": "/frota/acesso/*",
+            "comment": "Link de acesso do motorista"
+          },
+          {
+            "/": "/frota",
+            "comment": "Painel da frota"
+          },
+          {
+            "/": "/frota/*",
+            "comment": "Rotas do portal da frota"
+          }
+        ]
+      }
+    ]
+  }
+}
