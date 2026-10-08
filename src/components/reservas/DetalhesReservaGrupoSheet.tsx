@@ -144,7 +144,11 @@ function Field({ label, value }: { label: string; value: React.ReactNode | strin
   return (
     <div className="min-w-0">
       <p className="text-xs text-muted-foreground">{label}</p>
-      <p className="break-words text-sm font-medium [overflow-wrap:anywhere]">{value || "—"}</p>
+      {typeof value === "string" && value.trim() ? (
+        <TextoComLinks text={value} className="text-sm font-medium" />
+      ) : (
+        <p className="break-words text-sm font-medium [overflow-wrap:anywhere]">{value || "—"}</p>
+      )}
     </div>
   );
 }

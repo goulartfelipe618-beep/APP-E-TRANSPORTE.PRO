@@ -174,17 +174,32 @@ async function listFrotaPortalReservationsFallback(): Promise<{
     new Set([uid, ...(cadastros ?? []).map((row) => String(row.id)).filter(Boolean)]),
   );
 
-  const [tRes, gRes] = await Promise.all([
+  const [tRes, gRes, extraRes] = await Promise.all([
     supabase.from("reservas_transfer").select("*").in("motorista_id", assignIds),
     supabase.from("reservas_grupos").select("*").in("motorista_id", assignIds),
+    supabase.from("reserva_motoristas_extra" as "reservas_transfer").select("reserva_id, reserva_kind, motorista_id").in("motorista_id" as "id", assignIds),
   ]);
   if (tRes.error) return { transfers: [], grupos: [], error: tRes.error.message };
   if (gRes.error) return { transfers: [], grupos: [], error: gRes.error.message };
 
-  const transfers = (tRes.data || [])
+  const extraRows = (extraRes.error ? [] : extraRes.data ?? []) as unknown as { reserva_id: string; reserva_kind: string }[];
+  const extraTransferIds = extraRows.filter((row) => row.reserva_kind === "transfer").map((row) => row.reserva_id);
+  const extraGrupoIds = extraRows.filter((row) => row.reserva_kind === "grupo").map((row) => row.reserva_id);
+  const [tExtra, gExtra] = await Promise.all([
+    extraTransferIds.length
+      ? supabase.from("reservas_transfer").select("*").in("id", extraTransferIds)
+      : Promise.resolve({ data: [], error: null }),
+    extraGrupoIds.length
+      ? supabase.from("reservas_grupos").select("*").in("id", extraGrupoIds)
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+
+  const transferRows = [...(tRes.data || []), ...((tExtra.data as typeof tRes.data) || [])];
+  const grupoRows = [...(gRes.data || []), ...((gExtra.data as typeof gRes.data) || [])];
+  const transfers = Array.from(new Map(transferRows.map((row) => [row.id, row])).values())
     .map((row) => parseReserva({ kind: "transfer", ...row }))
     .filter((r): r is FrotaPortalTransferReserva => r?.kind === "transfer");
-  const grupos = (gRes.data || [])
+  const grupos = Array.from(new Map(grupoRows.map((row) => [row.id, row])).values())
     .map((row) => parseReserva({ kind: "grupo", ...row }))
     .filter((r): r is FrotaPortalGrupoReserva => r?.kind === "grupo");
   return { transfers, grupos, error: null };

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { splitTextoComLinks } from "@/lib/textoComLinks";
+import { organizarTextoReserva, splitTextoComLinks } from "@/lib/textoComLinks";
 
 describe("splitTextoComLinks", () => {
   it("separa um endereço http no meio do texto", () => {
@@ -14,5 +14,17 @@ describe("splitTextoComLinks", () => {
 
   it("mantém texto sem link", () => {
     expect(splitTextoComLinks("sem endereço")).toEqual([{ type: "text", value: "sem endereço" }]);
+  });
+});
+
+describe("organizarTextoReserva", () => {
+  it("separa trechos unidos por barra e rótulos", () => {
+    expect(organizarTextoReserva("Nome: Ana | Telefone: 11  Em: quinta")).toBe(
+      "Nome: Ana\nTelefone: 11\nEm: quinta",
+    );
+  });
+
+  it("preserva a quebra digitada no formulário", () => {
+    expect(organizarTextoReserva("primeira linha\nsegunda linha")).toBe("primeira linha\nsegunda linha");
   });
 });

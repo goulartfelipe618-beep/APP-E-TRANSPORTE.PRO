@@ -15,6 +15,10 @@ import {
 import { labelCategoriaVeiculoTransfer } from "@/lib/categoriaVeiculoTransfer";
 import { parseTrajetosTransfer } from "@/lib/transferTrajetos";
 import { TextoComLinks } from "@/components/TextoComLinks";
+import { listReservaMotoristasExtra } from "@/lib/reservaMotoristasExtra";
+import { resolveMotoristaNome } from "@/lib/motoristaReservaAssign";
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 type Reserva = Tables<"reservas_transfer">;
 
@@ -27,6 +31,29 @@ interface Props {
 }
 
 export default function DetalhesReservaTransferSheet({ reserva, open, onOpenChange, onComunicar, onDownload }: Props) {
+  const [motoristasTexto, setMotoristasTexto] = useState("");
+  useEffect(() => {
+    if (!reserva) return;
+    let cancel = false;
+    void (async () => {
+      const extras = await listReservaMotoristasExtra("transfer", reserva.id);
+      const ids = [...new Set([reserva.motorista_id, ...extras].map((id) => (id ?? "").trim()).filter(Boolean))];
+      if (ids.length === 0) {
+        if (!cancel) setMotoristasTexto("");
+        return;
+      }
+      const { data } = await supabase
+        .from("solicitacoes_motoristas")
+        .select("id, nome, portal_auth_user_id")
+        .eq("user_id", reserva.user_id);
+      const lista = (data ?? []) as { id: string; nome: string; portal_auth_user_id: string | null }[];
+      const nomes = ids.map((id) => resolveMotoristaNome(id, lista)).filter((nome) => nome !== "—");
+      if (!cancel) setMotoristasTexto(nomes.join("\n"));
+    })();
+    return () => {
+      cancel = true;
+    };
+  }, [reserva]);
   if (!reserva) return null;
 
   const r = reserva;
@@ -175,6 +202,15 @@ export default function DetalhesReservaTransferSheet({ reserva, open, onOpenChan
             </div>
           </Section>
 
+          {motoristasTexto ? (
+            <>
+              <Separator />
+              <Section title="Motoristas">
+                <TextoComLinks text={motoristasTexto} className="text-sm font-medium" />
+              </Section>
+            </>
+          ) : null}
+
           {r.observacoes && (
             <>
               <Separator />
@@ -215,7 +251,11 @@ function Field({ label, value, full }: { label: string; value: React.ReactNode |
   return (
     <div className={full ? "col-span-2 min-w-0" : "min-w-0"}>
       <p className="text-xs text-muted-foreground">{label}</p>
-      <p className="break-words text-sm font-medium [overflow-wrap:anywhere]">{value || "—"}</p>
+      {typeof value === "string" && value.trim() ? (
+        <TextoComLinks text={value} className="text-sm font-medium" />
+      ) : (
+        <p className="break-words text-sm font-medium [overflow-wrap:anywhere]">{value || "—"}</p>
+      )}
     </div>
   );
 }

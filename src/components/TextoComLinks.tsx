@@ -1,8 +1,8 @@
 import { cn } from "@/lib/utils";
-import { splitTextoComLinks } from "@/lib/textoComLinks";
+import { organizarTextoReserva, splitTextoComLinks } from "@/lib/textoComLinks";
 
 export function TextoComLinks({ text, className }: { text: string; className?: string }) {
-  const parts = splitTextoComLinks(text);
+  const parts = splitTextoComLinks(organizarTextoReserva(text));
   return (
     <p className={cn("min-w-0 max-w-full whitespace-pre-wrap break-words [overflow-wrap:anywhere]", className)}>
       {parts.map((part, index) =>

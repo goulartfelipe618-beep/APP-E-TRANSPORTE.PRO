@@ -25,6 +25,8 @@ import {
   isCategoriaVeiculoTransfer,
 } from "@/lib/categoriaVeiculoTransfer";
 import { motoristaAssignValue, motoristaMatchesAssignment } from "@/lib/motoristaReservaAssign";
+import { listReservaMotoristasExtra, replaceReservaMotoristasExtra } from "@/lib/reservaMotoristasExtra";
+import { MotoristasExtrasField } from "@/components/reservas/MotoristasExtrasField";
 import {
   isTransferPernaDividida,
   resolveMotoristaIdsPorPerna,
@@ -172,6 +174,7 @@ export default function CriarReservaTransferDialog({
   const [repasseMotorista, setRepasseMotorista] = useState("");
   const [motoristasFrota, setMotoristasFrota] = useState<{ id: string; nome: string; portal_auth_user_id: string | null }[]>([]);
   const [motoristaAtribUid, setMotoristaAtribUid] = useState<string>("");
+  const [motoristasExtras, setMotoristasExtras] = useState<string[]>([]);
   const motoristaAtribUidRef = useRef("");
   const editReservaIdRef = useRef<string | null>(null);
   const hydratedEditIdRef = useRef<string | null>(null);
@@ -281,6 +284,10 @@ export default function CriarReservaTransferDialog({
       );
       const mid = (row.motorista_id ?? "").trim();
       setMotoristaAtribuido(mid);
+      setMotoristasExtras([]);
+      void listReservaMotoristasExtra("transfer", row.id).then((ids) => {
+        setMotoristasExtras(ids.filter((id) => id !== mid));
+      });
       const cat = (row as { categoria_veiculo?: string | null }).categoria_veiculo;
       setCategoriaVeiculo(isCategoriaVeiculoTransfer(cat) ? cat : "");
       const cid = (row as { cadastro_cliente_id?: string | null }).cadastro_cliente_id;
@@ -387,6 +394,7 @@ export default function CriarReservaTransferDialog({
     setValorBase("0"); setDesconto("0"); setMetodoPagamento(""); setFaturado("nao"); setEsconderValores(false); setObservacoes("");
     setStatusOperacional("pendente"); setRepasseMotorista("");
     setMotoristaAtribuido("");
+    setMotoristasExtras([]);
     setMotoristaAtribPerna("ida");
     setTrajetosForm(defaultMultiplosTrajetosForm());
     setCategoriaVeiculo("");
@@ -586,6 +594,7 @@ export default function CriarReservaTransferDialog({
       return res;
     };
 
+    const vinculos: { id: string; primary: string | null }[] = [];
     const editId = reservaEdicao?.id ?? editReservaIdRef.current;
     if (editId) {
       // Só esta linha: nunca copiar motorista_id para o par (IDA/VOLTA).
@@ -598,6 +607,7 @@ export default function CriarReservaTransferDialog({
       if (!error && motoristaIdResolved && (saved?.motorista_id ?? "").trim() !== motoristaIdResolved) {
         error = { message: "O motorista não ficou gravado na reserva. Tente guardar outra vez." };
       }
+      if (!error) vinculos.push({ id: editId, primary: motoristaIdResolved });
     } else if (tipoViagem === "ida_volta") {
       if (!voltaData.trim()) {
         toast.error("Informe a data da volta para viagens ida e volta.");
@@ -700,15 +710,37 @@ export default function CriarReservaTransferDialog({
       if (first.error) {
         error = first.error;
       } else {
-        const second = await writeRow({ user_id: user.id, ...voltaRow }, "insert");
+        const second = await writeRow({ user_id: user.id, ...voltaRow }, "insert", undefined, true);
         if (second.error && first.data?.id) {
           await supabase.from("reservas_transfer").delete().eq("id", first.data.id);
           error = second.error;
+        } else if (!second.error) {
+          if (first.data?.id) vinculos.push({ id: first.data.id, primary: motoristaIda });
+          const secondId = (second.data as { id?: string } | null)?.id;
+          if (secondId) vinculos.push({ id: secondId, primary: motoristaVolta });
         }
       }
     } else {
-      const res = await writeRow({ user_id: user.id, ...rowPayload } as Record<string, unknown>, "insert");
+      const res = await writeRow({ user_id: user.id, ...rowPayload } as Record<string, unknown>, "insert", undefined, true);
       error = res.error;
+      const createdId = (res.data as { id?: string } | null)?.id;
+      if (!error && createdId) vinculos.push({ id: createdId, primary: motoristaIdResolved });
+    }
+
+    if (!error) {
+      for (const vinculo of vinculos) {
+        const extraErr = await replaceReservaMotoristasExtra({
+          userId: user.id,
+          kind: "transfer",
+          reservaId: vinculo.id,
+          motoristaIds: motoristasExtras,
+          primaryId: vinculo.primary,
+        });
+        if (extraErr) {
+          toast.error("A reserva foi salva, mas os outros motoristas não ficaram vinculados: " + extraErr);
+          break;
+        }
+      }
     }
 
     setSaving(false);
@@ -1141,6 +1173,12 @@ export default function CriarReservaTransferDialog({
                       A atribuição fica gravada só nesta reserva. Ida e volta são linhas separadas — mudar o motorista da VOLTA não altera a IDA.
                     </p>
                   </div>
+                  <MotoristasExtrasField
+                    motoristas={motoristasFrota}
+                    primaryId={motoristaAtribUid}
+                    selected={motoristasExtras}
+                    onChange={setMotoristasExtras}
+                  />
                   {reservaEdicao && isTransferPernaDividida(reservaEdicao.tipo_viagem, reservaEdicao.perna_viagem) ? (
                     <p className="text-xs text-muted-foreground sm:col-span-2">
                       Motorista apenas na{" "}
@@ -1272,7 +1310,13 @@ export default function CriarReservaTransferDialog({
 
           <div>
             <h3 className="font-semibold text-foreground mb-3">Observações</h3>
-            <Textarea placeholder="Observações adicionais sobre a reserva..." value={observacoes} onChange={(e) => setObservacoes(e.target.value)} />
+            <Textarea
+              rows={6}
+              className="whitespace-pre-wrap"
+              placeholder={"Uma informação por linha. Enter quebra a linha.\nEx.: Nome do passageiro\nVoo e horário"}
+              value={observacoes}
+              onChange={(e) => setObservacoes(e.target.value)}
+            />
           </div>
 
           <div className="flex justify-end gap-3 pt-2">

@@ -20,6 +20,8 @@ import { calendarDayKeySaoPauloFromIso, todayKeySaoPaulo } from "@/lib/spCalenda
 import { splitAmountInTwoHalves, valorTotalFromBaseDiscount } from "@/lib/reservaIdaVoltaSplit";
 import { logUserActivity } from "@/lib/userActivityLog";
 import { motoristaAssignValue, motoristaMatchesAssignment } from "@/lib/motoristaReservaAssign";
+import { listReservaMotoristasExtra, replaceReservaMotoristasExtra } from "@/lib/reservaMotoristasExtra";
+import { MotoristasExtrasField } from "@/components/reservas/MotoristasExtrasField";
 
 const TIPOS_VEICULO = ["van", "micro_onibus", "onibus"] as const;
 
@@ -101,6 +103,7 @@ export default function CriarReservaGrupoDialog({
   const [repasseMotorista, setRepasseMotorista] = useState("");
   const [motoristasFrota, setMotoristasFrota] = useState<{ id: string; nome: string; portal_auth_user_id: string | null }[]>([]);
   const [motoristaAtribUid, setMotoristaAtribUid] = useState<string>("");
+  const [motoristasExtras, setMotoristasExtras] = useState<string[]>([]);
   const [modoClienteReserva, setModoClienteReserva] = useState<"novo" | "cadastrado">("novo");
   const [clientesReservaOpts, setClientesReservaOpts] = useState<ClienteReservaOpt[]>([]);
   const [cadastroClienteIdReserva, setCadastroClienteIdReserva] = useState("");
@@ -168,8 +171,11 @@ export default function CriarReservaGrupoDialog({
       setRepasseMotorista(
         row.repasse_motorista != null && Number(row.repasse_motorista) > 0 ? String(row.repasse_motorista) : "",
       );
-      if (row.motorista_id) setMotoristaAtribUid(row.motorista_id);
-      else setMotoristaAtribUid("");
+      setMotoristaAtribUid(row.motorista_id ? String(row.motorista_id) : "");
+      setMotoristasExtras([]);
+      void listReservaMotoristasExtra("grupo", row.id).then((ids) => {
+        setMotoristasExtras(ids.filter((id) => id !== String(row.motorista_id ?? "")));
+      });
       const cid = (row as { cadastro_cliente_id?: string | null }).cadastro_cliente_id;
       if (cid) {
         setModoClienteReserva("cadastrado");
@@ -244,6 +250,7 @@ export default function CriarReservaGrupoDialog({
     setValorBase("0"); setDesconto("0"); setMetodoPagamento("");
     setStatusOperacional("pendente"); setRepasseMotorista("");
     setMotoristaAtribUid("");
+    setMotoristasExtras([]);
     setModoClienteReserva("novo");
     setCadastroClienteIdReserva("");
     setClientSearch("");
@@ -383,9 +390,11 @@ export default function CriarReservaGrupoDialog({
 
     let error: { message: string } | null = null;
 
+    const vinculos: { id: string; primary: string | null }[] = [];
     if (reservaGrupoEdicao?.id) {
       const res = await supabase.from("reservas_grupos").update(rowPayload).eq("id", reservaGrupoEdicao.id);
       error = res.error;
+      if (!error) vinculos.push({ id: reservaGrupoEdicao.id, primary: motoristaIdResolved });
     } else if (splitRoundTrip) {
       const parReservaId = crypto.randomUUID();
       const descNum = parseFloat(desconto) || 0;
@@ -460,15 +469,35 @@ export default function CriarReservaGrupoDialog({
       if (first.error) {
         error = first.error;
       } else {
-        const second = await supabase.from("reservas_grupos").insert({ user_id: user.id, ...voltaRow });
+        const second = await supabase.from("reservas_grupos").insert({ user_id: user.id, ...voltaRow }).select("id").single();
         if (second.error && first.data?.id) {
           await supabase.from("reservas_grupos").delete().eq("id", first.data.id);
           error = second.error;
+        } else if (!second.error) {
+          if (first.data?.id) vinculos.push({ id: first.data.id, primary: motoristaIdResolved });
+          if (second.data?.id) vinculos.push({ id: second.data.id, primary: motoristaIdResolved });
         }
       }
     } else {
-      const res = await supabase.from("reservas_grupos").insert({ user_id: user.id, ...rowPayload });
+      const res = await supabase.from("reservas_grupos").insert({ user_id: user.id, ...rowPayload }).select("id").single();
       error = res.error;
+      if (!error && res.data?.id) vinculos.push({ id: res.data.id, primary: motoristaIdResolved });
+    }
+
+    if (!error) {
+      for (const vinculo of vinculos) {
+        const extraErr = await replaceReservaMotoristasExtra({
+          userId: user.id,
+          kind: "grupo",
+          reservaId: vinculo.id,
+          motoristaIds: motoristasExtras,
+          primaryId: vinculo.primary,
+        });
+        if (extraErr) {
+          toast.error("A reserva foi salva, mas os outros motoristas não ficaram vinculados: " + extraErr);
+          break;
+        }
+      }
     }
 
     setSaving(false);
@@ -636,7 +665,16 @@ export default function CriarReservaGrupoDialog({
               <div className="space-y-1.5"><Label>Hora de Retorno (opcional)</Label><Input type="time" value={horaRetorno} onChange={(e) => setHoraRetorno(e.target.value)} /></div>
             </div>
             <div className="mt-4 w-1/2 space-y-1.5"><Label>Cupom de Desconto</Label><Input value={cupom} onChange={(e) => setCupom(e.target.value)} /></div>
-            <div className="mt-4 space-y-1.5"><Label>Observações</Label><Textarea placeholder="Detalhes sobre a excursão, itinerário, necessidades especiais..." value={observacoesViagem} onChange={(e) => setObservacoesViagem(e.target.value)} /></div>
+            <div className="mt-4 space-y-1.5">
+              <Label>Observações</Label>
+              <Textarea
+                rows={6}
+                className="whitespace-pre-wrap"
+                placeholder={"Uma informação por linha. Enter quebra a linha."}
+                value={observacoesViagem}
+                onChange={(e) => setObservacoesViagem(e.target.value)}
+              />
+            </div>
           </div>
 
           <Separator />
@@ -675,6 +713,12 @@ export default function CriarReservaGrupoDialog({
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground">A reserva fica na agenda do mini portal do motorista após guardar.</p>
+                <MotoristasExtrasField
+                  motoristas={motoristasFrota}
+                  primaryId={motoristaAtribUid}
+                  selected={motoristasExtras}
+                  onChange={setMotoristasExtras}
+                />
               </div>
               <div className="space-y-1.5"><Label>Nome (manual / extra)</Label><Input value={nomeMotorista} onChange={(e) => setNomeMotorista(e.target.value)} /></div>
               <div className="space-y-1.5"><Label>Telefone do Motorista</Label><Input value={telefoneMotorista} onChange={(e) => setTelefoneMotorista(e.target.value)} /></div>

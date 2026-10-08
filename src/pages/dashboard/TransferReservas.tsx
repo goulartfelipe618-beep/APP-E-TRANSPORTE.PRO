@@ -26,6 +26,7 @@ import { fetchAllSupabasePages } from "@/lib/supabaseFetchAll";
 import { abrevCategoriaVeiculoTransfer, labelCategoriaVeiculoTransfer } from "@/lib/categoriaVeiculoTransfer";
 import { formatTransferTipoViagemExibicao } from "@/lib/transferPernaViagem";
 import { motoristaAssignValue, motoristaMatchesAssignment, resolveMotoristaNome } from "@/lib/motoristaReservaAssign";
+import { listExtrasDoOperador } from "@/lib/reservaMotoristasExtra";
 
 type Reserva = Tables<"reservas_transfer">;
 
@@ -45,6 +46,7 @@ export default function TransferReservasPage() {
   const [reservaEdicao, setReservaEdicao] = useState<Reserva | null>(null);
   const [reservas, setReservas] = useState<Reserva[]>([]);
   const [motoristasOpts, setMotoristasOpts] = useState<{ id: string; nome: string; portal_auth_user_id?: string | null }[]>([]);
+  const [extrasPorReserva, setExtrasPorReserva] = useState<Record<string, string[]>>({});
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Reserva | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -68,6 +70,7 @@ export default function TransferReservasPage() {
     if (!uid) {
       setReservas([]);
       setMotoristasOpts([]);
+      setExtrasPorReserva({});
       setLoading(false);
       return;
     }
@@ -92,6 +95,13 @@ export default function TransferReservasPage() {
       setReservas([]);
     } else setReservas((res.data as Reserva[]) || []);
 
+    const extraRows = await listExtrasDoOperador("transfer", uid);
+    const extraMap: Record<string, string[]> = {};
+    for (const row of extraRows) {
+      extraMap[row.reserva_id] = [...(extraMap[row.reserva_id] ?? []), row.motorista_id];
+    }
+    setExtrasPorReserva(extraMap);
+
     if (!mot.error && mot.data) {
       setMotoristasOpts(
         (mot.data as { id: string; portal_auth_user_id: string | null; nome: string }[]).map((m) => ({
@@ -112,8 +122,14 @@ export default function TransferReservasPage() {
   }, [fetchAll]);
 
   const motoristaNome = useCallback(
-    (motoristaId: string | null) => resolveMotoristaNome(motoristaId, motoristasOpts),
-    [motoristasOpts],
+    (motoristaId: string | null, reservaId?: string) => {
+      const extras = reservaId ? extrasPorReserva[reservaId] ?? [] : [];
+      const nomes = [motoristaId, ...extras]
+        .map((id) => resolveMotoristaNome(id, motoristasOpts))
+        .filter((nome, index, all) => nome !== "—" && all.indexOf(nome) === index);
+      return nomes.length > 0 ? nomes.join(", ") : "—";
+    },
+    [motoristasOpts, extrasPorReserva],
   );
 
   const reservasFiltradas = useMemo(() => {
@@ -126,7 +142,9 @@ export default function TransferReservasPage() {
           if (mid !== "") return false;
         } else if (!motoristaMatchesAssignment(mid, { id: filterMotorista, portal_auth_user_id: filterMotorista })) {
           const chosen = motoristasOpts.find((m) => motoristaAssignValue(m) === filterMotorista || m.id === filterMotorista);
-          if (!chosen || !motoristaMatchesAssignment(mid, chosen)) return false;
+          const extras = extrasPorReserva[r.id] ?? [];
+          const extraHit = extras.some((id) => !chosen || motoristaMatchesAssignment(id, chosen) || id === filterMotorista);
+          if ((!chosen || !motoristaMatchesAssignment(mid, chosen)) && !extraHit) return false;
         }
       }
       if (filterFaturado === "sim" && !(r as { faturado?: boolean }).faturado) return false;
@@ -144,7 +162,7 @@ export default function TransferReservasPage() {
       }
       return true;
     });
-  }, [reservas, filterDataDe, filterDataAte, filterStatus, filterMotorista, filterFaturado, filterSearch, motoristasOpts]);
+  }, [reservas, filterDataDe, filterDataAte, filterStatus, filterMotorista, filterFaturado, filterSearch, motoristasOpts, extrasPorReserva]);
 
   const { slice: reservasPage, page, setPage, totalPages, totalItems } = usePainelListPagination(reservasFiltradas);
 
@@ -381,7 +399,7 @@ export default function TransferReservasPage() {
                   </TableCell>
                   <TableCell className={cn("text-sm", rowLocked && "opacity-60")}>{transferDisplayDateCell(r)}</TableCell>
                   <TableCell className={cn("max-w-[140px] truncate text-sm text-muted-foreground", rowLocked && "opacity-60")}>
-                    {motoristaNome(r.motorista_id)}
+                    {motoristaNome(r.motorista_id, r.id)}
                   </TableCell>
                   <TableCell className={cn("font-semibold", rowLocked && "opacity-60")}>
                     {Number(r.valor_total).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
