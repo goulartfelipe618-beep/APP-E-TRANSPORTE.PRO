@@ -65,7 +65,7 @@ export default function FinanceiroDashboardPage() {
   const [clienteTxLoading, setClienteTxLoading] = useState(false);
 
   const { start, end } = monthRangeUtc(cursor.y, cursor.m);
-  const { rows, loading, error } = useFinancialTransactions(start, end, { limit: 2000, offset: 0 });
+  const { rows, loading, error } = useFinancialTransactions(start, end, { limit: 50_000, offset: 0 });
 
   const transferIdSet = useMemo(() => new Set(reservaTransferIds), [reservaTransferIds]);
   const grupoIdSet = useMemo(() => new Set(reservaGrupoIds), [reservaGrupoIds]);
@@ -100,12 +100,14 @@ export default function FinanceiroDashboardPage() {
       if (reservaGrupoIds.length > 0) {
         clauses.push(`reserva_grupo_id.in.(${reservaGrupoIds.join(",")})`);
       }
-      const { data, error: qErr } = await supabase
-        .from("financial_transactions")
-        .select(FINANCIAL_TRANSACTION_COLUMNS)
-        .or(clauses.join(","))
-        .order("occurred_on", { ascending: false })
-        .limit(5000);
+      const { data, error: qErr } = await fetchAllSupabasePages<FinancialTransaction>((from, to) =>
+        supabase
+          .from("financial_transactions")
+          .select(FINANCIAL_TRANSACTION_COLUMNS)
+          .or(clauses.join(","))
+          .order("occurred_on", { ascending: false })
+          .range(from, to),
+      );
       if (cancelled) return;
       if (qErr) {
         setClienteTxRows([]);

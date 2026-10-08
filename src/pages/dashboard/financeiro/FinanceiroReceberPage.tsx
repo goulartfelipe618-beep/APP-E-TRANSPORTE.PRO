@@ -17,7 +17,7 @@ import { PainelPaginationBar } from "@/components/painel/PainelPaginationBar";
 export default function FinanceiroReceberPage() {
   const { setActivePage } = useActivePage();
   const { from, to } = useMemo(() => financeiroListagemRangePadrao(), []);
-  const { rows, loading, error } = useFinancialTransactions(from, to, { limit: 1500, offset: 0 });
+  const { rows, loading, error } = useFinancialTransactions(from, to, { limit: 50_000, offset: 0 });
 
   const receitasReserva = useMemo(
     () => rows.filter((r) => r.kind === "receita" && (r.origin === "reserva_transfer" || r.origin === "reserva_grupo")),

@@ -11,7 +11,7 @@ import { PainelPaginationBar } from "@/components/painel/PainelPaginationBar";
 export default function FinanceiroPagarPage() {
   const { setActivePage } = useActivePage();
   const { from, to } = useMemo(() => financeiroListagemRangePadrao(), []);
-  const { rows, loading, error } = useFinancialTransactions(from, to, { limit: 1500, offset: 0 });
+  const { rows, loading, error } = useFinancialTransactions(from, to, { limit: 50_000, offset: 0 });
 
   const despesas = useMemo(() => rows.filter((r) => r.kind === "despesa"), [rows]);
 

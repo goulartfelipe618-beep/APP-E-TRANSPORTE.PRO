@@ -69,7 +69,7 @@ export default function FinanceiroLancamentosPage() {
   const { transferIdSet, grupoIdSet, loading: idsClienteLoading } = useFinanceiroReservaIdsPorCliente(clienteIdAtivo);
 
   const { rows: allRows, loading, error, reload } = useFinancialTransactions(filterDataDe, filterDataAte, {
-    limit: 2000,
+    limit: 50_000,
     offset: 0,
   });
 
@@ -303,14 +303,15 @@ export default function FinanceiroLancamentosPage() {
     }
   }, [payDialogRow, payContabilizarAt, payMethod, reload]);
 
-  const removeManual = async (row: FinancialTransaction) => {
-    if (row.origin !== "manual") return;
+  const removeLancamento = async (row: FinancialTransaction) => {
+    const ok = window.confirm("Excluir este lançamento? A reserva, se houver, permanece. Esta ação não desfaz.");
+    if (!ok) return;
     const { error: dErr } = await supabase.from("financial_transactions").delete().eq("id", row.id);
     if (dErr) {
       toast.error(dErr.message);
       return;
     }
-    toast.success("Lançamento removido.");
+    toast.success("Lançamento excluído.");
     void reload();
   };
 
@@ -462,11 +463,9 @@ export default function FinanceiroLancamentosPage() {
                           Editar
                         </Button>
                       ) : null}
-                      {r.origin === "manual" ? (
-                        <Button type="button" variant="ghost" size="sm" className="h-8 text-destructive" onClick={() => void removeManual(r)}>
-                          Excluir
-                        </Button>
-                      ) : null}
+                      <Button type="button" variant="ghost" size="sm" className="h-8 text-destructive" onClick={() => void removeLancamento(r)}>
+                        Excluir
+                      </Button>
                     </div>
                   </TableCell>
                 </TableRow>

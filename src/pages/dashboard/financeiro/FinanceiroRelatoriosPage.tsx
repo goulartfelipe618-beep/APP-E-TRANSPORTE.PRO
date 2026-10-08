@@ -12,7 +12,7 @@ export default function FinanceiroRelatoriosPage() {
   const today = new Date();
   const [cursor, setCursor] = useState({ y: today.getFullYear(), m: today.getMonth() });
   const { start, end } = monthRangeUtc(cursor.y, cursor.m);
-  const { rows, loading, error } = useFinancialTransactions(start, end, { limit: 2000, offset: 0 });
+  const { rows, loading, error } = useFinancialTransactions(start, end, { limit: 50_000, offset: 0 });
 
   const resumo = useMemo(() => {
     let receitaTotal = 0;

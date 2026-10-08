@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useActivePage } from "@/contexts/ActivePageContext";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchAllSupabasePages } from "@/lib/supabaseFetchAll";
 import { formatBRL } from "@/lib/financeiroFrota";
 import { formatDbCalendarDatePtBr, toAgendaDayKey } from "@/lib/painelAgendaReservas";
 import { labelReservaStatus } from "@/lib/reservaStatus";
@@ -59,20 +60,22 @@ export default function FinanceiroFaturadoPage() {
       setLoading(false);
       return;
     }
-    const { data, error: qErr } = await supabase
-      .from("reservas_transfer")
-      .select(
-        "id,numero_reserva,nome_completo,valor_total,metodo_pagamento,status,ida_data,por_hora_data,created_at,faturado,cadastro_cliente_id",
-      )
-      .eq("user_id", auth.user.id)
-      .eq("faturado", true)
-      .order("created_at", { ascending: false })
-      .limit(2000);
+    const { data, error: qErr } = await fetchAllSupabasePages<ReservaFaturada>((from, to) =>
+      supabase
+        .from("reservas_transfer")
+        .select(
+          "id,numero_reserva,nome_completo,valor_total,metodo_pagamento,status,ida_data,por_hora_data,created_at,faturado,cadastro_cliente_id",
+        )
+        .eq("user_id", auth.user.id)
+        .eq("faturado", true)
+        .order("created_at", { ascending: false })
+        .range(from, to),
+    );
     if (qErr) {
-      setError(qErr.message);
+      setError(qErr);
       setRows([]);
     } else {
-      setRows((data as ReservaFaturada[]) ?? []);
+      setRows(data);
     }
     setLoading(false);
   }, []);

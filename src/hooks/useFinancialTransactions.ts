@@ -29,21 +29,30 @@ export function useFinancialTransactions(
     setLoading(true);
     setError(null);
     try {
-      let q = supabase
-        .from("financial_transactions")
-        .select(FINANCIAL_TRANSACTION_COLUMNS)
-        .order("occurred_on", { ascending: false })
-        .range(offset, offset + limit - 1);
-      if (from) q = q.gte("occurred_on", from);
-      if (to) q = q.lte("occurred_on", to);
-      const { data, error: qErr } = await q;
-      if (qErr) {
-        setError(qErr.message);
-        setRows([]);
-        setHasMore(false);
-        return;
+      const pageSize = 1000;
+      const list: FinancialTransaction[] = [];
+      let cursor = offset;
+      while (list.length < limit) {
+        const take = Math.min(pageSize, limit - list.length);
+        let q = supabase
+          .from("financial_transactions")
+          .select(FINANCIAL_TRANSACTION_COLUMNS)
+          .order("occurred_on", { ascending: false })
+          .range(cursor, cursor + take - 1);
+        if (from) q = q.gte("occurred_on", from);
+        if (to) q = q.lte("occurred_on", to);
+        const { data, error: qErr } = await q;
+        if (qErr) {
+          setError(qErr.message);
+          setRows([]);
+          setHasMore(false);
+          return;
+        }
+        const chunk = (data as FinancialTransaction[]) ?? [];
+        list.push(...chunk);
+        if (chunk.length < take) break;
+        cursor += chunk.length;
       }
-      const list = (data as FinancialTransaction[]) ?? [];
       setRows(list);
       setHasMore(list.length === limit);
     } catch (e) {
