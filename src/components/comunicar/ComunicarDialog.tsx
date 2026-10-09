@@ -8,9 +8,12 @@ import { FileDown, Loader2, MessageSquare, Send } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useComunicadoresEvolution } from "@/hooks/useComunicadoresEvolution";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { listReservaMotoristasExtra, type ReservaKind } from "@/lib/reservaMotoristasExtra";
 import { motoristaMatchesAssignment } from "@/lib/motoristaReservaAssign";
+import {
+  interpolarTextoComunicar,
+  persistirTextoComunicar,
+} from "@/lib/comunicarPlaceholders";
 import {
   buildComunicadorSnapshot,
   buildN8nEnvioWhatsappCampos,
@@ -24,7 +27,12 @@ import {
   dadosRegistroComunicarParaWebhook,
   formatComunicarValorCampo,
 } from "@/lib/comunicarFieldFormat";
-import { COMUNICAR_CLIENTE_CHAVES_CONFIDENCIAIS } from "@/lib/comunicarReservaCliente";
+import {
+  COMUNICAR_CLIENTE_CHAVES_CONFIDENCIAIS,
+  COMUNICAR_META_KEYS,
+  lerComunicarMotoristaIds,
+  lerComunicarReservaIds,
+} from "@/lib/comunicarReservaCliente";
 import { sendUazapiWhatsappCard } from "@/lib/evolutionApi";
 
 interface ComunicarDialogProps {
@@ -108,6 +116,7 @@ const ignoredKeys = [
   "motorista_id",
   "solicitacao_id",
   ...COMUNICAR_CLIENTE_CHAVES_CONFIDENCIAIS,
+  ...COMUNICAR_META_KEYS,
 ];
 
 function chaveFiltroComunicar(tipo: string | null): string {
@@ -202,23 +211,22 @@ type RascunhoUi = { acima: string; abaixo: string; vars: Set<string> };
 function textosPadrao(
   alvo: AlvoComunicar,
   tipo: WebhookComunicacaoTipo | null,
-  nomeCliente: string,
 ): { acima: string; abaixo: string } | null {
   if (alvo === "motorista") {
     return {
-      acima: "Olá, você tem uma nova reserva!\nDetalhes da reserva:",
+      acima: "Olá {{nome_motorista}}, você tem uma nova reserva!\nDetalhes da reserva:",
       abaixo: "",
     };
   }
   if (tipo === "transfer_solicitacao" || tipo === "grupo_solicitacao") {
     return {
-      acima: `Olá ${nomeCliente}, recebemos a sua solicitação de viagem!\n\ndetalhes da viagem:`,
+      acima: "Olá {{nome_cliente}}, recebemos a sua solicitação de viagem!\n\ndetalhes da viagem:",
       abaixo: "Em breve um de nossos motoristas entrará em contato!",
     };
   }
   if (tipo === "transfer_reserva" || tipo === "grupo_reserva") {
     return {
-      acima: `Olá ${nomeCliente}, a sua reserva está confirmada!\nDetalhes da reserva:`,
+      acima: "Olá {{nome_cliente}}, a sua reserva está confirmada!\nDetalhes da reserva:",
       abaixo: "Em breve o motorista entrará em contato!",
     };
   }
@@ -253,14 +261,17 @@ export default function ComunicarDialog({
     motorista: { acima: "", abaixo: "", vars: new Set() },
   });
   const [motoristas, setMotoristas] = useState<MotoristaOpcao[]>([]);
-  const [motoristaId, setMotoristaId] = useState("");
 
   const { sistema, own } = useComunicadoresEvolution();
 
   const availableVars = useMemo(
     () =>
       Object.entries(dados)
-        .filter(([key, value]) => !ignoredKeys.includes(key) && value != null && value !== "")
+        .filter(([key, value]) => {
+          if (ignoredKeys.includes(key) || value == null || value === "") return false;
+          if (Array.isArray(value) && value.length === 0) return false;
+          return formatComunicarValorCampo(key, value) !== "";
+        })
         .map(([key, value]) => ({
           key,
           label: labelMap[key] || key,
@@ -280,23 +291,34 @@ export default function ComunicarDialog({
   const isReservaN8n = webhookTipo === "transfer_reserva" || webhookTipo === "grupo_reserva";
   const hasTextoPrePreenchido = isSolicitacaoN8n || isReservaN8n;
   const atual = rascunhos[editando];
-  const motoristaEscolhido = motoristas.find((item) => item.id === motoristaId) ?? null;
+  const nomesComunicar = useMemo(
+    () => ({
+      cliente: nomeClienteParaComunicar(dados),
+      motorista: motoristas[0]?.nome?.trim() || "Motorista",
+    }),
+    [dados, motoristas],
+  );
 
   useEffect(() => {
     if (!open) return;
     const keys = Object.entries(dadosRef.current)
       .filter(([key, value]) => !ignoredKeys.includes(key) && value != null && value !== "")
       .map(([key]) => key);
-    const nome = nomeClienteParaComunicar(dadosRef.current as Record<string, unknown>);
     const montar = (alvo: AlvoComunicar): RascunhoUi => {
       const saved = lerConfigAlvo(webhookTipo, alvo);
-      const padrao = textosPadrao(alvo, webhookTipo, nome);
+      const padrao = textosPadrao(alvo, webhookTipo);
       const legado = alvo === "cliente" ? lerFiltroComunicar(webhookTipo) : null;
       const lista = saved?.vars ?? legado;
       const vars = lista ? new Set(keys.filter((key) => lista.includes(key))) : new Set(keys);
       return {
-        acima: saved?.acima ?? padrao?.acima ?? "",
-        abaixo: saved?.abaixo ?? padrao?.abaixo ?? "",
+        acima: persistirTextoComunicar(saved?.acima ?? padrao?.acima ?? "", {
+          cliente: nomeClienteParaComunicar(dadosRef.current as Record<string, unknown>),
+          motorista: "Motorista",
+        }),
+        abaixo: persistirTextoComunicar(saved?.abaixo ?? padrao?.abaixo ?? "", {
+          cliente: nomeClienteParaComunicar(dadosRef.current as Record<string, unknown>),
+          motorista: "Motorista",
+        }),
         vars,
       };
     };
@@ -320,15 +342,14 @@ export default function ComunicarDialog({
     void (async () => {
       const row = dadosRef.current as Record<string, unknown>;
       const userId = String(row.user_id ?? "").trim();
-      const reservaId = String(row.id ?? "").trim();
-      const primary = String(row.motorista_id ?? "").trim();
+      const reservaIds = lerComunicarReservaIds(row);
+      const primaryIds = lerComunicarMotoristaIds(row);
       const kind: ReservaKind = webhookTipo === "grupo_reserva" ? "grupo" : "transfer";
-      const extras = reservaId ? await listReservaMotoristasExtra(kind, reservaId) : [];
-      const ids = [...new Set([primary, ...extras].map((id) => id.trim()).filter(Boolean))];
+      const extrasPorReserva = await Promise.all(reservaIds.map((id) => listReservaMotoristasExtra(kind, id)));
+      const ids = [...new Set([...primaryIds, ...extrasPorReserva.flat()].map((id) => id.trim()).filter(Boolean))];
       if (!userId || ids.length === 0) {
         if (!cancel) {
           setMotoristas([]);
-          setMotoristaId("");
         }
         return;
       }
@@ -349,27 +370,11 @@ export default function ComunicarDialog({
       });
       if (cancel) return;
       setMotoristas(opcoes);
-      setMotoristaId((atualId) => (atualId && opcoes.some((item) => item.id === atualId) ? atualId : opcoes[0]?.id ?? ""));
     })();
     return () => {
       cancel = true;
     };
   }, [open, dadosFingerprint, webhookTipo, isReservaN8n]);
-
-  useEffect(() => {
-    if (!motoristaEscolhido?.nome) return;
-    const padrao = "Olá, você tem uma nova reserva!\nDetalhes da reserva:";
-    setRascunhos((prev) => {
-      if (prev.motorista.acima !== padrao) return prev;
-      return {
-        ...prev,
-        motorista: {
-          ...prev.motorista,
-          acima: `Olá ${motoristaEscolhido.nome}, você tem uma nova reserva!\nDetalhes da reserva:`,
-        },
-      };
-    });
-  }, [motoristaEscolhido]);
 
   useEffect(() => {
     if (alvos.has(editando)) return;
@@ -400,9 +405,11 @@ export default function ComunicarDialog({
     });
   };
 
-  const buildMessage = (rascunho: RascunhoUi) => {
+  const buildMessage = (rascunho: RascunhoUi, nomes = nomesComunicar) => {
     const parts: string[] = [];
-    if (rascunho.acima.trim()) parts.push(rascunho.acima.trim());
+    const acima = interpolarTextoComunicar(rascunho.acima, nomes).trim();
+    const abaixo = interpolarTextoComunicar(rascunho.abaixo, nomes).trim();
+    if (acima) parts.push(acima);
 
     if (rascunho.vars.size > 0) {
       parts.push("");
@@ -413,9 +420,9 @@ export default function ComunicarDialog({
       }
     }
 
-    if (rascunho.abaixo.trim()) {
+    if (abaixo) {
       parts.push("");
-      parts.push(rascunho.abaixo.trim());
+      parts.push(abaixo);
     }
 
     return parts.join("\n");
@@ -440,13 +447,14 @@ export default function ComunicarDialog({
         toast.error("Informe o WhatsApp do cliente.");
         return;
       }
+      const motoristasComWhatsapp = motoristas.filter((item) => item.telefone.replace(/\D/g, ""));
       if (destinos.includes("motorista")) {
-        if (!motoristaEscolhido) {
-          toast.error("Selecione o motorista que vai receber a mensagem.");
+        if (motoristas.length === 0) {
+          toast.error("Esta reserva não tem motorista atribuído.");
           return;
         }
-        if (!motoristaEscolhido.telefone.replace(/\D/g, "")) {
-          toast.error("Este motorista não tem WhatsApp cadastrado.");
+        if (motoristasComWhatsapp.length === 0) {
+          toast.error("Os motoristas atribuídos não têm WhatsApp cadastrado.");
           return;
         }
       }
@@ -480,61 +488,71 @@ export default function ComunicarDialog({
 
         for (const alvo of destinos) {
           const rascunho = rascunhos[alvo];
-          const message = buildMessage(rascunho);
-          const phone = alvo === "cliente" ? phoneCliente : motoristaEscolhido!.telefone.replace(/\D/g, "");
+          const destinatarios =
+            alvo === "cliente"
+              ? [{ id: "cliente", nome: nomesComunicar.cliente, telefone: phoneCliente }]
+              : motoristasComWhatsapp;
           const pdfDeste = alvo === "cliente" ? confirmacaoPdf : null;
-          const sent = await sendUazapiWhatsappCard({
-            number: phone,
-            text: message,
-            title: titulo,
-            buttons: [
-              { id: "recebido", text: "✅ Recebido" },
-              { id: "duvidas", text: "❓ Dúvidas" },
-            ],
-            pdf: pdfDeste ? { base64: pdfDeste.base64, filename: pdfDeste.filename } : null,
-          });
-          if (!sent.ok) {
-            toast.error(sent.error || (alvo === "motorista" ? "Não foi possível enviar ao motorista." : "Não foi possível enviar ao cliente."));
-            return;
-          }
-          if (sent.warning) toast.message(sent.warning);
-          try {
-            await dispatchComunicarWebhook(webhookTipo, {
-              evento: isReservaN8n ? "comunicar_reserva_webhook" : "comunicar_envio_webhook",
-              webhook_tipo: webhookTipo,
-              origem: webhookTipo,
-              destino: alvo,
-              momento: new Date().toISOString(),
-              titulo_modal: titulo,
-              telefone_cliente: phone || null,
-              telefone_cliente_disponivel: Boolean(phone),
-              dados_registro: dadosRegistroComunicarParaWebhook(row),
-              variaveis_chaves_incluidas: [...rascunho.vars],
-              mensagem_completa: message,
-              mensagem_partes: {
-                inicial: rascunho.acima,
-                final: rascunho.abaixo,
-              },
-              motorista_painel: motoristaPainel,
-              motorista_destino: alvo === "motorista" ? motoristaEscolhido : null,
-              comunicador: comunicadorSnap,
-              confirmacao_reserva_pdf: pdfDeste,
-              ...buildN8nEnvioWhatsappCampos(comunicadorSnap, phone, {
-                mensagem: message,
-                tipo: webhookTipo,
-              }),
-              ...(pdfDeste ? { pdf_base64: pdfDeste.base64, pdf_filename: pdfDeste.filename } : {}),
+          for (const dest of destinatarios) {
+            const nomes = {
+              cliente: nomesComunicar.cliente,
+              motorista: dest.id === "cliente" ? nomesComunicar.motorista : dest.nome,
+            };
+            const message = buildMessage(rascunho, nomes);
+            const phone = dest.telefone.replace(/\D/g, "");
+            const sent = await sendUazapiWhatsappCard({
+              number: phone,
+              text: message,
+              title: titulo,
+              buttons: [
+                { id: "recebido", text: "✅ Recebido" },
+                { id: "duvidas", text: "❓ Dúvidas" },
+              ],
+              pdf: pdfDeste ? { base64: pdfDeste.base64, filename: pdfDeste.filename } : null,
             });
-          } catch (webhookErr) {
-            console.warn(webhookErr);
+            if (!sent.ok) {
+              toast.error(sent.error || (alvo === "motorista" ? "Não foi possível enviar ao motorista." : "Não foi possível enviar ao cliente."));
+              return;
+            }
+            if (sent.warning) toast.message(sent.warning);
+            try {
+              await dispatchComunicarWebhook(webhookTipo, {
+                evento: isReservaN8n ? "comunicar_reserva_webhook" : "comunicar_envio_webhook",
+                webhook_tipo: webhookTipo,
+                origem: webhookTipo,
+                destino: alvo,
+                momento: new Date().toISOString(),
+                titulo_modal: titulo,
+                telefone_cliente: phone || null,
+                telefone_cliente_disponivel: Boolean(phone),
+                dados_registro: dadosRegistroComunicarParaWebhook(row),
+                variaveis_chaves_incluidas: [...rascunho.vars],
+                mensagem_completa: message,
+                mensagem_partes: {
+                  inicial: interpolarTextoComunicar(rascunho.acima, nomes),
+                  final: interpolarTextoComunicar(rascunho.abaixo, nomes),
+                },
+                motorista_painel: motoristaPainel,
+                motorista_destino: alvo === "motorista" ? dest : null,
+                comunicador: comunicadorSnap,
+                confirmacao_reserva_pdf: pdfDeste,
+                ...buildN8nEnvioWhatsappCampos(comunicadorSnap, phone, {
+                  mensagem: message,
+                  tipo: webhookTipo,
+                }),
+                ...(pdfDeste ? { pdf_base64: pdfDeste.base64, pdf_filename: pdfDeste.filename } : {}),
+              });
+            } catch (webhookErr) {
+              console.warn(webhookErr);
+            }
+            enviados += 1;
           }
           gravarConfigAlvo(webhookTipo, alvo, {
-            acima: rascunho.acima,
-            abaixo: rascunho.abaixo,
+            acima: persistirTextoComunicar(rascunho.acima, nomesComunicar),
+            abaixo: persistirTextoComunicar(rascunho.abaixo, nomesComunicar),
             vars: [...rascunho.vars],
           });
           if (alvo === "cliente") gravarFiltroComunicar(webhookTipo, rascunho.vars);
-          enviados += 1;
         }
         if (isReservaN8n) gravarAlvosComunicar(webhookTipo, destinos);
       } catch (e) {
@@ -563,8 +581,8 @@ export default function ComunicarDialog({
 
         <div className="space-y-4">
           <p className="text-sm text-muted-foreground rounded-lg border border-border bg-muted/40 p-3">
-            Escolha o cliente, o motorista ou os dois. Cada um guarda a última mensagem enviada.
-            Conecte o WhatsApp em <strong className="text-foreground">Comunicador</strong> antes do primeiro envio.
+            Escolha o cliente, o motorista ou os dois. A configuração (texto e chips) é a última gravada;
+            os valores são sempre desta reserva. Conecte o WhatsApp em <strong className="text-foreground">Comunicador</strong> antes do primeiro envio.
           </p>
 
           {isReservaN8n ? (
@@ -589,21 +607,19 @@ export default function ComunicarDialog({
               </div>
               {alvos.has("motorista") ? (
                 motoristas.length > 0 ? (
-                  <div className="space-y-1.5">
-                    <Label>Motorista</Label>
-                    <Select value={motoristaId} onValueChange={setMotoristaId}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione o motorista" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {motoristas.map((item) => (
-                          <SelectItem key={item.id} value={item.id}>
-                            {item.nome}
-                            {item.telefone ? ` · ${item.telefone}` : " · sem WhatsApp"}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                  <div className="space-y-1.5 rounded-lg border border-border bg-muted/30 p-3">
+                    <Label>Motoristas atribuídos nesta reserva</Label>
+                    <ul className="mt-1 space-y-1 text-sm">
+                      {motoristas.map((item) => (
+                        <li key={item.id}>
+                          {item.nome}
+                          {item.telefone ? ` · ${item.telefone}` : " · sem WhatsApp"}
+                        </li>
+                      ))}
+                    </ul>
+                    <p className="text-xs text-muted-foreground">
+                      A reserva já aparece no mini painel destes motoristas. O envio WhatsApp vai para todos os que têm número.
+                    </p>
                   </div>
                 ) : (
                   <p className="text-xs text-muted-foreground">Nenhum motorista vinculado a esta reserva.</p>
@@ -646,8 +662,10 @@ export default function ComunicarDialog({
                   ? "Saudação e introdução antes dos detalhes…"
                   : "Escreva uma saudação ou mensagem inicial…"
               }
-              value={atual.acima}
-              onChange={(e) => atualizarRascunho(editando, { acima: e.target.value })}
+              value={interpolarTextoComunicar(atual.acima, nomesComunicar)}
+              onChange={(e) =>
+                atualizarRascunho(editando, { acima: persistirTextoComunicar(e.target.value, nomesComunicar) })
+              }
               rows={hasTextoPrePreenchido ? 5 : 3}
             />
           </div>
@@ -656,7 +674,7 @@ export default function ComunicarDialog({
             <div className="space-y-1">
               <Label>Variáveis do registro</Label>
               <p className="text-xs text-muted-foreground">
-                Clique num chip para incluir ou excluir. Cliente e motorista guardam, cada um, o último filtro enviado.
+                Clique num chip para incluir ou excluir. Os valores são desta reserva. Só o conjunto de chips fica na última configuração.
               </p>
             </div>
             <div className="flex flex-wrap gap-2 max-h-[200px] overflow-y-auto rounded-lg border border-border p-3 bg-muted/30">
@@ -687,8 +705,10 @@ export default function ComunicarDialog({
               placeholder={
                 hasTextoPrePreenchido ? "Encerramento da mensagem…" : "Escreva uma mensagem de encerramento…"
               }
-              value={atual.abaixo}
-              onChange={(e) => atualizarRascunho(editando, { abaixo: e.target.value })}
+              value={interpolarTextoComunicar(atual.abaixo, nomesComunicar)}
+              onChange={(e) =>
+                atualizarRascunho(editando, { abaixo: persistirTextoComunicar(e.target.value, nomesComunicar) })
+              }
               rows={hasTextoPrePreenchido ? 4 : 3}
             />
           </div>

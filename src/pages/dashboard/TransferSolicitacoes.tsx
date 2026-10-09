@@ -195,6 +195,7 @@ export default function TransferSolicitacoesPage() {
 
       {comunicarDados && (
         <ComunicarDialog
+          key={comunicarDados.id}
           open={comunicarOpen}
           onOpenChange={setComunicarOpen}
           dados={comunicarDados}

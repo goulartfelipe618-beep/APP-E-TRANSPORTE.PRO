@@ -23,6 +23,11 @@ describe("comunicarFieldFormat", () => {
     expect(formatComunicarValorCampo("tipo", "por_hora")).toBe("Por Hora");
     expect(formatComunicarValorCampo("quem_viaja", "motorista")).toBe("Motorista");
     expect(formatComunicarValorCampo("nome_completo", "João")).toBe("João");
+    expect(
+      formatComunicarValorCampo("trajetos", [
+        { embarque: "Aeroporto", desembarque: "Hotel", data: "2026-10-09", hora: "10:00" },
+      ]),
+    ).toContain("Aeroporto → Hotel");
   });
 
   it("dadosRegistroComunicarParaWebhook substitui campos no clone", () => {
@@ -53,5 +58,6 @@ describe("comunicarFieldFormat", () => {
     expect(out.cadastro_cliente_id).toBeUndefined();
     expect(out.perna_viagem).toBeUndefined();
     expect(out.par_reserva_id).toBeUndefined();
+    expect(out._comunicar_reserva_ids).toBeUndefined();
   });
 });

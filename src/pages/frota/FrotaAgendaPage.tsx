@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { buildAgendaItemsPorDiaAtribuidoSomente, type AgendaItem } from "@/lib/painelAgendaReservas";
+import { buildAgendaItemsPorDia, type AgendaItem } from "@/lib/painelAgendaReservas";
 import FrotaReservaDetalheSheet from "@/components/frota/FrotaReservaDetalheSheet";
 import {
   listFrotaPortalReservations,
@@ -61,7 +61,8 @@ export default function FrotaAgendaPage() {
 
   const itemsByDay = useMemo((): Map<string, AgendaItem[]> => {
     if (!userId) return new Map();
-    return buildAgendaItemsPorDiaAtribuidoSomente(transfers, grupos, userId);
+    // A lista já vem exclusiva da RPC (principal + extras). Não filtrar só por motorista_id.
+    return buildAgendaItemsPorDia(transfers, grupos);
   }, [transfers, grupos, userId]);
 
   const { y, m } = cursor;

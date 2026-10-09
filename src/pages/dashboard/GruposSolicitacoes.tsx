@@ -182,6 +182,7 @@ export default function GruposSolicitacoesPage() {
 
       {comunicarDados && (
         <ComunicarDialog
+          key={comunicarDados.id}
           open={comunicarOpen}
           onOpenChange={setComunicarOpen}
           dados={comunicarDados}

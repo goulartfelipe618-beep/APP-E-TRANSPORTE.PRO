@@ -177,7 +177,10 @@ async function listFrotaPortalReservationsFallback(): Promise<{
   const [tRes, gRes, extraRes] = await Promise.all([
     supabase.from("reservas_transfer").select("*").in("motorista_id", assignIds),
     supabase.from("reservas_grupos").select("*").in("motorista_id", assignIds),
-    supabase.from("reserva_motoristas_extra" as "reservas_transfer").select("reserva_id, reserva_kind, motorista_id").in("motorista_id" as "id", assignIds),
+    supabase
+      .from("reserva_motoristas_extra")
+      .select("reserva_id, reserva_kind, motorista_id")
+      .in("motorista_id", assignIds),
   ]);
   if (tRes.error) return { transfers: [], grupos: [], error: tRes.error.message };
   if (gRes.error) return { transfers: [], grupos: [], error: gRes.error.message };

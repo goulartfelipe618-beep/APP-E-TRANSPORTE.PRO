@@ -1,4 +1,5 @@
-import { COMUNICAR_CLIENTE_CHAVES_CONFIDENCIAIS } from "@/lib/comunicarReservaCliente";
+import { COMUNICAR_CLIENTE_CHAVES_CONFIDENCIAIS, COMUNICAR_META_KEYS } from "@/lib/comunicarReservaCliente";
+import { parseTrajetosTransfer } from "@/lib/transferTrajetos";
 
 /** Rótulos iguais ao PDF e às telas de detalhe (Transfer). */
 const TIPO_VIAGEM_LABELS: Record<string, string> = {
@@ -31,6 +32,18 @@ export function formatComunicarValorCampo(key: string, value: unknown): string {
   if (key === "quem_viaja") {
     return formatQuemViajaParaComunicar(value);
   }
+  if (key === "trajetos") {
+    const items = parseTrajetosTransfer(value);
+    if (!items.length) return "";
+    return items
+      .map((t, i) => {
+        const trecho = [t.embarque, t.desembarque].filter(Boolean).join(" → ");
+        const quando = [t.data, t.hora].filter(Boolean).join(" ");
+        return `${i + 1}) ${[trecho, quando].filter(Boolean).join(" · ")}`;
+      })
+      .join("\n");
+  }
+  if (typeof value === "object") return JSON.stringify(value);
   return String(value);
 }
 
@@ -41,6 +54,9 @@ export function formatComunicarValorCampo(key: string, value: unknown): string {
 export function dadosRegistroComunicarParaWebhook(dados: Record<string, unknown>): Record<string, unknown> {
   const base = JSON.parse(JSON.stringify(dados)) as Record<string, unknown>;
   for (const k of COMUNICAR_CLIENTE_CHAVES_CONFIDENCIAIS) {
+    delete base[k];
+  }
+  for (const k of COMUNICAR_META_KEYS) {
     delete base[k];
   }
   if ("tipo_viagem" in base && base.tipo_viagem != null && base.tipo_viagem !== "") {

@@ -11,6 +11,8 @@ export const COMUNICAR_CLIENTE_CHAVES_CONFIDENCIAIS = [
   "par_reserva_id",
 ] as const;
 
+export const COMUNICAR_META_KEYS = ["_comunicar_reserva_ids", "_comunicar_motorista_ids"] as const;
+
 export type ComunicarChaveConfidencial = (typeof COMUNICAR_CLIENTE_CHAVES_CONFIDENCIAIS)[number];
 
 export function omitComunicarConfidencial<T extends Record<string, unknown>>(row: T): Record<string, unknown> {
@@ -26,21 +28,52 @@ function num(v: unknown): number {
   return Number.isFinite(n) ? n : 0;
 }
 
+function idsTexto(values: unknown[]): string[] {
+  return [...new Set(values.map((v) => String(v ?? "").trim()).filter(Boolean))];
+}
+
+function anexarMeta(
+  payload: Record<string, unknown>,
+  rows: { id: string; motorista_id?: string | null }[],
+): Record<string, unknown> {
+  return {
+    ...payload,
+    _comunicar_reserva_ids: idsTexto(rows.map((r) => r.id)),
+    _comunicar_motorista_ids: idsTexto(rows.map((r) => r.motorista_id)),
+  };
+}
+
+export function lerComunicarReservaIds(dados: Record<string, unknown>): string[] {
+  const extra = Array.isArray(dados._comunicar_reserva_ids) ? dados._comunicar_reserva_ids : [];
+  return idsTexto([dados.id, ...extra]);
+}
+
+export function lerComunicarMotoristaIds(dados: Record<string, unknown>): string[] {
+  const extra = Array.isArray(dados._comunicar_motorista_ids) ? dados._comunicar_motorista_ids : [];
+  return idsTexto([dados.motorista_id, ...extra]);
+}
+
 /**
- * Monta o objeto usado no modal Comunicar: se existir par (ida+volta em duas linhas),
- * junta os dois registos para mostrar ida e volta; caso contrário, só remove campos confidenciais.
+ * Monta o objeto usado no modal Comunicar a partir da linha gravada na base.
+ * Se existir par (ida+volta em duas linhas), junta só esse par.
  */
 export async function buildTransferDadosComunicarCliente(
   row: Tables<"reservas_transfer">,
 ): Promise<Record<string, unknown>> {
-  const parId = (row as { par_reserva_id?: string | null }).par_reserva_id?.trim();
+  const { data: fresh } = await supabase.from("reservas_transfer").select("*").eq("id", row.id).maybeSingle();
+  const current = (fresh ?? row) as Tables<"reservas_transfer">;
+  const parId = (current as { par_reserva_id?: string | null }).par_reserva_id?.trim();
   if (!parId) {
-    return omitComunicarConfidencial({ ...row } as Record<string, unknown>);
+    return anexarMeta(omitComunicarConfidencial({ ...current } as Record<string, unknown>), [current]);
   }
 
-  const { data: rows, error } = await supabase.from("reservas_transfer").select("*").eq("par_reserva_id", parId);
+  const { data: rows, error } = await supabase
+    .from("reservas_transfer")
+    .select("*")
+    .eq("par_reserva_id", parId)
+    .eq("user_id", current.user_id);
   if (error || !rows?.length) {
-    return omitComunicarConfidencial({ ...row } as Record<string, unknown>);
+    return anexarMeta(omitComunicarConfidencial({ ...current } as Record<string, unknown>), [current]);
   }
 
   const ida = rows.find((x) => (x as { perna_viagem?: string | null }).perna_viagem === "ida") ?? rows[0];
@@ -48,13 +81,16 @@ export async function buildTransferDadosComunicarCliente(
     rows.find((x) => (x as { perna_viagem?: string | null }).perna_viagem === "volta") ??
     rows.find((x) => x.id !== ida.id);
   if (!volta) {
-    return omitComunicarConfidencial({ ...ida } as Record<string, unknown>);
+    return anexarMeta(omitComunicarConfidencial({ ...ida } as Record<string, unknown>), [ida]);
   }
 
   const obs = [ida.observacoes, volta.observacoes].filter((s) => (s ?? "").toString().trim() !== "").join("\n\n");
 
   const merged: Record<string, unknown> = {
     ...omitComunicarConfidencial({ ...ida } as Record<string, unknown>),
+    id: current.id,
+    user_id: current.user_id,
+    motorista_id: current.motorista_id,
     tipo_viagem: "ida_volta",
     ida_embarque: ida.ida_embarque,
     ida_desembarque: ida.ida_desembarque,
@@ -77,20 +113,26 @@ export async function buildTransferDadosComunicarCliente(
     observacoes: obs || null,
   };
 
-  return merged;
+  return anexarMeta(merged, [ida, volta]);
 }
 
 export async function buildGrupoDadosComunicarCliente(
   row: Tables<"reservas_grupos">,
 ): Promise<Record<string, unknown>> {
-  const parId = (row as { par_reserva_id?: string | null }).par_reserva_id?.trim();
+  const { data: fresh } = await supabase.from("reservas_grupos").select("*").eq("id", row.id).maybeSingle();
+  const current = (fresh ?? row) as Tables<"reservas_grupos">;
+  const parId = (current as { par_reserva_id?: string | null }).par_reserva_id?.trim();
   if (!parId) {
-    return omitComunicarConfidencial({ ...row } as Record<string, unknown>);
+    return anexarMeta(omitComunicarConfidencial({ ...current } as Record<string, unknown>), [current]);
   }
 
-  const { data: rows, error } = await supabase.from("reservas_grupos").select("*").eq("par_reserva_id", parId);
+  const { data: rows, error } = await supabase
+    .from("reservas_grupos")
+    .select("*")
+    .eq("par_reserva_id", parId)
+    .eq("user_id", current.user_id);
   if (error || !rows?.length) {
-    return omitComunicarConfidencial({ ...row } as Record<string, unknown>);
+    return anexarMeta(omitComunicarConfidencial({ ...current } as Record<string, unknown>), [current]);
   }
 
   const ida = rows.find((x) => (x as { perna_viagem?: string | null }).perna_viagem === "ida") ?? rows[0];
@@ -98,7 +140,7 @@ export async function buildGrupoDadosComunicarCliente(
     rows.find((x) => (x as { perna_viagem?: string | null }).perna_viagem === "volta") ??
     rows.find((x) => x.id !== ida.id);
   if (!volta) {
-    return omitComunicarConfidencial({ ...ida } as Record<string, unknown>);
+    return anexarMeta(omitComunicarConfidencial({ ...ida } as Record<string, unknown>), [ida]);
   }
 
   const obs = [ida.observacoes_viagem, volta.observacoes_viagem]
@@ -107,6 +149,9 @@ export async function buildGrupoDadosComunicarCliente(
 
   const merged: Record<string, unknown> = {
     ...omitComunicarConfidencial({ ...ida } as Record<string, unknown>),
+    id: current.id,
+    user_id: current.user_id,
+    motorista_id: current.motorista_id,
     data_ida: ida.data_ida,
     hora_ida: ida.hora_ida,
     embarque: ida.embarque,
@@ -125,5 +170,5 @@ export async function buildGrupoDadosComunicarCliente(
     tipo_veiculo: ida.tipo_veiculo ?? volta.tipo_veiculo,
   };
 
-  return merged;
+  return anexarMeta(merged, [ida, volta]);
 }

@@ -46,6 +46,11 @@ supabase/.temp/
 
 # Payloads locais para deploy (não versionar)
 .tmp-mcp-*.json
+body.txt
+uazapi-openapi-spec*.yaml
+
+# Cópia antiga aninhada — o app usa só esta pasta
+APP-E-TRANSPORTE.PRO/
 
 # Capacitor — builds e chaves de assinatura (os projetos android/ e ios/ ficam no repo)
 *.keystore

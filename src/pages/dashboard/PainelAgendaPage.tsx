@@ -275,6 +275,7 @@ export default function PainelAgendaPage() {
 
       {comunicarTransferLinha && comunicarTransferPayload && (
         <ComunicarDialog
+          key={`transfer:${comunicarTransferLinha.id}`}
           open={comunicarOpen && comunicarTransferLinha != null}
           onOpenChange={(o) => {
             setComunicarOpen(o);
@@ -298,6 +299,7 @@ export default function PainelAgendaPage() {
 
       {comunicarGrupoLinha && comunicarGrupoPayload && (
         <ComunicarDialog
+          key={`grupo:${comunicarGrupoLinha.id}`}
           open={comunicarOpen && comunicarGrupoLinha != null}
           onOpenChange={(o) => {
             setComunicarOpen(o);

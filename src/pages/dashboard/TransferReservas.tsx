@@ -517,6 +517,7 @@ export default function TransferReservasPage() {
 
       {comunicarLinha && comunicarPayload && (
         <ComunicarDialog
+          key={comunicarLinha.id}
           open={comunicarOpen}
           onOpenChange={(o) => {
             setComunicarOpen(o);

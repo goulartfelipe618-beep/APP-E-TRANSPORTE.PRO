@@ -483,6 +483,7 @@ export default function GruposReservasPage() {
 
       {comunicarLinha && comunicarPayload && (
         <ComunicarDialog
+          key={comunicarLinha.id}
           open={comunicarOpen}
           onOpenChange={(o) => {
             setComunicarOpen(o);

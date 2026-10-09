@@ -1698,6 +1698,33 @@ export type Database = {
           },
         ]
       }
+      reserva_motoristas_extra: {
+        Row: {
+          created_at: string
+          id: string
+          motorista_id: string
+          reserva_id: string
+          reserva_kind: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          motorista_id: string
+          reserva_id: string
+          reserva_kind: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          motorista_id?: string
+          reserva_id?: string
+          reserva_kind?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       reservas_grupos: {
         Row: {
           cpf_cnpj: string
