@@ -3,6 +3,7 @@ import { Navigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { isMotoristaFrotaUser, userIsMotoristaFrotaFromMetadata } from "@/lib/motoristaFrotaRole";
 import { clearAuthStartedAt, isAuthExpired, readAuthStartedAt, setAuthStartedAt } from "@/lib/authExpiry";
+import AuthBootScreen from "@/components/AuthBootScreen";
 
 /**
  * Painel mínimo motorista da frota (/frota). Só utilizadores com portal_auth_user_id na ficha.
@@ -61,11 +62,7 @@ export default function ProtectedFrotaRoute({ children }: { children: React.Reac
   }, []);
 
   if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-      </div>
-    );
+    return <AuthBootScreen />;
   }
 
   if (!ok) return <Navigate to="/login" replace />;

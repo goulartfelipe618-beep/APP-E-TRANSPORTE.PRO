@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 import { applyThemeForRoute } from "@/lib/panelTheme";
 import { clearDashboardNavSessionStorage } from "@/lib/motoristaFrotaRole";
+import { claimExclusiveSession } from "@/lib/sessionRevocation";
 import { validateMotoristaPortalPassword } from "@/lib/motoristaPortalPassword";
 import { Loader2 } from "lucide-react";
 
@@ -146,6 +147,15 @@ export default function MotoristaFrotaAcessoPage() {
         toast.error(mapAuthError(sErr.message));
         return;
       }
+      if (!(await claimExclusiveSession())) {
+        try {
+          await supabase.auth.signOut();
+        } catch {
+          /* sessão nova não pode ficar sem ser a única */
+        }
+        toast.error("Não foi possível validar a sessão. Tente entrar de novo.");
+        return;
+      }
       const { data: s } = await supabase.auth.getSession();
       if (s.session?.user) applyThemeForRoute("/frota", s.session.user.id);
       clearDashboardNavSessionStorage();
@@ -173,6 +183,15 @@ export default function MotoristaFrotaAcessoPage() {
       });
       if (error) {
         toast.error(mapAuthError(error.message));
+        return;
+      }
+      if (!(await claimExclusiveSession())) {
+        try {
+          await supabase.auth.signOut();
+        } catch {
+          /* sessão nova não pode ficar sem ser a única */
+        }
+        toast.error("Não foi possível validar a sessão. Tente entrar de novo.");
         return;
       }
       const { data: s } = await supabase.auth.getSession();

@@ -82,6 +82,7 @@ if (typeof window !== "undefined") {
     if (msg.includes("lock broken by another request") && msg.includes("steal")) return true;
     if (obj.isAcquireTimeout === true) return true;
     if (msg.includes("acquiring process lock") && msg.includes("timed out")) return true;
+    if (msg.includes("signal is aborted without reason")) return true;
     return false;
   };
   window.addEventListener("unhandledrejection", (ev) => {

@@ -645,6 +645,24 @@ export type Database = {
         }
         Relationships: []
       }
+      user_active_sessions: {
+        Row: {
+          session_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          session_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          session_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       community_categories: {
         Row: {
           created_at: string
@@ -2801,6 +2819,10 @@ export type Database = {
       get_session_primary_role: {
         Args: never
         Returns: Database["public"]["Enums"]["app_role"]
+      }
+      claim_exclusive_session: {
+        Args: never
+        Returns: string
       }
       has_role: {
         Args: {

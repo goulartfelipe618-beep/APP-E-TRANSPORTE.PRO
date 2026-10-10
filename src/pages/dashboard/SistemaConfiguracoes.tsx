@@ -29,6 +29,7 @@ import R2AutoBackupSection from "@/components/sistema/R2AutoBackupSection";
 import ClaudeCodeConexaoSection from "@/components/sistema/ClaudeCodeConexaoSection";
 import { assertUploadMagicBytes, extensionForDetectedMime } from "@/lib/validateUploadMagicBytes";
 import { validatePainelStrongPassword } from "@/lib/motoristaPortalPassword";
+import { claimExclusiveSession } from "@/lib/sessionRevocation";
 import { FONTES_GLOBAIS, FONTE_GLOBAL_PADRAO, resolveFonteCss } from "@/lib/fontesGlobais";
 
 const COOLDOWN_DAYS = 60;
@@ -805,6 +806,16 @@ export default function SistemaConfiguracoesPage() {
           ? "Senha atual incorreta."
           : signInErr.message;
         toast.error(msg);
+        return;
+      }
+
+      if (!(await claimExclusiveSession())) {
+        toast.error("Não foi possível validar a sessão. Entre de novo e repita a troca de senha.");
+        try {
+          await supabase.auth.signOut();
+        } catch {
+          /* a sessão nova não pode ficar sem ser a única */
+        }
         return;
       }
 

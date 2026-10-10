@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { getPostLoginPath } from "@/lib/sessionRole";
 import { clearAuthStartedAt, isAuthExpired, readAuthStartedAt, setAuthStartedAt } from "@/lib/authExpiry";
 import { sessionRequiresMfaTotpChallenge } from "@/lib/mfaGate";
+import AuthBootScreen from "@/components/AuthBootScreen";
 
 export default function ProtectedAdminRoute({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
@@ -48,11 +49,7 @@ export default function ProtectedAdminRoute({ children }: { children: React.Reac
   }, []);
 
   if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-      </div>
-    );
+    return <AuthBootScreen />;
   }
 
   if (needsMfa) return <Navigate to="/mfa" replace />;

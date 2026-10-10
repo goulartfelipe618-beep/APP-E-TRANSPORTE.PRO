@@ -29,7 +29,9 @@ import type { Session } from "@supabase/supabase-js";
 import { sessionRequiresMfaTotpChallenge } from "@/lib/mfaGate";
 import { formatAuthSignInError } from "@/lib/authSignInErrors";
 import { reportAuthLoginFailure } from "@/lib/authLoginFailureReporter";
+import AuthBootScreen from "@/components/AuthBootScreen";
 import { validatePainelStrongPassword } from "@/lib/motoristaPortalPassword";
+import { claimExclusiveSession } from "@/lib/sessionRevocation";
 
 /** Persistência opcional; não ler na montagem — evita exibir URL antiga da imagem antes do fetch. */
 const LOGIN_CONFIG_CACHE_KEY = "etp_login_painel_config_v1";
@@ -144,6 +146,10 @@ const Login = () => {
       }, 400);
     };
 
+    const gateFailsafe = window.setTimeout(() => {
+      if (!cancelled) setGateReady(true);
+    }, 12_000);
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === "PASSWORD_RECOVERY") {
         enterRecoveryMode(session);
@@ -176,6 +182,7 @@ const Login = () => {
 
     return () => {
       cancelled = true;
+      window.clearTimeout(gateFailsafe);
       clearRedirectDebounce();
       subscription.unsubscribe();
     };
@@ -202,6 +209,16 @@ const Login = () => {
         return;
       }
       await supabase.auth.refreshSession();
+      const claimed = await claimExclusiveSession();
+      if (!claimed) {
+        try {
+          await supabase.auth.signOut();
+        } catch {
+          /* não deixa a sessão nova sem ser a única */
+        }
+        setRecoveryError("Não foi possível validar a sessão. Entre de novo com a senha nova.");
+        return;
+      }
       toast.success("Senha atualizada com sucesso.");
 
       const {
@@ -345,6 +362,19 @@ const Login = () => {
       return;
     }
 
+    const claimed = await claimExclusiveSession();
+    if (!claimed) {
+      try {
+        await supabase.auth.signOut();
+      } catch {
+        /* a sessão nova não pode ficar ativa sem ser a única */
+      }
+      setError("Não foi possível validar a sessão. Tente entrar de novo.");
+      setLoading(false);
+      refreshCaptcha();
+      return;
+    }
+
     const sessionAfterSignIn = data.session ?? (await supabase.auth.getSession()).data.session;
     if (await sessionRequiresMfaTotpChallenge(supabase, sessionAfterSignIn, { afterPasswordSignIn: true })) {
       setLoading(false);
@@ -362,11 +392,7 @@ const Login = () => {
   };
 
   if (!gateReady) {
-    return (
-      <div className="flex min-h-[100svh] min-h-[100dvh] w-full items-center justify-center bg-white pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-      </div>
-    );
+    return <AuthBootScreen />;
   }
 
   return (

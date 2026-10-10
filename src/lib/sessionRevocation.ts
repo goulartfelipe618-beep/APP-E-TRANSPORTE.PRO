@@ -99,17 +99,39 @@ export async function fetchServerRevokedAtIso(): Promise<string | null> {
   return revokeInflight;
 }
 
-/** `iat` do access token (ms). Usado quando ainda não há ack em LS (primeira carga / novo browser). */
-export function readJwtIatMs(accessToken: string): number | null {
+const SESSION_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function readJwtPayload(accessToken: string): { iat?: number; session_id?: string } | null {
   try {
     const [, payloadB64] = accessToken.split(".");
     if (!payloadB64) return null;
     const padded = payloadB64 + "=".repeat((4 - (payloadB64.length % 4)) % 4);
     const json = atob(padded.replace(/-/g, "+").replace(/_/g, "/"));
-    const p = JSON.parse(json) as { iat?: number };
-    if (typeof p.iat !== "number" || !Number.isFinite(p.iat)) return null;
-    return p.iat * 1000;
+    return JSON.parse(json) as { iat?: number; session_id?: string };
   } catch {
     return null;
   }
+}
+
+/** `session_id` do access token. Identifica este login, não o usuário. */
+export function readJwtSessionId(accessToken: string): string | null {
+  const sid = readJwtPayload(accessToken)?.session_id;
+  if (typeof sid !== "string" || !SESSION_ID_RE.test(sid)) return null;
+  return sid;
+}
+
+/**
+ * Marca este login como o único da conta e revoga os outros no servidor.
+ * Chamar só depois de um sign-in novo, antes de consultar dados.
+ */
+export async function claimExclusiveSession(): Promise<boolean> {
+  const { error } = await supabase.rpc("claim_exclusive_session");
+  return !error;
+}
+
+/** `iat` do access token (ms). Usado quando ainda não há ack em LS (primeira carga / novo browser). */
+export function readJwtIatMs(accessToken: string): number | null {
+  const iat = readJwtPayload(accessToken)?.iat;
+  if (typeof iat !== "number" || !Number.isFinite(iat)) return null;
+  return iat * 1000;
 }

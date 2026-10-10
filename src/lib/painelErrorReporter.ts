@@ -103,6 +103,7 @@ function benignConsoleNoise(message: string): boolean {
 /** Não tentar `getUser` em cadeia quando o próprio erro é contenção do lock do Supabase (piora o incidente). */
 function isSupabaseAuthLockNoise(message: string): boolean {
   const m = message.toLowerCase();
+  if (m.includes("signal is aborted without reason")) return true;
   return m.includes("acquiring process lock") && m.includes("auth-token") && m.includes("timed out");
 }
 

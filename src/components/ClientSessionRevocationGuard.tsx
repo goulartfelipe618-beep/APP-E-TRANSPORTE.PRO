@@ -7,6 +7,7 @@ import {
   clearRevokeAck,
   fetchServerRevokedAtIso,
   readJwtIatMs,
+  readJwtSessionId,
   readRevokeAckMs,
   setRevokeAckFromIso,
 } from "@/lib/sessionRevocation";
@@ -18,6 +19,8 @@ const JWT_IAT_SLACK_MS = 10_000;
 export default function ClientSessionRevocationGuard() {
   const navigate = useNavigate();
   const revokeHandledRef = useRef(false);
+  /** session_id do sign-in desta aba, enquanto o claim ainda não gravou no servidor. */
+  const pendingOwnSidRef = useRef<string | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -50,6 +53,22 @@ export default function ClientSessionRevocationGuard() {
       if (!session) {
         revokeHandledRef.current = false;
         return;
+      }
+
+      const tokenSid = readJwtSessionId(session.access_token);
+      if (tokenSid) {
+        const { data: active, error: activeErr } = await supabase
+          .from("user_active_sessions")
+          .select("session_id")
+          .eq("user_id", session.user.id)
+          .maybeSingle();
+        if (!mounted) return;
+        if (!activeErr && active?.session_id && active.session_id !== tokenSid) {
+          if (pendingOwnSidRef.current === tokenSid) return;
+          await handleRevoked();
+          return;
+        }
+        if (active?.session_id === tokenSid) pendingOwnSidRef.current = null;
       }
 
       const serverIso = await fetchServerRevokedAtIso();
@@ -95,11 +114,13 @@ export default function ClientSessionRevocationGuard() {
 
       if (event === "SIGNED_IN" && session?.user) {
         revokeHandledRef.current = false;
+        pendingOwnSidRef.current = session.access_token ? readJwtSessionId(session.access_token) : null;
         if (isTabLeader()) void syncAckFromServer();
       }
 
       if (event === "SIGNED_OUT") {
         revokeHandledRef.current = false;
+        pendingOwnSidRef.current = null;
         clearRevokeAck();
       }
 
@@ -112,11 +133,16 @@ export default function ClientSessionRevocationGuard() {
     const unsubLeader = onTabLeaderChange((leader) => {
       if (leader) tick();
     });
+    const onVisible = () => {
+      if (document.visibilityState === "visible") tick();
+    };
+    document.addEventListener("visibilitychange", onVisible);
 
     return () => {
       mounted = false;
       window.clearInterval(interval);
       unsubLeader();
+      document.removeEventListener("visibilitychange", onVisible);
       subscription.unsubscribe();
     };
   }, [navigate]);

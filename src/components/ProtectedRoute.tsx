@@ -8,6 +8,7 @@ import {
   userIsMotoristaFrotaFromMetadata,
 } from "@/lib/motoristaFrotaRole";
 import { sessionRequiresMfaTotpChallenge } from "@/lib/mfaGate";
+import AuthBootScreen from "@/components/AuthBootScreen";
 
 /**
  * Rotas autenticadas do painel (motorista executivo). O JWT é gerido pelo cliente Supabase
@@ -113,11 +114,7 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
   }, []);
 
   if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-      </div>
-    );
+    return <AuthBootScreen />;
   }
 
   if (redirectFrota) return <Navigate to="/frota" replace />;
