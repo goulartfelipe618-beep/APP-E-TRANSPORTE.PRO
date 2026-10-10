@@ -48,6 +48,10 @@ export function normalizeUserPlano(raw: string | null | undefined): PlanType {
 
 type Listener = () => void;
 const listeners = new Set<Listener>();
+let planChannel: ReturnType<typeof supabase.channel> | null = null;
+let planChannelFor: string | null = null;
+let planChannelUsers = 0;
+let planChannelStarting = false;
 let inflight: Promise<void> | null = null;
 
 function emitPlanChange() {
@@ -68,15 +72,22 @@ function readCachedLoading(): boolean {
 }
 
 async function fetchPlanIntoCache(): Promise<void> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user?.id) {
-    clearUserPlanCache();
-    return;
-  }
-  const { data } = await supabase.from("user_plans").select("plano").eq("user_id", user.id).maybeSingle();
-  setUserPlanCache(user.id, normalizePlano(data?.plano));
+  if (inflight) return inflight;
+  inflight = (async () => {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    const user = session?.user;
+    if (!user?.id) {
+      clearUserPlanCache();
+      return;
+    }
+    const { data } = await supabase.from("user_plans").select("plano").eq("user_id", user.id).maybeSingle();
+    setUserPlanCache(user.id, normalizePlano(data?.plano));
+  })().finally(() => {
+    inflight = null;
+  });
+  return inflight;
 }
 
 export function useUserPlan() {
@@ -93,8 +104,9 @@ export function useUserPlan() {
 
     void (async () => {
       const {
-        data: { user },
-      } = await supabase.auth.getUser();
+        data: { session },
+      } = await supabase.auth.getSession();
+      const user = session?.user;
       if (cancelled) return;
 
       if (isUserPlanCacheReadyFor(user?.id)) {
@@ -102,19 +114,8 @@ export function useUserPlan() {
         return;
       }
 
-      if (!inflight) {
-        inflight = fetchPlanIntoCache()
-          .catch(() => {
-            /* mantém último cache ou free */
-          })
-          .finally(() => {
-            inflight = null;
-            emitPlanChange();
-          });
-      } else {
-        await inflight;
-        if (!cancelled) emitPlanChange();
-      }
+      await fetchPlanIntoCache();
+      if (!cancelled) emitPlanChange();
     })();
 
     return () => {
@@ -139,47 +140,56 @@ export function useUserPlan() {
         emitPlanChange();
         return;
       }
-      if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED" || event === "USER_UPDATED") {
+      if (event === "SIGNED_IN" || event === "USER_UPDATED") {
         void refetch();
       }
     });
     return () => subscription.unsubscribe();
   }, [refetch]);
 
-  /** Plano alterado no servidor (pagamento, webhook ou admin): UI actualiza sem recarregar a página. */
+  /** Uma inscrição só, mesmo com vários componentes a usar o plano. */
   useEffect(() => {
     let cancelled = false;
-    let channel: ReturnType<typeof supabase.channel> | null = null;
+    planChannelUsers += 1;
 
     void (async () => {
       const {
-        data: { user },
-      } = await supabase.auth.getUser();
+        data: { session },
+      } = await supabase.auth.getSession();
+      const user = session?.user;
       if (cancelled || !user?.id) return;
-
+      if (planChannelStarting || (planChannel && planChannelFor === user.id)) return;
+      planChannelStarting = true;
+      if (planChannel) void supabase.removeChannel(planChannel);
+      planChannelFor = user.id;
       const ch = supabase
         .channel(`user-plans-self-${user.id}`)
         .on(
           "postgres_changes",
           { event: "*", schema: "public", table: "user_plans", filter: `user_id=eq.${user.id}` },
           () => {
-            void refetch();
+            void fetchPlanIntoCache().then(() => emitPlanChange());
           },
         );
-
       if (cancelled) {
-        void supabase.removeChannel(ch);
+        planChannelStarting = false;
         return;
       }
-      channel = ch;
-      channel.subscribe();
+      planChannel = ch;
+      planChannelStarting = false;
+      ch.subscribe();
     })();
 
     return () => {
       cancelled = true;
-      if (channel) void supabase.removeChannel(channel);
+      planChannelUsers -= 1;
+      if (planChannelUsers > 0) return;
+      planChannelUsers = 0;
+      if (planChannel) void supabase.removeChannel(planChannel);
+      planChannel = null;
+      planChannelFor = null;
     };
-  }, [refetch]);
+  }, []);
 
   /**
    * `hasPlan("free")` — sempre true.

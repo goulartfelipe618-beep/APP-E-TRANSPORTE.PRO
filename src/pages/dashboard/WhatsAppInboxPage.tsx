@@ -285,15 +285,19 @@ export default function WhatsAppInboxPage() {
 
   useEffect(() => {
     const t = setInterval(() => {
+      if (document.visibilityState !== "visible") return;
       void loadChats();
-    }, 8000);
+    }, 20_000);
     return () => clearInterval(t);
   }, [loadChats]);
 
   useEffect(() => {
     if (!activeJid) return;
     void loadMessages(activeJid);
-    const t = setInterval(() => void loadMessages(activeJid), 5000);
+    const t = setInterval(() => {
+      if (document.visibilityState !== "visible") return;
+      void loadMessages(activeJid);
+    }, 15_000);
     return () => clearInterval(t);
   }, [activeJid, loadMessages]);
 

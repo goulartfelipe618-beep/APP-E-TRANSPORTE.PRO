@@ -209,7 +209,7 @@ function useUltimosTransfers() {
         "id" | "numero_reserva" | "nome_completo" | "ida_embarque" | "ida_desembarque" | "ida_data" | "valor_total" | "status"
       >>;
     },
-    refetchInterval: 60_000,
+    refetchInterval: 3 * 60_000,
     staleTime: 30_000,
   });
 }
@@ -229,7 +229,7 @@ function useUltimosGrupos() {
         "id" | "numero_reserva" | "nome_completo" | "embarque" | "destino" | "data_ida" | "num_passageiros" | "valor_total" | "status"
       >>;
     },
-    refetchInterval: 60_000,
+    refetchInterval: 3 * 60_000,
     staleTime: 30_000,
   });
 }

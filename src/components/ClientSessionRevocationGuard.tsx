@@ -12,7 +12,7 @@ import {
   setRevokeAckFromIso,
 } from "@/lib/sessionRevocation";
 
-const CHECK_EVERY_MS = 60 * 1000;
+const CHECK_EVERY_MS = 3 * 60 * 1000;
 /** Folga relógio servidor vs `iat` do JWT (evita deslogar quem acabou de obter token). */
 const JWT_IAT_SLACK_MS = 10_000;
 

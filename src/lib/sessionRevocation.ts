@@ -45,7 +45,7 @@ export function clearRevokeAck(): void {
 
 const REVOKE_RETRY_MS = 45_000;
 const REVOKE_CACHE_KEY = "etp_revoke_at_cache_v1";
-const REVOKE_CACHE_MS = 50_000;
+const REVOKE_CACHE_MS = 170_000;
 let revokeInflight: Promise<string | null> | null = null;
 let revokeRetryAt = 0;
 

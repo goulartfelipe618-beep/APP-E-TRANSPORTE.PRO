@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { clearAuthStartedAt, isAuthExpired, readAuthStartedAt, setAuthStartedAt } from "@/lib/authExpiry";
 
-const CHECK_EVERY_MS = 60 * 1000; // 1 min
+const CHECK_EVERY_MS = 5 * 60 * 1000;
 
 export default function AuthExpiryGuard() {
   const navigate = useNavigate();
@@ -72,6 +72,7 @@ export default function AuthExpiryGuard() {
     });
 
     const interval = window.setInterval(() => {
+      if (document.visibilityState !== "visible") return;
       void checkOnce();
     }, CHECK_EVERY_MS);
 

@@ -182,7 +182,7 @@ export function useMetricasDashboard(periodDays: number) {
         },
       };
     },
-    refetchInterval: 60_000,
+    refetchInterval: 3 * 60_000,
     refetchOnWindowFocus: false,
     staleTime: 30_000,
   });

@@ -126,7 +126,7 @@ export default function FullscreenBannerOverlay({ painel, activePage }: Props) {
       }
     };
     void load();
-    const interval = window.setInterval(() => void load(), 90_000);
+    const interval = window.setInterval(() => void load(), 5 * 60_000);
     return () => {
       cancelled = true;
       window.clearInterval(interval);

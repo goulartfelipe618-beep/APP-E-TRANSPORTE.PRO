@@ -97,8 +97,9 @@ export function ConfiguracoesProvider({ children }: { children: ReactNode }) {
 
   const fetchConfig = async () => {
     const {
-      data: { user },
-    } = await supabase.auth.getUser();
+      data: { session },
+    } = await supabase.auth.getSession();
+    const user = session?.user;
     if (!user) {
       clearConfigCache();
       setConfig(defaultConfig);
@@ -120,12 +121,13 @@ export function ConfiguracoesProvider({ children }: { children: ReactNode }) {
     void fetchConfig();
     const onConfigUpdated = () => void fetchConfig();
     window.addEventListener("configuracoes-updated", onConfigUpdated);
-    const { data: authSub } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: authSub } = supabase.auth.onAuthStateChange((event, session) => {
       if (!session?.user) {
         clearConfigCache();
         setConfig(defaultConfig);
         return;
       }
+      if (event === "TOKEN_REFRESHED" || event === "INITIAL_SESSION") return;
       void fetchConfig();
     });
     return () => {
