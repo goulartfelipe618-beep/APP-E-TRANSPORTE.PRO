@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { lerTokenDaEntrada } from "@/lib/motoristaPortalEntrada";
+import { emailEhContaDeMotoristaPortal, lerTokenDaEntrada } from "@/lib/motoristaPortalEntrada";
+
+describe("emailEhContaDeMotoristaPortal", () => {
+  it("reconhece o e-mail do mini painel e deixa passar o da empresa", () => {
+    expect(emailEhContaDeMotoristaPortal("frota.465613b5f42eaeec56432abf407bda@motorista-frota.local")).toBe(true);
+    expect(emailEhContaDeMotoristaPortal("  Frota.ABC@Motorista-Frota.Local ")).toBe(true);
+    expect(emailEhContaDeMotoristaPortal("comercial@empresa.com")).toBe(false);
+  });
+});
 
 describe("lerTokenDaEntrada", () => {
   it("aceita só o token gravado para este motorista", () => {

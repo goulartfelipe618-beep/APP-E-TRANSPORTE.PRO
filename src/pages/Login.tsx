@@ -32,7 +32,7 @@ import { reportAuthLoginFailure } from "@/lib/authLoginFailureReporter";
 import AuthBootScreen from "@/components/AuthBootScreen";
 import { validatePainelStrongPassword } from "@/lib/motoristaPortalPassword";
 import { claimExclusiveSession } from "@/lib/sessionRevocation";
-import { consumirAvisoLoginPortal, limparEntradaPeloLinkUnico, MSG_MINI_PAINEL_SO_PELO_LINK } from "@/lib/motoristaPortalEntrada";
+import { consumirAvisoLoginPortal, emailEhContaDeMotoristaPortal, limparEntradaPeloLinkUnico, MSG_MINI_PAINEL_SO_PELO_LINK } from "@/lib/motoristaPortalEntrada";
 import { isMotoristaFrotaUser, userIsMotoristaFrotaFromMetadata } from "@/lib/motoristaFrotaRole";
 
 /** Persistência opcional; não ler na montagem — evita exibir URL antiga da imagem antes do fetch. */
@@ -308,6 +308,10 @@ const Login = () => {
       toast.error("Indique o e-mail da conta.");
       return;
     }
+    if (emailEhContaDeMotoristaPortal(em)) {
+      toast.error(MSG_MINI_PAINEL_SO_PELO_LINK);
+      return;
+    }
     const redirectTo = `${window.location.origin}/login`;
     setForgotSending(true);
     try {
@@ -378,6 +382,13 @@ const Login = () => {
     e.preventDefault();
     setError("");
 
+    const emailNorm = email.trim().toLowerCase();
+    if (emailEhContaDeMotoristaPortal(emailNorm)) {
+      setError(MSG_MINI_PAINEL_SO_PELO_LINK);
+      refreshCaptcha();
+      return;
+    }
+
     if (captchaInput !== captcha) {
       setError("Código de verificação incorreto.");
       refreshCaptcha();
@@ -385,7 +396,6 @@ const Login = () => {
     }
 
     setLoading(true);
-    const emailNorm = email.trim().toLowerCase();
     const { data, error: authError } = await supabase.auth.signInWithPassword({
       email: emailNorm,
       password,

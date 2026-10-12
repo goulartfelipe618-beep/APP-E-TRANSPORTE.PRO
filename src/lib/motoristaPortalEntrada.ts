@@ -6,6 +6,11 @@ const AVISO_KEY = "etp_portal_login_aviso";
 export const MSG_MINI_PAINEL_SO_PELO_LINK =
   "O mini painel do motorista só abre pelo link exclusivo gerado no cadastro. O login do painel não aceita esta conta.";
 
+/** Conta criada pelo link /frota/acesso. Não entra no login da empresa. */
+export function emailEhContaDeMotoristaPortal(email: string): boolean {
+  return email.trim().toLowerCase().endsWith("@motorista-frota.local");
+}
+
 type EntradaGravada = { userId?: string; token?: string };
 
 export function lerTokenDaEntrada(raw: string | null, userId: string): string | null {
