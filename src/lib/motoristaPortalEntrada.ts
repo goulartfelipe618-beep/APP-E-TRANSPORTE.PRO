@@ -74,12 +74,28 @@ export function consumirAvisoLoginPortal(): string | null {
   }
 }
 
-/** O servidor confirma que este token é o link deste motorista. Sem isso o painel não abre. */
+async function linkPertenceAoMotorista(userId: string, token: string): Promise<boolean> {
+  const { data: auth } = await supabase.auth.getUser();
+  const metaId = String(
+    (auth.user?.user_metadata as { solicitacao_motorista_id?: unknown } | undefined)?.solicitacao_motorista_id ?? "",
+  ).trim();
+  let query = supabase
+    .from("solicitacoes_motoristas")
+    .select("id")
+    .eq("portal_token", token)
+    .eq("portal_auth_user_id", userId)
+    .eq("status", "cadastrado");
+  if (metaId) query = query.eq("id", metaId);
+  const { data, error } = await query.maybeSingle();
+  return !error && !!data?.id;
+}
+
+/** A ficha deste login tem de ser a dona do link aberto. Sem isso o painel não abre. */
 export async function confirmarEntradaPeloLinkUnico(userId: string, token: string): Promise<boolean> {
   const limpo = token.trim();
   if (!userId || !limpo) return false;
-  const { data, error } = await supabase.rpc("validar_entrada_portal_motorista", { p_token: limpo });
-  if (error || data !== true) {
+  const ok = await linkPertenceAoMotorista(userId, limpo);
+  if (!ok) {
     limparEntradaPeloLinkUnico();
     return false;
   }
@@ -90,10 +106,7 @@ export async function confirmarEntradaPeloLinkUnico(userId: string, token: strin
 export async function entradaDoPortalEstaValida(userId: string): Promise<boolean> {
   const token = tokenEntradaPeloLinkUnico(userId);
   if (!token) return false;
-  const { data, error } = await supabase.rpc("validar_entrada_portal_motorista", { p_token: token });
-  if (error || data !== true) {
-    limparEntradaPeloLinkUnico();
-    return false;
-  }
-  return true;
+  const ok = await linkPertenceAoMotorista(userId, token);
+  if (!ok) limparEntradaPeloLinkUnico();
+  return ok;
 }
