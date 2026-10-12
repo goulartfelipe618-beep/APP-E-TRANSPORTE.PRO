@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Plus, RefreshCw, Trash2, Eye, MessageSquare, Download, Pencil, Filter, X, Lock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { purgeR2Record } from "@/lib/r2Registro";
 import { toast } from "sonner";
 import CriarReservaGrupoDialog from "@/components/grupos/CriarReservaGrupoDialog";
 import DetalhesReservaGrupoSheet from "@/components/reservas/DetalhesReservaGrupoSheet";
@@ -168,6 +169,11 @@ export default function GruposReservasPage() {
       const { error } = await supabase.from("reservas_grupos").delete().eq("id", deleteId);
       if (error) toast.error("Erro ao excluir");
       else {
+        try {
+          await purgeR2Record("reservas_grupos", deleteId);
+        } catch (e) {
+          toast.warning(e instanceof Error ? e.message : "Reserva excluída, mas o arquivo na Cloudflare ficou.");
+        }
         toast.success("Reserva excluída");
         setDeleteId(null);
         fetchAll();
@@ -177,13 +183,17 @@ export default function GruposReservasPage() {
     }
   };
 
+  const comunicarSeq = useRef(0);
   const handleComunicar = async (r: ReservaGrupo) => {
+    const seq = ++comunicarSeq.current;
     try {
       const payload = await buildGrupoDadosComunicarCliente(r);
+      if (seq !== comunicarSeq.current) return;
       setComunicarLinha(r);
       setComunicarPayload(payload);
       setComunicarOpen(true);
     } catch {
+      if (seq !== comunicarSeq.current) return;
       toast.error("Erro ao preparar dados para comunicação.");
     }
   };

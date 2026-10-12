@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
+import { syncR2Record } from "@/lib/r2Registro";
 import { toast } from "sonner";
 import DetalhesSolicitacaoGrupoSheet from "@/components/solicitacoes/DetalhesSolicitacaoGrupoSheet";
 import CriarReservaGrupoDialog, { type GrupoInitialData } from "@/components/grupos/CriarReservaGrupoDialog";
@@ -74,6 +75,7 @@ export default function GruposSolicitacoesPage() {
   const handleReservaCriada = async () => {
     if (initialData?.solicitacao_id) {
       await supabase.from("solicitacoes_grupos").update({ status: "convertida" }).eq("id", initialData.solicitacao_id);
+      syncR2Record("solicitacoes_grupos", initialData.solicitacao_id);
     }
     setInitialData(null);
     fetchData();

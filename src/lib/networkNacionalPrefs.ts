@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { syncR2Record } from "@/lib/r2Registro";
 
 const LS_ACEITO = "network_nacional_aceito";
 const LS_SAIDA = "network_saida_data";
@@ -20,6 +21,7 @@ async function upsertNetworkFields(fields: Record<string, unknown>) {
 
   if (existing) {
     const { error } = await supabase.from("configuracoes").update(payload).eq("user_id", user.id);
+    if (!error) syncR2Record("configuracoes", user.id);
     return !error;
   }
 
@@ -28,6 +30,7 @@ async function upsertNetworkFields(fields: Record<string, unknown>) {
     nome_projeto: "E-Transporte.pro",
     ...payload,
   });
+  if (!error) syncR2Record("configuracoes", user.id);
   return !error;
 }
 

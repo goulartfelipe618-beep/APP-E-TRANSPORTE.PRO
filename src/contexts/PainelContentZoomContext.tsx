@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { syncR2Record } from "@/lib/r2Registro";
 import { toast } from "sonner";
 
 const ZOOM_MIN = 70;
@@ -149,6 +150,7 @@ export function PainelContentZoomProvider({ children }: { children: ReactNode })
           /* ignore */
         }
         toast.success("Zoom da área principal salvo.");
+        syncR2Record("configuracoes", user.id);
       }
       setDialogOpen(false);
     } finally {

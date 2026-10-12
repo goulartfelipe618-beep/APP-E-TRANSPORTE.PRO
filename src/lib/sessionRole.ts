@@ -1,5 +1,6 @@
 import type { User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
+import { entradaDoPortalEstaValida } from "@/lib/motoristaPortalEntrada";
 import {
   clearDashboardNavSessionStorage,
   isMotoristaFrotaUser,
@@ -12,15 +13,12 @@ export async function getPostLoginPath(
   userId: string,
   user?: User | null,
 ): Promise<"/admin" | "/dashboard" | "/frota"> {
-  if (userIsMotoristaFrotaFromMetadata(user)) {
+  const ehMotorista =
+    userIsMotoristaFrotaFromMetadata(user) || (await isMotoristaFrotaUser(userId, user));
+  if (ehMotorista) {
     clearDashboardNavSessionStorage();
-    return "/frota";
-  }
-
-  const frotaByDb = await isMotoristaFrotaUser(userId, user);
-  if (frotaByDb) {
-    clearDashboardNavSessionStorage();
-    return "/frota";
+    if (await entradaDoPortalEstaValida(userId)) return "/frota";
+    return "/login";
   }
 
   const { data: primary, error } = await supabase.rpc("get_session_primary_role");

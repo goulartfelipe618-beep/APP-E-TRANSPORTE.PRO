@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/select";
 import { Loader2, FileDown } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { syncR2Record } from "@/lib/r2Registro";
 import { toast } from "sonner";
 import { useConfiguracoes } from "@/contexts/ConfiguracoesContext";
 import type { Tables } from "@/integrations/supabase/types";
@@ -108,7 +109,7 @@ export default function NovoReceptivoDialog({ open, onOpenChange, onSaved }: Pro
       const fname = `receptivo-${stamp}.pdf`;
       downloadReceptivoPdf(doc, fname);
 
-      const { error: insErr } = await supabase.from("receptivos").insert({
+      const { data: created, error: insErr } = await supabase.from("receptivos").insert({
         user_id: user.id,
         modelo: m,
         receptivo_pdf_layout_version: RECEPTIVO_PDF_LAYOUT_VERSION,
@@ -124,11 +125,12 @@ export default function NovoReceptivoDialog({ open, onOpenChange, onSaved }: Pro
         ida_hora: reserva?.ida_hora ?? null,
         volta_data: reserva?.volta_data ?? null,
         volta_hora: reserva?.volta_hora ?? null,
-      });
+      }).select("id").single();
 
       if (insErr) {
         toast.error("PDF gerado, mas não foi possível salvar o histórico: " + insErr.message);
       } else {
+        if (created?.id) syncR2Record("receptivos", created.id);
         toast.success("Receptivo gerado e salvo no histórico");
         void logUserActivity("receptivo_criado");
       }

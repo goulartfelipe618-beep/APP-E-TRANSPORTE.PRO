@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
+import { syncR2Record } from "@/lib/r2Registro";
 import { toast } from "sonner";
 import DetalhesSolicitacaoTransferSheet from "@/components/solicitacoes/DetalhesSolicitacaoTransferSheet";
 import CriarReservaTransferDialog, { type TransferInitialData } from "@/components/transfer/CriarReservaTransferDialog";
@@ -87,6 +88,7 @@ export default function TransferSolicitacoesPage() {
     // Mark solicitação as convertida
     if (initialData?.solicitacao_id) {
       await supabase.from("solicitacoes_transfer").update({ status: "convertida" }).eq("id", initialData.solicitacao_id);
+      syncR2Record("solicitacoes_transfer", initialData.solicitacao_id);
     }
     setInitialData(null);
     fetchData();

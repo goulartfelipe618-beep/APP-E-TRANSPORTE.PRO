@@ -27,7 +27,7 @@ export function MotoristasExtrasField({
     <div className="space-y-2 sm:col-span-2">
       <Label>Também vincular estes motoristas</Label>
       <p className="text-xs text-muted-foreground">
-        Qualquer categoria. Os motoristas marcados passam a ver esta reserva. Reservas já gravadas não são alteradas.
+        Cada motorista marcado passa a ver esta reserva no próprio mini painel. Só entram motoristas cadastrados nesta conta.
       </p>
       <div className="grid gap-2 sm:grid-cols-2">
         {others.map((m) => {

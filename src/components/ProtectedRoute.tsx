@@ -7,6 +7,7 @@ import {
   isMotoristaFrotaUser,
   userIsMotoristaFrotaFromMetadata,
 } from "@/lib/motoristaFrotaRole";
+import { entradaDoPortalEstaValida, guardarAvisoLoginPortal, limparEntradaPeloLinkUnico } from "@/lib/motoristaPortalEntrada";
 import { sessionRequiresMfaTotpChallenge } from "@/lib/mfaGate";
 import AuthBootScreen from "@/components/AuthBootScreen";
 
@@ -55,19 +56,29 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
           return;
         }
 
-        if (userIsMotoristaFrotaFromMetadata(session.user)) {
+        const ehMotorista =
+          userIsMotoristaFrotaFromMetadata(session.user) ||
+          (await isMotoristaFrotaUser(session.user.id, session.user));
+        if (ehMotorista) {
           clearDashboardNavSessionStorage();
-          setRedirectFrota(true);
-          setNeedsMfa(false);
-          setAuthenticated(false);
-          setLoading(false);
-          return;
-        }
-
-        const frota = await isMotoristaFrotaUser(session.user.id, session.user);
-        if (frota) {
-          clearDashboardNavSessionStorage();
-          setRedirectFrota(true);
+          const peloLink = await entradaDoPortalEstaValida(session.user.id);
+          if (!mounted) return;
+          if (peloLink) {
+            setRedirectFrota(true);
+            setNeedsMfa(false);
+            setAuthenticated(false);
+            setLoading(false);
+            return;
+          }
+          limparEntradaPeloLinkUnico();
+          guardarAvisoLoginPortal();
+          try {
+            await supabase.auth.signOut({ scope: "local" });
+          } catch {
+            /* sessão de motorista não abre o painel da empresa */
+          }
+          if (!mounted) return;
+          setRedirectFrota(false);
           setNeedsMfa(false);
           setAuthenticated(false);
           setLoading(false);

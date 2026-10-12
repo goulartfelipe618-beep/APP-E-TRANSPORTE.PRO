@@ -1,9 +1,12 @@
 /**
- * Backup R2 por empresa: só envia linhas novas ou alteradas.
- * Prefixo: backups/{empresa}__{userId8}/{dd.mm.yy}/...
+ * Registro R2 por empresa.
+ * A cópia inicial grava um arquivo por registro.
+ * Depois disso, cada salvamento regrava só esse arquivo e cada exclusão apaga só esse arquivo.
+ * Prefixo estável: backups/{empresa}__{userId8}/registros/{tabela}/{id}.json
+ * As pastas antigas por data não são apagadas.
  */
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { r2Client, r2Put } from "./r2.ts";
+import { espelhoKey, organizedKey, r2Client, r2Delete, r2List, r2Put } from "./r2.ts";
 import {
   chunkRows,
   incrementFileName,
@@ -20,6 +23,33 @@ const corsHeaders: Record<string, string> = {
 };
 
 const CHUNK = 250;
+const PAGE = 80;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+const REGISTRO_TABLES = [
+  "veiculos_frota",
+  "solicitacoes_motoristas",
+  "cadastro_clientes",
+  "reservas_transfer",
+  "solicitacoes_transfer",
+  "reservas_grupos",
+  "solicitacoes_grupos",
+  "anotacoes",
+  "financial_transactions",
+  "contratos",
+  "automacoes",
+  "receptivos",
+  "configuracoes",
+  "cabecalho_contratual",
+] as const;
+
+const SINGLETON_TABLES = new Set<string>(["configuracoes", "cabecalho_contratual"]);
+
+const MEDIA_BUCKET_BY_TABLE: Record<string, string> = {
+  veiculos_frota: "veiculos-imagens",
+  solicitacoes_motoristas: "motorista-frota-docs",
+  cadastro_clientes: "cadastro-clientes-docs",
+};
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -378,6 +408,175 @@ async function runForUser(
   return { ok: true, stats, prefix };
 }
 
+function isRegistroTable(table: string): boolean {
+  return (REGISTRO_TABLES as readonly string[]).includes(table);
+}
+
+function statsOf(raw: unknown): Record<string, unknown> {
+  return raw && typeof raw === "object" ? { ...(raw as Record<string, unknown>) } : {};
+}
+
+async function loadSettings(admin: SupabaseClient, userId: string) {
+  const { data } = await admin
+    .from("r2_auto_backup_settings")
+    .select("enabled, last_stats, last_prefix")
+    .eq("user_id", userId)
+    .maybeSingle();
+  return data as { enabled?: boolean; last_stats?: unknown; last_prefix?: string | null } | null;
+}
+
+async function registroPrefix(admin: SupabaseClient, userId: string): Promise<string> {
+  const existing = await loadSettings(admin, userId);
+  const saved = statsOf(existing?.last_stats).registro_prefix;
+  if (typeof saved === "string" && /^backups\/[a-zA-Z0-9_-]+\/registros$/.test(saved)) return saved;
+  const { data: cfg } = await admin.from("configuracoes").select("nome_empresa, nome_projeto").eq("user_id", userId).maybeSingle();
+  const { data: cab } = await admin.from("cabecalho_contratual").select("razao_social, nome").eq("user_id", userId).maybeSingle();
+  const cfgRow = (cfg ?? {}) as Record<string, unknown>;
+  const cabRow = (cab ?? {}) as Record<string, unknown>;
+  const empresaNome = String(cfgRow.nome_empresa || cfgRow.nome_projeto || cabRow.razao_social || cabRow.nome || "empresa");
+  return `backups/${slugEmpresa(empresaNome, userId)}/registros`;
+}
+
+function recordObjectKey(prefix: string, table: string, id: string): string {
+  if (!isRegistroTable(table) || !UUID_RE.test(id)) throw new Error("Registro inválido.");
+  return `${prefix}/${table}/${id}.json`;
+}
+
+async function fetchOwnedRow(
+  admin: SupabaseClient,
+  table: string,
+  userId: string,
+  id: string | null,
+): Promise<Record<string, unknown> | null> {
+  let q = admin.from(table).select("*").eq("user_id", userId);
+  if (!SINGLETON_TABLES.has(table)) {
+    if (!id || !UUID_RE.test(id)) throw new Error("Id inválido.");
+    q = q.eq("id", id);
+  }
+  const { data, error } = await q.maybeSingle();
+  if (error) throw new Error(`${table}: ${error.message}`);
+  return (data as Record<string, unknown> | null) ?? null;
+}
+
+async function putRecord(
+  admin: SupabaseClient,
+  userId: string,
+  table: string,
+  id: string | null,
+): Promise<{ key: string; skipped?: string }> {
+  const settings = await loadSettings(admin, userId);
+  if (!settings?.enabled) return { key: "", skipped: "desligado" };
+  const row = await fetchOwnedRow(admin, table, userId, id);
+  if (!row) return { key: "", skipped: "sem-registro" };
+  const rowId = String(row.id ?? "");
+  if (!UUID_RE.test(rowId)) throw new Error("Registro sem id.");
+  const prefix = await registroPrefix(admin, userId);
+  const key = recordObjectKey(prefix, table, rowId);
+  const bytes = new TextEncoder().encode(JSON.stringify(row));
+  const r2 = await r2Client();
+  await r2Put(r2, key, bytes, "application/json; charset=utf-8");
+  const stats = statsOf(settings.last_stats);
+  stats.registro_prefix = prefix;
+  await markSettings(admin, userId, {
+    last_run_at: new Date().toISOString(),
+    last_status: "ok",
+    last_error: null,
+    last_prefix: prefix,
+    last_stats: stats,
+  });
+  return { key };
+}
+
+async function snapshotPage(
+  admin: SupabaseClient,
+  userId: string,
+  table: string,
+  offset: number,
+): Promise<{ done: boolean; table: string; offset: number; written: number; prefix: string }> {
+  const settings = await loadSettings(admin, userId);
+  if (!settings?.enabled) throw new Error("Ligue o registro antes da cópia inicial.");
+  const stats = statsOf(settings.last_stats);
+  if (typeof stats.snapshot_completed_at === "string" && stats.snapshot_completed_at) {
+    return { done: true, table, offset: 0, written: 0, prefix: await registroPrefix(admin, userId) };
+  }
+  const prefix = await registroPrefix(admin, userId);
+  const from = Math.max(0, offset);
+  const { data, error } = await admin
+    .from(table)
+    .select("*")
+    .eq("user_id", userId)
+    .order("id", { ascending: true })
+    .range(from, from + PAGE - 1);
+  if (error) throw new Error(`${table}: ${error.message}`);
+  const rows = (data ?? []) as Record<string, unknown>[];
+  const r2 = rows.length ? await r2Client() : null;
+  for (const row of rows) {
+    const rowId = String(row.id ?? "");
+    if (!UUID_RE.test(rowId) || !r2) continue;
+    const bytes = new TextEncoder().encode(JSON.stringify(row));
+    await r2Put(r2, recordObjectKey(prefix, table, rowId), bytes, "application/json; charset=utf-8");
+  }
+  const tableIndex = REGISTRO_TABLES.indexOf(table as (typeof REGISTRO_TABLES)[number]);
+  if (tableIndex < 0) throw new Error("Tabela não registrada.");
+  const tableDone = rows.length < PAGE;
+  const nextIndex = tableDone ? tableIndex + 1 : tableIndex;
+  const finished = tableDone && nextIndex >= REGISTRO_TABLES.length;
+  stats.registro_prefix = prefix;
+  if (finished) stats.snapshot_completed_at = new Date().toISOString();
+  else delete stats.snapshot_completed_at;
+  await markSettings(admin, userId, {
+    ...(finished ? { last_run_at: new Date().toISOString() } : {}),
+    last_status: "ok",
+    last_error: null,
+    last_prefix: prefix,
+    last_stats: stats,
+  });
+  if (finished) return { done: true, table, offset: from + rows.length, written: rows.length, prefix };
+  const nextTable = tableDone ? REGISTRO_TABLES[nextIndex]! : table;
+  return { done: false, table: nextTable, offset: tableDone ? 0 : from + rows.length, written: rows.length, prefix };
+}
+
+async function deleteOwnedObjects(
+  admin: SupabaseClient,
+  userId: string,
+  table: string,
+  id: string,
+): Promise<{ json: string; media: number }> {
+  if (!isRegistroTable(table) || !UUID_RE.test(id) || !UUID_RE.test(userId)) throw new Error("Registro inválido.");
+  const prefix = await registroPrefix(admin, userId);
+  const key = recordObjectKey(prefix, table, id);
+  const r2 = await r2Client();
+  await r2Delete(r2, key);
+  let media = 0;
+  const bucket = MEDIA_BUCKET_BY_TABLE[table];
+  if (bucket) {
+    const folder = `${userId}/${id}/`;
+    const listPrefix = espelhoKey(bucket, folder);
+    const keys = await r2List(r2, listPrefix);
+    const { data: roleRows } = await admin.from("user_roles").select("role").eq("user_id", userId);
+    const roles = (roleRows ?? []).map((row) => String((row as { role?: string }).role ?? ""));
+    const roleByUser: Record<string, string> = {
+      [userId]: roles.includes("admin_transfer") ? "admin_transfer" : roles[0] || "sem-papel",
+    };
+    for (const found of keys) {
+      if (!found.startsWith(listPrefix)) continue;
+      await r2Delete(r2, found);
+      const objectPath = found.slice(`espelho/${bucket}/`.length);
+      if (!objectPath.startsWith(folder)) continue;
+      const organized = organizedKey(bucket, objectPath, roleByUser);
+      if (organized !== found) await r2Delete(r2, organized);
+      media += 1;
+    }
+    const { data: stored } = await admin.storage.from(bucket).list(`${userId}/${id}`, { limit: 100 });
+    const paths = (stored ?? [])
+      .map((item) => item.name)
+      .filter((name) => name && !name.includes("/") && !name.includes(".."))
+      .map((name) => `${userId}/${id}/${name}`);
+    if (paths.length) await admin.storage.from(bucket).remove(paths);
+  }
+  return { json: key, media };
+}
+
 async function requireEmpresa(
   authHeader: string | null,
   admin: SupabaseClient,
@@ -414,39 +613,41 @@ Deno.serve(async (req) => {
   const isCron = Boolean(cronSecret && headerSecret && headerSecret === cronSecret);
 
   const admin = createClient(supabaseUrl, serviceKey);
-  let body: { mode?: string } = {};
+  let body: { mode?: string; table?: string; id?: string; offset?: number } = {};
   try {
-    body = (await req.json()) as { mode?: string };
+    body = (await req.json()) as { mode?: string; table?: string; id?: string; offset?: number };
   } catch {
     body = {};
   }
 
   try {
-    if (isCron || body.mode === "cron") {
-      if (!isCron) return json({ error: "Cron secret inválido." }, 401);
-      const { data: list, error } = await admin.from("r2_auto_backup_settings").select("user_id").eq("enabled", true);
-      if (error) return json({ error: error.message }, 500);
-      const today = dateFolderSp();
-      const results: { user_id: string; ok: boolean; error?: string }[] = [];
-      for (const row of list ?? []) {
-        const uid = String((row as { user_id: string }).user_id);
-        try {
-          const r = await runForUser(admin, uid, supabaseUrl);
-          results.push({ user_id: uid, ok: r.ok });
-        } catch (e) {
-          const msg = e instanceof Error ? e.message : String(e);
-          await markSettings(admin, uid, { last_status: "error", last_error: msg.slice(0, 2000) });
-          results.push({ user_id: uid, ok: false, error: msg });
-        }
-      }
-      return json({ ok: true, mode: "cron", date: today, results });
+    if (isCron || body.mode === "cron" || body.mode === "manual") {
+      if ((body.mode === "cron" || isCron) && !isCron) return json({ error: "Cron secret inválido." }, 401);
+      return json({ ok: true, skipped: true, reason: "Nada mudou. Só a cópia inicial e cada salvamento enviam arquivos." });
     }
 
     const authz = await requireEmpresa(req.headers.get("Authorization"), admin, supabaseUrl, anon);
     if (!authz.ok) return authz.response;
+
+    const mode = body.mode === "upsert" || body.mode === "purge" ? body.mode : "snapshot";
     try {
-      const r = await runForUser(admin, authz.userId, supabaseUrl);
-      return json({ ok: r.ok, prefix: r.prefix, stats: r.stats, error: null });
+      if (mode === "upsert") {
+        const table = String(body.table ?? "");
+        if (!isRegistroTable(table)) return json({ error: "Tabela não registrada." }, 400);
+        const result = await putRecord(admin, authz.userId, table, body.id ?? null);
+        return json({ ok: true, ...result });
+      }
+      if (mode === "purge") {
+        const table = String(body.table ?? "");
+        const id = String(body.id ?? "");
+        if (!isRegistroTable(table) || !UUID_RE.test(id)) return json({ error: "Registro inválido." }, 400);
+        const result = await deleteOwnedObjects(admin, authz.userId, table, id);
+        return json({ ok: true, ...result });
+      }
+      const requested = String(body.table ?? REGISTRO_TABLES[0]);
+      const table = isRegistroTable(requested) ? requested : REGISTRO_TABLES[0];
+      const page = await snapshotPage(admin, authz.userId, table, Number(body.offset ?? 0));
+      return json({ ok: true, ...page });
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       await markSettings(admin, authz.userId, { last_status: "error", last_error: msg.slice(0, 2000) });

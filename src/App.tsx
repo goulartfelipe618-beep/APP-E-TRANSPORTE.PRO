@@ -20,6 +20,7 @@ import { ConfiguracoesProvider } from "./contexts/ConfiguracoesContext";
 import AuthExpiryGuard from "./components/AuthExpiryGuard";
 import ClientSessionRevocationGuard from "./components/ClientSessionRevocationGuard";
 import CapacitorFrotaBridge from "./components/CapacitorFrotaBridge";
+import AppLaunchAnimation from "./components/AppLaunchAnimation";
 
 const NotFound = lazy(() => import("./pages/NotFound"));
 const DashboardLayout = lazy(() => import("./components/DashboardLayout"));
@@ -58,6 +59,7 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
+        <AppLaunchAnimation />
         <AuthExpiryGuard />
         <ClientSessionRevocationGuard />
         <CapacitorFrotaBridge />

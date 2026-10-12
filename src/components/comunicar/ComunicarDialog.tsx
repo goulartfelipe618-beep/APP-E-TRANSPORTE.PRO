@@ -14,6 +14,7 @@ import {
   interpolarTextoComunicar,
   persistirTextoComunicar,
 } from "@/lib/comunicarPlaceholders";
+import { listarVariaveisComunicar, montarMensagemComunicar } from "@/lib/comunicarMensagem";
 import {
   buildComunicadorSnapshot,
   buildN8nEnvioWhatsappCampos,
@@ -23,10 +24,7 @@ import {
   jsonSafeRecord,
   type WebhookComunicacaoTipo,
 } from "@/lib/n8nComunicarWebhook";
-import {
-  dadosRegistroComunicarParaWebhook,
-  formatComunicarValorCampo,
-} from "@/lib/comunicarFieldFormat";
+import { dadosRegistroComunicarParaWebhook } from "@/lib/comunicarFieldFormat";
 import {
   COMUNICAR_CLIENTE_CHAVES_CONFIDENCIAIS,
   COMUNICAR_META_KEYS,
@@ -265,18 +263,7 @@ export default function ComunicarDialog({
   const { sistema, own } = useComunicadoresEvolution();
 
   const availableVars = useMemo(
-    () =>
-      Object.entries(dados)
-        .filter(([key, value]) => {
-          if (ignoredKeys.includes(key) || value == null || value === "") return false;
-          if (Array.isArray(value) && value.length === 0) return false;
-          return formatComunicarValorCampo(key, value) !== "";
-        })
-        .map(([key, value]) => ({
-          key,
-          label: labelMap[key] || key,
-          value: formatComunicarValorCampo(key, value),
-        })),
+    () => listarVariaveisComunicar(dados, labelMap, ignoredKeys),
     [dados],
   );
 
@@ -405,28 +392,20 @@ export default function ComunicarDialog({
     });
   };
 
-  const buildMessage = (rascunho: RascunhoUi, nomes = nomesComunicar) => {
-    const parts: string[] = [];
-    const acima = interpolarTextoComunicar(rascunho.acima, nomes).trim();
-    const abaixo = interpolarTextoComunicar(rascunho.abaixo, nomes).trim();
-    if (acima) parts.push(acima);
-
-    if (rascunho.vars.size > 0) {
-      parts.push("");
-      for (const v of availableVars) {
-        if (rascunho.vars.has(v.key)) {
-          parts.push(`*${v.label}:* ${v.value}`);
-        }
-      }
-    }
-
-    if (abaixo) {
-      parts.push("");
-      parts.push(abaixo);
-    }
-
-    return parts.join("\n");
-  };
+  const buildMessage = (
+    rascunho: RascunhoUi,
+    nomes = nomesComunicar,
+    fonte: Record<string, unknown> = dados,
+  ) =>
+    montarMensagemComunicar({
+      dados: fonte,
+      acima: rascunho.acima,
+      abaixo: rascunho.abaixo,
+      vars: rascunho.vars,
+      nomes,
+      labels: labelMap,
+      ignoredKeys,
+    });
 
   const handleEnviar = () => {
     void (async () => {
@@ -441,6 +420,7 @@ export default function ComunicarDialog({
         return;
       }
 
+      const idNoClique = String((dadosRef.current as { id?: unknown }).id ?? "");
       const row = jsonSafeRecord(dadosRef.current as Record<string, unknown>) as Record<string, unknown>;
       const phoneCliente = (coletarTelefoneDestinoDoRegistro(telefone, row).replace(/\D/g, "") || "");
       if (destinos.includes("cliente") && !phoneCliente) {
@@ -498,11 +478,17 @@ export default function ComunicarDialog({
               cliente: nomesComunicar.cliente,
               motorista: dest.id === "cliente" ? nomesComunicar.motorista : dest.nome,
             };
-            const message = buildMessage(rascunho, nomes);
+            const rowEnvio = jsonSafeRecord(dadosRef.current as Record<string, unknown>) as Record<string, unknown>;
+            if (String(rowEnvio.id ?? "") !== idNoClique) {
+              toast.error("A reserva selecionada mudou. Abra Comunicar novamente.");
+              return;
+            }
+            const message = buildMessage(rascunho, nomes, rowEnvio);
             const phone = dest.telefone.replace(/\D/g, "");
             const sent = await sendUazapiWhatsappCard({
               number: phone,
               text: message,
+              trackId: `${String(rowEnvio.id || "envio")}:${Date.now()}`,
               title: titulo,
               buttons: [
                 { id: "recebido", text: "✅ Recebido" },
@@ -525,7 +511,8 @@ export default function ComunicarDialog({
                 titulo_modal: titulo,
                 telefone_cliente: phone || null,
                 telefone_cliente_disponivel: Boolean(phone),
-                dados_registro: dadosRegistroComunicarParaWebhook(row),
+                dados_registro: dadosRegistroComunicarParaWebhook(rowEnvio),
+                reserva_id: rowEnvio.id ?? null,
                 variaveis_chaves_incluidas: [...rascunho.vars],
                 mensagem_completa: message,
                 mensagem_partes: {

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, CalendarDays, RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Tables } from "@/integrations/supabase/types";
@@ -47,6 +47,7 @@ export default function PainelAgendaPage() {
   const [comunicarTransferPayload, setComunicarTransferPayload] = useState<Record<string, unknown> | null>(null);
   const [comunicarGrupoLinha, setComunicarGrupoLinha] = useState<Tables<"reservas_grupos"> | null>(null);
   const [comunicarGrupoPayload, setComunicarGrupoPayload] = useState<Record<string, unknown> | null>(null);
+  const comunicarSeq = useRef(0);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -158,27 +159,33 @@ export default function PainelAgendaPage() {
   }, []);
 
   const handleComunicarTransfer = useCallback(async (r: Tables<"reservas_transfer">) => {
+    const seq = ++comunicarSeq.current;
     try {
       const payload = await buildTransferDadosComunicarCliente(r);
+      if (seq !== comunicarSeq.current) return;
       setComunicarGrupoLinha(null);
       setComunicarGrupoPayload(null);
       setComunicarTransferLinha(r);
       setComunicarTransferPayload(payload);
       setComunicarOpen(true);
     } catch {
+      if (seq !== comunicarSeq.current) return;
       toast.error("Erro ao preparar dados para comunicação.");
     }
   }, []);
 
   const handleComunicarGrupo = useCallback(async (r: Tables<"reservas_grupos">) => {
+    const seq = ++comunicarSeq.current;
     try {
       const payload = await buildGrupoDadosComunicarCliente(r);
+      if (seq !== comunicarSeq.current) return;
       setComunicarTransferLinha(null);
       setComunicarTransferPayload(null);
       setComunicarGrupoLinha(r);
       setComunicarGrupoPayload(payload);
       setComunicarOpen(true);
     } catch {
+      if (seq !== comunicarSeq.current) return;
       toast.error("Erro ao preparar dados para comunicação.");
     }
   }, []);

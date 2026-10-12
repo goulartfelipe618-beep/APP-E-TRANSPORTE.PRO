@@ -15,6 +15,7 @@ import { validateVehicleCoverDimensions, VEHICLE_COVER_DIMENSIONS } from "@/lib/
 import { cn } from "@/lib/utils";
 import { logUserActivity } from "@/lib/userActivityLog";
 import { uploadFileToR2 } from "@/lib/mirrorUploadToR2";
+import { syncR2Record } from "@/lib/r2Registro";
 
 type Props = {
   open: boolean;
@@ -367,6 +368,7 @@ export default function CadastrarVeiculoDialog({ open, onOpenChange, veiculoId =
         toast.success("Veículo cadastrado com sucesso.");
         void logUserActivity("veiculo_cadastrado");
       }
+      syncR2Record("veiculos_frota", id);
 
       onOpenChange(false);
       onSaved?.();

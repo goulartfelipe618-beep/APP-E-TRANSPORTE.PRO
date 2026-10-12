@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import type { MotoristaInitialData } from "@/lib/motoristaFromSolicitacao";
 import { parseDadosWebhook, pickStr } from "@/lib/motoristaFromSolicitacao";
 import { supabase } from "@/integrations/supabase/client";
+import { syncR2Record } from "@/lib/r2Registro";
 import type { Database, Json } from "@/integrations/supabase/types";
 import {
   fetchIbgeEstados,
@@ -390,6 +391,7 @@ export default function CadastrarMotoristaDialog({ open, onOpenChange, onCreated
         return;
       }
       toast.success("Motorista atualizado.");
+      syncR2Record("solicitacoes_motoristas", initialData.cadastro_row_id);
       setSaving(false);
       onOpenChange(false);
       onCreated?.();
@@ -457,6 +459,7 @@ export default function CadastrarMotoristaDialog({ open, onOpenChange, onCreated
           : "Solicitação concluída e disponível em Motoristas → Cadastros.",
         { duration: 12_000 },
       );
+      syncR2Record("solicitacoes_motoristas", leadId);
       setSaving(false);
       onOpenChange(false);
       onCreated?.();
@@ -522,6 +525,7 @@ export default function CadastrarMotoristaDialog({ open, onOpenChange, onCreated
       { duration: 12_000 },
     );
     void logUserActivity("motorista_cadastrado");
+    syncR2Record("solicitacoes_motoristas", novoId);
     setSaving(false);
     onOpenChange(false);
     onCreated?.();

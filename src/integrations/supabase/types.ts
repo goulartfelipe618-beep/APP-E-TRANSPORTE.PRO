@@ -2931,6 +2931,10 @@ export type Database = {
         Args: { p_user_id: string }
         Returns: undefined
       }
+      validar_entrada_portal_motorista: {
+        Args: { p_token: string }
+        Returns: boolean
+      }
     }
     Enums: {
       app_role: "admin_transfer" | "admin_taxi" | "admin_master"

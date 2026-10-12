@@ -19,6 +19,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { purgeR2Record, syncR2Record } from "@/lib/r2Registro";
 import { buildWebhookSolicitacaoUrl } from "@/lib/webhookSolicitacaoUrl";
 import FerramentasDevDialog from "@/components/automacoes/FerramentasDevDialog";
 import { ConfirmDeleteDialog } from "@/components/ConfirmDeleteDialog";
@@ -360,9 +361,15 @@ export default function SistemaAutomacoesPage() {
           setDeleteIntent(null);
           return;
         }
-        const { error } = await supabase.from("automacoes").delete().eq("id", deleteIntent.id);
+        const removedId = deleteIntent.id;
+        const { error } = await supabase.from("automacoes").delete().eq("id", removedId);
         if (error) toast.error("Erro ao excluir");
         else {
+          try {
+            await purgeR2Record("automacoes", removedId);
+          } catch (e) {
+            toast.warning(e instanceof Error ? e.message : "Automação excluída, mas o arquivo na Cloudflare ficou.");
+          }
           toast.success("Automação excluída");
           setTestes([]);
           setSelectedTeste(null);
@@ -394,16 +401,17 @@ export default function SistemaAutomacoesPage() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { toast.error("Não logado"); return; }
 
-    const { error } = await supabase.from("automacoes").insert({
+    const { data: created, error } = await supabase.from("automacoes").insert({
       user_id: user.id,
       nome: novoNome,
       tipo: novoTipo,
       ativo: false,
       mappings: {},
-    });
+    }).select("id").single();
 
     if (error) toast.error("Erro ao criar: " + error.message);
     else {
+      if (created?.id) syncR2Record("automacoes", created.id);
       toast.success("Automação criada com sucesso!");
       setNovoNome("");
       setNovoTipo("");
@@ -420,6 +428,7 @@ export default function SistemaAutomacoesPage() {
       .eq("id", automacao.id);
     if (error) toast.error("Erro ao atualizar");
     else {
+      syncR2Record("automacoes", automacao.id);
       toast.success(newAtivo ? "Webhook ativado!" : "Webhook desativado!");
       setAutomacoes((prev) => prev.map((a) => a.id === automacao.id ? { ...a, ativo: newAtivo } : a));
       if (selected?.id === automacao.id) setSelected({ ...selected, ativo: newAtivo });
@@ -448,6 +457,7 @@ export default function SistemaAutomacoesPage() {
       .eq("id", selected.id);
     if (error) toast.error("Erro ao salvar");
     else {
+      syncR2Record("automacoes", selected.id);
       toast.success("Mapeamento salvo com sucesso!");
       setAutomacoes((prev) => prev.map((a) => a.id === selected.id ? { ...a, mappings } : a));
       setSelected({ ...selected, mappings });
@@ -498,6 +508,7 @@ export default function SistemaAutomacoesPage() {
     setMappings(nextMappings);
     setAutomacoes((prev) => prev.map((a) => a.id === selected.id ? { ...a, mappings: nextMappings } : a));
     setSelected({ ...selected, mappings: nextMappings });
+    syncR2Record("automacoes", selected.id);
     toast.success("Mapeamento salvo com sucesso!");
     setCampaignFieldLocked(true);
   };

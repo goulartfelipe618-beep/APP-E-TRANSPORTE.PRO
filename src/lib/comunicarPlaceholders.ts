@@ -20,11 +20,21 @@ export function interpolarTextoComunicar(texto: string, nomes: ComunicarNomes): 
   return hidratarTextoComunicar(texto).split(COMUNICAR_PH_CLIENTE).join(cliente).split(COMUNICAR_PH_MOTORISTA).join(motorista);
 }
 
+/** Linhas `*Rótulo:* valor` são os chips da reserva. Não podem ficar no molde gravado. */
+export function limparLinhasDeCampoComunicar(texto: string): string {
+  return texto
+    .split("\n")
+    .filter((line) => !/^\*[^*\n]+:\*/.test(line.trim()))
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 /** Guarda só o molde. Não grava o nome da reserva actual. */
 export function persistirTextoComunicar(textoUi: string, nomes: ComunicarNomes): string {
   const cliente = nomes.cliente.trim();
   const motorista = nomes.motorista.trim();
-  let t = textoUi;
+  let t = limparLinhasDeCampoComunicar(textoUi);
   if (cliente.length >= 2) t = t.split(`Olá ${cliente},`).join(`Olá ${COMUNICAR_PH_CLIENTE},`);
   if (motorista.length >= 2 && motorista !== cliente) {
     t = t.split(`Olá ${motorista},`).join(`Olá ${COMUNICAR_PH_MOTORISTA},`);

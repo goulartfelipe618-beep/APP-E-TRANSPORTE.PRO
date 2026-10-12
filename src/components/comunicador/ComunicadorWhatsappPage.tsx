@@ -3,8 +3,10 @@ import { Button } from "@/components/ui/button";
 import { useComunicadoresEvolution, qrSrc } from "@/hooks/useComunicadoresEvolution";
 import { isOwnEvolutionConnected } from "@/lib/evolutionConnection";
 import {
+  fetchEvolutionMotoristaDeleteFromServer,
   fetchEvolutionMotoristaQrFromServer,
   fetchEvolutionMotoristaSyncFromServer,
+  formatPhoneBrDisplay,
 } from "@/lib/evolutionApi";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -152,6 +154,33 @@ export default function ComunicadorWhatsappPage() {
     };
   }, [qrSession, sessionDeadline, clearTimers]);
 
+  const handleDesconectar = useCallback(async () => {
+    setBusyQr(true);
+    try {
+      clearTimers();
+      setQrSession(false);
+      setSessionDeadline(null);
+      setSessionQrBase64(null);
+      const res = await fetchEvolutionMotoristaDeleteFromServer({ target: "own" });
+      if (!res.ok) {
+        toast.error(res.detail || "Não foi possível excluir a instância do WhatsApp.");
+        return;
+      }
+      wasConnectedRef.current = false;
+      await persistOwnPatch({
+        instance_name: null,
+        qr_code_base64: null,
+        connection_status: "desconectado",
+        telefone_conectado: null,
+        nome_dispositivo: null,
+        foto_perfil_url: null,
+      });
+      toast.success("WhatsApp desconectado. A instância foi excluída. Toque em Comunicar para gerar um novo QR Code.");
+    } finally {
+      setBusyQr(false);
+    }
+  }, [clearTimers, persistOwnPatch]);
+
   const handleConectar = useCallback(async () => {
     setBusyQr(true);
     try {
@@ -183,9 +212,35 @@ export default function ComunicadorWhatsappPage() {
   }, [persistOwnPatch, trySync, own]);
 
   const qrImg = ownConnected ? null : qrSrc(sessionQrBase64);
+  const temInstancia = Boolean(own?.instance_name?.trim()) || ownConnected || own?.connection_status === "aguardando_qr";
+  const numero = own?.telefone_conectado ? formatPhoneBrDisplay(own.telefone_conectado) : null;
 
   return (
     <div className="flex flex-col items-center gap-6 py-10">
+      {temInstancia ? (
+        <div className="flex w-full max-w-md flex-col items-center gap-3 rounded-lg border border-border bg-card p-4 text-center">
+          <p className="text-sm text-foreground">
+            {ownConnected ? "WhatsApp conectado" : "Instância do WhatsApp ainda existe"}
+            {own?.nome_dispositivo?.trim() ? ` · ${own.nome_dispositivo.trim()}` : ""}
+          </p>
+          {numero ? <p className="font-mono text-sm">{numero}</p> : null}
+          {own?.instance_name ? (
+            <p className="font-mono text-xs text-muted-foreground">{own.instance_name}</p>
+          ) : null}
+          <Button
+            type="button"
+            variant="destructive"
+            onClick={() => void handleDesconectar()}
+            disabled={busyQr || loading}
+          >
+            {busyQr ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+            Desconectar
+          </Button>
+          <p className="text-xs text-muted-foreground">
+            Desconectar exclui só a sua instância na UAZAPI. Depois, toque em Comunicar para gerar um QR Code novo.
+          </p>
+        </div>
+      ) : null}
       <Button
         type="button"
         className="bg-[#FF6600] text-white hover:bg-[#FF6600]/90"

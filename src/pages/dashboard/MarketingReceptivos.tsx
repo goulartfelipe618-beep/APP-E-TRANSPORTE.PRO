@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { RefreshCw, Plus, Trash2, Download } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { purgeR2Record } from "@/lib/r2Registro";
 import { toast } from "sonner";
 import NovoReceptivoDialog from "@/components/receptivos/NovoReceptivoDialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -74,6 +75,11 @@ export default function MarketingReceptivosPage() {
       if (error) {
         toast.error("Erro ao excluir");
         return;
+      }
+      try {
+        await purgeR2Record("receptivos", deleteId);
+      } catch (e) {
+        toast.warning(e instanceof Error ? e.message : "Registro excluído, mas o arquivo na Cloudflare ficou.");
       }
       toast.success("Registro removido");
       setDeleteId(null);

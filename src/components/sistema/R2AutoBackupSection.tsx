@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { runInitialR2Snapshot } from "@/lib/r2Registro";
 
 type BackupStatus = {
   user_id: string;
@@ -86,28 +87,17 @@ export default function R2AutoBackupSection() {
     };
   }, [loadStatus]);
 
-  const runBackup = async (quiet = false) => {
+  const runInitial = async () => {
     setRunning(true);
     try {
-      const { data, error } = await supabase.functions.invoke<{
-        ok?: boolean;
-        error?: string | null;
-        prefix?: string;
-        stats?: { files?: Record<string, number> };
-      }>("r2-auto-backup", { body: { mode: "manual" } });
-      if (error) throw new Error(error.message);
-      if (data?.ok === false) throw new Error(data.error || "Falha no backup.");
-      const sent = Object.keys(data?.stats?.files ?? {}).length;
-      if (!quiet) {
-        toast.success(
-          sent > 0
-            ? `Cópia enviada: ${sent} ficheiro(s) novo(s) ou alterado(s).`
-            : "Nada novo para enviar — os dados já estão no R2.",
-        );
-      }
+      await runInitialR2Snapshot((label) => {
+        toast.message(label, { id: "r2-snapshot" });
+      });
+      toast.success("Cópia inicial concluída. Daqui pra frente só o que você salvar ou excluir é enviado.", { id: "r2-snapshot" });
       await loadStatus();
     } catch (e) {
-      if (!quiet) toast.error(e instanceof Error ? e.message : "Falha no backup.");
+      toast.error(e instanceof Error ? e.message : "Falha na cópia inicial.", { id: "r2-snapshot" });
+      await loadStatus();
     } finally {
       setRunning(false);
     }
@@ -118,9 +108,8 @@ export default function R2AutoBackupSection() {
     try {
       const { error } = await supabase.rpc("set_r2_auto_backup" as never, { p_enabled: next } as never);
       if (error) throw new Error(error.message);
-      toast.success(next ? "AUTO BACK-UP ligado. A primeira cópia vai começar agora." : "AUTO BACK-UP desligado. As pastas já copiadas no R2 mantêm-se.");
+      toast.success(next ? "Registro ligado. Faça a cópia inicial uma vez. Depois, só cada salvamento é enviado." : "Registro desligado. O que já está na Cloudflare permanece.");
       await loadStatus();
-      if (next) await runBackup(true);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Não foi possível alterar o AUTO BACK-UP.");
     } finally {
@@ -129,18 +118,20 @@ export default function R2AutoBackupSection() {
   };
 
   const enabled = Boolean(status?.enabled);
+  const snapshotDone = Boolean(
+    status?.last_stats && typeof status.last_stats.snapshot_completed_at === "string" && status.last_stats.snapshot_completed_at,
+  );
 
   return (
     <div className="max-w-2xl rounded-xl border border-border bg-card p-6">
       <div className="mb-1 flex items-center gap-2">
         <HardDrive className="h-5 w-5 text-[#FF6600]" />
-        <h3 className="font-semibold text-foreground">AUTO BACK-UP</h3>
+        <h3 className="font-semibold text-foreground">Registro na Cloudflare</h3>
       </div>
       <p className="mb-4 text-sm text-muted-foreground">
-        Cópia só da <strong className="text-foreground">sua empresa</strong> para o Cloudflare R2. Depois da primeira
-        cópia, o <strong className="text-foreground">Copiar agora</strong> envia apenas o que foi adicionado ou
-        alterado (ex.: 1 cliente novo, não os 200 já copiados). Cada dia fica numa pasta com a data. Nada é apagado no
-        painel.
+        A <strong className="text-foreground">cópia inicial</strong> envia os dados que já existem, um arquivo por
+        registro. Depois disso, cadastrar ou clicar em salvar regrava só aquele registro. Excluir apaga só o arquivo
+        dele. Abrir o painel sem alterar nada não envia arquivo.
       </p>
 
       {loading ? (
@@ -152,10 +143,10 @@ export default function R2AutoBackupSection() {
           <div className="mb-4 flex items-center justify-between gap-4 rounded-lg border border-border/80 bg-muted/20 px-4 py-3">
             <div className="min-w-0">
               <Label htmlFor="auto-backup-r2" className="text-foreground">
-                Activar AUTO BACK-UP
+                Ativar registro
               </Label>
               <p className="text-xs text-muted-foreground">
-                Transfer, Grupos, Motoristas, Clientes, Veículos, Configurações e Anotações — só o que mudou.
+                Veículos, motoristas, clientes, reservas, financeiro, contratos, automações, receptivos, anotações e configurações.
               </p>
             </div>
             <Switch
@@ -185,11 +176,11 @@ export default function R2AutoBackupSection() {
             <Button
               type="button"
               className="bg-[#FF6600] text-white hover:bg-[#FF6600]/90"
-              disabled={running || toggling}
-              onClick={() => void runBackup(false)}
+              disabled={!enabled || running || toggling || snapshotDone}
+              onClick={() => void runInitial()}
             >
               {running ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Cloud className="mr-2 h-4 w-4" />}
-              Copiar agora
+              {snapshotDone ? "Cópia inicial já feita" : "Fazer cópia inicial"}
             </Button>
             <Button type="button" variant="outline" disabled={loading || running} onClick={() => void loadStatus()}>
               <RefreshCw className="mr-2 h-4 w-4" /> Actualizar estado
@@ -198,7 +189,7 @@ export default function R2AutoBackupSection() {
 
           <p className="mt-4 flex items-start gap-2 text-xs text-muted-foreground">
             <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-[#FF6600]" />
-            As pastas ficam privadas no R2 (não são públicas na internet). Dias anteriores não são substituídos.
+            Cada registro fica num arquivo próprio e privado. A pasta antiga por data não é apagada. Salvar de novo substitui só o arquivo daquele registro.
           </p>
         </>
       )}

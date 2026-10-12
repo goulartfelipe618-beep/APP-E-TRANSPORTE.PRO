@@ -1,4 +1,9 @@
 import { supabase } from "@/integrations/supabase/client";
+import {
+  reservaVisivelNoPortal,
+  type FichaPortalMotorista,
+} from "@/lib/frotaPortalIsolamento";
+import { motoristaMatchesAssignment } from "@/lib/motoristaReservaAssign";
 
 export type FrotaPortalTransferReserva = {
   kind: "transfer";
@@ -156,54 +161,112 @@ function parseReserva(raw: unknown): FrotaPortalReserva | null {
   };
 }
 
-async function listFrotaPortalReservationsFallback(): Promise<{
+export async function listarFichasDoPortalAtual(): Promise<FichaPortalMotorista[]> {
+  const { data: auth } = await supabase.auth.getUser();
+  const uid = auth.user?.id;
+  if (!uid) return [];
+  const metaId = String(
+    (auth.user.user_metadata as { solicitacao_motorista_id?: unknown } | undefined)?.solicitacao_motorista_id ?? "",
+  ).trim();
+  let query = supabase
+    .from("solicitacoes_motoristas")
+    .select("id, user_id, portal_auth_user_id")
+    .eq("portal_auth_user_id", uid)
+    .eq("status", "cadastrado");
+  if (metaId) query = query.eq("id", metaId);
+  const { data } = await query;
+  return (data ?? []).flatMap((row) => {
+    const id = String(row.id ?? "").trim();
+    const userId = String(row.user_id ?? "").trim();
+    const portalAuthUserId = String(row.portal_auth_user_id ?? "").trim();
+    if (!id || !userId || portalAuthUserId !== uid) return [];
+    return [{ id, userId, portalAuthUserId }];
+  });
+}
+
+function checagemDaLinha(raw: unknown): { motorista_id: string | null; owner_user_id: string | null; acesso: string | null } {
+  const r = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+  return {
+    motorista_id: typeof r.motorista_id === "string" ? r.motorista_id : r.motorista_id != null ? String(r.motorista_id) : null,
+    owner_user_id: typeof r.owner_user_id === "string" ? r.owner_user_id : r.user_id != null ? String(r.user_id) : null,
+    acesso: typeof r.acesso === "string" ? r.acesso : null,
+  };
+}
+
+async function listFrotaPortalReservationsFallback(fichas: FichaPortalMotorista[]): Promise<{
   transfers: FrotaPortalTransferReserva[];
   grupos: FrotaPortalGrupoReserva[];
   error: string | null;
 }> {
-  const { data: auth } = await supabase.auth.getUser();
-  const uid = auth.user?.id;
-  if (!uid) return { transfers: [], grupos: [], error: "Sessão inválida" };
-
-  const { data: cadastros } = await supabase
-    .from("solicitacoes_motoristas")
-    .select("id")
-    .eq("portal_auth_user_id", uid)
-    .eq("status", "cadastrado");
+  if (fichas.length === 0) return { transfers: [], grupos: [], error: null };
+  const owners = Array.from(new Set(fichas.map((ficha) => ficha.userId)));
   const assignIds = Array.from(
-    new Set([uid, ...(cadastros ?? []).map((row) => String(row.id)).filter(Boolean)]),
+    new Set(fichas.flatMap((ficha) => [ficha.id, ficha.portalAuthUserId])),
   );
 
   const [tRes, gRes, extraRes] = await Promise.all([
-    supabase.from("reservas_transfer").select("*").in("motorista_id", assignIds),
-    supabase.from("reservas_grupos").select("*").in("motorista_id", assignIds),
+    supabase.from("reservas_transfer").select("id, user_id, numero_reserva, status, motorista_id, tipo_viagem, perna_viagem, ida_data, ida_hora, volta_data, volta_hora, por_hora_data, por_hora_hora, ida_embarque, ida_desembarque, volta_embarque, volta_desembarque, por_hora_endereco_inicio, por_hora_ponto_encerramento, por_hora_passageiros, ida_passageiros, volta_passageiros, valor_base, desconto, valor_total, repasse_motorista, observacoes, faturado, esconder_valores, categoria_veiculo, trajetos").in("user_id", owners).in("motorista_id", assignIds),
+    supabase.from("reservas_grupos").select("id, user_id, numero_reserva, status, motorista_id, perna_viagem, data_ida, hora_ida, data_retorno, hora_retorno, embarque, destino, num_passageiros, valor_base, desconto, valor_total, repasse_motorista, observacoes_viagem").in("user_id", owners).in("motorista_id", assignIds),
     supabase
       .from("reserva_motoristas_extra")
-      .select("reserva_id, reserva_kind, motorista_id")
+      .select("reserva_id, reserva_kind, motorista_id, user_id")
+      .in("user_id", owners)
       .in("motorista_id", assignIds),
   ]);
   if (tRes.error) return { transfers: [], grupos: [], error: tRes.error.message };
   if (gRes.error) return { transfers: [], grupos: [], error: gRes.error.message };
 
-  const extraRows = (extraRes.error ? [] : extraRes.data ?? []) as unknown as { reserva_id: string; reserva_kind: string }[];
-  const extraTransferIds = extraRows.filter((row) => row.reserva_kind === "transfer").map((row) => row.reserva_id);
-  const extraGrupoIds = extraRows.filter((row) => row.reserva_kind === "grupo").map((row) => row.reserva_id);
+  const extraRows = (extraRes.error ? [] : extraRes.data ?? []) as unknown as {
+    reserva_id: string;
+    reserva_kind: string;
+    motorista_id: string;
+    user_id: string;
+  }[];
+  const extraPermitido = (row: { motorista_id: string; user_id: string }) =>
+    fichas.some(
+      (ficha) =>
+        ficha.userId === row.user_id &&
+        motoristaMatchesAssignment(row.motorista_id, { id: ficha.id, portal_auth_user_id: ficha.portalAuthUserId }),
+    );
+  const extrasOk = extraRows.filter(extraPermitido);
+  const extraTransferIds = extrasOk.filter((row) => row.reserva_kind === "transfer").map((row) => row.reserva_id);
+  const extraGrupoIds = extrasOk.filter((row) => row.reserva_kind === "grupo").map((row) => row.reserva_id);
   const [tExtra, gExtra] = await Promise.all([
     extraTransferIds.length
-      ? supabase.from("reservas_transfer").select("*").in("id", extraTransferIds)
+      ? supabase.from("reservas_transfer").select("id, user_id, numero_reserva, status, motorista_id, tipo_viagem, perna_viagem, ida_data, ida_hora, volta_data, volta_hora, por_hora_data, por_hora_hora, ida_embarque, ida_desembarque, volta_embarque, volta_desembarque, por_hora_endereco_inicio, por_hora_ponto_encerramento, por_hora_passageiros, ida_passageiros, volta_passageiros, valor_base, desconto, valor_total, repasse_motorista, observacoes, faturado, esconder_valores, categoria_veiculo, trajetos").in("id", extraTransferIds).in("user_id", owners)
       : Promise.resolve({ data: [], error: null }),
     extraGrupoIds.length
-      ? supabase.from("reservas_grupos").select("*").in("id", extraGrupoIds)
+      ? supabase.from("reservas_grupos").select("id, user_id, numero_reserva, status, motorista_id, perna_viagem, data_ida, hora_ida, data_retorno, hora_retorno, embarque, destino, num_passageiros, valor_base, desconto, valor_total, repasse_motorista, observacoes_viagem").in("id", extraGrupoIds).in("user_id", owners)
       : Promise.resolve({ data: [], error: null }),
   ]);
 
-  const transferRows = [...(tRes.data || []), ...((tExtra.data as typeof tRes.data) || [])];
-  const grupoRows = [...(gRes.data || []), ...((gExtra.data as typeof gRes.data) || [])];
+  const extraTransferSet = new Set(extraTransferIds);
+  const extraGrupoSet = new Set(extraGrupoIds);
+  const transferRows = [...(tRes.data || []), ...((tExtra.data as typeof tRes.data) || [])].filter((row) =>
+    reservaVisivelNoPortal(
+      {
+        motorista_id: row.motorista_id,
+        owner_user_id: row.user_id,
+        acesso: extraTransferSet.has(row.id) ? "extra" : "principal",
+      },
+      fichas,
+    ),
+  );
+  const grupoRows = [...(gRes.data || []), ...((gExtra.data as typeof gRes.data) || [])].filter((row) =>
+    reservaVisivelNoPortal(
+      {
+        motorista_id: row.motorista_id != null ? String(row.motorista_id) : null,
+        owner_user_id: row.user_id,
+        acesso: extraGrupoSet.has(row.id) ? "extra" : "principal",
+      },
+      fichas,
+    ),
+  );
   const transfers = Array.from(new Map(transferRows.map((row) => [row.id, row])).values())
-    .map((row) => parseReserva({ kind: "transfer", ...row }))
+    .map((row) => parseReserva({ kind: "transfer", ...row, observacoes: row.observacoes }))
     .filter((r): r is FrotaPortalTransferReserva => r?.kind === "transfer");
   const grupos = Array.from(new Map(grupoRows.map((row) => [row.id, row])).values())
-    .map((row) => parseReserva({ kind: "grupo", ...row }))
+    .map((row) => parseReserva({ kind: "grupo", ...row, observacoes: (row as { observacoes_viagem?: string | null }).observacoes_viagem ?? null }))
     .filter((r): r is FrotaPortalGrupoReserva => r?.kind === "grupo");
   return { transfers, grupos, error: null };
 }
@@ -213,16 +276,24 @@ export async function listFrotaPortalReservations(): Promise<{
   grupos: FrotaPortalGrupoReserva[];
   error: string | null;
 }> {
+  const fichas = await listarFichasDoPortalAtual();
+  if (fichas.length === 0) return { transfers: [], grupos: [], error: null };
+
   const { data, error } = await supabase.rpc("get_frota_motorista_reservas");
   if (!error) {
-    const rows = Array.isArray(data) ? data.map(parseReserva).filter((r): r is FrotaPortalReserva => r != null) : [];
+    const rows = Array.isArray(data)
+      ? data
+          .filter((raw) => reservaVisivelNoPortal(checagemDaLinha(raw), fichas))
+          .map(parseReserva)
+          .filter((r): r is FrotaPortalReserva => r != null)
+      : [];
     return {
       transfers: rows.filter((r): r is FrotaPortalTransferReserva => r.kind === "transfer"),
       grupos: rows.filter((r): r is FrotaPortalGrupoReserva => r.kind === "grupo"),
       error: null,
     };
   }
-  return listFrotaPortalReservationsFallback();
+  return listFrotaPortalReservationsFallback(fichas);
 }
 
 export async function updateFrotaReservaStatus(

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Car, LayoutGrid, Link2, List, Pencil, Plus, Search, Settings2 } from "lucide-react";
+import { Car, LayoutGrid, Link2, List, Pencil, Plus, Search, Settings2, Trash2 } from "lucide-react";
+import { purgeR2Record } from "@/lib/r2Registro";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -88,6 +89,28 @@ export default function VeiculosPage() {
   const openEdit = (id: string) => {
     setEditingVeiculoId(id);
     setDialogOpen(true);
+  };
+
+  const excluirVeiculo = async (id: string, nome: string) => {
+    if (!window.confirm(`Excluir ${nome}? Some o cadastro e só os arquivos deste veículo.`)) return;
+    const { data: sessionData } = await supabase.auth.getSession();
+    const uid = sessionData.session?.user?.id;
+    if (!uid) {
+      toast.error("Sessão inválida.");
+      return;
+    }
+    const { error } = await supabase.from("veiculos_frota").delete().eq("id", id).eq("user_id", uid);
+    if (error) {
+      toast.error("Não foi possível excluir o veículo.");
+      return;
+    }
+    try {
+      await purgeR2Record("veiculos_frota", id);
+    } catch (e) {
+      toast.warning(e instanceof Error ? e.message : "O veículo saiu do painel, mas o arquivo na Cloudflare não foi apagado.");
+    }
+    toast.success("Veículo excluído.");
+    void load();
   };
 
   const handleDialogOpenChange = (open: boolean) => {
@@ -235,16 +258,26 @@ export default function VeiculosPage() {
                 <p className="text-xs leading-relaxed text-muted-foreground">
                   Bandeirada: R$ {v.tarifa_base.toFixed(2)} | Mínimo: R$ {v.valor_minimo_corrida.toFixed(2)}
                 </p>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="mt-2 w-full border-[#FF6600]/40 text-[#FF6600] hover:bg-[#FF6600]/10"
-                  onClick={() => openEdit(v.id)}
-                >
-                  <Pencil className="mr-2 h-4 w-4" />
-                  Editar
-                </Button>
+                <div className="mt-2 flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="flex-1 border-[#FF6600]/40 text-[#FF6600] hover:bg-[#FF6600]/10"
+                    onClick={() => openEdit(v.id)}
+                  >
+                    <Pencil className="mr-2 h-4 w-4" />
+                    Editar
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => void excluirVeiculo(v.id, `${v.marca} ${v.modelo}`)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
             </article>
           ))}
@@ -302,16 +335,26 @@ export default function VeiculosPage() {
                     R$ {v.tarifa_base.toFixed(2)} / R$ {v.valor_minimo_corrida.toFixed(2)}
                   </td>
                   <td className="p-2 text-right sm:p-3">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="border-[#FF6600]/40 text-[#FF6600] hover:bg-[#FF6600]/10"
-                      onClick={() => openEdit(v.id)}
-                    >
-                      <Pencil className="mr-1.5 h-3.5 w-3.5 sm:mr-2 sm:h-4 sm:w-4" />
-                      <span className="hidden sm:inline">Editar</span>
-                    </Button>
+                    <div className="flex justify-end gap-1">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="border-[#FF6600]/40 text-[#FF6600] hover:bg-[#FF6600]/10"
+                        onClick={() => openEdit(v.id)}
+                      >
+                        <Pencil className="mr-1.5 h-3.5 w-3.5 sm:mr-2 sm:h-4 sm:w-4" />
+                        <span className="hidden sm:inline">Editar</span>
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => void excluirVeiculo(v.id, `${v.marca} ${v.modelo}`)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
                   </td>
                 </tr>
               ))}

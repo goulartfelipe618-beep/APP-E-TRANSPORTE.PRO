@@ -12,6 +12,7 @@ import { ArrowLeftRight, Loader2, Plus, Trash2 } from "lucide-react";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
+import { syncR2Record } from "@/lib/r2Registro";
 import { toast } from "sonner";
 import type { Json, Tables } from "@/integrations/supabase/types";
 import { normalizeReservaStatus, RESERVA_STATUS_OPTIONS } from "@/lib/reservaStatus";
@@ -175,6 +176,8 @@ export default function CriarReservaTransferDialog({
   const [motoristasFrota, setMotoristasFrota] = useState<{ id: string; nome: string; portal_auth_user_id: string | null }[]>([]);
   const [motoristaAtribUid, setMotoristaAtribUid] = useState<string>("");
   const [motoristasExtras, setMotoristasExtras] = useState<string[]>([]);
+  const motoristasExtrasRef = useRef<string[]>([]);
+  const extrasProntosRef = useRef(true);
   const motoristaAtribUidRef = useRef("");
   const editReservaIdRef = useRef<string | null>(null);
   const hydratedEditIdRef = useRef<string | null>(null);
@@ -182,6 +185,10 @@ export default function CriarReservaTransferDialog({
   const setMotoristaAtribuido = (uid: string) => {
     motoristaAtribUidRef.current = uid;
     setMotoristaAtribUid(uid);
+  };
+  const setExtrasAtribuidos = (ids: string[]) => {
+    motoristasExtrasRef.current = ids;
+    setMotoristasExtras(ids);
   };
   const [modoClienteReserva, setModoClienteReserva] = useState<"novo" | "cadastrado">("novo");
   const [clientesReservaOpts, setClientesReservaOpts] = useState<ClienteReservaOpt[]>([]);
@@ -284,9 +291,12 @@ export default function CriarReservaTransferDialog({
       );
       const mid = (row.motorista_id ?? "").trim();
       setMotoristaAtribuido(mid);
-      setMotoristasExtras([]);
+      extrasProntosRef.current = false;
+      setExtrasAtribuidos([]);
       void listReservaMotoristasExtra("transfer", row.id).then((ids) => {
-        setMotoristasExtras(ids.filter((id) => id !== mid));
+        if (hydratedEditIdRef.current !== row.id) return;
+        setExtrasAtribuidos(ids.filter((id) => id !== mid));
+        extrasProntosRef.current = true;
       });
       const cat = (row as { categoria_veiculo?: string | null }).categoria_veiculo;
       setCategoriaVeiculo(isCategoriaVeiculoTransfer(cat) ? cat : "");
@@ -394,7 +404,8 @@ export default function CriarReservaTransferDialog({
     setValorBase("0"); setDesconto("0"); setMetodoPagamento(""); setFaturado("nao"); setEsconderValores(false); setObservacoes("");
     setStatusOperacional("pendente"); setRepasseMotorista("");
     setMotoristaAtribuido("");
-    setMotoristasExtras([]);
+    extrasProntosRef.current = true;
+    setExtrasAtribuidos([]);
     setMotoristaAtribPerna("ida");
     setTrajetosForm(defaultMultiplosTrajetosForm());
     setCategoriaVeiculo("");
@@ -727,13 +738,13 @@ export default function CriarReservaTransferDialog({
       if (!error && createdId) vinculos.push({ id: createdId, primary: motoristaIdResolved });
     }
 
-    if (!error) {
+    if (!error && extrasProntosRef.current) {
       for (const vinculo of vinculos) {
         const extraErr = await replaceReservaMotoristasExtra({
           userId: user.id,
           kind: "transfer",
           reservaId: vinculo.id,
-          motoristaIds: motoristasExtras,
+          motoristaIds: motoristasExtrasRef.current,
           primaryId: vinculo.primary,
         });
         if (extraErr) {
@@ -747,6 +758,7 @@ export default function CriarReservaTransferDialog({
     if (error) {
       toast.error(editId ? "Erro ao atualizar reserva: " + error.message : "Erro ao criar reserva: " + error.message);
     } else {
+      for (const vinculo of vinculos) syncR2Record("reservas_transfer", vinculo.id);
       if (novoClientePct != null) {
         toast.success(`Reserva criada. Novo cliente no menu Clientes — perfil ${novoClientePct}% (complete dados quando quiser).`);
       } else if (!editId && tipoViagem === "ida_volta") {
@@ -1181,7 +1193,7 @@ export default function CriarReservaTransferDialog({
                     motoristas={motoristasFrota}
                     primaryId={motoristaAtribUid}
                     selected={motoristasExtras}
-                    onChange={setMotoristasExtras}
+                    onChange={setExtrasAtribuidos}
                   />
                   {reservaEdicao && isTransferPernaDividida(reservaEdicao.tipo_viagem, reservaEdicao.perna_viagem) ? (
                     <p className="text-xs text-muted-foreground sm:col-span-2">

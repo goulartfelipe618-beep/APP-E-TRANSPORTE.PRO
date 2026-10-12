@@ -2,6 +2,18 @@
 @tailwind components;
 @tailwind utilities;
 
+/* A tela fica entre a barra de status e a barra de navegação do celular. */
+.etp-safe-shell {
+  box-sizing: border-box;
+  height: 100dvh;
+  max-height: 100dvh;
+  min-height: 0;
+  padding-top: max(var(--safe-area-inset-top, 0px), env(safe-area-inset-top, 0px));
+  padding-right: max(var(--safe-area-inset-right, 0px), env(safe-area-inset-right, 0px));
+  padding-bottom: max(var(--safe-area-inset-bottom, 0px), env(safe-area-inset-bottom, 0px));
+  padding-left: max(var(--safe-area-inset-left, 0px), env(safe-area-inset-left, 0px));
+}
+
 /* Modo claro = :root sem classe .dark no <html>. Modo escuro = <html class="dark">. */
 
 @layer base {

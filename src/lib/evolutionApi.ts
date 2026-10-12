@@ -154,13 +154,22 @@ export async function sendUazapiWhatsappCard(opts: {
   title?: string;
   buttons?: Array<{ id: string; text: string }>;
   pdf?: { base64: string; filename: string } | null;
+  /** Identificador único deste envio. A UAZAPI não reaproveita o texto anterior. */
+  trackId?: string;
 }): Promise<{ ok: boolean; error?: string; canal?: string; warning?: string }> {
   const { data, error } = await invokeComunicadorFn<{
     ok?: boolean;
     error?: string;
     canal?: string;
     warning?: string;
-  }>("uazapi-send-card", opts as Record<string, unknown>);
+  }>("uazapi-send-card", {
+    number: opts.number,
+    text: opts.text,
+    title: opts.title,
+    buttons: opts.buttons,
+    pdf: opts.pdf ?? null,
+    track_id: opts.trackId,
+  });
 
   if (error) {
     return { ok: false, error: error.message };

@@ -15,6 +15,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { RefreshCw, Plus, Search, Trash2, Pencil, StickyNote } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { purgeR2Record, syncR2Record } from "@/lib/r2Registro";
 import { toast } from "sonner";
 
 interface Anotacao {
@@ -60,12 +61,23 @@ export default function AnotacoesPage() {
         .from("anotacoes" as any)
         .update({ titulo, conteudo, updated_at: new Date().toISOString() } as any)
         .eq("id", editingId);
-      if (error) toast.error("Erro ao atualizar"); else toast.success("Anotação atualizada");
+      if (error) toast.error("Erro ao atualizar");
+      else {
+        toast.success("Anotação atualizada");
+        syncR2Record("anotacoes", editingId);
+      }
     } else {
-      const { error } = await supabase
+      const { data: created, error } = await supabase
         .from("anotacoes" as any)
-        .insert({ titulo, conteudo, user_id: user.id } as any);
-      if (error) toast.error("Erro ao criar"); else toast.success("Anotação criada");
+        .insert({ titulo, conteudo, user_id: user.id } as any)
+        .select("id")
+        .single();
+      if (error) toast.error("Erro ao criar");
+      else {
+        toast.success("Anotação criada");
+        const createdId = (created as { id?: string } | null)?.id;
+        if (createdId) syncR2Record("anotacoes", createdId);
+      }
     }
     setDialogOpen(false);
     setTitulo("");
@@ -88,6 +100,11 @@ export default function AnotacoesPage() {
     const { error } = await supabase.from("anotacoes" as any).delete().eq("id", id);
     if (error) toast.error("Erro ao excluir");
     else {
+      try {
+        await purgeR2Record("anotacoes", id);
+      } catch (e) {
+        toast.warning(e instanceof Error ? e.message : "Anotação excluída, mas o arquivo na Cloudflare ficou.");
+      }
       toast.success("Anotação excluída");
       fetchAnotacoes();
     }

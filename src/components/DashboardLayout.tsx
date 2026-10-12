@@ -20,6 +20,7 @@ import {
   isMotoristaFrotaUser,
   userIsMotoristaFrotaFromMetadata,
 } from "@/lib/motoristaFrotaRole";
+import { entradaDoPortalEstaValida, guardarAvisoLoginPortal, limparEntradaPeloLinkUnico } from "@/lib/motoristaPortalEntrada";
 import { PainelContentZoomProvider } from "@/contexts/PainelContentZoomContext";
 import { PainelScaledContent } from "@/components/painel/PainelScaledContent";
 import { logUserActivity } from "@/lib/userActivityLog";
@@ -138,15 +139,23 @@ function DashboardContent() {
         data: { session },
       } = await supabase.auth.getSession();
       if (!session || cancelled) return;
-      if (userIsMotoristaFrotaFromMetadata(session.user)) {
-        clearDashboardNavSessionStorage();
-        if (!cancelled) setRedirectMotoristaFrota(true);
+      const ehMotorista =
+        userIsMotoristaFrotaFromMetadata(session.user) ||
+        (await isMotoristaFrotaUser(session.user.id, session.user));
+      if (!ehMotorista || cancelled) return;
+      clearDashboardNavSessionStorage();
+      const peloLink = await entradaDoPortalEstaValida(session.user.id);
+      if (cancelled) return;
+      if (peloLink) {
+        setRedirectMotoristaFrota(true);
         return;
       }
-      const frota = await isMotoristaFrotaUser(session.user.id, session.user);
-      if (frota && !cancelled) {
-        clearDashboardNavSessionStorage();
-        setRedirectMotoristaFrota(true);
+      limparEntradaPeloLinkUnico();
+      guardarAvisoLoginPortal();
+      try {
+        await supabase.auth.signOut({ scope: "local" });
+      } catch {
+        /* não deixa o motorista dentro do painel da empresa */
       }
     })();
     return () => {
@@ -292,7 +301,7 @@ function DashboardContent() {
 
   return (
     <NetworkSpotlightProvider active={showOverlay}>
-      <div className="flex min-h-svh w-full max-w-[100vw] overflow-x-hidden">
+      <div className="flex h-full min-h-0 w-full max-w-[100vw] overflow-x-hidden">
         <AppSidebar />
         <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
           {showOverlay && (

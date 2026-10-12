@@ -72,7 +72,7 @@ function AdminContent() {
   }, []);
 
   return (
-    <div className="flex min-h-svh w-full max-w-[100vw] overflow-x-hidden bg-background">
+    <div className="flex h-full min-h-0 w-full max-w-[100vw] overflow-x-hidden bg-background">
       <AdminSidebar />
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <header className="flex h-12 min-h-12 shrink-0 items-center gap-2 border-b border-border px-2 sm:px-4">

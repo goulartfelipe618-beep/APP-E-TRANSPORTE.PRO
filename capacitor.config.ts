@@ -13,6 +13,11 @@ const config: CapacitorConfig = {
   android: {
     allowMixedContent: false,
   },
+  plugins: {
+    SystemBars: {
+      insetsHandling: "native",
+    },
+  },
   server: {
     androidScheme: "https",
     hostname: "localhost",

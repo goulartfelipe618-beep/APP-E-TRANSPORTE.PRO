@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { supabase } from "@/integrations/supabase/client";
+import { syncR2Record } from "@/lib/r2Registro";
 import { toast } from "sonner";
 import { Loader2, Plus, Trash2, Upload, UserRound, X } from "lucide-react";
 import type { Json } from "@/integrations/supabase/types";
@@ -216,6 +217,7 @@ export default function CadastrarClienteDialog({ open, onOpenChange, onSaved, ed
           if (docErr) toast.warning(`Cliente guardado; anexos: ${docErr.message}`);
         }
         toast.success("Cliente atualizado.");
+        syncR2Record("cadastro_clientes", editRow.id);
       } else {
         const { data: inserted, error: insErr } = await supabase
           .from("cadastro_clientes")
@@ -247,6 +249,7 @@ export default function CadastrarClienteDialog({ open, onOpenChange, onSaved, ed
           if (docErr) toast.warning(`Cliente criado; ficheiros: ${docErr.message}`);
         }
         toast.success("Cliente cadastrado.");
+        syncR2Record("cadastro_clientes", newId);
       }
       onOpenChange(false);
       onSaved?.();

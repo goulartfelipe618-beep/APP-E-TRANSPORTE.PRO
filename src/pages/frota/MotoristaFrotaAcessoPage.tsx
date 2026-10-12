@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { applyThemeForRoute } from "@/lib/panelTheme";
 import { clearDashboardNavSessionStorage } from "@/lib/motoristaFrotaRole";
 import { claimExclusiveSession } from "@/lib/sessionRevocation";
+import { confirmarEntradaPeloLinkUnico, limparEntradaPeloLinkUnico } from "@/lib/motoristaPortalEntrada";
 import { validateMotoristaPortalPassword } from "@/lib/motoristaPortalPassword";
 import { Loader2 } from "lucide-react";
 
@@ -157,7 +158,18 @@ export default function MotoristaFrotaAcessoPage() {
         return;
       }
       const { data: s } = await supabase.auth.getSession();
-      if (s.session?.user) applyThemeForRoute("/frota", s.session.user.id);
+      const uid = s.session?.user?.id;
+      if (!uid || !(await confirmarEntradaPeloLinkUnico(uid, token))) {
+        limparEntradaPeloLinkUnico();
+        try {
+          await supabase.auth.signOut();
+        } catch {
+          /* sem o link confirmado a sessão não permanece */
+        }
+        toast.error("Este link não corresponde a esta conta de motorista.");
+        return;
+      }
+      applyThemeForRoute("/frota", uid);
       clearDashboardNavSessionStorage();
       toast.success("Conta criada. Bem-vindo!");
       navigate("/frota", { replace: true });
@@ -195,7 +207,18 @@ export default function MotoristaFrotaAcessoPage() {
         return;
       }
       const { data: s } = await supabase.auth.getSession();
-      if (s.session?.user) applyThemeForRoute("/frota", s.session.user.id);
+      const uid = s.session?.user?.id;
+      if (!uid || !(await confirmarEntradaPeloLinkUnico(uid, token))) {
+        limparEntradaPeloLinkUnico();
+        try {
+          await supabase.auth.signOut();
+        } catch {
+          /* sem o link confirmado a sessão não permanece */
+        }
+        toast.error("Este link não corresponde a esta conta de motorista.");
+        return;
+      }
+      applyThemeForRoute("/frota", uid);
       clearDashboardNavSessionStorage();
       navigate("/frota", { replace: true });
     } finally {
@@ -256,8 +279,7 @@ export default function MotoristaFrotaAcessoPage() {
           {!registered ? (
             <>
               <p className="text-sm text-muted-foreground">
-                Defina uma senha forte para entrar no painel (Agenda, Reservas e Documentos). Guarde este link — é o acesso{" "}
-                <strong className="text-foreground">permanente e exclusivo</strong> à sua área.
+                Defina uma senha forte para entrar no painel (Agenda, Reservas e Documentos). Este link é o único acesso ao mini painel. O login da empresa não abre esta área.
               </p>
               <div className="space-y-2">
                 <Label htmlFor="pw1">Senha</Label>
@@ -294,7 +316,9 @@ export default function MotoristaFrotaAcessoPage() {
                 void handleLogin();
               }}
             >
-              <p className="text-sm text-muted-foreground">Introduza a senha que definiu para este acesso.</p>
+              <p className="text-sm text-muted-foreground">
+                Introduza a senha que definiu para este acesso. Este link é o único jeito de abrir o mini painel.
+              </p>
               {loginEmail ? (
                 <input type="text" name="username" autoComplete="username" value={loginEmail} readOnly tabIndex={-1} aria-hidden className="sr-only" />
               ) : null}

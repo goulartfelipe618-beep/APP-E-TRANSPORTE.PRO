@@ -12,6 +12,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
+import { purgeR2Record, syncR2Record } from "@/lib/r2Registro";
 import { getLocalDateYmd } from "@/lib/localCalendarDate";
 import { toast } from "sonner";
 import { SolicitacoesCapturaExternaInfo } from "@/components/solicitacoes/SolicitacoesCapturaExternaInfo";
@@ -106,7 +107,11 @@ export default function CampanhasAtivosPage() {
     if (error || !data || data.length === 0) return;
     const ids = data.map((c: any) => c.id);
     await supabase.from("campanhas" as any).update({ status: "encerrada" }).in("id", ids);
+    const { data: autos } = await supabase.from("automacoes").select("id").in("campanha_id", ids);
     await supabase.from("automacoes").delete().in("campanha_id", ids);
+    for (const auto of autos ?? []) {
+      if (auto.id) void purgeR2Record("automacoes", auto.id).catch(() => undefined);
+    }
   }, []);
 
   useEffect(() => {
@@ -160,7 +165,7 @@ export default function CampanhasAtivosPage() {
       return;
     }
 
-    const { error: automacaoError } = await supabase.from("automacoes").insert({
+    const { data: createdAuto, error: automacaoError } = await supabase.from("automacoes").insert({
       user_id: user.id,
       nome: campanha.nome,
       tipo: "campanha",
@@ -169,7 +174,8 @@ export default function CampanhasAtivosPage() {
       mappings: {},
       campanha_id: campanha.id,
       is_campaign_webhook: true,
-    } as any);
+    } as any).select("id").single();
+    if (!automacaoError && createdAuto?.id) syncR2Record("automacoes", createdAuto.id);
 
     if (automacaoError) {
       // O DELETE pode falhar enquanto a campanha está "ativa" no período (trigger). Pausar antes remove o bloqueio.

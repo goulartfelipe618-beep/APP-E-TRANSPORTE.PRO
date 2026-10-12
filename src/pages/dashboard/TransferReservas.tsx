@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Plus, RefreshCw, Trash2, Eye, MessageSquare, Download, Pencil, Filter, X, Lock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { purgeR2Record } from "@/lib/r2Registro";
 import { toast } from "sonner";
 import CriarReservaTransferDialog from "@/components/transfer/CriarReservaTransferDialog";
 import DetalhesReservaTransferSheet from "@/components/reservas/DetalhesReservaTransferSheet";
@@ -53,6 +54,7 @@ export default function TransferReservasPage() {
   const [comunicarOpen, setComunicarOpen] = useState(false);
   const [comunicarLinha, setComunicarLinha] = useState<Reserva | null>(null);
   const [comunicarPayload, setComunicarPayload] = useState<Record<string, unknown> | null>(null);
+  const comunicarSeq = useRef(0);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
 
@@ -187,6 +189,11 @@ export default function TransferReservasPage() {
       const { error } = await supabase.from("reservas_transfer").delete().eq("id", deleteId);
       if (error) toast.error("Erro ao excluir");
       else {
+        try {
+          await purgeR2Record("reservas_transfer", deleteId);
+        } catch (e) {
+          toast.warning(e instanceof Error ? e.message : "Reserva excluída, mas o arquivo na Cloudflare ficou.");
+        }
         toast.success("Reserva excluída");
         setDeleteId(null);
         fetchAll();
@@ -197,12 +204,15 @@ export default function TransferReservasPage() {
   };
 
   const handleComunicar = async (r: Reserva) => {
+    const seq = ++comunicarSeq.current;
     try {
       const payload = await buildTransferDadosComunicarCliente(r);
+      if (seq !== comunicarSeq.current) return;
       setComunicarLinha(r);
       setComunicarPayload(payload);
       setComunicarOpen(true);
     } catch {
+      if (seq !== comunicarSeq.current) return;
       toast.error("Erro ao preparar dados para comunicação.");
     }
   };

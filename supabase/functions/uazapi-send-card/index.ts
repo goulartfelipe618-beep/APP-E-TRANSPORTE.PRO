@@ -66,10 +66,12 @@ Deno.serve(async (req) => {
       title?: string;
       buttons?: Array<{ id: string; text: string }>;
       pdf?: { base64?: string; filename?: string } | null;
+      track_id?: string;
     };
 
     const number = normalizeNumber(String(body.number || ""));
     const text = String(body.text || "").trim();
+    const trackId = String(body.track_id || "").trim().slice(0, 120);
     if (!number) return json({ ok: false, error: "Informe o WhatsApp de destino." });
     if (!text) return json({ ok: false, error: "A mensagem está vazia." });
     const buttons = parseButtons(body.buttons);
@@ -101,9 +103,9 @@ Deno.serve(async (req) => {
     }
 
     const root = uazapiRoot(baseUrl);
-    let send = await uazapiSendMenu(root, token, number, text, buttons);
+    let send = await uazapiSendMenu(root, token, number, text, buttons, trackId);
     if (send.status < 200 || send.status >= 300) {
-      send = await uazapiSendText(root, token, number, text);
+      send = await uazapiSendText(root, token, number, text, trackId);
     }
 
     if (send.status < 200 || send.status >= 300) {

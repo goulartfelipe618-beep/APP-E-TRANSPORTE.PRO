@@ -69,9 +69,12 @@ Deno.serve(async (req) => {
         .from("comunicadores_evolution")
         .update({
           uazapi_instance_token: null,
+          instance_name: null,
           qr_code_base64: null,
           connection_status: "desconectado",
           telefone_conectado: null,
+          nome_dispositivo: null,
+          foto_perfil_url: null,
           updated_at: new Date().toISOString(),
         })
         .eq("escopo", "usuario")

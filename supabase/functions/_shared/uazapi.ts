@@ -149,23 +149,30 @@ export async function uazapiDeleteInstance(
 }
 
 /** Menu de botões: POST /send/menu type=button, choices "texto|id". */
+function comRastreio(body: Record<string, unknown>, trackId?: string | null): Record<string, unknown> {
+  const id = trackId?.trim();
+  if (!id) return body;
+  return { ...body, track_source: "comunicar", track_id: id.slice(0, 120) };
+}
+
 export async function uazapiSendMenu(
   root: string,
   instanceToken: string,
   number: string,
   text: string,
   buttons: Array<{ id: string; text: string }>,
+  trackId?: string | null,
 ): Promise<{ status: number; text: string; json: unknown }> {
   return await uazapiFetch(`${root}/send/menu`, {
     method: "POST",
     headers: instanceHeaders(instanceToken, true),
-    body: JSON.stringify({
+    body: JSON.stringify(comRastreio({
       number,
       type: "button",
       text,
       choices: buttons.map((b) => `${b.text}|${b.id}`),
       footerText: "E-TRANSPORTE",
-    }),
+    }, trackId)),
   });
 }
 
@@ -174,11 +181,12 @@ export async function uazapiSendText(
   instanceToken: string,
   number: string,
   text: string,
+  trackId?: string | null,
 ): Promise<{ status: number; text: string; json: unknown }> {
   return await uazapiFetch(`${root}/send/text`, {
     method: "POST",
     headers: instanceHeaders(instanceToken, true),
-    body: JSON.stringify({ number, text }),
+    body: JSON.stringify(comRastreio({ number, text }, trackId)),
   });
 }
 

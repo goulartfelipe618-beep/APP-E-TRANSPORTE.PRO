@@ -4,6 +4,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Save, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { syncR2Record } from "@/lib/r2Registro";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import CabecalhoContratual from "@/components/contratos/CabecalhoContratual";
@@ -74,7 +75,7 @@ export default function TransferContratoPage() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { toast.error("Não logado"); setSaving(false); return; }
 
-    const { error } = await supabase.from("contratos").upsert({
+    const { data: saved, error } = await supabase.from("contratos").upsert({
       user_id: user.id,
       tipo: "transfer",
       modelo_contrato: modelo,
@@ -82,11 +83,14 @@ export default function TransferContratoPage() {
       clausulas_adicionais: clausulas,
       incluir_no_pdf_confirmacao: incluirNoPdfConfirmacao,
       updated_at: new Date().toISOString(),
-    }, { onConflict: "user_id,tipo" });
+    }, { onConflict: "user_id,tipo" }).select("id").maybeSingle();
 
     setSaving(false);
     if (error) toast.error("Erro ao salvar: " + error.message);
-    else toast.success("Contrato salvo com sucesso!");
+    else {
+      if (saved?.id) syncR2Record("contratos", saved.id);
+      toast.success("Contrato salvo com sucesso!");
+    }
   };
 
   const persistIncluirNoPdf = async (next: boolean) => {
@@ -98,7 +102,7 @@ export default function TransferContratoPage() {
     const prev = incluirNoPdfConfirmacao;
     setIncluirNoPdfConfirmacao(next);
     setPersistingToggle(true);
-    const { error } = await supabase.from("contratos").upsert(
+    const { data: saved, error } = await supabase.from("contratos").upsert(
       {
         user_id: user.id,
         tipo: "transfer",
@@ -109,12 +113,13 @@ export default function TransferContratoPage() {
         updated_at: new Date().toISOString(),
       },
       { onConflict: "user_id,tipo" },
-    );
+    ).select("id").maybeSingle();
     setPersistingToggle(false);
     if (error) {
       setIncluirNoPdfConfirmacao(prev);
       toast.error("Erro ao atualizar: " + error.message);
     } else {
+      if (saved?.id) syncR2Record("contratos", saved.id);
       toast.success(next ? "Contrato incluído no PDF de confirmação." : "Contrato removido do PDF de confirmação.");
     }
   };

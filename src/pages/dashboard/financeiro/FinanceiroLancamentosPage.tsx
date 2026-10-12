@@ -1,6 +1,7 @@
 import { useMemo, useState, useCallback } from "react";
 import { Plus, RefreshCw, Pencil } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { purgeR2Record, syncR2Record } from "@/lib/r2Registro";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -197,8 +198,9 @@ export default function FinanceiroLancamentosPage() {
           return;
         }
         toast.success("Lançamento atualizado.");
+        syncR2Record("financial_transactions", editManualRow.id);
       } else {
-        const { error: insErr } = await supabase.from("financial_transactions").insert({
+        const { data: created, error: insErr } = await supabase.from("financial_transactions").insert({
           user_id: uid,
           kind,
           origin: "manual",
@@ -208,12 +210,13 @@ export default function FinanceiroLancamentosPage() {
           description: description.trim() || null,
           category,
           is_primary: false,
-        });
+        }).select("id").single();
         if (insErr) {
           toast.error(insErr.message);
           return;
         }
         toast.success("Lançamento criado.");
+        if (created?.id) syncR2Record("financial_transactions", created.id);
       }
       setDialogOpen(false);
       setEditManualRow(null);
@@ -242,6 +245,7 @@ export default function FinanceiroLancamentosPage() {
         return;
       }
       toast.success("Lançamento atualizado.");
+      syncR2Record("financial_transactions", row.id);
       setEditLinkedRow(null);
       void reload();
     } finally {
@@ -264,6 +268,7 @@ export default function FinanceiroLancamentosPage() {
         return;
       }
       toast.success("Marcado como pendente.");
+      syncR2Record("financial_transactions", row.id);
       void reload();
     },
     [reload],
@@ -294,6 +299,7 @@ export default function FinanceiroLancamentosPage() {
         return;
       }
       toast.success("Marcado como pago.");
+      syncR2Record("financial_transactions", row.id);
       setPayDialogRow(null);
       setPayMethod("");
       setPayContabilizarAt("");
@@ -310,6 +316,11 @@ export default function FinanceiroLancamentosPage() {
     if (dErr) {
       toast.error(dErr.message);
       return;
+    }
+    try {
+      await purgeR2Record("financial_transactions", row.id);
+    } catch (e) {
+      toast.warning(e instanceof Error ? e.message : "Lançamento excluído, mas o arquivo na Cloudflare ficou.");
     }
     toast.success("Lançamento excluído.");
     void reload();

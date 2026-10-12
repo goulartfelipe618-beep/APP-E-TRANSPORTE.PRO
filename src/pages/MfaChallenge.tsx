@@ -5,6 +5,7 @@ import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
 import { getPostLoginPath } from "@/lib/sessionRole";
+import { limparEntradaPeloLinkUnico, MSG_MINI_PAINEL_SO_PELO_LINK } from "@/lib/motoristaPortalEntrada";
 import {
   getVerifiedTotpFactorId,
   jwtAuthenticatorAssuranceLevel,
@@ -44,6 +45,17 @@ export default function MfaChallengePage() {
     }
 
     const path = await getPostLoginPath(session.user.id, session.user);
+    if (path === "/login") {
+      limparEntradaPeloLinkUnico();
+      try {
+        await supabase.auth.signOut({ scope: "local" });
+      } catch {
+        /* motorista não conclui o 2FA do painel da empresa */
+      }
+      toast.error(MSG_MINI_PAINEL_SO_PELO_LINK);
+      navigate("/login", { replace: true });
+      return;
+    }
     navigate(path, { replace: true });
   }
 

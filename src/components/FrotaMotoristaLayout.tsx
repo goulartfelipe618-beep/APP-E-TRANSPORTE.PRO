@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { CalendarDays, ClipboardList, FileText, LogOut, Menu, Moon, Sun, Camera } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { limparEntradaPeloLinkUnico } from "@/lib/motoristaPortalEntrada";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
@@ -65,8 +66,25 @@ export default function FrotaMotoristaLayout() {
   }, []);
 
   const signOut = async () => {
+    limparEntradaPeloLinkUnico();
+    let destino = "/frota";
+    const { data: { user } } = await supabase.auth.getUser();
+    const metaId = String(
+      (user?.user_metadata as { solicitacao_motorista_id?: unknown } | undefined)?.solicitacao_motorista_id ?? "",
+    ).trim();
+    if (user) {
+      let query = supabase
+        .from("solicitacoes_motoristas")
+        .select("portal_token")
+        .eq("portal_auth_user_id", user.id)
+        .eq("status", "cadastrado");
+      if (metaId) query = query.eq("id", metaId);
+      const { data } = await query.maybeSingle();
+      const token = (data?.portal_token ?? "").trim();
+      if (token) destino = `/frota/acesso/${encodeURIComponent(token)}`;
+    }
     await supabase.auth.signOut();
-    window.location.href = "/login";
+    window.location.href = destino;
   };
 
   const go = (page: FrotaPage) => {
@@ -158,7 +176,7 @@ export default function FrotaMotoristaLayout() {
   );
 
   return (
-    <div className="flex min-h-screen min-h-[100dvh] w-full flex-col bg-background text-foreground md:flex-row">
+    <div className="etp-safe-shell flex w-full flex-col overflow-hidden bg-background text-foreground md:flex-row">
       {/* Barra superior — telemóvel */}
       <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-border bg-card/95 px-3 py-2.5 backdrop-blur supports-[backdrop-filter]:bg-card/80 md:hidden">
         <Button type="button" variant="outline" size="icon" className="h-11 w-11 shrink-0" onClick={() => setMenuOpen(true)} aria-label="Abrir menu">

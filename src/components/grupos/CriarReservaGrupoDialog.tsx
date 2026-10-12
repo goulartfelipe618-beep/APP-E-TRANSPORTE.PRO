@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { computeClienteProfilePercent } from "@/lib/clienteCompleteness";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -11,6 +11,7 @@ import { Separator } from "@/components/ui/separator";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { ArrowLeftRight, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { syncR2Record } from "@/lib/r2Registro";
 import { toast } from "sonner";
 import type { Json, Tables } from "@/integrations/supabase/types";
 import { normalizeReservaStatus, RESERVA_STATUS_OPTIONS } from "@/lib/reservaStatus";
@@ -104,6 +105,13 @@ export default function CriarReservaGrupoDialog({
   const [motoristasFrota, setMotoristasFrota] = useState<{ id: string; nome: string; portal_auth_user_id: string | null }[]>([]);
   const [motoristaAtribUid, setMotoristaAtribUid] = useState<string>("");
   const [motoristasExtras, setMotoristasExtras] = useState<string[]>([]);
+  const motoristasExtrasRef = useRef<string[]>([]);
+  const extrasProntosRef = useRef(true);
+  const extrasEditIdRef = useRef<string | null>(null);
+  const setExtrasAtribuidos = (ids: string[]) => {
+    motoristasExtrasRef.current = ids;
+    setMotoristasExtras(ids);
+  };
   const [modoClienteReserva, setModoClienteReserva] = useState<"novo" | "cadastrado">("novo");
   const [clientesReservaOpts, setClientesReservaOpts] = useState<ClienteReservaOpt[]>([]);
   const [cadastroClienteIdReserva, setCadastroClienteIdReserva] = useState("");
@@ -141,7 +149,10 @@ export default function CriarReservaGrupoDialog({
 
   // Pre-fill from edição, solicitação ou reset
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      extrasEditIdRef.current = null;
+      return;
+    }
 
     if (reservaGrupoEdicao) {
       const row = reservaGrupoEdicao;
@@ -172,9 +183,14 @@ export default function CriarReservaGrupoDialog({
         row.repasse_motorista != null && Number(row.repasse_motorista) > 0 ? String(row.repasse_motorista) : "",
       );
       setMotoristaAtribUid(row.motorista_id ? String(row.motorista_id) : "");
-      setMotoristasExtras([]);
+      extrasProntosRef.current = false;
+      extrasEditIdRef.current = row.id;
+      setExtrasAtribuidos([]);
+      const editId = row.id;
       void listReservaMotoristasExtra("grupo", row.id).then((ids) => {
-        setMotoristasExtras(ids.filter((id) => id !== String(row.motorista_id ?? "")));
+        if (extrasEditIdRef.current !== editId) return;
+        setExtrasAtribuidos(ids.filter((id) => id !== String(row.motorista_id ?? "")));
+        extrasProntosRef.current = true;
       });
       const cid = (row as { cadastro_cliente_id?: string | null }).cadastro_cliente_id;
       if (cid) {
@@ -250,7 +266,8 @@ export default function CriarReservaGrupoDialog({
     setValorBase("0"); setDesconto("0"); setMetodoPagamento("");
     setStatusOperacional("pendente"); setRepasseMotorista("");
     setMotoristaAtribUid("");
-    setMotoristasExtras([]);
+    extrasProntosRef.current = true;
+    setExtrasAtribuidos([]);
     setModoClienteReserva("novo");
     setCadastroClienteIdReserva("");
     setClientSearch("");
@@ -484,13 +501,13 @@ export default function CriarReservaGrupoDialog({
       if (!error && res.data?.id) vinculos.push({ id: res.data.id, primary: motoristaIdResolved });
     }
 
-    if (!error) {
+    if (!error && extrasProntosRef.current) {
       for (const vinculo of vinculos) {
         const extraErr = await replaceReservaMotoristasExtra({
           userId: user.id,
           kind: "grupo",
           reservaId: vinculo.id,
-          motoristaIds: motoristasExtras,
+          motoristaIds: motoristasExtrasRef.current,
           primaryId: vinculo.primary,
         });
         if (extraErr) {
@@ -504,6 +521,7 @@ export default function CriarReservaGrupoDialog({
     if (error) {
       toast.error(reservaGrupoEdicao?.id ? "Erro ao atualizar reserva: " + error.message : "Erro ao criar reserva: " + error.message);
     } else {
+      for (const vinculo of vinculos) syncR2Record("reservas_grupos", vinculo.id);
       if (novoClientePct != null) {
         toast.success(`Reserva criada. Novo cliente no menu Clientes — perfil ${novoClientePct}% (complete dados quando quiser).`);
       } else if (splitRoundTrip) {
@@ -719,7 +737,7 @@ export default function CriarReservaGrupoDialog({
                   motoristas={motoristasFrota}
                   primaryId={motoristaAtribUid}
                   selected={motoristasExtras}
-                  onChange={setMotoristasExtras}
+                  onChange={setExtrasAtribuidos}
                 />
               </div>
               <div className="space-y-1.5"><Label>Nome (manual / extra)</Label><Input value={nomeMotorista} onChange={(e) => setNomeMotorista(e.target.value)} /></div>

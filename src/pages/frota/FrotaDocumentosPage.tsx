@@ -28,11 +28,18 @@ export default function FrotaDocumentosPage() {
           if (!cancelled) setLoading(false);
           return;
         }
-        const { data, error } = await supabase
+        const metaId = String(
+          (auth.user.user_metadata as { solicitacao_motorista_id?: unknown } | undefined)?.solicitacao_motorista_id ?? "",
+        ).trim();
+        let query = supabase
           .from("solicitacoes_motoristas")
-          .select("nome, dados_webhook")
+          .select("id, nome, dados_webhook, portal_auth_user_id")
           .eq("portal_auth_user_id", uid)
-          .maybeSingle();
+          .eq("status", "cadastrado");
+        if (metaId) query = query.eq("id", metaId);
+        const { data: rows, error } = await query;
+        const proprias = (rows ?? []).filter((row) => row.portal_auth_user_id === uid);
+        const data = proprias.length === 1 ? proprias[0] : null;
 
         if (error || !data) {
           if (!cancelled) {

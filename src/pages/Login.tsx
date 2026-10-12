@@ -32,6 +32,8 @@ import { reportAuthLoginFailure } from "@/lib/authLoginFailureReporter";
 import AuthBootScreen from "@/components/AuthBootScreen";
 import { validatePainelStrongPassword } from "@/lib/motoristaPortalPassword";
 import { claimExclusiveSession } from "@/lib/sessionRevocation";
+import { consumirAvisoLoginPortal, limparEntradaPeloLinkUnico, MSG_MINI_PAINEL_SO_PELO_LINK } from "@/lib/motoristaPortalEntrada";
+import { isMotoristaFrotaUser, userIsMotoristaFrotaFromMetadata } from "@/lib/motoristaFrotaRole";
 
 /** Persistência opcional; não ler na montagem — evita exibir URL antiga da imagem antes do fetch. */
 const LOGIN_CONFIG_CACHE_KEY = "etp_login_painel_config_v1";
@@ -94,6 +96,11 @@ const Login = () => {
   }, []);
 
   useEffect(() => {
+    const aviso = consumirAvisoLoginPortal();
+    if (aviso) setError(aviso);
+  }, []);
+
+  useEffect(() => {
     let cancelled = false;
 
     const clearRedirectDebounce = () => {
@@ -129,6 +136,17 @@ const Login = () => {
       }
 
       const path = await getPostLoginPath(session.user.id, session.user);
+      if (path === "/login") {
+        limparEntradaPeloLinkUnico();
+        try {
+          await supabase.auth.signOut({ scope: "local" });
+        } catch {
+          /* conta de motorista não permanece no login da empresa */
+        }
+        if (!cancelled) setError(MSG_MINI_PAINEL_SO_PELO_LINK);
+        setGateReady(true);
+        return;
+      }
       applyThemeForRoute(path, session.user.id);
       navigate(path, { replace: true });
     };
@@ -203,6 +221,26 @@ const Login = () => {
 
     setRecoverySaving(true);
     try {
+      const {
+        data: { user: recoveryUser },
+      } = await supabase.auth.getUser();
+      if (
+        recoveryUser &&
+        (userIsMotoristaFrotaFromMetadata(recoveryUser) ||
+          (await isMotoristaFrotaUser(recoveryUser.id, recoveryUser)))
+      ) {
+        limparEntradaPeloLinkUnico();
+        try {
+          await supabase.auth.signOut({ scope: "local" });
+        } catch {
+          /* não abre o mini painel por este formulário */
+        }
+        passwordRecoveryRef.current = false;
+        setPasswordRecovery(false);
+        setRecoveryError(MSG_MINI_PAINEL_SO_PELO_LINK);
+        return;
+      }
+
       const { error: updateErr } = await supabase.auth.updateUser({ password: recoveryPass });
       if (updateErr) {
         setRecoveryError(updateErr.message || "Não foi possível atualizar a senha.");
@@ -241,6 +279,16 @@ const Login = () => {
       setPasswordRecovery(false);
       setAuthStartedAt(Date.now());
       const path = await getPostLoginPath(user.id, user);
+      if (path === "/login") {
+        limparEntradaPeloLinkUnico();
+        try {
+          await supabase.auth.signOut({ scope: "local" });
+        } catch {
+          /* conta de motorista não entra por aqui */
+        }
+        setRecoveryError(MSG_MINI_PAINEL_SO_PELO_LINK);
+        return;
+      }
       applyThemeForRoute(path, user.id);
       try {
         window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}`);
@@ -357,6 +405,22 @@ const Login = () => {
 
     if (!data.user) {
       setError("Resposta de autenticação inválida. Tente novamente.");
+      setLoading(false);
+      refreshCaptcha();
+      return;
+    }
+
+    if (
+      userIsMotoristaFrotaFromMetadata(data.user) ||
+      (await isMotoristaFrotaUser(data.user.id, data.user))
+    ) {
+      limparEntradaPeloLinkUnico();
+      try {
+        await supabase.auth.signOut({ scope: "local" });
+      } catch {
+        /* a sessão do motorista não fica ativa neste login */
+      }
+      setError(MSG_MINI_PAINEL_SO_PELO_LINK);
       setLoading(false);
       refreshCaptcha();
       return;
