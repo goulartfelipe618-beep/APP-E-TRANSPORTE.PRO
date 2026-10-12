@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import { Car, User, Upload, Save, Key, Shield, RefreshCw, Type, Pencil, FileText, Users, AlertTriangle, Loader2, PenLine, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { syncR2Record } from "@/lib/r2Registro";
 import { toast } from "sonner";
 import { useConfiguracoes } from "@/contexts/ConfiguracoesContext";
 import { Badge } from "@/components/ui/badge";
@@ -34,11 +35,12 @@ import { FONTES_GLOBAIS, FONTE_GLOBAL_PADRAO, resolveFonteCss } from "@/lib/font
 
 const COOLDOWN_DAYS = 60;
 
-/** GoTrue envia o QR como `data:image/...`; se vier só base64 cru, compõe a data URL para o `<img>` renderizar. */
+/** GoTrue pode mandar o QR como data URL, SVG ou base64. O `<img>` precisa de uma URL válida. */
 function totpQrCodeToImageSrc(raw: string): string {
   const t = raw.trim();
   if (!t) return "";
   if (t.startsWith("data:") || /^https?:\/\//i.test(t)) return t;
+  if (t.startsWith("<svg")) return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(t)}`;
   return `data:image/png;base64,${t}`;
 }
 
@@ -201,6 +203,8 @@ export default function SistemaConfiguracoesPage() {
   const [enrollingMfa, setEnrollingMfa] = useState(false);
   const [enablingMfa, setEnablingMfa] = useState(false);
   const [mfaSetupError, setMfaSetupError] = useState<string>("");
+  const mfaFactorIdRef = useRef<string | null>(null);
+  const keepVerifiedFactorRef = useRef(false);
   const [isAdminMaster, setIsAdminMaster] = useState(false);
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
 
@@ -320,6 +324,7 @@ export default function SistemaConfiguracoesPage() {
         .insert({ user_id: user.id, ...fields } as any);
       if (error) { toast.error("Erro ao salvar"); return false; }
     }
+    syncR2Record("configuracoes", user.id);
     return true;
   };
 
@@ -476,6 +481,7 @@ export default function SistemaConfiguracoesPage() {
         toast.error("Erro ao salvar informações contratuais");
         return;
       }
+      syncR2Record("cabecalho_contratual", user.id);
       toast.success("Contratos usarão os dados do Meu Perfil.");
       setContratualEditing(false);
       setContratualSaved(true);
@@ -529,6 +535,7 @@ export default function SistemaConfiguracoesPage() {
       toast.error("Erro ao salvar informações contratuais");
       return;
     }
+    syncR2Record("cabecalho_contratual", user.id);
     toast.success("Cabeçalho 1 salvo com sucesso");
     setContratualEditing(false);
     setContratualSaved(true);
@@ -566,6 +573,7 @@ export default function SistemaConfiguracoesPage() {
       toast.error("Erro ao guardar assinatura");
       return false;
     }
+    syncR2Record("cabecalho_contratual", user.id);
     window.dispatchEvent(new Event("configuracoes-updated"));
     return true;
   };
@@ -604,6 +612,7 @@ export default function SistemaConfiguracoesPage() {
       const ok = await upsertAssinaturaUrl(publicUrl);
       if (ok) {
         setAssinaturaUrl(publicUrl);
+        syncR2Record("cabecalho_contratual", user.id);
         toast.success("Assinatura eletrónica guardada");
       }
     } catch {
@@ -658,7 +667,14 @@ export default function SistemaConfiguracoesPage() {
   };
 
   const resetTwoFaSetup = (opts?: { unenrollPendingId?: string | null }) => {
-    const pendingId = opts?.unenrollPendingId ?? mfaFactorId;
+    const explicit = opts != null && Object.prototype.hasOwnProperty.call(opts, "unenrollPendingId");
+    const pendingId = keepVerifiedFactorRef.current
+      ? null
+      : explicit
+        ? opts.unenrollPendingId
+        : mfaFactorIdRef.current;
+    keepVerifiedFactorRef.current = false;
+    mfaFactorIdRef.current = null;
     setMfaFactorId(null);
     setMfaQrCode("");
     setMfaSecret("");
@@ -723,6 +739,7 @@ export default function SistemaConfiguracoesPage() {
       });
       if (error) throw error;
 
+      mfaFactorIdRef.current = data.id;
       setMfaFactorId(data.id);
       setMfaQrCode(totpQrCodeToImageSrc(data.totp.qr_code));
       setMfaSecret(data.totp.secret);
@@ -751,13 +768,14 @@ export default function SistemaConfiguracoesPage() {
       const verify = await supabase.auth.mfa.verify({
         factorId: mfaFactorId,
         challengeId: challenge.data.id,
-        code: mfaVerifyCode.trim(),
+        code: mfaVerifyCode.replace(/\D/g, ""),
       });
       if (verify.error) throw verify.error;
 
       toast.success("2FA ativado com sucesso.");
+      keepVerifiedFactorRef.current = true;
+      mfaFactorIdRef.current = null;
       setTwoFaDialogOpen(false);
-      // Factor acabou de ficar 'verified' — não o remover.
       resetTwoFaSetup({ unenrollPendingId: null });
 
       // Garante que o JWT seja atualizado para aal2.
