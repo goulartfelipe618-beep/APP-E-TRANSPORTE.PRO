@@ -57,18 +57,18 @@ export default function ClientSessionRevocationGuard() {
 
       const tokenSid = readJwtSessionId(session.access_token);
       if (tokenSid) {
-        const { data: active, error: activeErr } = await supabase
+        const { data: activeRows, error: activeErr } = await supabase
           .from("user_active_sessions")
           .select("session_id")
-          .eq("user_id", session.user.id)
-          .maybeSingle();
+          .eq("user_id", session.user.id);
         if (!mounted) return;
-        if (!activeErr && active?.session_id && active.session_id !== tokenSid) {
+        const activeIds = (activeRows ?? []).map((row) => row.session_id).filter(Boolean);
+        if (!activeErr && activeIds.length > 0 && !activeIds.includes(tokenSid)) {
           if (pendingOwnSidRef.current === tokenSid) return;
           await handleRevoked();
           return;
         }
-        if (active?.session_id === tokenSid) pendingOwnSidRef.current = null;
+        if (activeIds.includes(tokenSid)) pendingOwnSidRef.current = null;
       }
 
       const serverIso = await fetchServerRevokedAtIso();

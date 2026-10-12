@@ -214,7 +214,7 @@ const Login = () => {
         try {
           await supabase.auth.signOut();
         } catch {
-          /* não deixa a sessão nova sem ser a única */
+          /* não deixa a sessão nova fora da lista dos três aparelhos */
         }
         setRecoveryError("Não foi possível validar a sessão. Entre de novo com a senha nova.");
         return;
@@ -367,7 +367,7 @@ const Login = () => {
       try {
         await supabase.auth.signOut();
       } catch {
-        /* a sessão nova não pode ficar ativa sem ser a única */
+        /* a sessão nova não pode ficar ativa sem entrar na lista dos três aparelhos */
       }
       setError("Não foi possível validar a sessão. Tente entrar de novo.");
       setLoading(false);

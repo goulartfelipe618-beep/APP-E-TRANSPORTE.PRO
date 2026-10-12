@@ -120,8 +120,12 @@ export function readJwtSessionId(accessToken: string): string | null {
   return sid;
 }
 
+/** Uma conta pode ficar aberta em até três aparelhos ao mesmo tempo. */
+export const MAX_ACTIVE_DEVICES = 3;
+
 /**
- * Marca este login como o único da conta e revoga os outros no servidor.
+ * Registra este login entre os aparelhos da conta.
+ * Se já houver três, o acesso mais antigo perde a renovação.
  * Chamar só depois de um sign-in novo, antes de consultar dados.
  */
 export async function claimExclusiveSession(): Promise<boolean> {
