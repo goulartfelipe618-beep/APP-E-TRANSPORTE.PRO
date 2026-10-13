@@ -24,6 +24,7 @@ import { entradaDoPortalEstaValida, guardarAvisoLoginPortal, limparEntradaPeloLi
 import { PainelContentZoomProvider } from "@/contexts/PainelContentZoomContext";
 import { PainelScaledContent } from "@/components/painel/PainelScaledContent";
 import { logUserActivity } from "@/lib/userActivityLog";
+import { useConfiguracoes } from "@/contexts/ConfiguracoesContext";
 import { toast } from "sonner";
 import { useR2AutoBackupCatchup } from "@/hooks/useR2AutoBackupCatchup";
 
@@ -121,6 +122,7 @@ function DashboardContent() {
   const { activePage, setActivePage } = useActivePage();
   const onboarding = useMotoristaOnboarding();
   const { flags: ferramentasFlags, loading: ferramentasLoading } = usePlataformaFerramentasDisponibilidade();
+  const { config } = useConfiguracoes();
   const mainRef = useRef<HTMLElement>(null);
   useScrollPanelToTop(activePage, mainRef);
   useSlowScrollContainer(mainRef, activePage === "website");
@@ -224,11 +226,14 @@ function DashboardContent() {
 
   /** Marketing só se o Admin Master liberar a categoria no painel master. */
   useEffect(() => {
-    if (ferramentasLoading) return;
-    if (!ferramentasFlags.marketing_menu_liberado && isMarketingMenuPage(activePage)) {
+    if (!ferramentasLoading && !ferramentasFlags.marketing_menu_liberado && isMarketingMenuPage(activePage)) {
+      setActivePage("home");
+      return;
+    }
+    if (config.financeiro_bloqueado && (activePage === "financeiro" || activePage.startsWith("financeiro/"))) {
       setActivePage("home");
     }
-  }, [ferramentasLoading, ferramentasFlags.marketing_menu_liberado, activePage, setActivePage]);
+  }, [ferramentasLoading, ferramentasFlags.marketing_menu_liberado, config.financeiro_bloqueado, activePage, setActivePage]);
 
   /** Sessão antiga na logo, ou rotas removidas, abre na Home. */
   useEffect(() => {

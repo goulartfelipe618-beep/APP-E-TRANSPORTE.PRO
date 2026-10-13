@@ -270,7 +270,13 @@ export function AppSidebar() {
       </div>
 
       <SidebarContent className={cn(showNetworkHighlight && "relative z-30")}>
-        {getMenuStructure(networkAceito, showMarketingMenu).map((group) => (
+        {getMenuStructure(networkAceito, showMarketingMenu)
+          .map((group) => ({
+            ...group,
+            items: config.financeiro_bloqueado ? group.items.filter((item) => item.title !== "Financeiro") : group.items,
+          }))
+          .filter((group) => group.items.length > 0)
+          .map((group) => (
           <SidebarGroup key={group.label}>
             <SidebarGroupLabel
               className={cn(

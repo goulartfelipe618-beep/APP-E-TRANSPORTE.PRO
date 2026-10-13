@@ -16,6 +16,7 @@ interface Configuracoes {
   nome_completo: string;
   logo_url: string;
   fonte_global: string;
+  financeiro_bloqueado: boolean;
 }
 
 interface ConfiguracoesContextType {
@@ -28,6 +29,7 @@ const defaultConfig: Configuracoes = {
   nome_completo: "",
   logo_url: "",
   fonte_global: FONTE_GLOBAL_PADRAO,
+  financeiro_bloqueado: false,
 };
 
 const CACHE_KEY = "etp_configuracoes_v1";
@@ -56,6 +58,7 @@ function readConfigCache(): Configuracoes | null {
       nome_completo: typeof c.nome_completo === "string" ? c.nome_completo : "",
       logo_url: rewriteSupabaseStorageUrlToR2(typeof c.logo_url === "string" ? c.logo_url : "") || (typeof c.logo_url === "string" ? c.logo_url : ""),
       fonte_global: typeof c.fonte_global === "string" ? c.fonte_global : defaultConfig.fonte_global,
+      financeiro_bloqueado: c.financeiro_bloqueado === true,
     };
   } catch {
     return null;
@@ -83,12 +86,14 @@ function mergeConfigFromRow(data: {
   nome_completo: string | null;
   logo_url: string | null;
   fonte_global: string | null;
+  financeiro_bloqueado: boolean | null;
 }): Configuracoes {
   return {
     nome_projeto: data.nome_projeto || defaultConfig.nome_projeto,
     nome_completo: data.nome_completo || "",
     logo_url: rewriteSupabaseStorageUrlToR2(data.logo_url) || data.logo_url || "",
     fonte_global: data.fonte_global || defaultConfig.fonte_global,
+    financeiro_bloqueado: data.financeiro_bloqueado === true,
   };
 }
 
@@ -108,7 +113,7 @@ export function ConfiguracoesProvider({ children }: { children: ReactNode }) {
 
     const { data } = await supabase
       .from("configuracoes")
-      .select("nome_projeto, nome_completo, logo_url, fonte_global")
+      .select("nome_projeto, nome_completo, logo_url, fonte_global, financeiro_bloqueado")
       .eq("user_id", user.id)
       .maybeSingle();
 

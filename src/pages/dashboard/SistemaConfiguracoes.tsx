@@ -24,6 +24,7 @@ import MapboxAddressInput from "@/components/mapbox/MapboxAddressInput";
 import { isMapboxConfigured } from "@/lib/mapboxGeocode";
 import { persistNetworkRetornoSolicitado, persistNetworkSair } from "@/lib/networkNacionalPrefs";
 import LoginConfiguracoesSection from "@/pages/dashboard/LoginConfiguracoesSection";
+import BloqueioFinanceiroSection from "@/components/sistema/BloqueioFinanceiroSection";
 import { uploadFileToR2 } from "@/lib/mirrorUploadToR2";
 import WebsiteEmbedSnippetSection from "@/components/admin/WebsiteEmbedSnippetSection";
 import R2AutoBackupSection from "@/components/sistema/R2AutoBackupSection";
@@ -1374,6 +1375,8 @@ export default function SistemaConfiguracoesPage() {
           </div>
         </div>
       </div>
+
+      <BloqueioFinanceiroSection />
 
       <Dialog
         open={twoFaDialogOpen}

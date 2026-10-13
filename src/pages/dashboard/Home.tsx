@@ -38,6 +38,7 @@ import { useMotoristaOnboarding } from "@/hooks/useMotoristaOnboarding";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import SlideCarousel from "@/components/SlideCarousel";
+import { useConfiguracoes } from "@/contexts/ConfiguracoesContext";
 import { useActivePage } from "@/contexts/ActivePageContext";
 import { toast } from "sonner";
 import {
@@ -62,6 +63,7 @@ type MajorSection = {
 function buildHomeSections(
   showNetwork: boolean,
   showMarketing: boolean,
+  financeiroBloqueado: boolean,
 ): MajorSection[] {
   const principal: Subsection[] = [
     {
@@ -144,7 +146,7 @@ function buildHomeSections(
   ];
 
   return [
-    { id: "principal", label: "Principal", subsections: principal },
+    { id: "principal", label: "Principal", subsections: financeiroBloqueado ? principal.filter((s) => s.title !== "Financeiro") : principal },
     ...(showMarketing
       ? [
           {
@@ -199,9 +201,10 @@ export default function HomePage() {
   const [mostrarRegras, setMostrarRegras] = useState(false);
   const [menuNetwork, setMenuNetwork] = useState(() => localStorage.getItem("network_nacional_aceito") === "sim");
 
+  const { config } = useConfiguracoes();
   const sections = useMemo(
-    () => buildHomeSections(menuNetwork, showMarketingMenu),
-    [menuNetwork, showMarketingMenu],
+    () => buildHomeSections(menuNetwork, showMarketingMenu, config.financeiro_bloqueado),
+    [menuNetwork, showMarketingMenu, config.financeiro_bloqueado],
   );
 
   useEffect(() => {

@@ -959,6 +959,7 @@ export type Database = {
           endereco_longitude: number | null
           estado: string | null
           fonte_global: string | null
+          financeiro_bloqueado: boolean
           id: string
           logo_url: string | null
           network_highlight_shown: boolean
@@ -982,6 +983,7 @@ export type Database = {
           endereco_longitude?: number | null
           estado?: string | null
           fonte_global?: string | null
+          financeiro_bloqueado?: boolean
           id?: string
           logo_url?: string | null
           network_highlight_shown?: boolean
@@ -1005,6 +1007,7 @@ export type Database = {
           endereco_longitude?: number | null
           estado?: string | null
           fonte_global?: string | null
+          financeiro_bloqueado?: boolean
           id?: string
           logo_url?: string | null
           network_highlight_shown?: boolean
@@ -2671,6 +2674,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      definir_bloqueio_financeiro: {
+        Args: { p_bloquear: boolean }
+        Returns: undefined
+      }
       encerrar_rastreio: {
         Args: {
           p_destino?: string
