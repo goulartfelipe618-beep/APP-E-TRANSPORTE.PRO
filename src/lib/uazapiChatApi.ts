@@ -12,6 +12,9 @@ type Invoke = {
   hasMore?: boolean;
   nextOffset?: number | null;
   historico?: HistoricoPedido;
+  message?: ChatMensagem | null;
+  fileURL?: string;
+  mimetype?: string;
 };
 
 async function chamar(body: Record<string, unknown>): Promise<Invoke & { falhaRede?: string }> {
@@ -46,8 +49,21 @@ export function listarMensagens(chatid: string, offset = 0) {
   return chamar({ action: "mensagens", chatid, limit: 50, offset });
 }
 
-export function pedirHistorico(chatid: string, next: Record<string, unknown> | null) {
-  return chamar({ action: "historico", chatid, count: 50, next });
+export function enviarTexto(chatid: string, text: string) {
+  return chamar({ action: "enviar", kind: "text", chatid, text });
+}
+
+export function enviarMidia(
+  chatid: string,
+  type: "image" | "video" | "audio" | "document" | "sticker",
+  file: string,
+  extra: { text?: string; docName?: string; mimetype?: string },
+) {
+  return chamar({ action: "enviar", kind: "media", chatid, type, file, ...extra });
+}
+
+export function baixarArquivo(id: string) {
+  return chamar({ action: "arquivo", id });
 }
 
 export function ligarEventos() {

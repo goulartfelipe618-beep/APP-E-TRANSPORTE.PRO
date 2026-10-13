@@ -261,6 +261,18 @@ export async function uazapiWebhookAdd(
   });
 }
 
+export async function uazapiMessageDownload(
+  root: string,
+  instanceToken: string,
+  body: Record<string, unknown>,
+): Promise<{ status: number; text: string; json: unknown }> {
+  return await uazapiFetch(`${root}/message/download`, {
+    method: "POST",
+    headers: instanceHeaders(instanceToken, true),
+    body: JSON.stringify(body),
+  });
+}
+
 export async function uazapiSendDocument(
   root: string,
   instanceToken: string,

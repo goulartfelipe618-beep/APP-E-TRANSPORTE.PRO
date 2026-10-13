@@ -17,8 +17,11 @@ import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {
   uazapiChatFind,
   uazapiHistorySync,
+  uazapiMessageDownload,
   uazapiMessageFind,
   uazapiRoot,
+  uazapiSendMedia,
+  uazapiSendText,
   uazapiWebhookAdd,
   uazapiWebhookGet,
 } from "../_shared/uazapi.ts";
@@ -166,6 +169,53 @@ Deno.serve(async (req) => {
       });
     }
 
+    if (action === "enviar") {
+      const chatid = String(body.chatid || "").trim();
+      if (!chatid || chatid.length > 200) return json({ error: "chatid é obrigatório" }, 400);
+      const kind = String(body.kind || "");
+      if (kind === "text") {
+        const text = String(body.text || "");
+        if (!text.trim() || text.length > 4096) return json({ error: "Texto inválido." }, 400);
+        const pack = await umaVez(() => uazapiSendText(root, token, chatid, text));
+        return await respostaDeEnvio(supabaseAdmin, userId, pack, chatid);
+      }
+      if (kind === "media") {
+        const type = String(body.type || "");
+        if (!["image", "video", "audio", "document", "sticker"].includes(type)) {
+          return json({ error: "Tipo de arquivo não aceito pela UAZAPI." }, 400);
+        }
+        const file = String(body.file || "");
+        if (!file.startsWith("data:") || file.length < 32 || file.length > 4_500_000) {
+          return json({ error: "O arquivo precisa ter até 3 MB." }, 400);
+        }
+        const payload: Record<string, unknown> = { type, file };
+        const legenda = String(body.text || "").trim().slice(0, 1024);
+        const docName = String(body.docName || "").trim().slice(0, 180);
+        const mimetype = String(body.mimetype || "").trim().slice(0, 120);
+        if (legenda) payload.text = legenda;
+        if (type === "document" && docName) payload.docName = docName;
+        if (mimetype) payload.mimetype = mimetype;
+        const pack = await umaVez(() => uazapiSendMedia(root, token, chatid, payload));
+        return await respostaDeEnvio(supabaseAdmin, userId, pack, chatid);
+      }
+      return json({ error: "Envio inválido." }, 400);
+    }
+
+    if (action === "arquivo") {
+      const id = String(body.id || "").trim();
+      if (!id || id.length > 200) return json({ error: "id é obrigatório" }, 400);
+      const pack = await umaVez(() =>
+        uazapiMessageDownload(root, token, { id, return_base64: false, generate_mp3: true }),
+      );
+      const o = pack.json && typeof pack.json === "object" ? (pack.json as Record<string, unknown>) : {};
+      const fileURL = typeof o.fileURL === "string" ? o.fileURL : "";
+      const mimetype = typeof o.mimetype === "string" ? o.mimetype : "";
+      if (pack.status < 200 || pack.status >= 300 || !fileURL.startsWith("https://")) {
+        return json({ ok: false, error: "A UAZAPI não devolveu o arquivo." });
+      }
+      return json({ ok: true, fileURL, mimetype });
+    }
+
     if (action === "eventos") {
       const aviso = await garantirWebhook(supabaseAdmin, userId, root, token, supabaseUrl, anonKey);
       return json({ ok: aviso == null, error: aviso || undefined });
@@ -176,6 +226,36 @@ Deno.serve(async (req) => {
     return json({ error: "Falha ao consultar a UAZAPI." }, 500);
   }
 });
+
+function erroDaApi(jsonBody: unknown, fallback: string): string {
+  if (jsonBody && typeof jsonBody === "object" && typeof (jsonBody as { error?: unknown }).error === "string") {
+    return (jsonBody as { error: string }).error.slice(0, 300);
+  }
+  return fallback;
+}
+
+async function respostaDeEnvio(
+  supabaseAdmin: SupabaseClient,
+  userId: string,
+  pack: { status: number; json: unknown },
+  chatid: string,
+): Promise<Response> {
+  const ok = pack.status >= 200 && pack.status < 300;
+  const message = ok ? normalizarMensagem(pack.json, chatid) : null;
+  if (message) {
+    try {
+      await gravarMensagens(supabaseAdmin, userId, [message]);
+    } catch {
+      /* a confirmação da API continua valendo */
+    }
+  }
+  return json({
+    ok,
+    httpStatus: pack.status,
+    message,
+    error: ok ? undefined : erroDaApi(pack.json, "A UAZAPI não confirmou o envio."),
+  });
+}
 
 async function garantirWebhook(
   supabaseAdmin: SupabaseClient,
