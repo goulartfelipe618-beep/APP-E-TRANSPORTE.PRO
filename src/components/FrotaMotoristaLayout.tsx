@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { CalendarDays, ClipboardList, FileText, LogOut, Menu, Moon, Sun, Camera } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { limparEntradaPeloLinkUnico } from "@/lib/motoristaPortalEntrada";
+import { limparEntradaPeloLinkUnico, limparPreviewDoDono, previewDoDonoGuardada, validarMiniPainelDoDono } from "@/lib/motoristaPortalEntrada";
+import { getPostLoginPath } from "@/lib/sessionRole";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
@@ -25,10 +26,19 @@ export default function FrotaMotoristaLayout() {
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [nomeProjeto, setNomeProjeto] = useState<string>("");
   const [dark, setDark] = useState(false);
+  const [previewNome, setPreviewNome] = useState<string | null>(null);
 
   const uid = getPersistedSupabaseUserId();
 
   const loadBranding = useCallback(async () => {
+    const preview = await validarMiniPainelDoDono();
+    if (preview) {
+      setPreviewNome(preview.nome || "Motorista");
+      setNomeProjeto(preview.nome || "Motorista");
+      setLogoUrl(null);
+      return;
+    }
+    setPreviewNome(null);
     const { data, error } = await supabase.rpc("get_frota_motorista_branding");
     if (error || !data?.length) {
       setLogoUrl(null);
@@ -66,6 +76,13 @@ export default function FrotaMotoristaLayout() {
   }, []);
 
   const signOut = async () => {
+    if (previewDoDonoGuardada()) {
+      limparPreviewDoDono();
+      const { data: auth } = await supabase.auth.getUser();
+      const destino = auth.user ? await getPostLoginPath(auth.user.id, auth.user) : "/dashboard";
+      window.location.href = destino;
+      return;
+    }
     limparEntradaPeloLinkUnico();
     let destino = "/frota";
     const { data: { user } } = await supabase.auth.getUser();
@@ -169,7 +186,7 @@ export default function FrotaMotoristaLayout() {
         </Button>
         <Button type="button" variant="ghost" className="h-11 w-full justify-start gap-2 text-destructive" onClick={() => void signOut()}>
           <LogOut className="h-4 w-4" />
-          Sair
+          {previewNome ? "Voltar ao painel" : "Sair"}
         </Button>
       </div>
     </>
@@ -207,6 +224,11 @@ export default function FrotaMotoristaLayout() {
       </aside>
 
       <main className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto p-3 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 sm:p-6">
+        {previewNome ? (
+          <p className="mb-3 rounded-lg border border-primary/30 bg-primary/10 px-3 py-2 text-xs text-foreground">
+            Mini painel de <strong>{previewNome}</strong>. A outra guia continua no seu painel, com a mesma sessão.
+          </p>
+        ) : null}
         {active === "agenda" ? (
           <FrotaAgendaPage />
         ) : active === "reservas" ? (

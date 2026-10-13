@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, LayoutGrid, List, Link2, Copy, Eye, Pencil, KeyRound, Lock } from "lucide-react";
+import { Plus, Search, LayoutGrid, List, Link2, Copy, Eye, Pencil, KeyRound, Lock, ExternalLink } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import CadastrarMotoristaDialog from "@/components/motoristas/CadastrarMotoristaDialog";
 import DetalhesMotoristaFrotaSheet from "@/components/motoristas/DetalhesMotoristaFrotaSheet";
@@ -123,6 +123,19 @@ export default function MotoristaCadastrosPage() {
     const u = portalUrl(token);
     if (!u) return;
     void navigator.clipboard.writeText(u).then(() => toast.success("Link copiado."));
+  };
+
+  const abrirMiniPainel = (token: string) => {
+    if (!planLoading && !canUseMotoristaPortalLink(plano)) {
+      toast.message("O link do mini painel do motorista está disponível no plano PRÓ.");
+      setUpgradeOpen(true);
+      return;
+    }
+    const u = portalUrl(token);
+    if (!u) return;
+    const aba = window.open(u, "_blank");
+    if (aba) aba.opener = null;
+    else toast.error("O navegador bloqueou a nova guia. Copie o link e abra numa guia nova.");
   };
 
   const filtered = useMemo(() => {
@@ -293,6 +306,10 @@ export default function MotoristaCadastrosPage() {
                     <span className="text-xs text-muted-foreground">
                       Portal: {m.portal_auth_user_id ? "senha definida" : "enviar link para definir senha"}
                     </span>
+                    <Button type="button" variant="outline" size="sm" className="h-7 text-xs" disabled={rowLocked} onClick={() => abrirMiniPainel(m.portal_token)}>
+                      <ExternalLink className="mr-1 h-3 w-3" />
+                      Abrir
+                    </Button>
                     <Button type="button" variant="outline" size="sm" className="h-7 text-xs" disabled={rowLocked} onClick={() => copyPortalLink(m.portal_token)}>
                       <Copy className="mr-1 h-3 w-3" />
                       Copiar link
@@ -372,6 +389,10 @@ export default function MotoristaCadastrosPage() {
                       <td className="p-3 whitespace-nowrap">{new Date(m.created_at).toLocaleDateString("pt-BR")}</td>
                       <td className="p-3 text-right">
                         <div className="flex flex-wrap justify-end gap-1">
+                          <Button type="button" variant="outline" size="sm" className="h-8 px-2 text-xs" disabled={rowLocked} onClick={() => abrirMiniPainel(m.portal_token)}>
+                            <ExternalLink className="mr-1 h-3 w-3" />
+                            Abrir
+                          </Button>
                           <Button type="button" variant="outline" size="sm" className="h-8 px-2 text-xs" disabled={rowLocked} onClick={() => copyPortalLink(m.portal_token)}>
                             <Copy className="mr-1 h-3 w-3" />
                             Copiar link

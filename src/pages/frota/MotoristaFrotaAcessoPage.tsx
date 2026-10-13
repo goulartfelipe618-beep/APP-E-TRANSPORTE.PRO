@@ -9,7 +9,12 @@ import { toast } from "sonner";
 import { applyThemeForRoute } from "@/lib/panelTheme";
 import { clearDashboardNavSessionStorage } from "@/lib/motoristaFrotaRole";
 import { claimExclusiveSession } from "@/lib/sessionRevocation";
-import { confirmarEntradaPeloLinkUnico, limparEntradaPeloLinkUnico } from "@/lib/motoristaPortalEntrada";
+import {
+  confirmarEntradaPeloLinkUnico,
+  entrarNoMiniPainelComoDono,
+  limparEntradaPeloLinkUnico,
+  loginDoMotoristaTrocaraOutraConta,
+} from "@/lib/motoristaPortalEntrada";
 import { validateMotoristaPortalPassword } from "@/lib/motoristaPortalPassword";
 import { Loader2 } from "lucide-react";
 
@@ -81,6 +86,15 @@ export default function MotoristaFrotaAcessoPage() {
         setLoading(false);
         return;
       }
+      try {
+        const preview = await entrarNoMiniPainelComoDono(token);
+        if (preview) {
+          navigate("/frota", { replace: true });
+          return;
+        }
+      } catch {
+        /* a sessão do painel fica; o formulário do motorista segue abaixo */
+      }
       const { data, error } = await supabase.functions.invoke<{
         nome?: string;
         registered?: boolean;
@@ -107,7 +121,7 @@ export default function MotoristaFrotaAcessoPage() {
       setRegistered(!!data?.registered);
       setLoginEmail(data?.login_email ?? null);
     })();
-  }, [token]);
+  }, [token, navigate]);
 
   const handleBootstrap = async () => {
     if (!token) return;
@@ -141,6 +155,11 @@ export default function MotoristaFrotaAcessoPage() {
       const email = data?.email;
       if (!email) {
         toast.error("Resposta inválida do servidor.");
+        return;
+      }
+      const atual = await supabase.auth.getSession();
+      if (loginDoMotoristaTrocaraOutraConta(atual.data.session?.user?.email, email)) {
+        toast.error("O painel já aberto neste navegador foi mantido. Este motorista entra numa janela anônima, ou depois de sair da outra conta.");
         return;
       }
       const { error: sErr } = await supabase.auth.signInWithPassword({ email, password });
@@ -189,6 +208,11 @@ export default function MotoristaFrotaAcessoPage() {
     }
     setBusy(true);
     try {
+      const atual = await supabase.auth.getSession();
+      if (loginDoMotoristaTrocaraOutraConta(atual.data.session?.user?.email, loginEmail)) {
+        toast.error("O painel já aberto neste navegador foi mantido. Este motorista entra numa janela anônima, ou depois de sair da outra conta.");
+        return;
+      }
       const { error } = await supabase.auth.signInWithPassword({
         email: loginEmail.trim(),
         password: loginPass,

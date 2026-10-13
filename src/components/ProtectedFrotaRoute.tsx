@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { isMotoristaFrotaUser, userIsMotoristaFrotaFromMetadata } from "@/lib/motoristaFrotaRole";
-import { entradaDoPortalEstaValida, limparEntradaPeloLinkUnico, MSG_MINI_PAINEL_SO_PELO_LINK } from "@/lib/motoristaPortalEntrada";
+import { entradaDoPortalEstaValida, limparEntradaPeloLinkUnico, MSG_MINI_PAINEL_SO_PELO_LINK, validarMiniPainelDoDono } from "@/lib/motoristaPortalEntrada";
 import { getPostLoginPath } from "@/lib/sessionRole";
 import { clearAuthStartedAt, isAuthExpired, readAuthStartedAt, setAuthStartedAt } from "@/lib/authExpiry";
 import AuthBootScreen from "@/components/AuthBootScreen";
@@ -53,6 +53,16 @@ export default function ProtectedFrotaRoute({ children }: { children: React.Reac
         }
         setOk(false);
         setSomenteLink(true);
+        setOutroPainel(null);
+        setLoading(false);
+        return;
+      }
+
+      const preview = await validarMiniPainelDoDono();
+      if (!mounted) return;
+      if (preview) {
+        setOk(true);
+        setSomenteLink(false);
         setOutroPainel(null);
         setLoading(false);
         return;

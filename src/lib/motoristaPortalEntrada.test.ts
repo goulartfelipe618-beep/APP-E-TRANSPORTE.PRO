@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { emailEhContaDeMotoristaPortal, lerTokenDaEntrada } from "@/lib/motoristaPortalEntrada";
+import {
+  emailEhContaDeMotoristaPortal,
+  lerPreviewDoDono,
+  lerTokenDaEntrada,
+  loginDoMotoristaTrocaraOutraConta,
+  sessaoPodeAbrirMiniPainelDoDono,
+} from "@/lib/motoristaPortalEntrada";
 
 describe("emailEhContaDeMotoristaPortal", () => {
   it("reconhece o e-mail do mini painel e deixa passar o da empresa", () => {
@@ -20,5 +26,26 @@ describe("lerTokenDaEntrada", () => {
     expect(lerTokenDaEntrada(JSON.stringify({ userId: "motorista-1", token: "  " }), "motorista-1")).toBeNull();
     expect(lerTokenDaEntrada("nao-json", "motorista-1")).toBeNull();
     expect(lerTokenDaEntrada(null, "motorista-1")).toBeNull();
+  });
+});
+
+describe("mini painel na guia do admin", () => {
+  it("deixa o dono e o admin master abrirem, e recusa outra conta", () => {
+    expect(sessaoPodeAbrirMiniPainelDoDono({ sessionUserId: "admin-1", fichaUserId: "admin-1", papel: "cliente" })).toBe(true);
+    expect(sessaoPodeAbrirMiniPainelDoDono({ sessionUserId: "mestre", fichaUserId: "admin-1", papel: "admin_master" })).toBe(true);
+    expect(sessaoPodeAbrirMiniPainelDoDono({ sessionUserId: "outro", fichaUserId: "admin-1", papel: "cliente" })).toBe(false);
+  });
+
+  it("não troca a sessão quando o e-mail já aberto é outro", () => {
+    expect(loginDoMotoristaTrocaraOutraConta("admin@empresa.com", "frota.abc@motorista-frota.local")).toBe(true);
+    expect(loginDoMotoristaTrocaraOutraConta("frota.abc@motorista-frota.local", "frota.abc@motorista-frota.local")).toBe(false);
+    expect(loginDoMotoristaTrocaraOutraConta(null, "frota.abc@motorista-frota.local")).toBe(false);
+  });
+
+  it("lê só um preview completo", () => {
+    expect(
+      lerPreviewDoDono(JSON.stringify({ ownerId: "admin-1", token: "link", fichaId: "ficha-1", nome: "Ana" }))?.fichaId,
+    ).toBe("ficha-1");
+    expect(lerPreviewDoDono(JSON.stringify({ ownerId: "admin-1" }))).toBeNull();
   });
 });

@@ -4,6 +4,7 @@ import {
   type FichaPortalMotorista,
 } from "@/lib/frotaPortalIsolamento";
 import { motoristaMatchesAssignment } from "@/lib/motoristaReservaAssign";
+import { validarMiniPainelDoDono } from "@/lib/motoristaPortalEntrada";
 import { repasseVisivelNoPortal } from "@/lib/reservaMotoristasExtra";
 
 export type FrotaPortalTransferReserva = {
@@ -202,7 +203,7 @@ async function listFrotaPortalReservationsFallback(fichas: FichaPortalMotorista[
   if (fichas.length === 0) return { transfers: [], grupos: [], error: null };
   const owners = Array.from(new Set(fichas.map((ficha) => ficha.userId)));
   const assignIds = Array.from(
-    new Set(fichas.flatMap((ficha) => [ficha.id, ficha.portalAuthUserId])),
+    new Set(fichas.flatMap((ficha) => [ficha.id, ficha.portalAuthUserId].map((id) => id.trim()).filter(Boolean))),
   );
 
   const [tRes, gRes, extraRes] = await Promise.all([
@@ -315,6 +316,17 @@ export async function listFrotaPortalReservations(): Promise<{
   grupos: FrotaPortalGrupoReserva[];
   error: string | null;
 }> {
+  const preview = await validarMiniPainelDoDono();
+  if (preview) {
+    return listFrotaPortalReservationsFallback([
+      {
+        id: preview.fichaId,
+        userId: preview.ownerId,
+        portalAuthUserId: preview.portalAuthUserId || preview.fichaId,
+      },
+    ]);
+  }
+
   const fichas = await listarFichasDoPortalAtual();
   if (fichas.length === 0) return { transfers: [], grupos: [], error: null };
 
@@ -340,6 +352,31 @@ export async function updateFrotaReservaStatus(
   id: string,
   status: string,
 ): Promise<{ status: string | null; error: string | null }> {
+  const preview = await validarMiniPainelDoDono();
+  if (preview) {
+    const patch = { status, updated_at: new Date().toISOString() };
+    const gravacao =
+      kind === "grupo"
+        ? await supabase
+            .from("reservas_grupos")
+            .update(patch)
+            .eq("id", id)
+            .eq("user_id", preview.ownerId)
+            .select("status")
+            .maybeSingle()
+        : await supabase
+            .from("reservas_transfer")
+            .update(patch)
+            .eq("id", id)
+            .eq("user_id", preview.ownerId)
+            .select("status")
+            .maybeSingle();
+    if (gravacao.error) return { status: null, error: gravacao.error.message };
+    const saved = typeof gravacao.data?.status === "string" ? gravacao.data.status.trim() : "";
+    if (!saved) return { status: null, error: "O estado não ficou gravado. Tente novamente." };
+    return { status: saved, error: null };
+  }
+
   const { data, error } = await supabase.rpc("frota_update_reserva_status", {
     p_kind: kind,
     p_id: id,

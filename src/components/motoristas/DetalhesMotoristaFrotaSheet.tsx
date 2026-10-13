@@ -172,6 +172,14 @@ export default function DetalhesMotoristaFrotaSheet({
     void navigator.clipboard.writeText(u).then(() => toast.success("Link copiado."));
   };
 
+  const abrirMiniPainel = () => {
+    const u = portalUrl();
+    if (!u) return;
+    const aba = window.open(u, "_blank");
+    if (aba) aba.opener = null;
+    else toast.error("O navegador bloqueou a nova guia. Copie o link e abra numa guia nova.");
+  };
+
   const handleExportPdf = () => {
     void toast.promise(
       (async () => {
@@ -481,6 +489,10 @@ export default function DetalhesMotoristaFrotaSheet({
                     {motorista.portal_auth_user_id ? "Senha já definida — pode redefinir abaixo se necessário." : "Partilhe o link para o motorista definir a primeira senha."}
                   </p>
                   <div className="flex flex-wrap gap-2">
+                    <Button type="button" variant="outline" size="sm" className="h-8 text-xs" onClick={abrirMiniPainel}>
+                      <ExternalLink className="mr-1 h-3 w-3" />
+                      Abrir em nova guia
+                    </Button>
                     <Button type="button" variant="outline" size="sm" className="h-8 text-xs" onClick={copyPortalLink}>
                       <Copy className="mr-1 h-3 w-3" />
                       Copiar link

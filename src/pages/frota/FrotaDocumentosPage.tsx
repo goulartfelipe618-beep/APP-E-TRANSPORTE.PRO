@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { ExternalLink, FileText, Loader2, Shield } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { validarMiniPainelDoDono } from "@/lib/motoristaPortalEntrada";
 import type { Json } from "@/integrations/supabase/types";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
@@ -28,17 +29,24 @@ export default function FrotaDocumentosPage() {
           if (!cancelled) setLoading(false);
           return;
         }
+        const preview = await validarMiniPainelDoDono();
         const metaId = String(
           (auth.user.user_metadata as { solicitacao_motorista_id?: unknown } | undefined)?.solicitacao_motorista_id ?? "",
         ).trim();
         let query = supabase
           .from("solicitacoes_motoristas")
           .select("id, nome, dados_webhook, portal_auth_user_id")
-          .eq("portal_auth_user_id", uid)
           .eq("status", "cadastrado");
-        if (metaId) query = query.eq("id", metaId);
+        if (preview) {
+          query = query.eq("id", preview.fichaId).eq("user_id", preview.ownerId);
+        } else {
+          query = query.eq("portal_auth_user_id", uid);
+          if (metaId) query = query.eq("id", metaId);
+        }
         const { data: rows, error } = await query;
-        const proprias = (rows ?? []).filter((row) => row.portal_auth_user_id === uid);
+        const proprias = preview
+          ? (rows ?? []).filter((row) => row.id === preview.fichaId)
+          : (rows ?? []).filter((row) => row.portal_auth_user_id === uid);
         const data = proprias.length === 1 ? proprias[0] : null;
 
         if (error || !data) {

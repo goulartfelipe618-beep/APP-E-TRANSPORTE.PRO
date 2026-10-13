@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Camera, Loader2, Shield, Trash2, Upload } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { validarMiniPainelDoDono } from "@/lib/motoristaPortalEntrada";
 import type { Json } from "@/integrations/supabase/types";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -33,17 +34,24 @@ export default function FrotaFotosPage() {
         setLoading(false);
         return;
       }
+      const preview = await validarMiniPainelDoDono();
       const metaId = String(
         (auth.user.user_metadata as { solicitacao_motorista_id?: unknown } | undefined)?.solicitacao_motorista_id ?? "",
       ).trim();
       let query = supabase
         .from("solicitacoes_motoristas")
         .select("id, user_id, nome, dados_webhook, portal_auth_user_id")
-        .eq("portal_auth_user_id", uid)
         .eq("status", "cadastrado");
-      if (metaId) query = query.eq("id", metaId);
+      if (preview) {
+        query = query.eq("id", preview.fichaId).eq("user_id", preview.ownerId);
+      } else {
+        query = query.eq("portal_auth_user_id", uid);
+        if (metaId) query = query.eq("id", metaId);
+      }
       const { data: rows, error } = await query;
-      const proprias = (rows ?? []).filter((row) => row.portal_auth_user_id === uid && row.user_id);
+      const proprias = preview
+        ? (rows ?? []).filter((row) => row.id === preview.fichaId && row.user_id)
+        : (rows ?? []).filter((row) => row.portal_auth_user_id === uid && row.user_id);
       const data = proprias.length === 1 ? proprias[0] : null;
 
       if (error || !data) {
