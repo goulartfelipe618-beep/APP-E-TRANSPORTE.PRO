@@ -117,6 +117,7 @@ export default function BloqueioFinanceiroSection() {
       if (error) throw error;
       await refreshConfig();
       window.dispatchEvent(new Event("configuracoes-updated"));
+      window.dispatchEvent(new Event("mfa-atualizado"));
       toast.success(bloquear ? "Menu Financeiro bloqueado. O login desta conta passa a exigir o autenticador." : "Menu Financeiro liberado.");
       setFactorId(null);
       setAberto(false);

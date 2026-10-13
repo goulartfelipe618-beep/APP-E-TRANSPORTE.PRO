@@ -32,6 +32,7 @@ import ClaudeCodeConexaoSection from "@/components/sistema/ClaudeCodeConexaoSect
 import { assertUploadMagicBytes, extensionForDetectedMime } from "@/lib/validateUploadMagicBytes";
 import { validatePainelStrongPassword } from "@/lib/motoristaPortalPassword";
 import { claimExclusiveSession } from "@/lib/sessionRevocation";
+import { desativarAutenticador } from "@/lib/desativarAutenticador";
 import { FONTES_GLOBAIS, FONTE_GLOBAL_PADRAO, resolveFonteCss } from "@/lib/fontesGlobais";
 
 const COOLDOWN_DAYS = 60;
@@ -204,6 +205,10 @@ export default function SistemaConfiguracoesPage() {
   const [enrollingMfa, setEnrollingMfa] = useState(false);
   const [enablingMfa, setEnablingMfa] = useState(false);
   const [mfaSetupError, setMfaSetupError] = useState<string>("");
+  const [twoFaAtivo, setTwoFaAtivo] = useState(false);
+  const [desativarAberto, setDesativarAberto] = useState(false);
+  const [codigoDesativar, setCodigoDesativar] = useState("");
+  const [desativando, setDesativando] = useState(false);
   const mfaFactorIdRef = useRef<string | null>(null);
   const keepVerifiedFactorRef = useRef(false);
   const [isAdminMaster, setIsAdminMaster] = useState(false);
@@ -225,7 +230,22 @@ export default function SistemaConfiguracoesPage() {
   }, []);
 
   useEffect(() => {
-    (async () => {
+    let cancelado = false;
+    const ler = async () => {
+      const list = await supabase.auth.mfa.listFactors();
+      if (cancelado || list.error) return;
+      setTwoFaAtivo((list.data?.totp ?? []).some((f) => f.status === "verified"));
+    };
+    void ler();
+    window.addEventListener("mfa-atualizado", ler);
+    return () => {
+      cancelado = true;
+      window.removeEventListener("mfa-atualizado", ler);
+    };
+  }, []);
+
+  useEffect(() => {
+    void (async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
       if (user.email) setCurrentAccountEmail(user.email);
@@ -776,8 +796,10 @@ export default function SistemaConfiguracoesPage() {
       toast.success("2FA ativado com sucesso.");
       keepVerifiedFactorRef.current = true;
       mfaFactorIdRef.current = null;
+      setTwoFaAtivo(true);
       setTwoFaDialogOpen(false);
       resetTwoFaSetup({ unenrollPendingId: null });
+      window.dispatchEvent(new Event("mfa-atualizado"));
 
       // Garante que o JWT seja atualizado para aal2.
       await supabase.auth.refreshSession();
@@ -787,6 +809,49 @@ export default function SistemaConfiguracoesPage() {
       toast.error(message);
     } finally {
       setEnablingMfa(false);
+    }
+  };
+
+  const handleDesativarTwoFa = async () => {
+    setDesativando(true);
+    try {
+      const list = await supabase.auth.mfa.listFactors();
+      if (list.error) throw list.error;
+      await desativarAutenticador({
+        codigo: codigoDesativar,
+        financeiroBloqueado: config.financeiro_bloqueado === true,
+        fatores: list.data?.totp ?? [],
+        confirmar: async (factorId, codigo) => {
+          const challenge = await supabase.auth.mfa.challenge({ factorId });
+          if (challenge.error || !challenge.data) throw challenge.error ?? new Error("Não foi possível validar o código.");
+          const verify = await supabase.auth.mfa.verify({ factorId, challengeId: challenge.data.id, code: codigo });
+          if (verify.error) throw new Error("Código inválido.");
+          await supabase.auth.refreshSession();
+        },
+        liberarFinanceiro: async () => {
+          const { error } = await supabase.rpc("definir_bloqueio_financeiro", { p_bloquear: false });
+          if (error) throw error;
+        },
+        remover: async (factorId) => {
+          const { error } = await supabase.auth.mfa.unenroll({ factorId });
+          if (error) throw error;
+        },
+      });
+      setTwoFaAtivo(false);
+      setDesativarAberto(false);
+      setCodigoDesativar("");
+      await refreshConfig();
+      window.dispatchEvent(new Event("configuracoes-updated"));
+      window.dispatchEvent(new Event("mfa-atualizado"));
+      toast.success(
+        config.financeiro_bloqueado
+          ? "2FA desativado e o menu Financeiro voltou a aparecer."
+          : "2FA desativado. O login desta conta volta a usar só a senha.",
+      );
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Não foi possível desativar o 2FA.");
+    } finally {
+      setDesativando(false);
     }
   };
 
@@ -1351,15 +1416,30 @@ export default function SistemaConfiguracoesPage() {
           </div>
           <div className="flex items-center justify-between p-3 rounded-lg border border-border">
             <div className="space-y-1.5">
-              <Badge
-                variant="outline"
-                className="border-amber-500/60 bg-amber-500/15 text-[10px] font-bold uppercase tracking-wide text-amber-700 dark:text-amber-300"
-              >
-                Beta
-              </Badge>
+              {twoFaAtivo ? (
+                <Badge variant="outline" className="border-emerald-500/50 bg-emerald-500/10 text-[10px] font-bold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">
+                  Ativo
+                </Badge>
+              ) : (
+                <Badge
+                  variant="outline"
+                  className="border-amber-500/60 bg-amber-500/15 text-[10px] font-bold uppercase tracking-wide text-amber-700 dark:text-amber-300"
+                >
+                  Beta
+                </Badge>
+              )}
               <p className="font-medium text-foreground">Autenticação em 2 Fatores (2FA)</p>
-              <p className="text-sm text-muted-foreground">Camada extra de segurança via app autenticador (TOTP)</p>
+              <p className="text-sm text-muted-foreground">
+                {twoFaAtivo
+                  ? "O login desta conta exige o código do autenticador."
+                  : "Camada extra de segurança via app autenticador (TOTP)"}
+              </p>
             </div>
+            {twoFaAtivo ? (
+              <Button variant="outline" size="sm" type="button" className="shrink-0 self-center" onClick={() => { setCodigoDesativar(""); setDesativarAberto(true); }}>
+                Desativar
+              </Button>
+            ) : (
             <Button
               variant="outline"
               size="sm"
@@ -1372,6 +1452,7 @@ export default function SistemaConfiguracoesPage() {
             >
               <Shield className="h-4 w-4 mr-2" /> Configurar
             </Button>
+            )}
           </div>
         </div>
       </div>
@@ -1460,6 +1541,38 @@ export default function SistemaConfiguracoesPage() {
               ) : (
                 "Ativar 2FA"
               )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={desativarAberto} onOpenChange={(open) => { setDesativarAberto(open); if (!open) setCodigoDesativar(""); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Desativar o 2FA</DialogTitle>
+            <DialogDescription>
+              {config.financeiro_bloqueado
+                ? "O autenticador será removido e o menu Financeiro volta a aparecer. Os dois saem juntos."
+                : "O login desta conta volta a pedir só a senha."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label>Código do autenticador</Label>
+            <InputOTP maxLength={6} value={codigoDesativar} onChange={setCodigoDesativar}>
+              <InputOTPGroup>
+                {Array.from({ length: 6 }, (_, i) => (
+                  <InputOTPSlot key={i} index={i} />
+                ))}
+              </InputOTPGroup>
+            </InputOTP>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" disabled={desativando} onClick={() => setDesativarAberto(false)}>
+              Cancelar
+            </Button>
+            <Button type="button" disabled={desativando || codigoDesativar.trim().length !== 6} onClick={() => void handleDesativarTwoFa()}>
+              {desativando ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Desativar
             </Button>
           </DialogFooter>
         </DialogContent>
