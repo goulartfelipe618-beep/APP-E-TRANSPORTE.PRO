@@ -16,12 +16,14 @@ export function RepassesMotoristasLista({
   userId,
   primaryId,
   repassePrincipal,
+  ocultarValores = false,
 }: {
   kind: ReservaKind;
   reservaId: string;
   userId: string;
   primaryId: string | null;
   repassePrincipal: number | null;
+  ocultarValores?: boolean;
 }) {
   const [linhas, setLinhas] = useState<Linha[]>([]);
 
@@ -39,20 +41,20 @@ export function RepassesMotoristasLista({
       const saida: Linha[] = [];
       if (principal) {
         const nome = resolveMotoristaNome(principal, lista);
-        if (nome !== "—") saida.push({ nome, papel: "Principal", repasse: dinheiro(repassePrincipal) });
+        if (nome !== "—") saida.push({ nome, papel: "Principal", repasse: ocultarValores ? "—" : dinheiro(repassePrincipal) });
       }
       for (const extra of extras) {
         if (extra.motoristaId === principal) continue;
         const nome = resolveMotoristaNome(extra.motoristaId, lista);
         if (nome === "—") continue;
-        saida.push({ nome, papel: "Extra", repasse: dinheiro(extra.repasse) });
+        saida.push({ nome, papel: "Extra", repasse: ocultarValores ? "—" : dinheiro(extra.repasse) });
       }
       if (!cancel) setLinhas(saida);
     })();
     return () => {
       cancel = true;
     };
-  }, [kind, reservaId, userId, primaryId, repassePrincipal]);
+  }, [kind, reservaId, userId, primaryId, repassePrincipal, ocultarValores]);
 
   if (linhas.length === 0) return null;
 

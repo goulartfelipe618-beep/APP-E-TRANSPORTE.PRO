@@ -17,6 +17,8 @@ import { toast } from "sonner";
 import type { Json, Tables } from "@/integrations/supabase/types";
 import { normalizeReservaStatus, RESERVA_STATUS_OPTIONS } from "@/lib/reservaStatus";
 import { toAgendaDayKey } from "@/lib/painelAgendaReservas";
+import { useConfiguracoes } from "@/contexts/ConfiguracoesContext";
+import { mostrarValorReserva, redigirValoresTexto } from "@/lib/valorReservaJanela";
 import { normalizeUserPlano, FREE_MAX_RESERVAS_DIA } from "@/lib/painelPlanPolicy";
 import { calendarDayKeySaoPauloFromIso, todayKeySaoPaulo } from "@/lib/spCalendarBr";
 import { splitAmountInTwoHalves, valorTotalFromBaseDiscount } from "@/lib/reservaIdaVoltaSplit";
@@ -234,6 +236,23 @@ export default function CriarReservaTransferDialog({
   }, [valorBase, desconto]);
 
   const valorTotalFormatted = valorTotalNum.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+  const { config } = useConfiguracoes();
+  const ocultarValores =
+    Boolean(reservaEdicao) &&
+    !mostrarValorReserva(config.financeiro_bloqueado === true, [
+      idaData,
+      voltaData,
+      porHoraData,
+      ...trajetosForm.map((t) => t.data),
+    ]);
+  const campoTexto = (value: string, onChange: (valor: string) => void) =>
+    ocultarValores ? (
+      <div className="min-h-[80px] whitespace-pre-wrap rounded-md border border-input bg-muted/40 px-3 py-2 text-sm">
+        {redigirValoresTexto(value) || "—"}
+      </div>
+    ) : (
+      <Textarea value={value} onChange={(e) => onChange(e.target.value)} />
+    );
 
   // Pre-fill from edição, solicitação ou reset
   useEffect(() => {
@@ -1009,7 +1028,7 @@ export default function CriarReservaTransferDialog({
                     <div className="space-y-1.5"><Label>Número de Passageiros *</Label><Input type="number" min="1" required value={idaPassageiros} onChange={(e) => setIdaPassageiros(e.target.value)} /></div>
                     <div className="space-y-1.5"><Label>Cupom</Label><Input value={idaCupom} onChange={(e) => setIdaCupom(e.target.value)} /></div>
                   </div>
-                  <div className="space-y-1.5"><Label>Mensagem / Observações</Label><Textarea value={idaMensagem} onChange={(e) => setIdaMensagem(e.target.value)} /></div>
+                  <div className="space-y-1.5"><Label>Mensagem / Observações</Label>{campoTexto(idaMensagem, setIdaMensagem)}</div>
                 </div>
               )}
 
@@ -1038,7 +1057,7 @@ export default function CriarReservaTransferDialog({
                     <div className="space-y-1.5"><Label>Passageiros</Label><Input type="number" min="1" value={voltaPassageiros} onChange={(e) => setVoltaPassageiros(e.target.value)} /></div>
                     <div className="space-y-1.5"><Label>Cupom</Label><Input value={voltaCupom} onChange={(e) => setVoltaCupom(e.target.value)} /></div>
                   </div>
-                  <div className="space-y-1.5"><Label>Mensagem / Observações</Label><Textarea value={voltaMensagem} onChange={(e) => setVoltaMensagem(e.target.value)} /></div>
+                  <div className="space-y-1.5"><Label>Mensagem / Observações</Label>{campoTexto(voltaMensagem, setVoltaMensagem)}</div>
                 </div>
               )}
 
@@ -1219,6 +1238,7 @@ export default function CriarReservaTransferDialog({
                     selected={motoristasExtras}
                     onChange={setExtrasAtribuidos}
                     repassePrincipal={repasseMotorista}
+                    ocultarValores={ocultarValores}
                   />
                   {reservaEdicao && isTransferPernaDividida(reservaEdicao.tipo_viagem, reservaEdicao.perna_viagem) ? (
                     <p className="text-xs text-muted-foreground sm:col-span-2">
@@ -1260,6 +1280,12 @@ export default function CriarReservaTransferDialog({
           {/* Valores e Pagamento */}
           <div>
             <h3 className="font-semibold text-foreground mb-3">Valores e Pagamento</h3>
+            {ocultarValores ? (
+              <p className="mb-4 text-sm text-muted-foreground">
+                Indisponível. Com o Financeiro bloqueado, o valor só aparece nas reservas de ontem, hoje e amanhã. O que já está gravado permanece ao guardar.
+              </p>
+            ) : (
+              <>
             <div className="grid grid-cols-3 gap-4">
               <div className="space-y-1.5"><Label>Valor Base *</Label><Input type="number" min="0" step="0.01" value={valorBase} onChange={(e) => setValorBase(e.target.value)} required /></div>
               <div className="space-y-1.5"><Label>Desconto (%)</Label><Input type="number" min="0" max="100" value={desconto} onChange={(e) => setDesconto(e.target.value)} /></div>
@@ -1313,8 +1339,10 @@ export default function CriarReservaTransferDialog({
                 </div>
               </div>
             </div>
+              </>
+            )}
 
-            <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className={ocultarValores ? "" : "mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2"}>
               <div className="space-y-1.5">
                 <Label>Status da reserva</Label>
                 <Select value={statusOperacional} onValueChange={setStatusOperacional}>
@@ -1334,6 +1362,7 @@ export default function CriarReservaTransferDialog({
                   <strong className="text-foreground">despesa</strong> no Financeiro (contas a pagar ao motorista).
                 </p>
               </div>
+              {ocultarValores ? null : (
               <div className="space-y-1.5">
                 <Label>Repasse do motorista principal (R$)</Label>
                 <Input
@@ -1346,6 +1375,7 @@ export default function CriarReservaTransferDialog({
                   Valor só do motorista principal. Cada motorista extra tem o próprio repasse no cartão acima. Ida e volta criadas juntas dividem estes valores entre as duas reservas.
                 </p>
               </div>
+              )}
             </div>
           </div>
 
@@ -1353,6 +1383,11 @@ export default function CriarReservaTransferDialog({
 
           <div>
             <h3 className="font-semibold text-foreground mb-3">Observações</h3>
+            {ocultarValores ? (
+              <div className="min-h-[120px] whitespace-pre-wrap rounded-md border border-input bg-muted/40 px-3 py-2 text-sm">
+                {redigirValoresTexto(observacoes) || "—"}
+              </div>
+            ) : (
             <Textarea
               rows={6}
               className="whitespace-pre-wrap"
@@ -1360,6 +1395,7 @@ export default function CriarReservaTransferDialog({
               value={observacoes}
               onChange={(e) => setObservacoes(e.target.value)}
             />
+            )}
           </div>
 
           <div className="flex justify-end gap-3 pt-2">

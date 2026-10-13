@@ -17,6 +17,9 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatDbCalendarDatePtBr, toAgendaDayKey } from "@/lib/painelAgendaReservas";
+import { useConfiguracoes } from "@/contexts/ConfiguracoesContext";
+import { mostrarValorReserva } from "@/lib/valorReservaJanela";
+import { parseTrajetosTransfer } from "@/lib/transferTrajetos";
 import { useUserPlan } from "@/hooks/useUserPlan";
 import { freePlanLockedReservaIdsByCreationDay } from "@/lib/freePlanLocks";
 import { cn } from "@/lib/utils";
@@ -42,8 +45,21 @@ function transferDisplayDateCell(r: Reserva): string {
   return formatDbCalendarDatePtBr(r.ida_data);
 }
 
+function valorDaLinha(r: Reserva, financeiroBloqueado: boolean): string {
+  const datas = [
+    r.ida_data,
+    r.volta_data,
+    r.por_hora_data,
+    ...parseTrajetosTransfer((r as { trajetos?: unknown }).trajetos).map((t) => t.data),
+  ];
+  if (!mostrarValorReserva(financeiroBloqueado, datas)) return "—";
+  return Number(r.valor_total).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
 export default function TransferReservasPage() {
   const { plano, loading: planLoading } = useUserPlan();
+  const { config } = useConfiguracoes();
+  const financeiroBloqueado = config.financeiro_bloqueado === true;
   const [dialogOpen, setDialogOpen] = useState(false);
   const [reservaEdicao, setReservaEdicao] = useState<Reserva | null>(null);
   const [reservas, setReservas] = useState<Reserva[]>([]);
@@ -381,9 +397,7 @@ export default function TransferReservasPage() {
                         </Badge>
                       ) : null}
                       <span className="text-xs text-muted-foreground">{transferDisplayDateCell(r)}</span>
-                      <span className="text-sm font-semibold">
-                        {Number(r.valor_total).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
-                      </span>
+                      <span className="text-sm font-semibold">{valorDaLinha(r, financeiroBloqueado)}</span>
                     </div>
                     <ReservaListaAcoes
                       locked={rowLocked}
@@ -468,7 +482,7 @@ export default function TransferReservasPage() {
                     {motoristaNome(r.motorista_id, r.id)}
                   </TableCell>
                   <TableCell className={cn("font-semibold", rowLocked && "opacity-60")}>
-                    {Number(r.valor_total).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                    {valorDaLinha(r, financeiroBloqueado)}
                   </TableCell>
                   <TableCell className={cn(rowLocked && "opacity-60")}>
                     <Badge variant={badgeToneReservaStatus(r.status)}>{labelReservaStatus(r.status)}</Badge>

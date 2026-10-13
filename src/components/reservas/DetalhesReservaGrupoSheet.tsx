@@ -8,6 +8,8 @@ import { badgeToneReservaStatus, labelReservaStatus } from "@/lib/reservaStatus"
 import { formatDbCalendarDatePtBr } from "@/lib/painelAgendaReservas";
 import { TextoComLinks } from "@/components/TextoComLinks";
 import { RepassesMotoristasLista } from "@/components/reservas/RepassesMotoristasLista";
+import { useConfiguracoes } from "@/contexts/ConfiguracoesContext";
+import { mostrarValorReserva, redigirValoresTexto } from "@/lib/valorReservaJanela";
 
 type ReservaGrupo = Tables<"reservas_grupos">;
 
@@ -26,6 +28,7 @@ interface Props {
 }
 
 export default function DetalhesReservaGrupoSheet({ reserva, open, onOpenChange, onComunicar, onDownload }: Props) {
+  const { config } = useConfiguracoes();
   if (!reserva) return null;
 
   const r = reserva;
@@ -34,6 +37,8 @@ export default function DetalhesReservaGrupoSheet({ reserva, open, onOpenChange,
     return t === "—" ? null : t;
   };
   const formatCurrency = (v: number) => Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+  const mostrarValores = mostrarValorReserva(config.financeiro_bloqueado === true, [r.data_ida, r.data_retorno]);
+  const texto = (valor: string | null) => (mostrarValores || !valor ? valor : redigirValoresTexto(valor));
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -87,7 +92,7 @@ export default function DetalhesReservaGrupoSheet({ reserva, open, onOpenChange,
 
           <Separator />
 
-          {/* Valores */}
+          {mostrarValores ? (
           <Section title="Valores e Pagamento">
             <div className="grid grid-cols-2 gap-3">
               <Field label="Valor Base" value={formatCurrency(r.valor_base)} />
@@ -104,6 +109,13 @@ export default function DetalhesReservaGrupoSheet({ reserva, open, onOpenChange,
               />
             </div>
           </Section>
+          ) : (
+            <Section title="Valores e Pagamento">
+              <p className="text-sm text-muted-foreground">
+                Indisponível. Com o Financeiro bloqueado, o valor só aparece nas reservas de ontem, hoje e amanhã.
+              </p>
+            </Section>
+          )}
 
           <Separator />
           <Section title="Motoristas e repasses">
@@ -112,7 +124,8 @@ export default function DetalhesReservaGrupoSheet({ reserva, open, onOpenChange,
               reservaId={r.id}
               userId={r.user_id}
               primaryId={r.motorista_id}
-              repassePrincipal={r.repasse_motorista}
+              repassePrincipal={mostrarValores ? r.repasse_motorista : null}
+              ocultarValores={!mostrarValores}
             />
           </Section>
 
@@ -120,7 +133,7 @@ export default function DetalhesReservaGrupoSheet({ reserva, open, onOpenChange,
             <>
               <Separator />
               <Section title="Observações">
-                <TextoComLinks text={r.observacoes_viagem} className="rounded-lg bg-muted/50 p-3 text-sm" />
+                <TextoComLinks text={texto(r.observacoes_viagem) ?? ""} className="rounded-lg bg-muted/50 p-3 text-sm" />
               </Section>
             </>
           )}

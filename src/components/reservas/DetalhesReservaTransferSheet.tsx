@@ -16,6 +16,8 @@ import { labelCategoriaVeiculoTransfer } from "@/lib/categoriaVeiculoTransfer";
 import { parseTrajetosTransfer } from "@/lib/transferTrajetos";
 import { TextoComLinks } from "@/components/TextoComLinks";
 import { RepassesMotoristasLista } from "@/components/reservas/RepassesMotoristasLista";
+import { useConfiguracoes } from "@/contexts/ConfiguracoesContext";
+import { mostrarValorReserva, redigirValoresTexto } from "@/lib/valorReservaJanela";
 
 type Reserva = Tables<"reservas_transfer">;
 
@@ -28,6 +30,7 @@ interface Props {
 }
 
 export default function DetalhesReservaTransferSheet({ reserva, open, onOpenChange, onComunicar, onDownload }: Props) {
+  const { config } = useConfiguracoes();
   if (!reserva) return null;
 
   const r = reserva;
@@ -36,6 +39,13 @@ export default function DetalhesReservaTransferSheet({ reserva, open, onOpenChan
     return t === "—" ? null : t;
   };
   const formatCurrency = (v: number) => Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+  const mostrarValores = mostrarValorReserva(config.financeiro_bloqueado === true, [
+    r.ida_data,
+    r.volta_data,
+    r.por_hora_data,
+    ...parseTrajetosTransfer((r as { trajetos?: unknown }).trajetos).map((t) => t.data),
+  ]);
+  const texto = (valor: string | null) => (mostrarValores || !valor ? valor : redigirValoresTexto(valor));
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -89,7 +99,7 @@ export default function DetalhesReservaTransferSheet({ reserva, open, onOpenChan
                   <Field label="Passageiros" value={r.ida_passageiros?.toString()} />
                   <Field label="Cupom" value={r.ida_cupom} />
                 </div>
-                {r.ida_mensagem && <Field label="Mensagem" value={r.ida_mensagem} full />}
+                {r.ida_mensagem && <Field label="Mensagem" value={texto(r.ida_mensagem)} full />}
               </Section>
             </>
           )}
@@ -107,7 +117,7 @@ export default function DetalhesReservaTransferSheet({ reserva, open, onOpenChan
                   <Field label="Passageiros" value={r.volta_passageiros?.toString()} />
                   <Field label="Cupom" value={r.volta_cupom} />
                 </div>
-                {r.volta_mensagem && <Field label="Mensagem" value={r.volta_mensagem} full />}
+                {r.volta_mensagem && <Field label="Mensagem" value={texto(r.volta_mensagem)} full />}
               </Section>
             </>
           )}
@@ -150,7 +160,7 @@ export default function DetalhesReservaTransferSheet({ reserva, open, onOpenChan
 
           <Separator />
 
-          {/* Valores */}
+          {mostrarValores ? (
           <Section title="Valores e Pagamento">
             <div className="grid grid-cols-2 gap-3">
               <Field label="Valor Base" value={formatCurrency(r.valor_base)} />
@@ -175,6 +185,13 @@ export default function DetalhesReservaTransferSheet({ reserva, open, onOpenChan
               />
             </div>
           </Section>
+          ) : (
+            <Section title="Valores e Pagamento">
+              <p className="text-sm text-muted-foreground">
+                Indisponível. Com o Financeiro bloqueado, o valor só aparece nas reservas de ontem, hoje e amanhã.
+              </p>
+            </Section>
+          )}
 
           <Separator />
           <Section title="Motoristas e repasses">
@@ -183,7 +200,8 @@ export default function DetalhesReservaTransferSheet({ reserva, open, onOpenChan
               reservaId={r.id}
               userId={r.user_id}
               primaryId={r.motorista_id}
-              repassePrincipal={r.repasse_motorista}
+              repassePrincipal={mostrarValores ? r.repasse_motorista : null}
+              ocultarValores={!mostrarValores}
             />
           </Section>
 
@@ -191,7 +209,7 @@ export default function DetalhesReservaTransferSheet({ reserva, open, onOpenChan
             <>
               <Separator />
               <Section title="Observações">
-                <TextoComLinks text={r.observacoes} className="rounded-lg bg-muted/50 p-3 text-sm" />
+                <TextoComLinks text={texto(r.observacoes) ?? ""} className="rounded-lg bg-muted/50 p-3 text-sm" />
               </Section>
             </>
           )}

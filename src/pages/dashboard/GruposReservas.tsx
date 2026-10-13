@@ -17,6 +17,8 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatDbCalendarDatePtBr, toAgendaDayKey } from "@/lib/painelAgendaReservas";
+import { useConfiguracoes } from "@/contexts/ConfiguracoesContext";
+import { mostrarValorReserva } from "@/lib/valorReservaJanela";
 import { useUserPlan } from "@/hooks/useUserPlan";
 import { freePlanLockedReservaIdsByCreationDay } from "@/lib/freePlanLocks";
 import { cn } from "@/lib/utils";
@@ -36,6 +38,8 @@ const veiculoLabel: Record<string, string> = {
 
 export default function GruposReservasPage() {
   const { plano, loading: planLoading } = useUserPlan();
+  const { config } = useConfiguracoes();
+  const financeiroBloqueado = config.financeiro_bloqueado === true;
   const [dialogOpen, setDialogOpen] = useState(false);
   const [reservaGrupoEdicao, setReservaGrupoEdicao] = useState<ReservaGrupo | null>(null);
   const [reservas, setReservas] = useState<ReservaGrupo[]>([]);
@@ -361,7 +365,9 @@ export default function GruposReservasPage() {
                       ) : null}
                       <span className="text-xs text-muted-foreground">{formatDbCalendarDatePtBr(r.data_ida)}</span>
                       <span className="text-sm font-semibold">
-                        {Number(r.valor_total).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                        {mostrarValorReserva(financeiroBloqueado, [r.data_ida, r.data_retorno])
+                          ? Number(r.valor_total).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
+                          : "—"}
                       </span>
                     </div>
                     <ReservaListaAcoes
@@ -430,7 +436,11 @@ export default function GruposReservasPage() {
                   </TableCell>
                   <TableCell className={cn("text-sm", rowLocked && "opacity-60")}>{formatDbCalendarDatePtBr(r.data_ida)}</TableCell>
                   <TableCell className={cn("max-w-[160px] truncate text-sm text-muted-foreground", rowLocked && "opacity-60")}>{motoristaCell(r)}</TableCell>
-                  <TableCell className={cn("font-semibold", rowLocked && "opacity-60")}>{Number(r.valor_total).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</TableCell>
+                  <TableCell className={cn("font-semibold", rowLocked && "opacity-60")}>
+                    {mostrarValorReserva(financeiroBloqueado, [r.data_ida, r.data_retorno])
+                      ? Number(r.valor_total).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
+                      : "—"}
+                  </TableCell>
                   <TableCell className={cn(rowLocked && "opacity-60")}>
                     <Badge variant={badgeToneReservaStatus(r.status)}>{labelReservaStatus(r.status)}</Badge>
                   </TableCell>

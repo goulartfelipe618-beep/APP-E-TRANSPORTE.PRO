@@ -27,12 +27,14 @@ export function MotoristasExtrasField({
   selected,
   onChange,
   repassePrincipal = "",
+  ocultarValores = false,
 }: {
   motoristas: Motorista[];
   primaryId: string;
   selected: ExtraSelecionado[];
   onChange: (ids: ExtraSelecionado[]) => void;
   repassePrincipal?: string;
+  ocultarValores?: boolean;
 }) {
   const primary = primaryId.trim();
   const others = motoristas.filter((m) => motoristaAssignValue(m) !== primary && m.id !== primary);
@@ -94,7 +96,7 @@ export function MotoristasExtrasField({
                   </span>
                 </span>
               </label>
-              {ativo ? (
+              {ativo && !ocultarValores ? (
                 <div className="mt-3 space-y-1.5 pl-7">
                   <Label className="text-xs">Repasse deste motorista (R$)</Label>
                   <Input
@@ -116,7 +118,9 @@ export function MotoristasExtrasField({
         {vinculados === 0
           ? "Nenhum motorista extra marcado."
           : `${vinculados} motorista${vinculados === 1 ? "" : "s"} extra${vinculados === 1 ? "" : "s"} marcado${vinculados === 1 ? "" : "s"}.`}
-        {total == null
+        {ocultarValores
+          ? ""
+          : total == null
           ? " Há um repasse inválido."
           : ` Soma dos repasses desta tela: ${total.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}.`}
       </p>

@@ -16,6 +16,8 @@ import { toast } from "sonner";
 import type { Json, Tables } from "@/integrations/supabase/types";
 import { normalizeReservaStatus, RESERVA_STATUS_OPTIONS } from "@/lib/reservaStatus";
 import { toAgendaDayKey } from "@/lib/painelAgendaReservas";
+import { useConfiguracoes } from "@/contexts/ConfiguracoesContext";
+import { mostrarValorReserva, redigirValoresTexto } from "@/lib/valorReservaJanela";
 import { normalizeUserPlano, FREE_MAX_RESERVAS_DIA } from "@/lib/painelPlanPolicy";
 import { calendarDayKeySaoPauloFromIso, todayKeySaoPaulo } from "@/lib/spCalendarBr";
 import { splitAmountInTwoHalves, valorTotalFromBaseDiscount } from "@/lib/reservaIdaVoltaSplit";
@@ -151,6 +153,10 @@ export default function CriarReservaGrupoDialog({
   }, [valorBase, desconto]);
 
   const valorTotalFormatted = valorTotalNum.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+  const { config } = useConfiguracoes();
+  const ocultarValores =
+    Boolean(reservaGrupoEdicao) &&
+    !mostrarValorReserva(config.financeiro_bloqueado === true, [dataIda, dataRetorno]);
 
   // Pre-fill from edição, solicitação ou reset
   useEffect(() => {
@@ -709,6 +715,11 @@ export default function CriarReservaGrupoDialog({
             <div className="mt-4 w-1/2 space-y-1.5"><Label>Cupom de Desconto</Label><Input value={cupom} onChange={(e) => setCupom(e.target.value)} /></div>
             <div className="mt-4 space-y-1.5">
               <Label>Observações</Label>
+              {ocultarValores ? (
+                <div className="min-h-[120px] whitespace-pre-wrap rounded-md border border-input bg-muted/40 px-3 py-2 text-sm">
+                  {redigirValoresTexto(observacoesViagem) || "—"}
+                </div>
+              ) : (
               <Textarea
                 rows={6}
                 className="whitespace-pre-wrap"
@@ -716,6 +727,7 @@ export default function CriarReservaGrupoDialog({
                 value={observacoesViagem}
                 onChange={(e) => setObservacoesViagem(e.target.value)}
               />
+              )}
             </div>
           </div>
 
@@ -763,6 +775,7 @@ export default function CriarReservaGrupoDialog({
                   selected={motoristasExtras}
                   onChange={setExtrasAtribuidos}
                   repassePrincipal={repasseMotorista}
+                  ocultarValores={ocultarValores}
                 />
               </div>
               <div className="space-y-1.5"><Label>Nome (manual / extra)</Label><Input value={nomeMotorista} onChange={(e) => setNomeMotorista(e.target.value)} /></div>
@@ -774,6 +787,12 @@ export default function CriarReservaGrupoDialog({
 
           <div>
             <h3 className="font-semibold text-foreground mb-3">Valores e Pagamento</h3>
+            {ocultarValores ? (
+              <p className="mb-4 text-sm text-muted-foreground">
+                Indisponível. Com o Financeiro bloqueado, o valor só aparece nas reservas de ontem, hoje e amanhã. O que já está gravado permanece ao guardar.
+              </p>
+            ) : (
+            <>
             <div className="grid grid-cols-3 gap-4">
               <div className="space-y-1.5"><Label>Valor Base *</Label><Input type="number" min="0" step="0.01" value={valorBase} onChange={(e) => setValorBase(e.target.value)} required /></div>
               <div className="space-y-1.5"><Label>Desconto (%)</Label><Input type="number" min="0" max="100" value={desconto} onChange={(e) => setDesconto(e.target.value)} /></div>
@@ -783,7 +802,9 @@ export default function CriarReservaGrupoDialog({
               <span className="text-sm font-medium text-primary">Valor Total (a receber do cliente)</span>
               <span className="text-lg font-bold text-foreground">{valorTotalFormatted}</span>
             </div>
-            <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+            </>
+            )}
+            <div className={ocultarValores ? "" : "mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2"}>
               <div className="space-y-1.5">
                 <Label>Status da reserva</Label>
                 <Select value={statusOperacional} onValueChange={setStatusOperacional}>
@@ -802,6 +823,7 @@ export default function CriarReservaGrupoDialog({
                   Ao marcar <strong className="text-foreground">Concluída</strong> com repasse, cria despesa no Financeiro.
                 </p>
               </div>
+              {ocultarValores ? null : (
               <div className="space-y-1.5">
                 <Label>Repasse do motorista principal (R$)</Label>
                 <Input inputMode="decimal" placeholder="0,00" value={repasseMotorista} onChange={(e) => setRepasseMotorista(e.target.value)} />
@@ -809,6 +831,7 @@ export default function CriarReservaGrupoDialog({
                   Valor só do motorista principal. Cada extra tem o próprio repasse. Ida e volta criadas juntas dividem os valores entre as duas reservas.
                 </p>
               </div>
+              )}
             </div>
           </div>
 
