@@ -85,3 +85,10 @@ verify_jwt = false
 # O retorno do Google chega sem JWT. A função valida o usuário no POST.
 [functions.gmail-oauth]
 verify_jwt = false
+
+# CHAT: a função valida o JWT. O hook recebe a UAZAPI sem sessão do painel.
+[functions.uazapi-chat]
+verify_jwt = false
+
+[functions.uazapi-chat-hook]
+verify_jwt = false

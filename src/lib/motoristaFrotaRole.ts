@@ -22,8 +22,8 @@ export function clearDashboardNavSessionStorage(): void {
   }
 }
 
-/** Página exibida ao entrar no painel (logo E-Transporte à direita). */
-export const DASHBOARD_ENTRADA_PAGE = "entrada";
+/** Página exibida ao entrar no painel: Home, com o banner e a central de ferramentas. */
+export const DASHBOARD_ENTRADA_PAGE = "home";
 
 /** Garante que o painel do operador abre na tela de entrada, não num submenu guardado. */
 export function setDashboardNavToEntrada(): void {

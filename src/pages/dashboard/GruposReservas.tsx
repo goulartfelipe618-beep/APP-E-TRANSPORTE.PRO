@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { Plus, RefreshCw, Trash2, Eye, MessageSquare, Download, Pencil, Filter, X, Lock } from "lucide-react";
+import { Plus, RefreshCw, Filter, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { purgeR2Record } from "@/lib/r2Registro";
 import { toast } from "sonner";
@@ -20,6 +20,7 @@ import { formatDbCalendarDatePtBr, toAgendaDayKey } from "@/lib/painelAgendaRese
 import { useUserPlan } from "@/hooks/useUserPlan";
 import { freePlanLockedReservaIdsByCreationDay } from "@/lib/freePlanLocks";
 import { cn } from "@/lib/utils";
+import ReservaListaAcoes from "@/components/reservas/ReservaListaAcoes";
 import { usePainelListPagination } from "@/hooks/usePainelListPagination";
 import { PainelPaginationBar } from "@/components/painel/PainelPaginationBar";
 import { buildGrupoDadosComunicarCliente } from "@/lib/comunicarReservaCliente";
@@ -332,6 +333,56 @@ export default function GruposReservasPage() {
           </p>
         ) : (
           <div className="p-0">
+            <div className="divide-y divide-border md:hidden">
+              {reservasPage.map((r) => {
+                const rowLocked = !planLoading && freeLockedReservaIds.has(r.id);
+                return (
+                  <article key={r.id} className={cn("space-y-2 p-3", rowLocked && "bg-muted/30")}>
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className={cn("truncate font-medium", rowLocked && "opacity-60")}>{r.nome_completo}</p>
+                        <p className={cn("text-xs text-muted-foreground", rowLocked && "opacity-60")}>
+                          #{r.numero_reserva} · {r.whatsapp}
+                        </p>
+                      </div>
+                      <Badge variant={badgeToneReservaStatus(r.status)} className={cn("shrink-0", rowLocked && "opacity-60")}>
+                        {labelReservaStatus(r.status)}
+                      </Badge>
+                    </div>
+                    <p className={cn("break-words text-sm text-muted-foreground", rowLocked && "opacity-60")}>
+                      {r.embarque && r.destino ? `${r.embarque} → ${r.destino}` : "—"}
+                    </p>
+                    <div className={cn("flex flex-wrap items-center gap-1", rowLocked && "opacity-60")}>
+                      {r.tipo_veiculo ? <Badge variant="secondary">{veiculoLabel[r.tipo_veiculo] || r.tipo_veiculo}</Badge> : null}
+                      {r.perna_viagem === "ida" || r.perna_viagem === "volta" ? (
+                        <Badge variant="outline" className="border-[#FF6600]/60 text-[#FF6600]">
+                          {r.perna_viagem === "volta" ? "VOLTA" : "IDA"}
+                        </Badge>
+                      ) : null}
+                      <span className="text-xs text-muted-foreground">{formatDbCalendarDatePtBr(r.data_ida)}</span>
+                      <span className="text-sm font-semibold">
+                        {Number(r.valor_total).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                      </span>
+                    </div>
+                    <ReservaListaAcoes
+                      locked={rowLocked}
+                      onEdit={() => {
+                        setReservaGrupoEdicao(r);
+                        setDialogOpen(true);
+                      }}
+                      onView={() => {
+                        setSelected(r);
+                        setSheetOpen(true);
+                      }}
+                      onComunicar={() => void handleComunicar(r)}
+                      onDownload={() => handleDownload(r)}
+                      onDelete={() => setDeleteId(r.id)}
+                    />
+                  </article>
+                );
+              })}
+            </div>
+            <div className="hidden md:block">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -346,7 +397,7 @@ export default function GruposReservasPage() {
                   <TableHead>Motorista</TableHead>
                   <TableHead>Valor</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead className="text-right sm:min-w-[11rem] sm:whitespace-nowrap">Ações</TableHead>
+                  <TableHead className="whitespace-nowrap text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -383,80 +434,28 @@ export default function GruposReservasPage() {
                   <TableCell className={cn(rowLocked && "opacity-60")}>
                     <Badge variant={badgeToneReservaStatus(r.status)}>{labelReservaStatus(r.status)}</Badge>
                   </TableCell>
-                  <TableCell className="max-w-[11rem] text-right align-top sm:max-w-none sm:align-middle">
-                    <div className="flex max-w-full flex-wrap justify-end gap-1 sm:inline-flex sm:max-w-none sm:flex-nowrap sm:items-center sm:gap-0.5">
-                      {rowLocked ? (
-                        <Badge
-                          variant="outline"
-                          title="Acima do limite diário do plano FREE — ações limitadas; os dados mantêm-se na conta."
-                          className="shrink-0 gap-0.5 border-amber-600/40 px-1.5 py-0 text-[10px] leading-tight text-amber-700 dark:text-amber-400"
-                        >
-                          <Lock className="h-3 w-3 shrink-0" aria-hidden />
-                          FREE
-                        </Badge>
-                      ) : null}
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-9 w-9 shrink-0 sm:h-8 sm:w-8"
-                        disabled={rowLocked}
-                        onClick={() => {
-                          setReservaGrupoEdicao(r);
-                          setDialogOpen(true);
-                        }}
-                        title="Editar"
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-9 w-9 shrink-0 sm:h-8 sm:w-8"
-                        onClick={() => {
-                          setSelected(r);
-                          setSheetOpen(true);
-                        }}
-                        title="Ver detalhes"
-                      >
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-9 w-9 shrink-0 sm:h-8 sm:w-8"
-                        disabled={rowLocked}
-                        onClick={() => handleComunicar(r)}
-                        title="Comunicar"
-                      >
-                        <MessageSquare className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-9 w-9 shrink-0 sm:h-8 sm:w-8"
-                        disabled={rowLocked}
-                        onClick={() => handleDownload(r)}
-                        title="Download"
-                      >
-                        <Download className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-9 w-9 shrink-0 sm:h-8 sm:w-8"
-                        disabled={rowLocked}
-                        onClick={() => setDeleteId(r.id)}
-                        title="Excluir"
-                      >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </div>
+                  <TableCell className="whitespace-nowrap text-right">
+                    <ReservaListaAcoes
+                      locked={rowLocked}
+                      onEdit={() => {
+                        setReservaGrupoEdicao(r);
+                        setDialogOpen(true);
+                      }}
+                      onView={() => {
+                        setSelected(r);
+                        setSheetOpen(true);
+                      }}
+                      onComunicar={() => void handleComunicar(r)}
+                      onDownload={() => handleDownload(r)}
+                      onDelete={() => setDeleteId(r.id)}
+                    />
                   </TableCell>
                 </TableRow>
                 );
               })}
             </TableBody>
           </Table>
+            </div>
           <div className="px-4 pb-4">
             <PainelPaginationBar page={page} totalPages={totalPages} totalItems={totalItems} onPageChange={setPage} />
           </div>

@@ -16,6 +16,18 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    flavorDimensions "shell"
+    productFlavors {
+        painel {
+            dimension "shell"
+            isDefault true
+            applicationId "pro.etransporte.frota"
+        }
+        motorista {
+            dimension "shell"
+            applicationId "pro.etransporte.motorista"
+        }
+    }
     buildTypes {
         release {
             minifyEnabled false

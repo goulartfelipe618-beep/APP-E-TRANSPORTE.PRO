@@ -227,6 +227,40 @@ export async function uazapiMessageFind(
   });
 }
 
+export async function uazapiHistorySync(
+  root: string,
+  instanceToken: string,
+  body: Record<string, unknown>,
+): Promise<{ status: number; text: string; json: unknown }> {
+  return await uazapiFetch(`${root}/message/history-sync`, {
+    method: "POST",
+    headers: instanceHeaders(instanceToken, true),
+    body: JSON.stringify(body),
+  });
+}
+
+export async function uazapiWebhookGet(
+  root: string,
+  instanceToken: string,
+): Promise<{ status: number; text: string; json: unknown }> {
+  return await uazapiFetch(`${root}/webhook`, {
+    method: "GET",
+    headers: instanceHeaders(instanceToken),
+  });
+}
+
+export async function uazapiWebhookAdd(
+  root: string,
+  instanceToken: string,
+  body: Record<string, unknown>,
+): Promise<{ status: number; text: string; json: unknown }> {
+  return await uazapiFetch(`${root}/webhook`, {
+    method: "POST",
+    headers: instanceHeaders(instanceToken, true),
+    body: JSON.stringify(body),
+  });
+}
+
 export async function uazapiSendDocument(
   root: string,
   instanceToken: string,

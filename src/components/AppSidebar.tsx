@@ -5,7 +5,7 @@ import {
   LayoutDashboard, Home, Activity, MapPin, ArrowLeftRight,
   FileText, BookOpen, Map, Users, UserCheck,
   ClipboardList, Car, Megaphone, BarChart3,
-  Globe, Search, Mail, Monitor, Settings, StickyNote, Link2,
+  Globe, Search, Mail, MessageCircle, Monitor, Settings, StickyNote, Link2,
   Bell, Moon, Sun, LogOut, Calendar,
   Wallet2,
   List,
@@ -145,6 +145,7 @@ const getMenuStructure = (
   {
     label: "Ferramentas",
     items: [
+      { title: "Chat", page: "chat", icon: MessageCircle },
       { title: "E-mail", page: "email", icon: Mail },
       { title: "Geolocalização", page: "transfer/geolocalizacao", icon: Map },
       { title: "Receptivos", page: "marketing/receptivos", icon: Globe },

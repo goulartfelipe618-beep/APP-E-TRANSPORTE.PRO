@@ -4,7 +4,7 @@ import "./index.css";
 import { AppErrorBoundary } from "./components/AppErrorBoundary";
 import { installBrowserZoomLock } from "./lib/installBrowserZoomLock";
 import { installVercelSkewProtection } from "./lib/vercelSkewProtection";
-import { isCapacitorNative, primeFrotaLaunchUrl } from "./lib/capacitorFrota";
+import { isCapacitorNative, primeNativeShell } from "./lib/capacitorFrota";
 
 installVercelSkewProtection();
 
@@ -111,7 +111,8 @@ function renderApp() {
 if (!isCapacitorNative()) {
   renderApp();
 } else {
-  void primeFrotaLaunchUrl()
+  document.documentElement.classList.add("etp-native-app");
+  void primeNativeShell()
     .catch(() => {
       /* link inválido: abre o portal na rota normal */
     })

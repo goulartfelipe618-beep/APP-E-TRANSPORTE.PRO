@@ -29,7 +29,6 @@ import { useR2AutoBackupCatchup } from "@/hooks/useR2AutoBackupCatchup";
 
 // Import all page components
 import HomePage from "@/pages/dashboard/Home";
-import PainelEntradaPage from "@/pages/dashboard/PainelEntradaPage";
 import MetricasPage from "@/pages/dashboard/Metricas";
 import MotoristaAbrangenciaPage from "@/pages/dashboard/MotoristaAbrangencia";
 import TransferSolicitacoesPage from "@/pages/dashboard/TransferSolicitacoes";
@@ -48,6 +47,7 @@ import MarketingQRCodePage from "@/pages/dashboard/MarketingQRCode";
 import NetworkPage from "@/pages/dashboard/NetworkPage";
 import EmailBusinessPage from "@/pages/dashboard/EmailBusinessPage";
 import EmailPage from "@/pages/dashboard/EmailPage";
+import ChatPage from "@/pages/dashboard/ChatPage";
 import WebsitePage from "@/pages/dashboard/WebsitePage";
 import DominiosPage from "@/pages/dashboard/DominiosPage";
 import AnotacoesPage from "@/pages/dashboard/AnotacoesPage";
@@ -69,7 +69,7 @@ import PainelAvisoBanner from "@/components/PainelAvisoBanner";
 import FullscreenBannerOverlay from "@/components/FullscreenBannerOverlay";
 
 const PAGE_MAP: Record<string, React.ComponentType> = {
-  entrada: PainelEntradaPage,
+  entrada: HomePage,
   home: HomePage,
   atualizacoes: AtualizacoesPage,
   metricas: MetricasPage,
@@ -229,9 +229,10 @@ function DashboardContent() {
     }
   }, [ferramentasLoading, ferramentasFlags.marketing_menu_liberado, activePage, setActivePage]);
 
-  /** Rotas descontinuadas (Catálogo / Google Maps): evita sessão antiga presa numa página removida. */
+  /** Sessão antiga na logo, ou rotas removidas, abre na Home. */
   useEffect(() => {
     if (
+      activePage === "entrada" ||
       activePage === "catalogo" ||
       activePage === "google" ||
       activePage === "whatsapp" ||
@@ -244,7 +245,7 @@ function DashboardContent() {
       activePage === "grupos/reservas" ||
       activePage === "grupos/contrato"
     ) {
-      setActivePage("entrada");
+      setActivePage("home");
     }
   }, [activePage, setActivePage]);
 
@@ -297,7 +298,7 @@ function DashboardContent() {
     window.dispatchEvent(new Event("network-highlight-dismissed"));
   };
 
-  const PageComponent = PAGE_MAP[activePage] || PainelEntradaPage;
+  const PageComponent = PAGE_MAP[activePage] || HomePage;
 
   return (
     <NetworkSpotlightProvider active={showOverlay}>
@@ -341,7 +342,7 @@ function DashboardContent() {
 
 export default function DashboardLayout() {
   return (
-    <ActivePageProvider defaultPage="entrada" storageKey="etp_nav_dashboard">
+    <ActivePageProvider defaultPage="home" storageKey="etp_nav_dashboard">
       <PainelContentZoomProvider>
         <SidebarProvider>
           <DashboardContent />

@@ -15,7 +15,9 @@ const config: CapacitorConfig = {
   },
   plugins: {
     SystemBars: {
-      insetsHandling: "native",
+      /* Injeta --safe-area-inset-* . No WebView novo o modo native não reserva a barra. */
+      insetsHandling: "css",
+      initialViewportFitValueHint: "cover",
     },
   },
   server: {
@@ -23,7 +25,8 @@ const config: CapacitorConfig = {
     hostname: "localhost",
   },
   ios: {
-    contentInset: "automatic",
+    /* A margem fica no CSS do app. O site não usa esta casca. */
+    contentInset: "never",
   },
 };
 

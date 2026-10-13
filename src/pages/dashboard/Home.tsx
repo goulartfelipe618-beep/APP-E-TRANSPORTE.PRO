@@ -1,5 +1,6 @@
 import {
   Mail,
+  MessageCircle,
   Globe,
   Search,
   Users,
@@ -117,6 +118,7 @@ function buildHomeSections(
   ];
 
   const ferramentasItems: ToolDef[] = [
+    { title: "Chat", page: "chat", desc: "Conversas e comunicados sincronizados pela UAZAPI.", icon: MessageCircle },
     { title: "E-mail", page: "email", desc: "Conecte o Gmail desta operação com um clique.", icon: Mail },
     { title: "Geolocalização", page: "transfer/geolocalizacao", desc: "Rastreamento e envio de posição ao cliente.", icon: Map },
     { title: "Receptivos", page: "marketing/receptivos", desc: "Materiais e páginas para receptivo.", icon: Globe },

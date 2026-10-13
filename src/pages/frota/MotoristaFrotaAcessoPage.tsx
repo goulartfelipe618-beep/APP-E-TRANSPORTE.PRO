@@ -10,9 +10,15 @@ import { applyThemeForRoute } from "@/lib/panelTheme";
 import { clearDashboardNavSessionStorage } from "@/lib/motoristaFrotaRole";
 import { claimExclusiveSession } from "@/lib/sessionRevocation";
 import {
+  aplicativoEhDoMotorista,
+  lembrarTokenAplicativoMotorista,
+  limparTokenAplicativoMotorista,
+} from "@/lib/capacitorFrota";
+import {
   confirmarEntradaPeloLinkUnico,
   entrarNoMiniPainelComoDono,
   limparEntradaPeloLinkUnico,
+  limparPreviewDoDono,
   loginDoMotoristaTrocaraOutraConta,
 } from "@/lib/motoristaPortalEntrada";
 import { validateMotoristaPortalPassword } from "@/lib/motoristaPortalPassword";
@@ -86,6 +92,7 @@ export default function MotoristaFrotaAcessoPage() {
         setLoading(false);
         return;
       }
+      lembrarTokenAplicativoMotorista(token);
       try {
         const preview = await entrarNoMiniPainelComoDono(token);
         if (preview) {
@@ -105,23 +112,47 @@ export default function MotoristaFrotaAcessoPage() {
         method: "POST",
         body: { action: "status", token },
       });
-      setLoading(false);
 
       const blocked = parsePortalProOnlyFromFunctionsError(error, data);
       if (blocked) {
         setPlanBlockedMessage(blocked);
+        setLoading(false);
         return;
       }
 
       if (error || data?.error) {
         toast.error(data?.error || error?.message || "Link inválido.");
+        setLoading(false);
         return;
       }
       setNome(data?.nome ?? "");
       setRegistered(!!data?.registered);
       setLoginEmail(data?.login_email ?? null);
+      const sessao = await supabase.auth.getSession();
+      const emailSessao = sessao.data.session?.user?.email;
+      const emailDoLink = data?.login_email ?? "";
+      if (emailSessao && emailDoLink && !loginDoMotoristaTrocaraOutraConta(emailSessao, emailDoLink)) {
+        const uid = sessao.data.session?.user?.id;
+        if (uid && (await confirmarEntradaPeloLinkUnico(uid, token))) {
+          navigate("/frota", { replace: true });
+          return;
+        }
+      }
+      setLoading(false);
     })();
   }, [token, navigate]);
+
+  const usarOutroMotorista = async () => {
+    limparTokenAplicativoMotorista();
+    limparEntradaPeloLinkUnico();
+    limparPreviewDoDono();
+    try {
+      await supabase.auth.signOut({ scope: "local" });
+    } catch {
+      /* só esta instalação */
+    }
+    navigate("/aplicativo-motorista", { replace: true });
+  };
 
   const handleBootstrap = async () => {
     if (!token) return;
@@ -363,6 +394,11 @@ export default function MotoristaFrotaAcessoPage() {
               </Button>
             </form>
           )}
+          {aplicativoEhDoMotorista() ? (
+            <Button type="button" variant="ghost" className="h-11 w-full" onClick={() => void usarOutroMotorista()}>
+              Este aplicativo é de outro motorista
+            </Button>
+          ) : null}
         </CardContent>
       </Card>
     </div>

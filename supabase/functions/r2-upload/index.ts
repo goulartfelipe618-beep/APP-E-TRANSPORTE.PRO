@@ -44,9 +44,14 @@ Deno.serve(async (req) => {
   }
 
   const admin = createClient(supabaseUrl, serviceKey);
-  const { data: staff } = await admin.rpc("is_platform_staff", { check_uid: uid });
+  const { data: master } = await admin.rpc("is_admin_master", { _user_id: uid });
   const ownerPrefix = `${uid}/`;
-  if (staff !== true && !path.startsWith(ownerPrefix) && !path.startsWith("slides/") && !path.startsWith("login/") && !path.startsWith("banners/") && !path.startsWith("templates/")) {
+  const platformPrefix =
+    path.startsWith("slides/") ||
+    path.startsWith("login/") ||
+    path.startsWith("banners/") ||
+    path.startsWith("templates/");
+  if (master !== true && (platformPrefix || !path.startsWith(ownerPrefix))) {
     return json({ error: "Sem permissão para este caminho." }, 403);
   }
 

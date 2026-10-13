@@ -126,9 +126,9 @@ Deno.serve(async (req) => {
   }
 
   const admin = createClient(supabaseUrl, serviceKey);
-  const { data: staff } = await admin.rpc("is_platform_staff", { check_uid: uid });
+  const { data: master } = await admin.rpc("is_admin_master", { _user_id: uid });
   const owner = path.split("/")[0] ?? "";
-  let canAccess = staff === true || uid === owner;
+  let canAccess = master === true || uid === owner;
   if (!canAccess && bucket === "motorista-frota-docs") {
     const motoristaId = path.split("/")[1] ?? "";
     if (UUID_RE.test(motoristaId)) {

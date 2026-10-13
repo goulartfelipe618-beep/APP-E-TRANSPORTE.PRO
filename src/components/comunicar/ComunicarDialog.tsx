@@ -573,15 +573,15 @@ export default function ComunicarDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <MessageSquare className="h-5 w-5 text-primary" />
+      <DialogContent className="left-0 top-0 flex h-[100dvh] max-h-[100dvh] w-full max-w-none translate-x-0 translate-y-0 flex-col gap-3 overflow-hidden rounded-none p-4 pt-[max(3.5rem,calc(env(safe-area-inset-top)+3rem))] pb-[max(1rem,env(safe-area-inset-bottom))] sm:left-1/2 sm:top-1/2 sm:h-auto sm:max-h-[min(42rem,calc(100dvh-2rem))] sm:w-[min(32rem,calc(100vw-2rem))] sm:max-w-lg sm:translate-x-[-50%] sm:translate-y-[-50%] sm:overflow-y-auto sm:rounded-lg sm:p-6">
+        <DialogHeader className="shrink-0 pr-12 text-left">
+          <DialogTitle className="flex items-center gap-2 break-words">
+            <MessageSquare className="h-5 w-5 shrink-0 text-primary" />
             {titulo}
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <div className="min-h-0 min-w-0 flex-1 space-y-4 overflow-x-hidden overflow-y-auto overscroll-contain sm:flex-none sm:overflow-visible">
           <p className="text-sm text-muted-foreground rounded-lg border border-border bg-muted/40 p-3">
             Escolha o cliente, o motorista ou os dois. A saudação segue o padrão e os chips trazem só esta reserva.
             Ao enviar, sai exatamente o que está preenchido aqui. Conecte o WhatsApp em <strong className="text-foreground">Comunicador</strong> antes do primeiro envio.
@@ -589,11 +589,11 @@ export default function ComunicarDialog({
 
           {isReservaN8n ? (
             <div className="space-y-3">
-              <div className="flex gap-2">
+              <div className="grid grid-cols-2 gap-2">
                 <Button
                   type="button"
                   variant={alvos.has("cliente") ? "default" : "outline"}
-                  className="flex-1"
+                  className="min-h-11 min-w-0"
                   onClick={() => toggleAlvo("cliente")}
                 >
                   Cliente
@@ -601,7 +601,7 @@ export default function ComunicarDialog({
                 <Button
                   type="button"
                   variant={alvos.has("motorista") ? "default" : "outline"}
-                  className="flex-1"
+                  className="min-h-11 min-w-0"
                   onClick={() => toggleAlvo("motorista")}
                 >
                   Motorista
@@ -613,7 +613,7 @@ export default function ComunicarDialog({
                     <Label>Motoristas atribuídos nesta reserva</Label>
                     <ul className="mt-1 space-y-1 text-sm">
                       {motoristas.map((item) => (
-                        <li key={item.id}>
+                        <li key={item.id} className="break-words">
                           {item.nome}
                           {item.telefone ? ` · ${item.telefone}` : " · sem WhatsApp"}
                         </li>
@@ -628,11 +628,11 @@ export default function ComunicarDialog({
                 )
               ) : null}
               {alvos.size > 1 ? (
-                <div className="flex gap-2">
-                  <Button type="button" variant={editando === "cliente" ? "secondary" : "ghost"} onClick={() => setEditando("cliente")}>
+                <div className="grid grid-cols-1 gap-2 min-[380px]:grid-cols-2">
+                  <Button type="button" variant={editando === "cliente" ? "secondary" : "ghost"} className="min-h-11 min-w-0 whitespace-normal" onClick={() => setEditando("cliente")}>
                     Mensagem do cliente
                   </Button>
-                  <Button type="button" variant={editando === "motorista" ? "secondary" : "ghost"} onClick={() => setEditando("motorista")}>
+                  <Button type="button" variant={editando === "motorista" ? "secondary" : "ghost"} className="min-h-11 min-w-0 whitespace-normal" onClick={() => setEditando("motorista")}>
                     Mensagem do motorista
                   </Button>
                 </div>
@@ -659,6 +659,7 @@ export default function ComunicarDialog({
               </p>
             ) : null}
             <Textarea
+              className="min-w-0 w-full"
               placeholder={
                 hasTextoPrePreenchido
                   ? "Saudação e introdução antes dos detalhes…"
@@ -679,15 +680,15 @@ export default function ComunicarDialog({
                 Clique num chip para incluir ou excluir. Os valores são desta reserva. Só o conjunto de chips fica na última configuração.
               </p>
             </div>
-            <div className="flex flex-wrap gap-2 max-h-[200px] overflow-y-auto rounded-lg border border-border p-3 bg-muted/30">
+            <div className="flex max-h-[40dvh] min-w-0 flex-wrap gap-2 overflow-y-auto overflow-x-hidden rounded-lg border border-border bg-muted/30 p-3">
               {availableVars.map((v) => (
                 <Badge
                   key={v.key}
                   variant={atual.vars.has(v.key) ? "default" : "outline"}
-                  className="cursor-pointer select-none transition-colors"
+                  className="h-auto max-w-full cursor-pointer select-none whitespace-normal break-words py-1.5 text-left transition-colors"
                   onClick={() => toggleVar(v.key)}
                 >
-                  {v.label}: <span className="font-normal ml-1 max-w-[100px] truncate">{v.value}</span>
+                  {v.label}: <span className="ml-1 break-all font-normal">{v.value}</span>
                 </Badge>
               ))}
               {availableVars.length === 0 && (
@@ -704,6 +705,7 @@ export default function ComunicarDialog({
               </p>
             ) : null}
             <Textarea
+              className="min-w-0 w-full"
               placeholder={
                 hasTextoPrePreenchido ? "Encerramento da mensagem…" : "Escreva uma mensagem de encerramento…"
               }
@@ -720,21 +722,21 @@ export default function ComunicarDialog({
               <Label className="text-xs text-muted-foreground">
                 Pré-visualização {isReservaN8n ? (editando === "motorista" ? "do motorista" : "do cliente") : ""}
               </Label>
-              <div className="rounded-lg border border-border bg-card p-3 text-sm whitespace-pre-wrap max-h-[150px] overflow-y-auto">
+              <div className="max-h-[30dvh] min-w-0 overflow-x-hidden overflow-y-auto whitespace-pre-wrap break-words rounded-lg border border-border bg-card p-3 text-sm">
                 {buildMessage(atual)}
               </div>
             </div>
           )}
 
-          <div className="flex gap-2 pt-2 border-t border-border">
+          <div className="flex flex-col gap-2 border-t border-border pt-2 min-[380px]:flex-row">
             {onGerarPDF && (
-              <Button variant="outline" onClick={onGerarPDF} className="flex-1">
-                <FileDown className="h-4 w-4 mr-2" /> Gerar PDF
+              <Button variant="outline" onClick={onGerarPDF} className="min-h-11 w-full min-w-0 min-[380px]:flex-1">
+                <FileDown className="mr-2 h-4 w-4 shrink-0" /> Gerar PDF
               </Button>
             )}
             <Button
               onClick={handleEnviar}
-              className="flex-1"
+              className="min-h-11 w-full min-w-0 min-[380px]:flex-1"
               disabled={!webhookTipo || enviando}
             >
               {enviando ? (

@@ -5,10 +5,10 @@
   display: grid;
   place-items: center;
   padding:
-    max(1.5rem, env(safe-area-inset-top))
-    max(1.25rem, env(safe-area-inset-right))
-    max(1.5rem, env(safe-area-inset-bottom))
-    max(1.25rem, env(safe-area-inset-left));
+    max(1.5rem, var(--safe-area-inset-top, 0px), env(safe-area-inset-top, 0px))
+    max(1.25rem, var(--safe-area-inset-right, 0px), env(safe-area-inset-right, 0px))
+    max(1.5rem, var(--safe-area-inset-bottom, 0px), env(safe-area-inset-bottom, 0px))
+    max(1.25rem, var(--safe-area-inset-left, 0px), env(safe-area-inset-left, 0px));
   background:
     radial-gradient(520px 240px at 50% 42%, rgba(232, 160, 26, 0.22), transparent 70%),
     #090a0c;

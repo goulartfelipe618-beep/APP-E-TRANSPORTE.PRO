@@ -110,8 +110,8 @@ Deno.serve(async (req) => {
       const { data: userData } = await userClient.auth.getUser(jwt);
       const uid = userData.user?.id;
       if (uid) {
-        const { data: staff } = await admin.rpc("is_platform_staff", { check_uid: uid });
-        allowed = staff === true;
+        const { data: master } = await admin.rpc("is_admin_master", { _user_id: uid });
+        allowed = master === true;
       }
     }
   }

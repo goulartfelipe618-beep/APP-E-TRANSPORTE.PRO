@@ -1,3 +1,4 @@
+import { tokenAplicativoMotoristaGuardado } from "@/lib/capacitorFrota";
 import { supabase } from "@/integrations/supabase/client";
 
 const ENTRADA_KEY = "etp_frota_link_entrada";
@@ -263,9 +264,13 @@ export async function validarMiniPainelDoDono(): Promise<PreviewMiniPainel | nul
 }
 
 export async function entradaDoPortalEstaValida(userId: string): Promise<boolean> {
-  const token = tokenEntradaPeloLinkUnico(userId);
+  const token = tokenEntradaPeloLinkUnico(userId) ?? tokenAplicativoMotoristaGuardado();
   if (!token) return false;
   const ok = await linkPertenceAoMotorista(userId, token);
-  if (!ok) limparEntradaPeloLinkUnico();
-  return ok;
+  if (!ok) {
+    limparEntradaPeloLinkUnico();
+    return false;
+  }
+  marcarEntradaPeloLinkUnico(userId, token);
+  return true;
 }

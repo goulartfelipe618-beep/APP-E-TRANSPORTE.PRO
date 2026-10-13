@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <activity android:name=".MainActivity">
+            <!-- Links do mini painel no aplicativo do motorista. O app do painel não declara estes hosts. -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="app.e-transporte.pro" android:path="/frota" />
+                <data android:scheme="https" android:host="app.e-transporte.pro" android:pathPrefix="/frota/" />
+                <data android:scheme="https" android:host="business.transporteexecutivo.com" android:path="/frota" />
+                <data android:scheme="https" android:host="business.transporteexecutivo.com" android:pathPrefix="/frota/" />
+                <data android:scheme="https" android:host="e-transporte.pro" android:path="/frota" />
+                <data android:scheme="https" android:host="e-transporte.pro" android:pathPrefix="/frota/" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { frotaPathFromAppUrl } from "./capacitorFrota";
+import { frotaPathFromAppUrl, rotaInicialAplicativoMotorista, tokenDoTextoDeAcesso } from "./capacitorFrota";
 
 describe("frotaPathFromAppUrl", () => {
   it("aceita o link público do portal", () => {
@@ -7,6 +7,12 @@ describe("frotaPathFromAppUrl", () => {
       "/frota/acesso/abc123",
     );
     expect(frotaPathFromAppUrl("https://www.e-transporte.pro/frota")).toBe("/frota");
+    expect(
+      frotaPathFromAppUrl(
+        "https://business.transporteexecutivo.com/frota/acesso/5244d013-cd71-4dfc-96b9-4e16bc7db1e5",
+      ),
+    ).toBe("/frota/acesso/5244d013-cd71-4dfc-96b9-4e16bc7db1e5");
+    expect(frotaPathFromAppUrl("https://app.e-transporte.pro/frota")).toBe("/frota");
   });
 
   it("preserva query e hash", () => {
@@ -35,5 +41,27 @@ describe("frotaPathFromAppUrl", () => {
 
   it("normaliza .. para não sair de /frota", () => {
     expect(frotaPathFromAppUrl("https://e-transporte.pro/frota/acesso/../../admin")).toBeNull();
+  });
+});
+
+describe("aplicativo do motorista", () => {
+  const token = "5244d013-cd71-4dfc-96b9-4e16bc7db1e5";
+
+  it("aceita o link, o caminho e o código", () => {
+    expect(tokenDoTextoDeAcesso(`https://business.transporteexecutivo.com/frota/acesso/${token}`)).toBe(token);
+    expect(tokenDoTextoDeAcesso(`/frota/acesso/${token}`)).toBe(token);
+    expect(tokenDoTextoDeAcesso(token.toUpperCase())).toBe(token);
+  });
+
+  it("recusa texto que não é o link do motorista", () => {
+    expect(tokenDoTextoDeAcesso("https://business.transporteexecutivo.com/login")).toBeNull();
+    expect(tokenDoTextoDeAcesso("/admin")).toBeNull();
+    expect(tokenDoTextoDeAcesso("")).toBeNull();
+  });
+
+  it("abre o link guardado e, sem ele, a tela de colar o link", () => {
+    expect(rotaInicialAplicativoMotorista(token, null)).toBe(`/frota/acesso/${token}`);
+    expect(rotaInicialAplicativoMotorista(null, null)).toBe("/aplicativo-motorista");
+    expect(rotaInicialAplicativoMotorista(token, "/frota/acesso/outro")).toBe("/frota/acesso/outro");
   });
 });
