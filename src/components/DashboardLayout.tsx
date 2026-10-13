@@ -92,6 +92,7 @@ const PAGE_MAP: Record<string, React.ComponentType> = {
   comunidade: CommunityPage,
   "email-business": EmailBusinessPage,
   email: EmailPage,
+  chat: ChatPage,
   website: WebsitePage,
   dominios: DominiosPage,
   anotacoes: AnotacoesPage,
