@@ -18,6 +18,7 @@ export type ChatConversa = {
   chatlid: string | null;
   titulo: string;
   previa: string | null;
+  foto: string | null;
   timestampMs: number | null;
   naoLidas: number | null;
   grupo: boolean | null;
@@ -36,6 +37,7 @@ export type ChatMensagem = {
   remetenteNome: string | null;
   enviadaPelaApi: boolean | null;
   erro: string | null;
+  arquivo: string | null;
   timestampMs: number | null;
 };
 
@@ -48,6 +50,12 @@ export type HistoricoPedido = {
   error: string | null;
   nextRequest: Record<string, unknown> | null;
 };
+
+function https(v: unknown): string | null {
+  if (typeof v !== "string") return null;
+  const t = v.trim();
+  return t.startsWith("https://") ? t : null;
+}
 
 function texto(v: unknown): string | null {
   if (typeof v !== "string") return null;
@@ -117,6 +125,7 @@ export function normalizarConversa(raw: unknown): ChatConversa | null {
     chatlid: texto(o.wa_chatlid),
     titulo,
     previa: texto(o.wa_lastMessageTextVote),
+    foto: https(o.imagePreview) || https(o.image),
     timestampMs: timestampMs(o.wa_lastMsgTimestamp),
     naoLidas: naoLidas != null && naoLidas >= 0 ? Math.floor(naoLidas) : null,
     grupo: bool(o.wa_isGroup),
@@ -129,6 +138,13 @@ export function normalizarMensagem(raw: unknown, chatidFallback?: string | null)
   const chave = chaveMensagem(o.id, o.messageid);
   const chatid = texto(o.chatid) || texto(chatidFallback);
   if (!chave || !chatid) return null;
+  const messageType = texto(o.messageType);
+  const mediaType = texto(o.mediaType);
+  const type = texto(o.type);
+  const tipo =
+    mediaType ||
+    (type && type !== "media" && type !== "text" ? type : null) ||
+    messageType;
   return {
     chave,
     id: texto(o.id),
@@ -136,12 +152,13 @@ export function normalizarMensagem(raw: unknown, chatidFallback?: string | null)
     chatid,
     fromMe: bool(o.fromMe),
     texto: texto(o.text),
-    tipo: texto(o.messageType),
+    tipo,
     status: statusUazapi(o.status),
     remetente: texto(o.sender),
     remetenteNome: texto(o.senderName),
     enviadaPelaApi: bool(o.wasSentByApi),
     erro: texto(o.error),
+    arquivo: https(o.fileURL),
     timestampMs: timestampMs(o.messageTimestamp),
   };
 }
@@ -165,6 +182,7 @@ export function fundirMensagens(atual: ChatMensagem[], novas: ChatMensagem[]): C
       fromMe: n.fromMe ?? anterior.fromMe,
       enviadaPelaApi: n.enviadaPelaApi ?? anterior.enviadaPelaApi,
       erro: n.erro || anterior.erro,
+      arquivo: n.arquivo || anterior.arquivo,
       timestampMs: n.timestampMs ?? anterior.timestampMs,
       status: escolherStatus(anterior.status, n.status),
       id: n.id || anterior.id,

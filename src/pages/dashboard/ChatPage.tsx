@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Check, CheckCheck, FileText, Loader2, MessageCircle, Paperclip, Send, Smile } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 import { useActivePage } from "@/contexts/ActivePageContext";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -10,8 +9,8 @@ import {
   baixarArquivo,
   enviarMidia,
   enviarTexto,
+  fotoDoContato,
   ligarEventos,
-  linhaParaMensagem,
   listarConversas,
   listarMensagens,
   mensagemVisivel,
@@ -69,6 +68,7 @@ function fundirConversas(atual: ChatConversa[], novas: ChatConversa[]): ChatConv
             ...n,
             titulo: n.titulo || anterior.titulo,
             previa: n.previa || anterior.previa,
+            foto: n.foto || anterior.foto,
             timestampMs: n.timestampMs ?? anterior.timestampMs,
           }
         : n,
@@ -96,7 +96,11 @@ export default function ChatPage() {
   const listaVoo = useRef(false);
   const msgSeq = useRef(0);
   const primeiraLista = useRef(true);
-  const pedidosMidia = useRef(new Set<string>());
+  const pedidosMidia = useRef(new Map<string, number>());
+  const midiaEmVoo = useRef(new Set<string>());
+  const fotosPedidas = useRef(new Set<string>());
+  const fotosEmVoo = useRef(false);
+  const [fotoTick, setFotoTick] = useState(0);
   const fimRef = useRef<HTMLDivElement>(null);
   const caixaRef = useRef<HTMLDivElement>(null);
   const pertoDoFim = useRef(true);
@@ -175,48 +179,43 @@ export default function ChatPage() {
   }, [visiveis.length, chatid]);
 
   useEffect(() => {
-    let cancelado = false;
-    for (const m of visiveis) {
-      if (!classeMidia(m.tipo)) continue;
-      const id = m.messageid || m.id;
-      if (!id || pedidosMidia.current.has(id)) continue;
-      pedidosMidia.current.add(id);
-      void baixarArquivo(id).then((res) => {
-        if (cancelado || !res.fileURL) return;
-        setUrls((prev) => (prev[id] ? prev : { ...prev, [id]: res.fileURL as string }));
-      });
-    }
-    return () => {
-      cancelado = true;
-    };
-  }, [visiveis]);
+    if (fotosEmVoo.current) return;
+    const faltam = conversas.filter((c) => !c.foto && !fotosPedidas.current.has(c.chatid)).slice(0, 40);
+    if (!faltam.length) return;
+    fotosEmVoo.current = true;
+    void (async () => {
+      for (const c of faltam) {
+        fotosPedidas.current.add(c.chatid);
+        const res = await fotoDoContato(c.chatid);
+        if (!res.url?.startsWith("https://")) continue;
+        setConversas((prev) => prev.map((item) => (item.chatid === c.chatid ? { ...item, foto: res.url as string } : item)));
+      }
+      fotosEmVoo.current = false;
+      setFotoTick((n) => n + 1);
+    })();
+  }, [conversas, fotoTick]);
 
   useEffect(() => {
-    let canal: ReturnType<typeof supabase.channel> | null = null;
-    let ativo = true;
-    void supabase.auth.getSession().then(({ data }) => {
-      const uid = data.session?.user.id;
-      if (!uid || !ativo) return;
-      canal = supabase
-        .channel(`uazapi-chat-${uid}`)
-        .on(
-          "postgres_changes",
-          { event: "*", schema: "public", table: "uazapi_chat_mensagens", filter: `user_id=eq.${uid}` },
-          (payload) => {
-            const row = payload.new;
-            if (!row || typeof row !== "object") return;
-            const msg = linhaParaMensagem(row as Record<string, unknown>);
-            if (!msg || msg.chatid !== chatRef.current) return;
-            setMensagens((prev) => fundirMensagens(prev, [msg]));
-          },
-        )
-        .subscribe();
-    });
-    return () => {
-      ativo = false;
-      if (canal) void supabase.removeChannel(canal);
-    };
-  }, []);
+    const pendentes = visiveis.filter((m) => classeMidia(m.tipo) && !m.arquivo && !urls[m.chave]);
+    let vagas = 2 - midiaEmVoo.current.size;
+    for (const m of pendentes) {
+      if (vagas <= 0) break;
+      const id = m.id || m.messageid;
+      if (!id || midiaEmVoo.current.has(m.chave) || (pedidosMidia.current.get(m.chave) ?? 0) >= 2) continue;
+      vagas -= 1;
+      midiaEmVoo.current.add(m.chave);
+      void baixarArquivo(id, m.messageid && m.messageid !== id ? m.messageid : null).then((res) => {
+        midiaEmVoo.current.delete(m.chave);
+        if (res.fileURL?.startsWith("https://")) {
+          pedidosMidia.current.set(m.chave, 2);
+          setUrls((prev) => (prev[m.chave] ? prev : { ...prev, [m.chave]: res.fileURL as string }));
+          return;
+        }
+        pedidosMidia.current.set(m.chave, (pedidosMidia.current.get(m.chave) ?? 0) + 1);
+        setFotoTick((n) => n + 1);
+      });
+    }
+  }, [fotoTick, urls, visiveis]);
 
   const confirmarEnvio = async (res: Awaited<ReturnType<typeof enviarTexto>>) => {
     if (res.code === "not_connected") {
@@ -248,14 +247,19 @@ export default function ChatPage() {
           return;
         }
         const dataUrl = await lerArquivo(file);
-        const ok = await confirmarEnvio(
-          await enviarMidia(chatid, tipoDoArquivo(file), dataUrl, {
-            text: caption || undefined,
-            docName: file.name,
-            mimetype: file.type || undefined,
-          }),
-        );
-        if (!ok) return;
+        const local = URL.createObjectURL(file);
+        const resposta = await enviarMidia(chatid, tipoDoArquivo(file), dataUrl, {
+          text: caption || undefined,
+          docName: file.name,
+          mimetype: file.type || undefined,
+        });
+        const ok = await confirmarEnvio(resposta);
+        if (!ok) {
+          URL.revokeObjectURL(local);
+          return;
+        }
+        const chave = resposta.message?.chave;
+        if (chave) setUrls((prev) => ({ ...prev, [chave]: local }));
       } else {
         const ok = await confirmarEnvio(await enviarTexto(chatid, caption));
         if (!ok) return;
@@ -301,9 +305,7 @@ export default function ChatPage() {
                   c.chatid === chatid && "bg-[#2a3942]",
                 )}
               >
-                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#6b7c85] text-sm font-semibold text-white">
-                  {(c.titulo || "?").slice(0, 1).toUpperCase()}
-                </span>
+                <Avatar nome={c.titulo} foto={c.foto} tamanho="h-11 w-11" />
                 <span className="min-w-0 flex-1">
                   <span className="flex items-baseline justify-between gap-2">
                     <span className="truncate text-sm font-medium">{c.titulo}</span>
@@ -343,9 +345,7 @@ export default function ChatPage() {
               <Button type="button" variant="ghost" className="text-[#e9edef] md:hidden" onClick={() => setChatid(null)}>
                 Voltar
               </Button>
-              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#6b7c85] text-sm font-semibold">
-                {(ativa.titulo || "?").slice(0, 1).toUpperCase()}
-              </span>
+              <Avatar nome={ativa.titulo} foto={ativa.foto} tamanho="h-10 w-10" />
               <div className="min-w-0">
                 <p className="truncate text-sm font-semibold">{ativa.titulo}</p>
                 <p className="truncate text-xs text-[#8696a0]">{ativa.chatid}</p>
@@ -365,7 +365,7 @@ export default function ChatPage() {
                   <Loader2 className="h-5 w-5 animate-spin text-[#8696a0]" />
                 </div>
               ) : (
-                visiveis.map((m) => <Bolha key={m.chave} mensagem={m} url={urls[m.messageid || m.id || ""]} />)
+                visiveis.map((m) => <Bolha key={m.chave} mensagem={m} url={m.arquivo || urls[m.chave]} />)
               )}
               <div ref={fimRef} />
             </div>
@@ -477,6 +477,18 @@ export default function ChatPage() {
         )}
       </section>
     </div>
+  );
+}
+
+function Avatar({ nome, foto, tamanho }: { nome: string; foto: string | null; tamanho: string }) {
+  const [falhou, setFalhou] = useState(false);
+  if (foto && !falhou) {
+    return <img src={foto} alt="" className={cn(tamanho, "shrink-0 rounded-full object-cover")} onError={() => setFalhou(true)} />;
+  }
+  return (
+    <span className={cn(tamanho, "flex shrink-0 items-center justify-center rounded-full bg-[#6b7c85] text-sm font-semibold text-white")}>
+      {(nome || "?").slice(0, 1).toUpperCase()}
+    </span>
   );
 }
 

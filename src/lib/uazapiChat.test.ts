@@ -22,6 +22,7 @@ const base = {
   remetenteNome: null,
   enviadaPelaApi: true as boolean | null,
   erro: null,
+  arquivo: null,
   timestampMs: 1_700_000_000_000,
 };
 
@@ -82,5 +83,26 @@ describe("uazapi chat", () => {
   it("usa o nome que a conversa traz", () => {
     expect(normalizarConversa({ wa_chatid: "1@s.whatsapp.net", wa_contactName: "Ana" })?.titulo).toBe("Ana");
     expect(normalizarConversa({ wa_chatid: "1@s.whatsapp.net" })?.titulo).toBe("1@s.whatsapp.net");
+    expect(normalizarConversa({ wa_chatid: "1@s.whatsapp.net", imagePreview: "https://pps.whatsapp.net/a.jpg" })?.foto).toBe(
+      "https://pps.whatsapp.net/a.jpg",
+    );
+    expect(normalizarConversa({ wa_chatid: "1@s.whatsapp.net", image: "http://inseguro" })?.foto).toBeNull();
+  });
+
+  it("reconhece imagem pela mídia da API e só guarda link https", () => {
+    const msg = normalizarMensagem({
+      id: "r1",
+      messageid: "3EB0",
+      chatid: "1@s.whatsapp.net",
+      messageType: "media",
+      mediaType: "image",
+      text: "legenda",
+      fileURL: "https://cdn.exemplo/foto.jpg",
+    });
+    expect(msg?.tipo).toBe("image");
+    expect(msg?.arquivo).toBe("https://cdn.exemplo/foto.jpg");
+    expect(normalizarMensagem({ id: "r2", messageid: "3EB1", chatid: "1@s.whatsapp.net", messageType: "ImageMessage" })?.tipo).toBe(
+      "ImageMessage",
+    );
   });
 });

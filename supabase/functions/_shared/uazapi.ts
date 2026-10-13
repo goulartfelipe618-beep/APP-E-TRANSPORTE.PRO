@@ -261,6 +261,18 @@ export async function uazapiWebhookAdd(
   });
 }
 
+export async function uazapiChatAvatar(
+  root: string,
+  instanceToken: string,
+  number: string,
+): Promise<{ status: number; text: string; json: unknown }> {
+  return await uazapiFetch(`${root}/chat/avatar`, {
+    method: "POST",
+    headers: instanceHeaders(instanceToken, true),
+    body: JSON.stringify({ number, preview: true }),
+  });
+}
+
 export async function uazapiMessageDownload(
   root: string,
   instanceToken: string,

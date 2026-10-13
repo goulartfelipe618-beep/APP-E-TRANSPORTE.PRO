@@ -12,9 +12,9 @@ import {
   paginacao,
   pedidoHistoricoSeguro,
 } from "../_shared/uazapiChat.ts";
-import { gravarMensagens } from "../_shared/uazapiChatStore.ts";
 import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {
+  uazapiChatAvatar,
   uazapiChatFind,
   uazapiHistorySync,
   uazapiMessageDownload,
@@ -120,11 +120,6 @@ Deno.serve(async (req) => {
       const pack = await umaVez(() => uazapiMessageFind(root, token, { chatid, limit, offset }));
       const brutas = listaDe(pack.json, "messages");
       const messages = brutas.map((m) => normalizarMensagem(m, chatid)).filter((m) => m != null);
-      try {
-        await gravarMensagens(supabaseAdmin, userId, messages);
-      } catch {
-        /* a lista da API continua valendo mesmo se o espelho falhar */
-      }
       const page = paginacao(pack.json);
       return json({
         ok: pack.status >= 200 && pack.status < 300,
@@ -152,11 +147,6 @@ Deno.serve(async (req) => {
       const messages = mensagensDoHistorico(pack.json)
         .map((m) => normalizarMensagem(m, chatid))
         .filter((m) => m != null);
-      try {
-        await gravarMensagens(supabaseAdmin, userId, messages);
-      } catch {
-        /* idem */
-      }
       return json({
         ok: pack.status === 200 || pack.status === 202,
         httpStatus: pack.status,
@@ -177,7 +167,7 @@ Deno.serve(async (req) => {
         const text = String(body.text || "");
         if (!text.trim() || text.length > 4096) return json({ error: "Texto inválido." }, 400);
         const pack = await umaVez(() => uazapiSendText(root, token, chatid, text));
-        return await respostaDeEnvio(supabaseAdmin, userId, pack, chatid);
+        return respostaDeEnvio(pack, chatid);
       }
       if (kind === "media") {
         const type = String(body.type || "");
@@ -196,24 +186,30 @@ Deno.serve(async (req) => {
         if (type === "document" && docName) payload.docName = docName;
         if (mimetype) payload.mimetype = mimetype;
         const pack = await umaVez(() => uazapiSendMedia(root, token, chatid, payload));
-        return await respostaDeEnvio(supabaseAdmin, userId, pack, chatid);
+        return respostaDeEnvio(pack, chatid);
       }
       return json({ error: "Envio inválido." }, 400);
     }
 
     if (action === "arquivo") {
-      const id = String(body.id || "").trim();
-      if (!id || id.length > 200) return json({ error: "id é obrigatório" }, 400);
-      const pack = await umaVez(() =>
-        uazapiMessageDownload(root, token, { id, return_base64: false, generate_mp3: true }),
-      );
-      const o = pack.json && typeof pack.json === "object" ? (pack.json as Record<string, unknown>) : {};
-      const fileURL = typeof o.fileURL === "string" ? o.fileURL : "";
-      const mimetype = typeof o.mimetype === "string" ? o.mimetype : "";
-      if (pack.status < 200 || pack.status >= 300 || !fileURL.startsWith("https://")) {
-        return json({ ok: false, error: "A UAZAPI não devolveu o arquivo." });
+      const ids = [String(body.id || "").trim(), String(body.alt || "").trim()].filter((id, i, lista) => id && id.length <= 500 && lista.indexOf(id) === i).slice(0, 2);
+      if (!ids.length) return json({ error: "id é obrigatório" }, 400);
+      for (const id of ids) {
+        const pack = await umaVez(() =>
+          uazapiMessageDownload(root, token, { id, return_base64: false, generate_mp3: true, return_link: true }),
+        );
+        const arquivo = urlDoArquivo(pack.json);
+        if (pack.status >= 200 && pack.status < 300 && arquivo.fileURL) return json({ ok: true, ...arquivo });
       }
-      return json({ ok: true, fileURL, mimetype });
+      return json({ ok: false, error: "A UAZAPI não devolveu o arquivo." });
+    }
+
+    if (action === "avatar") {
+      const number = String(body.number || "").trim();
+      if (!number || number.length > 200) return json({ error: "number é obrigatório" }, 400);
+      const pack = await umaVez(() => uazapiChatAvatar(root, token, number));
+      const url = pack.json && typeof pack.json === "object" && typeof (pack.json as { url?: unknown }).url === "string" && (pack.json as { url: string }).url.startsWith("https://") ? (pack.json as { url: string }).url : "";
+      return json({ ok: pack.status >= 200 && pack.status < 300, url });
     }
 
     if (action === "eventos") {
@@ -227,6 +223,25 @@ Deno.serve(async (req) => {
   }
 });
 
+function urlDoArquivo(json: unknown): { fileURL: string; mimetype: string } {
+  if (!json || typeof json !== "object") return { fileURL: "", mimetype: "" };
+  const o = json as Record<string, unknown>;
+  const bruto = [o.fileURL, o.fileUrl, o.url].find((v) => typeof v === "string" && v.startsWith("https://"));
+  const mimetype = typeof o.mimetype === "string" ? o.mimetype : "";
+  if (typeof bruto === "string") return { fileURL: bruto, mimetype };
+  const aninhado = o.response ?? o.data ?? o.message;
+  if (aninhado && aninhado !== json) return urlDoArquivo(aninhado);
+  return { fileURL: "", mimetype: "" };
+}
+
+function mensagemDoEnvio(json: unknown, chatid: string) {
+  const direta = normalizarMensagem(json, chatid);
+  if (direta) return direta;
+  if (!json || typeof json !== "object") return null;
+  const o = json as Record<string, unknown>;
+  return normalizarMensagem(o.message, chatid) || normalizarMensagem(o.response, chatid);
+}
+
 function erroDaApi(jsonBody: unknown, fallback: string): string {
   if (jsonBody && typeof jsonBody === "object" && typeof (jsonBody as { error?: unknown }).error === "string") {
     return (jsonBody as { error: string }).error.slice(0, 300);
@@ -234,21 +249,9 @@ function erroDaApi(jsonBody: unknown, fallback: string): string {
   return fallback;
 }
 
-async function respostaDeEnvio(
-  supabaseAdmin: SupabaseClient,
-  userId: string,
-  pack: { status: number; json: unknown },
-  chatid: string,
-): Promise<Response> {
+function respostaDeEnvio(pack: { status: number; json: unknown }, chatid: string): Response {
   const ok = pack.status >= 200 && pack.status < 300;
-  const message = ok ? normalizarMensagem(pack.json, chatid) : null;
-  if (message) {
-    try {
-      await gravarMensagens(supabaseAdmin, userId, [message]);
-    } catch {
-      /* a confirmação da API continua valendo */
-    }
-  }
+  const message = ok ? mensagemDoEnvio(pack.json, chatid) : null;
   return json({
     ok,
     httpStatus: pack.status,

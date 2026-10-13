@@ -15,6 +15,7 @@ type Invoke = {
   message?: ChatMensagem | null;
   fileURL?: string;
   mimetype?: string;
+  url?: string;
 };
 
 async function chamar(body: Record<string, unknown>): Promise<Invoke & { falhaRede?: string }> {
@@ -62,8 +63,12 @@ export function enviarMidia(
   return chamar({ action: "enviar", kind: "media", chatid, type, file, ...extra });
 }
 
-export function baixarArquivo(id: string) {
-  return chamar({ action: "arquivo", id });
+export function baixarArquivo(id: string, alt?: string | null) {
+  return chamar({ action: "arquivo", id, alt: alt || undefined });
+}
+
+export function fotoDoContato(number: string) {
+  return chamar({ action: "avatar", number });
 }
 
 export function ligarEventos() {
@@ -89,6 +94,7 @@ export function linhaParaMensagem(row: Record<string, unknown>): ChatMensagem | 
     remetenteNome: typeof row.remetente_nome === "string" ? row.remetente_nome : null,
     enviadaPelaApi: row.enviada_pela_api === true || row.enviada_pela_api === false ? row.enviada_pela_api : null,
     erro: typeof row.erro === "string" && row.erro.trim() ? row.erro : null,
+    arquivo: null,
     timestampMs: typeof row.message_timestamp === "number" ? row.message_timestamp : null,
   };
 }
