@@ -40,8 +40,6 @@ function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: headers() });
 }
 
-const CONNECTED = /^(open|connected|conectado|online)$/i;
-
 function inteiro(v: unknown, min: number, max: number, fallback: number): number {
   const n = typeof v === "number" ? v : Number(v);
   if (!Number.isFinite(n)) return fallback;
@@ -69,17 +67,7 @@ Deno.serve(async (req) => {
     const auth = await sessaoDoChat(authHeader, supabaseUrl, anonKey, serviceKey);
     if (!auth.ok) return new Response(auth.body, { status: auth.status, headers: headers() });
 
-    const { userId, baseUrl, admin: supabaseAdmin, token } = auth;
-    const { data: ownRow } = await supabaseAdmin
-      .from("comunicadores_evolution")
-      .select("connection_status, telefone_conectado")
-      .eq("escopo", "usuario")
-      .eq("user_id", userId)
-      .maybeSingle();
-    const conectado = Boolean(
-      token &&
-        (ownRow?.telefone_conectado?.trim() || CONNECTED.test(String(ownRow?.connection_status || ""))),
-    );
+    const { userId, baseUrl, admin: supabaseAdmin, token, conectado } = auth;
     if (!token || !conectado) {
       return json({ ok: false, code: "not_connected", error: "WhatsApp desta conta não está conectado." });
     }
@@ -290,17 +278,22 @@ async function garantirWebhook(
     : bruto && typeof bruto === "object" && Array.isArray((bruto as { webhooks?: unknown }).webhooks)
       ? (bruto as { webhooks: unknown[] }).webhooks
       : [];
-  const ja = lista.some((item) => {
+  const nosso = lista.find((item) => {
     if (!item || typeof item !== "object") return false;
     return String((item as { url?: string }).url || "").includes(`/uazapi-chat-hook?k=${segredo}`);
-  });
-  if (ja) return null;
+  }) as { id?: string; events?: unknown } | undefined;
+  const events = Array.isArray(nosso?.events) ? nosso.events.map((e) => String(e)) : [];
+  const enxuto = events.length > 0 && !events.includes("history") && events.includes("messages") && events.includes("chats");
+  if (enxuto) return null;
+  if (nosso?.id) {
+    await uazapiWebhookAdd(root, token, { action: "delete", id: String(nosso.id) });
+  }
   const add = await uazapiWebhookAdd(root, token, {
     action: "add",
     enabled: true,
     url,
-    events: ["messages", "messages_update", "history", "chats"],
-    excludeMessages: [],
+    events: ["messages", "messages_update", "chats"],
+    excludeMessages: ["wasSentByApi"],
   });
   if (add.status < 200 || add.status >= 300) return "A UAZAPI não aceitou o webhook de eventos.";
   return null;

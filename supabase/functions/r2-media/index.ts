@@ -42,7 +42,7 @@ Deno.serve(async (req) => {
   if (!cdnUrl.includes("/functions/v1/r2-media/")) {
     return new Response(null, {
       status: 302,
-      headers: { ...corsHeaders, Location: cdnUrl, "Cache-Control": "public, max-age=300" },
+      headers: { ...corsHeaders, Location: cdnUrl, "Cache-Control": "public, max-age=86400" },
     });
   }
 
@@ -62,7 +62,8 @@ Deno.serve(async (req) => {
     const headers: Record<string, string> = {
       ...corsHeaders,
       "Content-Type": upstream.headers.get("content-type") || mimeFromKey(key),
-      "Cache-Control": "public, max-age=86400",
+      "Cache-Control": "public, max-age=31536000, immutable",
+      "CDN-Cache-Control": "public, max-age=31536000",
     };
     const len = upstream.headers.get("content-length");
     if (len) headers["Content-Length"] = len;

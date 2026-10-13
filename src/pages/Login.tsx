@@ -347,35 +347,7 @@ const Login = () => {
   }, []);
 
   useEffect(() => {
-    const url = loginConfig?.imagem_lateral_url;
-    if (!url) {
-      setLateralImageReady(false);
-      return;
-    }
     setLateralImageReady(false);
-    let cancelled = false;
-    const img = new Image();
-    img.onload = () => {
-      void (async () => {
-        try {
-          if ("decode" in img && typeof img.decode === "function") {
-            await img.decode();
-          }
-        } catch {
-          /* decode opcional */
-        }
-        if (!cancelled) setLateralImageReady(true);
-      })();
-    };
-    img.onerror = () => {
-      if (!cancelled) setLateralImageReady(true);
-    };
-    img.src = url;
-    return () => {
-      cancelled = true;
-      img.onload = null;
-      img.onerror = null;
-    };
   }, [loginConfig?.imagem_lateral_url]);
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -472,12 +444,14 @@ const Login = () => {
   return (
     <div className="flex min-h-[100svh] min-h-[100dvh] w-full flex-col bg-white lg:fixed lg:inset-0 lg:h-[100dvh] lg:flex-row lg:items-stretch lg:overflow-hidden">
       <aside className="hidden h-full min-h-0 shrink-0 overflow-hidden bg-white p-0 lg:block lg:w-1/2 lg:max-w-[50%]">
-        {loginConfig && lateralImageReady ? (
+        {loginConfig?.imagem_lateral_url ? (
           <img
             key={loginConfig.imagem_lateral_url}
             src={loginConfig.imagem_lateral_url}
             alt=""
-            className="h-full w-full object-contain object-left"
+            onLoad={() => setLateralImageReady(true)}
+            onError={() => setLateralImageReady(true)}
+            className={`h-full w-full object-contain object-left ${lateralImageReady ? "opacity-100" : "opacity-0"}`}
           />
         ) : null}
       </aside>

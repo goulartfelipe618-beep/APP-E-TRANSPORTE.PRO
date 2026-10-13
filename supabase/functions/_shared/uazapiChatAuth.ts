@@ -38,16 +38,13 @@ async function tokenDaConta(admin: SupabaseClient, userId: string): Promise<stri
   return token || null;
 }
 
-async function urlDaConta(admin: SupabaseClient, userId: string): Promise<string | null> {
-  const { data, error } = await admin
-    .from("comunicadores_evolution")
-    .select("uazapi_server_url")
-    .eq("escopo", "usuario")
-    .eq("user_id", userId)
-    .maybeSingle();
-  if (error) return null;
-  const url = String((data as { uazapi_server_url?: string | null } | null)?.uazapi_server_url || "").trim();
-  return url || null;
+type SessaoPronta = { userId: string; baseUrl: string; token: string; conectado: boolean };
+const sessaoCache = new Map<string, { ate: number; sessao: SessaoPronta }>();
+const SESSAO_MS = 3 * 60 * 1000;
+
+async function chaveDaSessao(authHeader: string): Promise<string> {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(authHeader));
+  return [...new Uint8Array(buf)].slice(0, 12).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
 export async function sessaoDoChat(
@@ -56,9 +53,16 @@ export async function sessaoDoChat(
   anonKey: string,
   serviceKey: string,
 ): Promise<
-  | { ok: true; userId: string; baseUrl: string; token: string; admin: SupabaseClient }
+  | { ok: true; userId: string; baseUrl: string; token: string; conectado: boolean; admin: SupabaseClient }
   | { ok: false; status: number; body: string }
 > {
+  const admin = createClient(supabaseUrl, serviceKey);
+  const agora = Date.now();
+  const chave = await chaveDaSessao(authHeader);
+  const guardada = sessaoCache.get(chave);
+  if (guardada && guardada.ate > agora) {
+    return { ok: true, ...guardada.sessao, admin };
+  }
   const supabaseUser = createClient(supabaseUrl, anonKey, {
     global: { headers: { Authorization: authHeader } },
   });
@@ -66,7 +70,6 @@ export async function sessaoDoChat(
   if (userErr || !user) {
     return { ok: false, status: 401, body: JSON.stringify({ error: "Sessão inválida" }) };
   }
-  const admin = createClient(supabaseUrl, serviceKey);
   const { data: roleRows, error: roleErr } = await admin.from("user_roles").select("role").eq("user_id", user.id);
   if (roleErr) {
     return { ok: false, status: 500, body: JSON.stringify({ error: "Não foi possível verificar permissões." }) };
@@ -79,12 +82,28 @@ export async function sessaoDoChat(
       body: JSON.stringify({ error: "O chat usa o WhatsApp da conta de frota.", code: "evolution_motorista_role_only" }),
     };
   }
-  const token = await tokenDaConta(admin, user.id);
+  const { data: conta } = await admin
+    .from("comunicadores_evolution")
+    .select("uazapi_instance_token, uazapi_server_url, connection_status, telefone_conectado")
+    .eq("escopo", "usuario")
+    .eq("user_id", user.id)
+    .maybeSingle();
+  const linha = conta as {
+    uazapi_instance_token?: string | null;
+    uazapi_server_url?: string | null;
+    connection_status?: string | null;
+    telefone_conectado?: string | null;
+  } | null;
+  let token = linha?.uazapi_instance_token?.trim() || "";
+  if (!token) token = (await tokenDaConta(admin, user.id)) || "";
   let baseUrl: string;
   try {
-    baseUrl = baseHttps((await urlDaConta(admin, user.id)) || Deno.env.get("UAZAPI_SERVER_URL") || "https://ipazua.uazapi.com");
+    baseUrl = baseHttps(linha?.uazapi_server_url?.trim() || Deno.env.get("UAZAPI_SERVER_URL") || "https://ipazua.uazapi.com");
   } catch (e) {
     return { ok: false, status: 400, body: JSON.stringify({ error: e instanceof Error ? e.message : "URL inválida" }) };
   }
-  return { ok: true, userId: user.id, baseUrl, token: token || "", admin };
+  const conectado = Boolean(token && (linha?.telefone_conectado?.trim() || /^(open|connected|conectado|online)$/i.test(String(linha?.connection_status || ""))));
+  const sessao = { userId: user.id, baseUrl, token, conectado };
+  sessaoCache.set(chave, { ate: agora + SESSAO_MS, sessao });
+  return { ok: true, ...sessao, admin };
 }

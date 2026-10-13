@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Check, CheckCheck, FileText, Loader2, MessageCircle, Paperclip, Send, Smile } from "lucide-react";
 import { useActivePage } from "@/contexts/ActivePageContext";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { fundirMensagens, type ChatMensagem } from "../../../supabase/functions/_shared/uazapiChat";
@@ -168,12 +169,43 @@ export default function ChatPage() {
 
   useEffect(() => {
     void carregarConversas().then(() => ligarEventos());
-    const timer = window.setInterval(() => {
-      void carregarConversas();
-      const aberto = chatRef.current;
-      if (aberto) void atualizarMensagens(aberto, false);
-    }, 8000);
-    return () => window.clearInterval(timer);
+    let canal: ReturnType<typeof supabase.channel> | null = null;
+    let espera: number | null = null;
+    let escondido = false;
+    const atualizarUmaVez = () => {
+      if (document.visibilityState !== "visible") return;
+      if (espera != null) return;
+      espera = window.setTimeout(() => {
+        espera = null;
+        void carregarConversas();
+        const aberto = chatRef.current;
+        if (aberto) void atualizarMensagens(aberto, false);
+      }, 1500);
+    };
+    const aoMudarAba = () => {
+      if (document.visibilityState === "hidden") escondido = true;
+      if (document.visibilityState === "visible" && escondido) {
+        escondido = false;
+        atualizarUmaVez();
+      }
+    };
+    let cancelado = false;
+    document.addEventListener("visibilitychange", aoMudarAba);
+    void supabase.auth.getSession().then(({ data }) => {
+      if (cancelado) return;
+      const uid = data.session?.user.id;
+      if (!uid) return;
+      canal = supabase
+        .channel(`chat-aviso:${uid}`)
+        .on("broadcast", { event: "nova" }, () => atualizarUmaVez())
+        .subscribe();
+    });
+    return () => {
+      cancelado = true;
+      document.removeEventListener("visibilitychange", aoMudarAba);
+      if (espera != null) window.clearTimeout(espera);
+      if (canal) void supabase.removeChannel(canal);
+    };
   }, [atualizarMensagens, carregarConversas]);
 
   useEffect(() => {
