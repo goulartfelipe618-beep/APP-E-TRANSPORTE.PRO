@@ -4,6 +4,7 @@ import {
   type FichaPortalMotorista,
 } from "@/lib/frotaPortalIsolamento";
 import { motoristaMatchesAssignment } from "@/lib/motoristaReservaAssign";
+import { repasseVisivelNoPortal } from "@/lib/reservaMotoristasExtra";
 
 export type FrotaPortalTransferReserva = {
   kind: "transfer";
@@ -209,7 +210,7 @@ async function listFrotaPortalReservationsFallback(fichas: FichaPortalMotorista[
     supabase.from("reservas_grupos").select("id, user_id, numero_reserva, status, motorista_id, perna_viagem, data_ida, hora_ida, data_retorno, hora_retorno, embarque, destino, num_passageiros, valor_base, desconto, valor_total, repasse_motorista, observacoes_viagem").in("user_id", owners).in("motorista_id", assignIds),
     supabase
       .from("reserva_motoristas_extra")
-      .select("reserva_id, reserva_kind, motorista_id, user_id")
+      .select("reserva_id, reserva_kind, motorista_id, user_id, repasse_valor")
       .in("user_id", owners)
       .in("motorista_id", assignIds),
   ]);
@@ -221,6 +222,7 @@ async function listFrotaPortalReservationsFallback(fichas: FichaPortalMotorista[
     reserva_kind: string;
     motorista_id: string;
     user_id: string;
+    repasse_valor: number | null;
   }[];
   const extraPermitido = (row: { motorista_id: string; user_id: string }) =>
     fichas.some(
@@ -242,6 +244,21 @@ async function listFrotaPortalReservationsFallback(fichas: FichaPortalMotorista[
 
   const extraTransferSet = new Set(extraTransferIds);
   const extraGrupoSet = new Set(extraGrupoIds);
+  const repasseExtra = (reservaId: string) => {
+    const hit = extrasOk.find((row) => row.reserva_id === reservaId);
+    if (!hit || hit.repasse_valor == null) return null;
+    const n = Number(hit.repasse_valor);
+    return Number.isFinite(n) ? n : null;
+  };
+  const principalDestaConta = (row: { user_id: string; motorista_id: string | null }) =>
+    fichas.some(
+      (ficha) =>
+        ficha.userId === row.user_id &&
+        motoristaMatchesAssignment(String(row.motorista_id ?? ""), {
+          id: ficha.id,
+          portal_auth_user_id: ficha.portalAuthUserId,
+        }),
+    );
   const transferRows = [...(tRes.data || []), ...((tExtra.data as typeof tRes.data) || [])].filter((row) =>
     reservaVisivelNoPortal(
       {
@@ -263,10 +280,32 @@ async function listFrotaPortalReservationsFallback(fichas: FichaPortalMotorista[
     ),
   );
   const transfers = Array.from(new Map(transferRows.map((row) => [row.id, row])).values())
-    .map((row) => parseReserva({ kind: "transfer", ...row, observacoes: row.observacoes }))
+    .map((row) =>
+      parseReserva({
+        kind: "transfer",
+        ...row,
+        observacoes: row.observacoes,
+        repasse_motorista: repasseVisivelNoPortal({
+          acesso: extraTransferSet.has(row.id) && !principalDestaConta(row) ? "extra" : "principal",
+          repassePrincipal: row.repasse_motorista,
+          repasseDesteMotorista: repasseExtra(row.id),
+        }),
+      }),
+    )
     .filter((r): r is FrotaPortalTransferReserva => r?.kind === "transfer");
   const grupos = Array.from(new Map(grupoRows.map((row) => [row.id, row])).values())
-    .map((row) => parseReserva({ kind: "grupo", ...row, observacoes: (row as { observacoes_viagem?: string | null }).observacoes_viagem ?? null }))
+    .map((row) =>
+      parseReserva({
+        kind: "grupo",
+        ...row,
+        observacoes: (row as { observacoes_viagem?: string | null }).observacoes_viagem ?? null,
+        repasse_motorista: repasseVisivelNoPortal({
+          acesso: extraGrupoSet.has(row.id) && !principalDestaConta({ ...row, motorista_id: row.motorista_id != null ? String(row.motorista_id) : null }) ? "extra" : "principal",
+          repassePrincipal: row.repasse_motorista,
+          repasseDesteMotorista: repasseExtra(row.id),
+        }),
+      }),
+    )
     .filter((r): r is FrotaPortalGrupoReserva => r?.kind === "grupo");
   return { transfers, grupos, error: null };
 }

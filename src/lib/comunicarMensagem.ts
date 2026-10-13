@@ -1,5 +1,9 @@
 import { formatComunicarValorCampo } from "@/lib/comunicarFieldFormat";
-import { interpolarTextoComunicar, type ComunicarNomes } from "@/lib/comunicarPlaceholders";
+import {
+  interpolarTextoComunicar,
+  limparLinhasDeCampoComunicar,
+  type ComunicarNomes,
+} from "@/lib/comunicarPlaceholders";
 
 export type VariavelComunicar = { key: string; label: string; value: string };
 
@@ -37,8 +41,8 @@ export function montarMensagemComunicar(opts: {
 }): string {
   const escolhidas = new Set(opts.vars);
   const parts: string[] = [];
-  const acima = interpolarTextoComunicar(opts.acima, opts.nomes).trim();
-  const abaixo = interpolarTextoComunicar(opts.abaixo, opts.nomes).trim();
+  const acima = interpolarTextoComunicar(limparLinhasDeCampoComunicar(opts.acima), opts.nomes).trim();
+  const abaixo = interpolarTextoComunicar(limparLinhasDeCampoComunicar(opts.abaixo), opts.nomes).trim();
   if (acima) parts.push(acima);
 
   const linhas = listarVariaveisComunicar(opts.dados, opts.labels, opts.ignoredKeys).filter((v) =>

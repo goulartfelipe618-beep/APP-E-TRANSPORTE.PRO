@@ -20,11 +20,16 @@ export function interpolarTextoComunicar(texto: string, nomes: ComunicarNomes): 
   return hidratarTextoComunicar(texto).split(COMUNICAR_PH_CLIENTE).join(cliente).split(COMUNICAR_PH_MOTORISTA).join(motorista);
 }
 
-/** Linhas `*Rótulo:* valor` são os chips da reserva. Não podem ficar no molde gravado. */
+/** Linhas de campo da reserva (com ou sem asterisco) não podem ficar no molde. */
 export function limparLinhasDeCampoComunicar(texto: string): string {
   return texto
     .split("\n")
-    .filter((line) => !/^\*[^*\n]+:\*/.test(line.trim()))
+    .filter((line) => {
+      const t = line.trim();
+      if (/^\*[^*\n]+:\*/.test(t)) return false;
+      if (/^[^:\n]{2,80}:\s+\S/.test(t)) return false;
+      return true;
+    })
     .join("\n")
     .replace(/\n{3,}/g, "\n\n")
     .trim();

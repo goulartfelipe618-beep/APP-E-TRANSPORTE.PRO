@@ -7,6 +7,7 @@ import { Tables } from "@/integrations/supabase/types";
 import { badgeToneReservaStatus, labelReservaStatus } from "@/lib/reservaStatus";
 import { formatDbCalendarDatePtBr } from "@/lib/painelAgendaReservas";
 import { TextoComLinks } from "@/components/TextoComLinks";
+import { RepassesMotoristasLista } from "@/components/reservas/RepassesMotoristasLista";
 
 type ReservaGrupo = Tables<"reservas_grupos">;
 
@@ -94,7 +95,7 @@ export default function DetalhesReservaGrupoSheet({ reserva, open, onOpenChange,
               <Field label="Método de Pagamento" value={r.metodo_pagamento} />
               <Field label="Valor Total" value={<span className="text-base font-normal text-primary">{formatCurrency(r.valor_total)}</span>} />
               <Field
-                label="Repasse ao motorista"
+                label="Repasse do principal"
                 value={
                   r.repasse_motorista != null && Number(r.repasse_motorista) > 0
                     ? formatCurrency(Number(r.repasse_motorista))
@@ -102,6 +103,17 @@ export default function DetalhesReservaGrupoSheet({ reserva, open, onOpenChange,
                 }
               />
             </div>
+          </Section>
+
+          <Separator />
+          <Section title="Motoristas e repasses">
+            <RepassesMotoristasLista
+              kind="grupo"
+              reservaId={r.id}
+              userId={r.user_id}
+              primaryId={r.motorista_id}
+              repassePrincipal={r.repasse_motorista}
+            />
           </Section>
 
           {r.observacoes_viagem && (

@@ -417,7 +417,12 @@ export default function FinanceiroLancamentosPage() {
                   <TableCell>
                     <Badge variant={r.kind === "receita" ? "default" : "secondary"}>{FINANCEIRO_KIND_LABEL[r.kind] ?? r.kind}</Badge>
                   </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">{FINANCEIRO_ORIGIN_LABEL[r.origin] ?? r.origin}</TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    <span>{FINANCEIRO_ORIGIN_LABEL[r.origin] ?? r.origin}</span>
+                    {r.origin === "repasse_reserva_transfer" || r.origin === "repasse_reserva_grupo" ? (
+                      <span className="mt-0.5 block text-xs text-foreground">{r.description || "Repasse"}</span>
+                    ) : null}
+                  </TableCell>
                   <TableCell className="text-sm">{r.category}</TableCell>
                   <TableCell className="text-right font-mono text-sm font-medium">
                     {r.kind === "despesa" ? "− " : ""}

@@ -21,8 +21,13 @@ import { calendarDayKeySaoPauloFromIso, todayKeySaoPaulo } from "@/lib/spCalenda
 import { splitAmountInTwoHalves, valorTotalFromBaseDiscount } from "@/lib/reservaIdaVoltaSplit";
 import { logUserActivity } from "@/lib/userActivityLog";
 import { motoristaAssignValue, motoristaMatchesAssignment, selectValueForMotorista } from "@/lib/motoristaReservaAssign";
-import { listReservaMotoristasExtra, replaceReservaMotoristasExtra } from "@/lib/reservaMotoristasExtra";
-import { MotoristasExtrasField } from "@/components/reservas/MotoristasExtrasField";
+import {
+  dividirVinculosNasDuasPernas,
+  listReservaMotoristasExtraComRepasse,
+  montarVinculosExtrasParaGravar,
+  replaceReservaMotoristasExtra,
+} from "@/lib/reservaMotoristasExtra";
+import { MotoristasExtrasField, type ExtraSelecionado } from "@/components/reservas/MotoristasExtrasField";
 
 const TIPOS_VEICULO = ["van", "micro_onibus", "onibus"] as const;
 
@@ -104,11 +109,11 @@ export default function CriarReservaGrupoDialog({
   const [repasseMotorista, setRepasseMotorista] = useState("");
   const [motoristasFrota, setMotoristasFrota] = useState<{ id: string; nome: string; portal_auth_user_id: string | null }[]>([]);
   const [motoristaAtribUid, setMotoristaAtribUid] = useState<string>("");
-  const [motoristasExtras, setMotoristasExtras] = useState<string[]>([]);
-  const motoristasExtrasRef = useRef<string[]>([]);
+  const [motoristasExtras, setMotoristasExtras] = useState<ExtraSelecionado[]>([]);
+  const motoristasExtrasRef = useRef<ExtraSelecionado[]>([]);
   const extrasProntosRef = useRef(true);
   const extrasEditIdRef = useRef<string | null>(null);
-  const setExtrasAtribuidos = (ids: string[]) => {
+  const setExtrasAtribuidos = (ids: ExtraSelecionado[]) => {
     motoristasExtrasRef.current = ids;
     setMotoristasExtras(ids);
   };
@@ -187,9 +192,16 @@ export default function CriarReservaGrupoDialog({
       extrasEditIdRef.current = row.id;
       setExtrasAtribuidos([]);
       const editId = row.id;
-      void listReservaMotoristasExtra("grupo", row.id).then((ids) => {
+      void listReservaMotoristasExtraComRepasse("grupo", row.id).then((rows) => {
         if (extrasEditIdRef.current !== editId) return;
-        setExtrasAtribuidos(ids.filter((id) => id !== String(row.motorista_id ?? "")));
+        setExtrasAtribuidos(
+          rows
+            .filter((item) => item.motoristaId !== String(row.motorista_id ?? ""))
+            .map((item) => ({
+              motoristaId: item.motoristaId,
+              repasse: item.repasse != null ? String(item.repasse) : "",
+            })),
+        );
         extrasProntosRef.current = true;
       });
       const cid = (row as { cadastro_cliente_id?: string | null }).cadastro_cliente_id;
@@ -362,6 +374,12 @@ export default function CriarReservaGrupoDialog({
 
     const repasseNumParsed = parseFloat(String(repasseMotorista).replace(",", "."));
     const repasseNum = Number.isFinite(repasseNumParsed) && repasseNumParsed > 0 ? repasseNumParsed : null;
+    const extrasPreparados = montarVinculosExtrasParaGravar(motoristasExtrasRef.current);
+    if (!extrasPreparados.ok) {
+      toast.error("O repasse de um motorista vinculado está inválido. Use zero ou um valor positivo.");
+      setSaving(false);
+      return;
+    }
 
     const nomeMotoristaResolved = (() => {
       if (!motoristaAtribUid.trim()) return nomeMotorista || null;
@@ -502,12 +520,18 @@ export default function CriarReservaGrupoDialog({
     }
 
     if (!error && extrasProntosRef.current) {
-      for (const vinculo of vinculos) {
+      const extrasDivididos = splitRoundTrip ? dividirVinculosNasDuasPernas(extrasPreparados.vinculos) : null;
+      for (const [indice, vinculo] of vinculos.entries()) {
+        const lote = extrasDivididos
+          ? indice === 0
+            ? extrasDivididos.ida
+            : extrasDivididos.volta
+          : extrasPreparados.vinculos;
         const extraErr = await replaceReservaMotoristasExtra({
           userId: user.id,
           kind: "grupo",
           reservaId: vinculo.id,
-          motoristaIds: motoristasExtrasRef.current,
+          vinculos: lote,
           primaryId: vinculo.primary,
         });
         if (extraErr) {
@@ -738,6 +762,7 @@ export default function CriarReservaGrupoDialog({
                   primaryId={motoristaAtribUid}
                   selected={motoristasExtras}
                   onChange={setExtrasAtribuidos}
+                  repassePrincipal={repasseMotorista}
                 />
               </div>
               <div className="space-y-1.5"><Label>Nome (manual / extra)</Label><Input value={nomeMotorista} onChange={(e) => setNomeMotorista(e.target.value)} /></div>
@@ -778,8 +803,11 @@ export default function CriarReservaGrupoDialog({
                 </p>
               </div>
               <div className="space-y-1.5">
-                <Label>Repasse ao motorista (R$)</Label>
+                <Label>Repasse do motorista principal (R$)</Label>
                 <Input inputMode="decimal" placeholder="0,00" value={repasseMotorista} onChange={(e) => setRepasseMotorista(e.target.value)} />
+                <p className="text-xs text-muted-foreground">
+                  Valor só do motorista principal. Cada extra tem o próprio repasse. Ida e volta criadas juntas dividem os valores entre as duas reservas.
+                </p>
               </div>
             </div>
           </div>

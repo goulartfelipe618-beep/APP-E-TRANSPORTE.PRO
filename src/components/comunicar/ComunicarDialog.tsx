@@ -12,6 +12,7 @@ import { listReservaMotoristasExtra, type ReservaKind } from "@/lib/reservaMotor
 import { motoristaMatchesAssignment } from "@/lib/motoristaReservaAssign";
 import {
   interpolarTextoComunicar,
+  limparLinhasDeCampoComunicar,
   persistirTextoComunicar,
 } from "@/lib/comunicarPlaceholders";
 import { listarVariaveisComunicar, montarMensagemComunicar } from "@/lib/comunicarMensagem";
@@ -298,14 +299,8 @@ export default function ComunicarDialog({
       const lista = saved?.vars ?? legado;
       const vars = lista ? new Set(keys.filter((key) => lista.includes(key))) : new Set(keys);
       return {
-        acima: persistirTextoComunicar(saved?.acima ?? padrao?.acima ?? "", {
-          cliente: nomeClienteParaComunicar(dadosRef.current as Record<string, unknown>),
-          motorista: "Motorista",
-        }),
-        abaixo: persistirTextoComunicar(saved?.abaixo ?? padrao?.abaixo ?? "", {
-          cliente: nomeClienteParaComunicar(dadosRef.current as Record<string, unknown>),
-          motorista: "Motorista",
-        }),
+        acima: padrao?.acima ?? "",
+        abaixo: padrao?.abaixo ?? "",
         vars,
       };
     };
@@ -420,8 +415,27 @@ export default function ComunicarDialog({
         return;
       }
 
-      const idNoClique = String((dadosRef.current as { id?: unknown }).id ?? "");
-      const row = jsonSafeRecord(dadosRef.current as Record<string, unknown>) as Record<string, unknown>;
+      const reservaNoClique = jsonSafeRecord({
+        ...(dadosRef.current as Record<string, unknown>),
+      }) as Record<string, unknown>;
+      const idNoClique = String(reservaNoClique.id ?? "");
+      const row = reservaNoClique;
+      const nomesNoClique = {
+        cliente: nomeClienteParaComunicar(reservaNoClique),
+        motorista: nomesComunicar.motorista,
+      };
+      const rascunhosNoClique = {
+        cliente: {
+          acima: rascunhos.cliente.acima,
+          abaixo: rascunhos.cliente.abaixo,
+          vars: new Set(rascunhos.cliente.vars),
+        },
+        motorista: {
+          acima: rascunhos.motorista.acima,
+          abaixo: rascunhos.motorista.abaixo,
+          vars: new Set(rascunhos.motorista.vars),
+        },
+      };
       const phoneCliente = (coletarTelefoneDestinoDoRegistro(telefone, row).replace(/\D/g, "") || "");
       if (destinos.includes("cliente") && !phoneCliente) {
         toast.error("Informe o WhatsApp do cliente.");
@@ -440,7 +454,7 @@ export default function ComunicarDialog({
       }
 
       for (const alvo of destinos) {
-        if (!buildMessage(rascunhos[alvo]).trim()) {
+        if (!buildMessage(rascunhosNoClique[alvo], nomesNoClique, reservaNoClique).trim()) {
           toast.error(alvo === "motorista" ? "Escreva a mensagem do motorista." : "Escreva a mensagem do cliente.");
           return;
         }
@@ -467,22 +481,22 @@ export default function ComunicarDialog({
         const comunicadorSnap = buildComunicadorSnapshot(sistema, own);
 
         for (const alvo of destinos) {
-          const rascunho = rascunhos[alvo];
+          const rascunho = rascunhosNoClique[alvo];
           const destinatarios =
             alvo === "cliente"
-              ? [{ id: "cliente", nome: nomesComunicar.cliente, telefone: phoneCliente }]
+              ? [{ id: "cliente", nome: nomesNoClique.cliente, telefone: phoneCliente }]
               : motoristasComWhatsapp;
           const pdfDeste = alvo === "cliente" ? confirmacaoPdf : null;
           for (const dest of destinatarios) {
-            const nomes = {
-              cliente: nomesComunicar.cliente,
-              motorista: dest.id === "cliente" ? nomesComunicar.motorista : dest.nome,
-            };
-            const rowEnvio = jsonSafeRecord(dadosRef.current as Record<string, unknown>) as Record<string, unknown>;
-            if (String(rowEnvio.id ?? "") !== idNoClique) {
+            if (String((dadosRef.current as { id?: unknown }).id ?? "") !== idNoClique) {
               toast.error("A reserva selecionada mudou. Abra Comunicar novamente.");
               return;
             }
+            const nomes = {
+              cliente: nomesNoClique.cliente,
+              motorista: dest.id === "cliente" ? nomesNoClique.motorista : dest.nome,
+            };
+            const rowEnvio = reservaNoClique;
             const message = buildMessage(rascunho, nomes, rowEnvio);
             const phone = dest.telefone.replace(/\D/g, "");
             const sent = await sendUazapiWhatsappCard({
@@ -516,8 +530,8 @@ export default function ComunicarDialog({
                 variaveis_chaves_incluidas: [...rascunho.vars],
                 mensagem_completa: message,
                 mensagem_partes: {
-                  inicial: interpolarTextoComunicar(rascunho.acima, nomes),
-                  final: interpolarTextoComunicar(rascunho.abaixo, nomes),
+                  inicial: interpolarTextoComunicar(limparLinhasDeCampoComunicar(rascunho.acima), nomes),
+                  final: interpolarTextoComunicar(limparLinhasDeCampoComunicar(rascunho.abaixo), nomes),
                 },
                 motorista_painel: motoristaPainel,
                 motorista_destino: alvo === "motorista" ? dest : null,
@@ -534,9 +548,10 @@ export default function ComunicarDialog({
             }
             enviados += 1;
           }
+          const padrao = textosPadrao(alvo, webhookTipo);
           gravarConfigAlvo(webhookTipo, alvo, {
-            acima: persistirTextoComunicar(rascunho.acima, nomesComunicar),
-            abaixo: persistirTextoComunicar(rascunho.abaixo, nomesComunicar),
+            acima: padrao?.acima ?? "",
+            abaixo: padrao?.abaixo ?? "",
             vars: [...rascunho.vars],
           });
           if (alvo === "cliente") gravarFiltroComunicar(webhookTipo, rascunho.vars);
@@ -568,8 +583,8 @@ export default function ComunicarDialog({
 
         <div className="space-y-4">
           <p className="text-sm text-muted-foreground rounded-lg border border-border bg-muted/40 p-3">
-            Escolha o cliente, o motorista ou os dois. A configuração (texto e chips) é a última gravada;
-            os valores são sempre desta reserva. Conecte o WhatsApp em <strong className="text-foreground">Comunicador</strong> antes do primeiro envio.
+            Escolha o cliente, o motorista ou os dois. A saudação segue o padrão e os chips trazem só esta reserva.
+            Ao enviar, sai exatamente o que está preenchido aqui. Conecte o WhatsApp em <strong className="text-foreground">Comunicador</strong> antes do primeiro envio.
           </p>
 
           {isReservaN8n ? (

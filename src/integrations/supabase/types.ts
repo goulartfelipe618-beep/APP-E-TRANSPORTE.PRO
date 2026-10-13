@@ -1104,6 +1104,7 @@ export type Database = {
           paid_at: string | null
           payment_method: string | null
           payment_status: string
+          repasse_motorista_ref: string | null
           reserva_grupo_id: string | null
           reserva_transfer_id: string | null
           updated_at: string
@@ -1123,6 +1124,7 @@ export type Database = {
           paid_at?: string | null
           payment_method?: string | null
           payment_status?: string
+          repasse_motorista_ref?: string | null
           reserva_grupo_id?: string | null
           reserva_transfer_id?: string | null
           updated_at?: string
@@ -1142,6 +1144,7 @@ export type Database = {
           paid_at?: string | null
           payment_method?: string | null
           payment_status?: string
+          repasse_motorista_ref?: string | null
           reserva_grupo_id?: string | null
           reserva_transfer_id?: string | null
           updated_at?: string
@@ -1721,6 +1724,7 @@ export type Database = {
           created_at: string
           id: string
           motorista_id: string
+          repasse_valor: number | null
           reserva_id: string
           reserva_kind: string
           user_id: string
@@ -1729,6 +1733,7 @@ export type Database = {
           created_at?: string
           id?: string
           motorista_id: string
+          repasse_valor?: number | null
           reserva_id: string
           reserva_kind: string
           user_id: string
@@ -1737,6 +1742,7 @@ export type Database = {
           created_at?: string
           id?: string
           motorista_id?: string
+          repasse_valor?: number | null
           reserva_id?: string
           reserva_kind?: string
           user_id?: string

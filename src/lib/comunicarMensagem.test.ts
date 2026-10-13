@@ -50,6 +50,38 @@ describe("montarMensagemComunicar", () => {
     expect(segunda).not.toContain("2027-01-31");
   });
 
+  it("texto gravado do comunicado anterior não entra no envio desta reserva", () => {
+    const acimaDoAnterior = [
+      "Olá MZ, a sua reserva está confirmada!",
+      "Detalhes da reserva:",
+      "*Embarque (Ida):* FLN - Aeroporto Hercilio Luz",
+      "Data (Ida): 2027-01-31",
+    ].join("\n");
+    const msg = montarMensagemComunicar({
+      dados: {
+        id: "reserva-2",
+        nome_completo: "Ana Costa",
+        ida_embarque: "GRU - Guarulhos",
+        ida_data: "2027-03-02",
+      },
+      acima: acimaDoAnterior,
+      abaixo: "*Valor:* R$ 290,00\nEm breve o motorista entrará em contato!",
+      vars: ["nome_completo", "ida_embarque", "ida_data"],
+      nomes: { cliente: "Ana Costa", motorista: "Carlos" },
+      labels,
+      ignoredKeys: ignored,
+    });
+
+    expect(msg).toContain("Olá Ana Costa, a sua reserva está confirmada!");
+    expect(msg).toContain("*Embarque (Ida):* GRU - Guarulhos");
+    expect(msg).toContain("*Data (Ida):* 2027-03-02");
+    expect(msg).toContain("Em breve o motorista entrará em contato!");
+    expect(msg).not.toContain("MZ");
+    expect(msg).not.toContain("FLN");
+    expect(msg).not.toContain("2027-01-31");
+    expect(msg).not.toContain("R$ 290,00");
+  });
+
   it("o molde gravado não carrega os valores da reserva", () => {
     const sujo = [
       "Olá MZ, a sua reserva está confirmada!",

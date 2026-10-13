@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { motoristaMatchesAssignment } from "@/lib/motoristaReservaAssign";
+import { splitAmountInTwoHalves } from "@/lib/reservaIdaVoltaSplit";
 
 export type ReservaKind = "transfer" | "grupo";
 
@@ -8,6 +9,67 @@ export type MotoristaDaFrota = {
   portal_auth_user_id?: string | null;
   user_id?: string | null;
 };
+
+export type VinculoExtraGravado = { motoristaId: string; repasse: number | null };
+
+export type RepasseExtraInformado = { motoristaId: string; repasse: string };
+
+/** Valor digitado no formulário. Vazio significa motorista vinculado sem repasse. */
+export function parseRepasseInformado(raw: string): { ok: true; valor: number | null } | { ok: false } {
+  const texto = raw.trim();
+  if (!texto) return { ok: true, valor: null };
+  const n = Number(texto.replace(",", "."));
+  if (!Number.isFinite(n) || n < 0) return { ok: false };
+  if (n === 0) return { ok: true, valor: null };
+  return { ok: true, valor: Math.round(n * 100) / 100 };
+}
+
+export function montarVinculosExtrasParaGravar(
+  linhas: RepasseExtraInformado[],
+): { ok: true; vinculos: VinculoExtraGravado[] } | { ok: false } {
+  const vinculos: VinculoExtraGravado[] = [];
+  for (const linha of linhas) {
+    const motoristaId = linha.motoristaId.trim();
+    if (!motoristaId) continue;
+    const parsed = parseRepasseInformado(linha.repasse);
+    if (!parsed.ok) return { ok: false };
+    vinculos.push({ motoristaId, repasse: parsed.valor });
+  }
+  return { ok: true, vinculos };
+}
+
+/** Ida e volta gravadas juntas dividem cada repasse. A soma das duas pernas é o valor informado. */
+export function dividirVinculosNasDuasPernas(vinculos: VinculoExtraGravado[]): {
+  ida: VinculoExtraGravado[];
+  volta: VinculoExtraGravado[];
+} {
+  const ida: VinculoExtraGravado[] = [];
+  const volta: VinculoExtraGravado[] = [];
+  for (const vinculo of vinculos) {
+    if (vinculo.repasse == null) {
+      ida.push({ ...vinculo });
+      volta.push({ ...vinculo });
+      continue;
+    }
+    const [parteIda, parteVolta] = splitAmountInTwoHalves(vinculo.repasse);
+    ida.push({ motoristaId: vinculo.motoristaId, repasse: parteIda > 0 ? parteIda : null });
+    volta.push({ motoristaId: vinculo.motoristaId, repasse: parteVolta > 0 ? parteVolta : null });
+  }
+  return { ida, volta };
+}
+
+/**
+ * O motorista principal vê o repasse da reserva.
+ * O motorista extra vê só o valor marcado para ele, nunca o do principal nem o de outro extra.
+ */
+export function repasseVisivelNoPortal(opts: {
+  acesso: string | null;
+  repassePrincipal: number | null;
+  repasseDesteMotorista: number | null;
+}): number | null {
+  if (opts.acesso === "extra") return opts.repasseDesteMotorista;
+  return opts.repassePrincipal;
+}
 
 /**
  * Converte a seleção da tela no id do cadastro (ficha) de cada motorista extra.
@@ -46,6 +108,38 @@ export function resolverMotoristasExtras(opts: {
   return { ids: [...ids], recusados };
 }
 
+/** O repasse acompanha a ficha desta conta. Motorista de outro administrador continua de fora. */
+export function resolverVinculosExtras(opts: {
+  vinculos: VinculoExtraGravado[];
+  primaryId?: string | null;
+  motoristas: MotoristaDaFrota[];
+  userId: string;
+}): { vinculos: VinculoExtraGravado[]; recusados: string[] } {
+  const { ids, recusados } = resolverMotoristasExtras({
+    selecionados: opts.vinculos.map((v) => v.motoristaId),
+    primaryId: opts.primaryId,
+    motoristas: opts.motoristas,
+    userId: opts.userId,
+  });
+  const repassePorFicha = new Map<string, number | null>();
+  const dono = opts.userId.trim();
+  for (const vinculo of opts.vinculos) {
+    const ficha = opts.motoristas.find((m) => {
+      if ((m.user_id ?? "").trim() && (m.user_id ?? "").trim() !== dono) return false;
+      return m.id === vinculo.motoristaId || motoristaMatchesAssignment(vinculo.motoristaId, m);
+    });
+    if (!ficha?.id) continue;
+    repassePorFicha.set(ficha.id.trim(), vinculo.repasse);
+  }
+  return {
+    vinculos: ids.map((motoristaId) => ({
+      motoristaId,
+      repasse: repassePorFicha.get(motoristaId) ?? null,
+    })),
+    recusados,
+  };
+}
+
 export async function listExtrasDoOperador(
   kind: ReservaKind,
   userId: string,
@@ -64,14 +158,29 @@ export async function listExtrasDoOperador(
     .filter((row) => row.reserva_id && row.motorista_id);
 }
 
-export async function listReservaMotoristasExtra(kind: ReservaKind, reservaId: string): Promise<string[]> {
+export async function listReservaMotoristasExtraComRepasse(
+  kind: ReservaKind,
+  reservaId: string,
+): Promise<VinculoExtraGravado[]> {
   const { data, error } = await supabase
     .from("reserva_motoristas_extra")
-    .select("motorista_id")
+    .select("motorista_id, repasse_valor")
     .eq("reserva_kind", kind)
     .eq("reserva_id", reservaId);
   if (error || !data) return [];
-  return data.map((row) => String(row.motorista_id ?? "").trim()).filter(Boolean);
+  return data.flatMap((row) => {
+    const motoristaId = String(row.motorista_id ?? "").trim();
+    if (!motoristaId) return [];
+    const bruto = row.repasse_valor;
+    const numero = bruto == null ? null : Number(bruto);
+    const repasse = numero != null && Number.isFinite(numero) && numero > 0 ? Math.round(numero * 100) / 100 : null;
+    return [{ motoristaId, repasse }];
+  });
+}
+
+export async function listReservaMotoristasExtra(kind: ReservaKind, reservaId: string): Promise<string[]> {
+  const rows = await listReservaMotoristasExtraComRepasse(kind, reservaId);
+  return rows.map((row) => row.motoristaId);
 }
 
 /** Grava só os motoristas desta reserva e desta conta. Não altera outras reservas nem o motorista principal. */
@@ -79,7 +188,8 @@ export async function replaceReservaMotoristasExtra(opts: {
   userId: string;
   kind: ReservaKind;
   reservaId: string;
-  motoristaIds: string[];
+  motoristaIds?: string[];
+  vinculos?: VinculoExtraGravado[];
   primaryId?: string | null;
 }): Promise<string | null> {
   const frota = await supabase
@@ -89,8 +199,11 @@ export async function replaceReservaMotoristasExtra(opts: {
     .eq("status", "cadastrado");
   if (frota.error) return frota.error.message;
 
-  const { ids, recusados } = resolverMotoristasExtras({
-    selecionados: opts.motoristaIds,
+  const entrada =
+    opts.vinculos ??
+    (opts.motoristaIds ?? []).map((motoristaId) => ({ motoristaId, repasse: null as number | null }));
+  const { vinculos, recusados } = resolverVinculosExtras({
+    vinculos: entrada,
     primaryId: opts.primaryId,
     motoristas: (frota.data ?? []) as MotoristaDaFrota[],
     userId: opts.userId,
@@ -98,6 +211,7 @@ export async function replaceReservaMotoristasExtra(opts: {
   if (recusados.length > 0) {
     return "Um dos motoristas marcados não pertence à sua frota. A reserva não foi vinculada a ele.";
   }
+  const ids = vinculos;
 
   const removed = await supabase
     .from("reserva_motoristas_extra")
@@ -111,11 +225,12 @@ export async function replaceReservaMotoristasExtra(opts: {
   const inserted = await supabase
     .from("reserva_motoristas_extra")
     .insert(
-      ids.map((motorista_id) => ({
+      ids.map((vinculo) => ({
         user_id: opts.userId,
         reserva_kind: opts.kind,
         reserva_id: opts.reservaId,
-        motorista_id,
+        motorista_id: vinculo.motoristaId,
+        repasse_valor: vinculo.repasse,
       })),
     )
     .select("id");

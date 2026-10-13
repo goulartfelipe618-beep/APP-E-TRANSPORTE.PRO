@@ -26,8 +26,13 @@ import {
   isCategoriaVeiculoTransfer,
 } from "@/lib/categoriaVeiculoTransfer";
 import { motoristaAssignValue, motoristaMatchesAssignment, selectValueForMotorista } from "@/lib/motoristaReservaAssign";
-import { listReservaMotoristasExtra, replaceReservaMotoristasExtra } from "@/lib/reservaMotoristasExtra";
-import { MotoristasExtrasField } from "@/components/reservas/MotoristasExtrasField";
+import {
+  dividirVinculosNasDuasPernas,
+  listReservaMotoristasExtraComRepasse,
+  montarVinculosExtrasParaGravar,
+  replaceReservaMotoristasExtra,
+} from "@/lib/reservaMotoristasExtra";
+import { MotoristasExtrasField, type ExtraSelecionado } from "@/components/reservas/MotoristasExtrasField";
 import {
   isTransferPernaDividida,
   resolveMotoristaIdsPorPerna,
@@ -175,8 +180,8 @@ export default function CriarReservaTransferDialog({
   const [repasseMotorista, setRepasseMotorista] = useState("");
   const [motoristasFrota, setMotoristasFrota] = useState<{ id: string; nome: string; portal_auth_user_id: string | null }[]>([]);
   const [motoristaAtribUid, setMotoristaAtribUid] = useState<string>("");
-  const [motoristasExtras, setMotoristasExtras] = useState<string[]>([]);
-  const motoristasExtrasRef = useRef<string[]>([]);
+  const [motoristasExtras, setMotoristasExtras] = useState<ExtraSelecionado[]>([]);
+  const motoristasExtrasRef = useRef<ExtraSelecionado[]>([]);
   const extrasProntosRef = useRef(true);
   const motoristaAtribUidRef = useRef("");
   const editReservaIdRef = useRef<string | null>(null);
@@ -186,7 +191,7 @@ export default function CriarReservaTransferDialog({
     motoristaAtribUidRef.current = uid;
     setMotoristaAtribUid(uid);
   };
-  const setExtrasAtribuidos = (ids: string[]) => {
+  const setExtrasAtribuidos = (ids: ExtraSelecionado[]) => {
     motoristasExtrasRef.current = ids;
     setMotoristasExtras(ids);
   };
@@ -293,9 +298,16 @@ export default function CriarReservaTransferDialog({
       setMotoristaAtribuido(mid);
       extrasProntosRef.current = false;
       setExtrasAtribuidos([]);
-      void listReservaMotoristasExtra("transfer", row.id).then((ids) => {
+      void listReservaMotoristasExtraComRepasse("transfer", row.id).then((rows) => {
         if (hydratedEditIdRef.current !== row.id) return;
-        setExtrasAtribuidos(ids.filter((id) => id !== mid));
+        setExtrasAtribuidos(
+          rows
+            .filter((item) => item.motoristaId !== mid)
+            .map((item) => ({
+              motoristaId: item.motoristaId,
+              repasse: item.repasse != null ? String(item.repasse) : "",
+            })),
+        );
         extrasProntosRef.current = true;
       });
       const cat = (row as { categoria_veiculo?: string | null }).categoria_veiculo;
@@ -518,6 +530,12 @@ export default function CriarReservaTransferDialog({
 
     const repasseNumParsed = parseFloat(String(repasseMotorista).replace(",", "."));
     const repasseNum = Number.isFinite(repasseNumParsed) && repasseNumParsed > 0 ? repasseNumParsed : null;
+    const extrasPreparados = montarVinculosExtrasParaGravar(motoristasExtrasRef.current);
+    if (!extrasPreparados.ok) {
+      toast.error("O repasse de um motorista vinculado está inválido. Use zero ou um valor positivo.");
+      setSaving(false);
+      return;
+    }
 
     const motoristaRaw = (motoristaAtribUidRef.current || motoristaAtribUid).trim();
     const motoristaHit = motoristasFrota.find(
@@ -607,6 +625,7 @@ export default function CriarReservaTransferDialog({
 
     const vinculos: { id: string; primary: string | null }[] = [];
     const editId = reservaEdicao?.id ?? editReservaIdRef.current;
+    const extrasDivididos = !editId && tipoViagem === "ida_volta" ? dividirVinculosNasDuasPernas(extrasPreparados.vinculos) : null;
     if (editId) {
       // Só esta linha: nunca copiar motorista_id para o par (IDA/VOLTA).
       const res = await writeRow(rowPayload as Record<string, unknown>, "update", editId);
@@ -739,12 +758,17 @@ export default function CriarReservaTransferDialog({
     }
 
     if (!error && extrasProntosRef.current) {
-      for (const vinculo of vinculos) {
+      for (const [indice, vinculo] of vinculos.entries()) {
+        const lote = extrasDivididos
+          ? indice === 0
+            ? extrasDivididos.ida
+            : extrasDivididos.volta
+          : extrasPreparados.vinculos;
         const extraErr = await replaceReservaMotoristasExtra({
           userId: user.id,
           kind: "transfer",
           reservaId: vinculo.id,
-          motoristaIds: motoristasExtrasRef.current,
+          vinculos: lote,
           primaryId: vinculo.primary,
         });
         if (extraErr) {
@@ -1194,6 +1218,7 @@ export default function CriarReservaTransferDialog({
                     primaryId={motoristaAtribUid}
                     selected={motoristasExtras}
                     onChange={setExtrasAtribuidos}
+                    repassePrincipal={repasseMotorista}
                   />
                   {reservaEdicao && isTransferPernaDividida(reservaEdicao.tipo_viagem, reservaEdicao.perna_viagem) ? (
                     <p className="text-xs text-muted-foreground sm:col-span-2">
@@ -1310,14 +1335,16 @@ export default function CriarReservaTransferDialog({
                 </p>
               </div>
               <div className="space-y-1.5">
-                <Label>Repasse ao motorista (R$)</Label>
+                <Label>Repasse do motorista principal (R$)</Label>
                 <Input
                   inputMode="decimal"
                   placeholder="0,00"
                   value={repasseMotorista}
                   onChange={(e) => setRepasseMotorista(e.target.value)}
                 />
-                <p className="text-xs text-muted-foreground">Valor a pagar ao motorista após a viagem concluída (margem = total − repasse).</p>
+                <p className="text-xs text-muted-foreground">
+                  Valor só do motorista principal. Cada motorista extra tem o próprio repasse no cartão acima. Ida e volta criadas juntas dividem estes valores entre as duas reservas.
+                </p>
               </div>
             </div>
           </div>

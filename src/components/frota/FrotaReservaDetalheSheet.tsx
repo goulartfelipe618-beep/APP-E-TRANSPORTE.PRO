@@ -111,7 +111,7 @@ export default function FrotaReservaDetalheSheet({ transfer, grupo, open, onOpen
                 ) : (
                   <DetailRow label="Valor total" value={formatCurrency(row.valor_total)} />
                 )}
-                <DetailRow label="Repasse motorista" value={formatCurrency(row.repasse_motorista)} />
+                <DetailRow label="Seu repasse" value={formatCurrency(row.repasse_motorista)} />
               </div>
             </div>
 

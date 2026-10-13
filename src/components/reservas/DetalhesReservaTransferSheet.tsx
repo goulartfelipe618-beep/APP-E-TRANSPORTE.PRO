@@ -15,10 +15,7 @@ import {
 import { labelCategoriaVeiculoTransfer } from "@/lib/categoriaVeiculoTransfer";
 import { parseTrajetosTransfer } from "@/lib/transferTrajetos";
 import { TextoComLinks } from "@/components/TextoComLinks";
-import { listReservaMotoristasExtra } from "@/lib/reservaMotoristasExtra";
-import { resolveMotoristaNome } from "@/lib/motoristaReservaAssign";
-import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { RepassesMotoristasLista } from "@/components/reservas/RepassesMotoristasLista";
 
 type Reserva = Tables<"reservas_transfer">;
 
@@ -31,29 +28,6 @@ interface Props {
 }
 
 export default function DetalhesReservaTransferSheet({ reserva, open, onOpenChange, onComunicar, onDownload }: Props) {
-  const [motoristasTexto, setMotoristasTexto] = useState("");
-  useEffect(() => {
-    if (!reserva) return;
-    let cancel = false;
-    void (async () => {
-      const extras = await listReservaMotoristasExtra("transfer", reserva.id);
-      const ids = [...new Set([reserva.motorista_id, ...extras].map((id) => (id ?? "").trim()).filter(Boolean))];
-      if (ids.length === 0) {
-        if (!cancel) setMotoristasTexto("");
-        return;
-      }
-      const { data } = await supabase
-        .from("solicitacoes_motoristas")
-        .select("id, nome, portal_auth_user_id")
-        .eq("user_id", reserva.user_id);
-      const lista = (data ?? []) as { id: string; nome: string; portal_auth_user_id: string | null }[];
-      const nomes = ids.map((id) => resolveMotoristaNome(id, lista)).filter((nome) => nome !== "—");
-      if (!cancel) setMotoristasTexto(nomes.join("\n"));
-    })();
-    return () => {
-      cancel = true;
-    };
-  }, [reserva]);
   if (!reserva) return null;
 
   const r = reserva;
@@ -184,7 +158,7 @@ export default function DetalhesReservaTransferSheet({ reserva, open, onOpenChan
               <Field label="Método de Pagamento" value={r.metodo_pagamento} />
               <Field label="Valor Total" value={<span className="text-base font-normal text-primary">{formatCurrency(r.valor_total)}</span>} />
               <Field
-                label="Repasse ao motorista"
+                label="Repasse do principal"
                 value={
                   r.repasse_motorista != null && Number(r.repasse_motorista) > 0
                     ? formatCurrency(Number(r.repasse_motorista))
@@ -202,14 +176,16 @@ export default function DetalhesReservaTransferSheet({ reserva, open, onOpenChan
             </div>
           </Section>
 
-          {motoristasTexto ? (
-            <>
-              <Separator />
-              <Section title="Motoristas">
-                <TextoComLinks text={motoristasTexto} className="text-sm" />
-              </Section>
-            </>
-          ) : null}
+          <Separator />
+          <Section title="Motoristas e repasses">
+            <RepassesMotoristasLista
+              kind="transfer"
+              reservaId={r.id}
+              userId={r.user_id}
+              primaryId={r.motorista_id}
+              repassePrincipal={r.repasse_motorista}
+            />
+          </Section>
 
           {r.observacoes && (
             <>
