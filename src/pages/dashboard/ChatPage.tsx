@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useActivePage } from "@/contexts/ActivePageContext";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { fundirMensagens, type ChatMensagem } from "../../supabase/functions/_shared/uazapiChat";
+import { fundirMensagens, type ChatMensagem } from "../../../supabase/functions/_shared/uazapiChat";
 import {
   ROTULO_STATUS,
   ligarEventos,
