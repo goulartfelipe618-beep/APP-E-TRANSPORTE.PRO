@@ -94,13 +94,12 @@ export default function ChatPage() {
   const [urls, setUrls] = useState<Record<string, string>>({});
   const chatRef = useRef<string | null>(null);
   const listaVoo = useRef(false);
+  const geracaoLista = useRef(0);
   const msgSeq = useRef(0);
   const primeiraLista = useRef(true);
   const pedidosMidia = useRef(new Map<string, number>());
-  const midiaEmVoo = useRef(new Set<string>());
+  const midiaEmVoo = useRef(0);
   const fotosPedidas = useRef(new Set<string>());
-  const fotosEmVoo = useRef(false);
-  const [fotoTick, setFotoTick] = useState(0);
   const fimRef = useRef<HTMLDivElement>(null);
   const caixaRef = useRef<HTMLDivElement>(null);
   const pertoDoFim = useRef(true);
@@ -113,9 +112,16 @@ export default function ChatPage() {
 
   const carregarConversas = useCallback(async () => {
     if (listaVoo.current) return;
+    const voo = ++geracaoLista.current;
     listaVoo.current = true;
+    const limite = window.setTimeout(() => {
+      if (geracaoLista.current !== voo) return;
+      listaVoo.current = false;
+      setPronto(true);
+    }, 12000);
     try {
       const res = await listarConversas(0);
+      if (geracaoLista.current !== voo) return;
       if (res.code === "not_connected") {
         if (primeiraLista.current) setSemConexao(true);
         return;
@@ -127,10 +133,17 @@ export default function ChatPage() {
       setSemConexao(false);
       setErro(null);
       setConversas((prev) => fundirConversas(prev, res.chats || []));
+    } catch (e) {
+      if (geracaoLista.current === voo && primeiraLista.current) {
+        setErro(e instanceof Error ? e.message : "Não foi possível sincronizar.");
+      }
     } finally {
-      listaVoo.current = false;
-      primeiraLista.current = false;
-      setPronto(true);
+      window.clearTimeout(limite);
+      if (geracaoLista.current === voo) {
+        listaVoo.current = false;
+        primeiraLista.current = false;
+        setPronto(true);
+      }
     }
   }, []);
 
@@ -154,8 +167,7 @@ export default function ChatPage() {
   }, []);
 
   useEffect(() => {
-    void carregarConversas();
-    void ligarEventos();
+    void carregarConversas().then(() => ligarEventos());
     const timer = window.setInterval(() => {
       void carregarConversas();
       const aberto = chatRef.current;
@@ -178,44 +190,49 @@ export default function ChatPage() {
     if (pertoDoFim.current) fimRef.current?.scrollIntoView({ block: "end" });
   }, [visiveis.length, chatid]);
 
-  useEffect(() => {
-    if (fotosEmVoo.current) return;
-    const faltam = conversas.filter((c) => !c.foto && !fotosPedidas.current.has(c.chatid)).slice(0, 40);
-    if (!faltam.length) return;
-    fotosEmVoo.current = true;
-    void (async () => {
-      for (const c of faltam) {
-        fotosPedidas.current.add(c.chatid);
-        const res = await fotoDoContato(c.chatid);
-        if (!res.url?.startsWith("https://")) continue;
-        setConversas((prev) => prev.map((item) => (item.chatid === c.chatid ? { ...item, foto: res.url as string } : item)));
-      }
-      fotosEmVoo.current = false;
-      setFotoTick((n) => n + 1);
-    })();
-  }, [conversas, fotoTick]);
+  const conversasRef = useRef(conversas);
+  conversasRef.current = conversas;
 
   useEffect(() => {
-    const pendentes = visiveis.filter((m) => classeMidia(m.tipo) && !m.arquivo && !urls[m.chave]);
-    let vagas = 2 - midiaEmVoo.current.size;
-    for (const m of pendentes) {
-      if (vagas <= 0) break;
-      const id = m.id || m.messageid;
-      if (!id || midiaEmVoo.current.has(m.chave) || (pedidosMidia.current.get(m.chave) ?? 0) >= 2) continue;
-      vagas -= 1;
-      midiaEmVoo.current.add(m.chave);
-      void baixarArquivo(id, m.messageid && m.messageid !== id ? m.messageid : null).then((res) => {
-        midiaEmVoo.current.delete(m.chave);
-        if (res.fileURL?.startsWith("https://")) {
-          pedidosMidia.current.set(m.chave, 2);
-          setUrls((prev) => (prev[m.chave] ? prev : { ...prev, [m.chave]: res.fileURL as string }));
-          return;
+    if (!pronto) return;
+    let cancelado = false;
+    void (async () => {
+      for (;;) {
+        if (cancelado) return;
+        if (listaVoo.current) {
+          await new Promise((resolver) => window.setTimeout(resolver, 500));
+          continue;
         }
-        pedidosMidia.current.set(m.chave, (pedidosMidia.current.get(m.chave) ?? 0) + 1);
-        setFotoTick((n) => n + 1);
-      });
-    }
-  }, [fotoTick, urls, visiveis]);
+        const alvo = conversasRef.current.find((c) => !c.foto && !fotosPedidas.current.has(c.chatid));
+        if (!alvo) return;
+        fotosPedidas.current.add(alvo.chatid);
+        const res = await fotoDoContato(alvo.chatid);
+        if (cancelado || !res.url?.startsWith("https://")) continue;
+        setConversas((prev) => prev.map((item) => (item.chatid === alvo.chatid ? { ...item, foto: res.url as string } : item)));
+      }
+    })();
+    return () => {
+      cancelado = true;
+    };
+  }, [pronto, conversas.length]);
+
+  useEffect(() => {
+    if (midiaEmVoo.current >= 1) return;
+    const proxima = visiveis.find((m) => classeMidia(m.tipo) && !m.arquivo && !urls[m.chave] && (m.id || m.messageid) && (pedidosMidia.current.get(m.chave) ?? 0) < 2);
+    if (!proxima) return;
+    const id = proxima.id || proxima.messageid;
+    if (!id) return;
+    midiaEmVoo.current += 1;
+    void baixarArquivo(id, proxima.messageid && proxima.messageid !== id ? proxima.messageid : null).then((res) => {
+      midiaEmVoo.current = Math.max(0, midiaEmVoo.current - 1);
+      if (res.fileURL?.startsWith("https://")) {
+        pedidosMidia.current.set(proxima.chave, 2);
+        setUrls((prev) => (prev[proxima.chave] ? prev : { ...prev, [proxima.chave]: res.fileURL as string }));
+        return;
+      }
+      pedidosMidia.current.set(proxima.chave, (pedidosMidia.current.get(proxima.chave) ?? 0) + 1);
+    });
+  }, [urls, visiveis]);
 
   const confirmarEnvio = async (res: Awaited<ReturnType<typeof enviarTexto>>) => {
     if (res.code === "not_connected") {

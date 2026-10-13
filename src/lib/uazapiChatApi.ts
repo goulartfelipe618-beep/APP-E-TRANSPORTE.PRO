@@ -19,13 +19,7 @@ type Invoke = {
 };
 
 async function chamar(body: Record<string, unknown>): Promise<Invoke & { falhaRede?: string }> {
-  const { data: sess } = await supabase.auth.getSession();
-  const access = sess.session?.access_token;
-  if (!access) return { ok: false, falhaRede: "Sessão expirada. Entre novamente." };
-  const { data, error } = await supabase.functions.invoke<Invoke>("uazapi-chat", {
-    body,
-    headers: { Authorization: `Bearer ${access}` },
-  });
+  const { data, error } = await supabase.functions.invoke<Invoke>("uazapi-chat", { body });
   if (error) {
     let detail = error.message;
     try {
