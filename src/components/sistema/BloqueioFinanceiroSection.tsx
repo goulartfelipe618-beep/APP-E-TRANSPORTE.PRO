@@ -28,7 +28,6 @@ async function validarCodigo(codigo: string): Promise<void> {
   if (challenge.error || !challenge.data) throw challenge.error ?? new Error("Não foi possível validar o código.");
   const verify = await supabase.auth.mfa.verify({ factorId: factor.id, challengeId: challenge.data.id, code });
   if (verify.error) throw new Error("Código inválido.");
-  await supabase.auth.refreshSession();
 }
 
 export default function BloqueioFinanceiroSection() {
@@ -108,7 +107,6 @@ export default function BloqueioFinanceiroSection() {
         if (challenge.error || !challenge.data) throw challenge.error ?? new Error("Não foi possível validar o código.");
         const verify = await supabase.auth.mfa.verify({ factorId, challengeId: challenge.data.id, code });
         if (verify.error) throw new Error("Código inválido.");
-        await supabase.auth.refreshSession();
         setFactorId(null);
       } else {
         await validarCodigo(codigo);

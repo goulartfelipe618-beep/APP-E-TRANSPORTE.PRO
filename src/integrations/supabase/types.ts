@@ -2678,6 +2678,10 @@ export type Database = {
         Args: { p_bloquear: boolean }
         Returns: undefined
       }
+      painel_motorista_evolution_ativo: {
+        Args: never
+        Returns: boolean
+      }
       encerrar_rastreio: {
         Args: {
           p_destino?: string

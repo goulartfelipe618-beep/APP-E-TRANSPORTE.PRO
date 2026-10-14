@@ -2,10 +2,7 @@
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {
   extractUazapiName,
-  extractUazapiToken,
-  findInstanceInAllList,
-  uazapiInitInstance,
-  uazapiListInstances,
+  uazapiCreateInstance,
   uazapiRoot,
   uazapiStatus,
 } from "./uazapi.ts";
@@ -202,9 +199,6 @@ export async function getAuthorizedUserAndCreds(
   };
 }
 
-const DEFAULT_CREATE_INSTANCE_URL =
-  "https://grlwciflaotripbumhve.supabase.co/functions/v1/create-instance-url";
-
 /** Cria instância na plataforma (token só no servidor). Nunca expor o token da plataforma ao browser. */
 export async function loadPlatformCreateToken(supabaseAdmin: SupabaseClient): Promise<string> {
   const fromEnv = (Deno.env.get("UAZAPI_PLATFORM_CREATE_TOKEN") || "").trim();
@@ -221,43 +215,62 @@ export async function createInstanceViaPlatform(opts: {
   name: string;
   deviceName: string;
   platformToken?: string;
+  serverUrl?: string;
+  ownerUserId?: string;
 }): Promise<{ serverUrl: string; instanceToken: string; instanceName: string }> {
   const platformToken = (opts.platformToken || (Deno.env.get("UAZAPI_PLATFORM_CREATE_TOKEN") || "")).trim();
   if (!platformToken) {
     throw new Error("Token da plataforma UAZAPI não está configurado no servidor.");
   }
-  const createUrl = (Deno.env.get("UAZAPI_CREATE_INSTANCE_URL") || DEFAULT_CREATE_INSTANCE_URL).trim();
-  const res = await fetch(createUrl, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      token: platformToken,
-      name: opts.name,
-      deviceName: opts.deviceName,
-    }),
+  const root = uazapiRoot(
+    (opts.serverUrl || Deno.env.get("UAZAPI_SERVER_URL") || "https://ipazua.uazapi.com").trim(),
+  );
+  const res = await uazapiCreateInstance(root, platformToken, {
+    name: opts.name,
+    systemName: opts.deviceName || "E-Transporte.pro",
+    adminField01: opts.ownerUserId || "",
+    adminField02: "usuario",
   });
-  const text = await res.text();
-  let json: unknown = null;
-  try {
-    json = text ? JSON.parse(text) : null;
-  } catch {
-    json = null;
-  }
   if (res.status === 401) throw new Error("Token da plataforma UAZAPI inválido ou expirado.");
   if (res.status === 403) throw new Error("Saldo insuficiente para criar instância UAZAPI.");
-  if (res.status === 400) throw new Error("Parâmetros em falta ao criar a instância.");
-  if (!res.ok) {
-    throw new Error(`Falha ao criar instância (${res.status}): ${text.slice(0, 280)}`);
+  if (res.status === 400 || res.status === 409) {
+    throw new Error("Não foi possível abrir uma instância nova com esse nome.");
   }
-  const o = json && typeof json === "object" ? (json as Record<string, unknown>) : {};
-  const instanceToken = String(o["Instance Token"] || o.instance_token || o.instanceToken || "").trim();
-  const serverUrl = String(o.server_url || o.serverUrl || "https://ipazua.uazapi.com").trim();
+  if (!res.ok) throw new Error(`Falha ao criar instância (${res.status}).`);
+  const o = res.json && typeof res.json === "object" ? (res.json as Record<string, unknown>) : {};
   const inst = o.instance && typeof o.instance === "object" ? (o.instance as Record<string, unknown>) : {};
-  const instanceName = String(inst.name || opts.name).trim();
+  const instanceToken = String(o.token || inst.token || "").trim();
+  const instanceName = String(o.name || inst.name || opts.name).trim();
   if (!instanceToken || instanceToken.length < 16) {
-    throw new Error("A plataforma não devolveu o token da instância.");
+    throw new Error("A UAZAPI não devolveu o token da instância nova.");
   }
-  return { serverUrl, instanceToken, instanceName };
+  return { serverUrl: root, instanceToken, instanceName };
+}
+
+/** True quando o token já está na instância oficial ou na conta de outro utilizador. */
+export async function tokenJaUsadoPorOutraConta(
+  supabaseAdmin: SupabaseClient,
+  token: string,
+  userId: string,
+): Promise<boolean> {
+  const t = token.trim();
+  if (!t) return false;
+  const { data } = await supabaseAdmin
+    .from("comunicadores_evolution")
+    .select("escopo, user_id")
+    .eq("uazapi_instance_token", t);
+  const naLinha = (data || []).some((r) => {
+    if (r.escopo === "sistema") return true;
+    return r.escopo === "usuario" && typeof r.user_id === "string" && r.user_id !== userId;
+  });
+  if (naLinha) return true;
+  const { data: assigned } = await supabaseAdmin
+    .from("comunicador_uazapi_instancias")
+    .select("assigned_user_id")
+    .eq("instance_token", t);
+  return (assigned || []).some(
+    (r) => typeof r.assigned_user_id === "string" && r.assigned_user_id !== userId,
+  );
 }
 
 export async function loadStoredInstanceToken(
@@ -300,10 +313,14 @@ export async function loadStoredInstanceToken(
     .maybeSingle();
   if (!full.error) {
     const ownTok = (full.data as { uazapi_instance_token?: string | null } | null)?.uazapi_instance_token?.trim() || null;
-    if (ownTok) return ownTok;
+    if (ownTok && !(await tokenJaUsadoPorOutraConta(supabaseAdmin, ownTok, userId))) return ownTok;
   }
   const assigned = await loadAssignedUazapiInstance(supabaseAdmin, userId);
-  return assigned?.instance_token ?? null;
+  const assignedTok = assigned?.instance_token ?? null;
+  if (assignedTok && !(await tokenJaUsadoPorOutraConta(supabaseAdmin, assignedTok, userId))) {
+    return assignedTok;
+  }
+  return null;
 }
 
 async function updateComunicadorPatch(
@@ -416,37 +433,16 @@ async function tokenWorksAsInstance(
   return null;
 }
 
-/** Garante instância uazapi: token já gravado, token da plataforma, ou init admin. */
+/** Só aceita o token já gravado nesta conta. Não usa o token admin nem lista as outras instâncias. */
 export async function ensureUazapiInstanceToken(
   root: string,
-  adminToken: string,
-  instanceName: string,
+  _adminToken: string,
+  _instanceName: string,
   storedToken: string | null,
 ): Promise<{ token: string; initJson: unknown; detail?: string }> {
   const storedOk = await tokenWorksAsInstance(root, storedToken);
   if (storedOk) return storedOk;
-
-  const platformOk = await tokenWorksAsInstance(root, adminToken);
-  if (platformOk) {
-    return { ...platformOk, detail: "token da plataforma (instância)" };
-  }
-
-  const init = await uazapiInitInstance(root, adminToken, instanceName, "E-Transporte.pro");
-  const fromInit = extractUazapiToken(init.json);
-  if (fromInit) {
-    return { token: fromInit, initJson: init.json };
-  }
-
-  const listed = await uazapiListInstances(root, adminToken);
-  const hit = findInstanceInAllList(listed.json, instanceName);
-  const fromList = extractUazapiToken(hit);
-  if (fromList) {
-    return { token: fromList, initJson: hit, detail: init.text.slice(0, 400) };
-  }
-
-  throw new Error(
-    `Não foi possível criar/obter a instância uazapi (${init.status}): ${init.text.slice(0, 500)}`,
-  );
+  throw new Error("Esta conta ainda não tem uma instância UAZAPI própria.");
 }
 
 /** Impede que um segundo utilizador reutilize o token único da plataforma. */

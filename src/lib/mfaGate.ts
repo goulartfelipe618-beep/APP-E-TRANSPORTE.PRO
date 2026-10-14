@@ -71,22 +71,10 @@ export async function sessionRequiresMfaTotpChallenge(
 
   let { data: assurance, error: assuranceErr } = await runAssurance();
 
-  if (assuranceErr) {
-    if (sessionHint) {
-      /** Logo após login, não refrescar de imediato — pode misturar estado; só repetir AAL. */
-      await new Promise((r) => setTimeout(r, 120));
-      ({ data: assurance, error: assuranceErr } = await runAssurance());
-    }
-    if (assuranceErr && !sessionHint) {
-      await supabase.auth.refreshSession();
-      const { data: s2 } = await supabase.auth.getSession();
-      const t2 = s2.session?.access_token;
-      if (t2 && jwtAuthenticatorAssuranceLevel(t2) === "aal2") {
-        return false;
-      }
-      if (t2) accessToken = t2;
-      ({ data: assurance, error: assuranceErr } = await runAssurance());
-    }
+  if (assuranceErr && sessionHint) {
+    /** Logo após login, só repetir a leitura. Renovar o token aqui apaga o refresh da sessão aal1. */
+    await new Promise((r) => setTimeout(r, 120));
+    ({ data: assurance, error: assuranceErr } = await runAssurance());
   }
 
   const apiRequiresStepUp =

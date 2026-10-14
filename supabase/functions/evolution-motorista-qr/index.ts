@@ -1,6 +1,6 @@
 /**
- * Cria instância na plataforma (create-instance-url) se ainda não existir e devolve o QR.
- * Token da plataforma só no secret do servidor.
+ * Abre o QR da instância desta conta. Se ela ainda não tiver uma instância exclusiva,
+ * cria uma nova na UAZAPI sem listar, apagar ou reconectar as instâncias das outras contas.
  */
 import {
   corsHeaders,
@@ -10,6 +10,7 @@ import {
   loadStoredInstanceToken,
   parseUazapiTarget,
   persistUazapiInstanceToken,
+  tokenJaUsadoPorOutraConta,
 } from "../_shared/evolutionMotorista.ts";
 import {
   extractUazapiQrBase64,
@@ -90,30 +91,38 @@ Deno.serve(async (req) => {
       if (tokenRecusado(probe.status, probe.text)) token = null;
     }
 
-    if (!token) {
+    const abrirInstanciaDestaConta = async () => {
       const platformToken = await loadPlatformCreateToken(supabaseAdmin);
-      const suffix = Date.now().toString(36).slice(-6);
-      const names = [`${instanceName}-${suffix}`, instanceName];
-      let lastCreateErr = "";
-      for (const name of names) {
-        try {
-          const created = await createInstanceViaPlatform({
-            name,
-            deviceName: "E-Transporte.pro",
-            platformToken,
-          });
-          token = created.instanceToken;
-          resolvedName = created.instanceName || name;
-          root = uazapiRoot(created.serverUrl || baseUrl);
-          lastCreateErr = "";
-          break;
-        } catch (e) {
-          lastCreateErr = e instanceof Error ? e.message : String(e);
-        }
+      const name = `${instanceName}-${Date.now().toString(36).slice(-6)}`;
+      const created = await createInstanceViaPlatform({
+        name,
+        deviceName: "E-Transporte.pro",
+        platformToken,
+        serverUrl: root,
+        ownerUserId: target === "own" ? user.id : "",
+      });
+      if (
+        target === "own" &&
+        (await tokenJaUsadoPorOutraConta(supabaseAdmin, created.instanceToken, user.id))
+      ) {
+        throw new Error("A instância devolvida já pertence a outra conta. Nada foi alterado.");
       }
-      if (!token) {
-        return failureResponse("Não foi possível criar a instância UAZAPI.", lastCreateErr, "uazapi_create");
+      token = created.instanceToken;
+      resolvedName = created.instanceName || name;
+      root = uazapiRoot(created.serverUrl || baseUrl);
+    };
+
+    if (!token) {
+      try {
+        await abrirInstanciaDestaConta();
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        return failureResponse("Não foi possível criar a instância UAZAPI.", msg, "uazapi_create");
       }
+    }
+
+    if (!token) {
+      return failureResponse("Não foi possível criar a instância UAZAPI.", "Sem token da conta.", "uazapi_create");
     }
 
     await persistUazapiInstanceToken(supabaseAdmin, {
@@ -141,15 +150,7 @@ Deno.serve(async (req) => {
       if (!recriouToken && tokenRecusado(st.status, st.text)) {
         recriouToken = true;
         token = "";
-        const platformToken = await loadPlatformCreateToken(supabaseAdmin);
-        const created = await createInstanceViaPlatform({
-          name: `${instanceName}-${Date.now().toString(36).slice(-6)}`,
-          deviceName: "E-Transporte.pro",
-          platformToken,
-        });
-        token = created.instanceToken;
-        resolvedName = created.instanceName || resolvedName;
-        root = uazapiRoot(created.serverUrl || baseUrl);
+        await abrirInstanciaDestaConta();
         connectStarted = false;
         await persistUazapiInstanceToken(supabaseAdmin, {
           target,
@@ -178,15 +179,7 @@ Deno.serve(async (req) => {
       lastText = conn.text;
       if (!recriouToken && tokenRecusado(conn.status, conn.text)) {
         recriouToken = true;
-        const platformToken = await loadPlatformCreateToken(supabaseAdmin);
-        const created = await createInstanceViaPlatform({
-          name: `${instanceName}-${Date.now().toString(36).slice(-6)}`,
-          deviceName: "E-Transporte.pro",
-          platformToken,
-        });
-        token = created.instanceToken;
-        resolvedName = created.instanceName || resolvedName;
-        root = uazapiRoot(created.serverUrl || baseUrl);
+        await abrirInstanciaDestaConta();
         connectStarted = false;
         await persistUazapiInstanceToken(supabaseAdmin, {
           target,

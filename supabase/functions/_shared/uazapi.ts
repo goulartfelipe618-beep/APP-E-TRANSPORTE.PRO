@@ -107,6 +107,24 @@ export async function uazapiInitInstance(
   });
 }
 
+/** Cria uma instância nova. Não lista nem altera instâncias já existentes. */
+export async function uazapiCreateInstance(
+  root: string,
+  adminToken: string,
+  body: { name: string; systemName?: string; adminField01?: string; adminField02?: string },
+): Promise<{ status: number; text: string; json: unknown }> {
+  return await uazapiFetch(`${root}/instance/create`, {
+    method: "POST",
+    headers: adminHeaders(adminToken, true),
+    body: JSON.stringify({
+      name: body.name,
+      systemName: body.systemName || "E-Transporte.pro",
+      ...(body.adminField01 ? { adminField01: body.adminField01 } : {}),
+      ...(body.adminField02 ? { adminField02: body.adminField02 } : {}),
+    }),
+  });
+}
+
 export async function uazapiListInstances(
   root: string,
   adminToken: string,

@@ -4,6 +4,7 @@ import { Shield, Loader2, LogOut } from "lucide-react";
 import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
+import { isTabLeader } from "@/lib/tabLeader";
 import { getPostLoginPath } from "@/lib/sessionRole";
 import { limparEntradaPeloLinkUnico, MSG_MINI_PAINEL_SO_PELO_LINK } from "@/lib/motoristaPortalEntrada";
 import {
@@ -68,6 +69,13 @@ export default function MfaChallengePage() {
     if (message) toast.error(message);
     navigate("/login", { replace: true });
   };
+
+  useEffect(() => {
+    void supabase.auth.stopAutoRefresh();
+    return () => {
+      if (isTabLeader()) void supabase.auth.startAutoRefresh();
+    };
+  }, []);
 
   useEffect(() => {
     const run = async () => {
@@ -136,14 +144,16 @@ export default function MfaChallengePage() {
       });
       if (verify.error) throw verify.error;
 
-      toast.success("2FA verificado com sucesso.");
-      await supabase.auth.refreshSession();
-
-      const stillNeeds = await sessionRequiresMfaTotpChallenge(supabase);
-      if (stillNeeds) {
+      const tokenElevado = verify.data?.access_token;
+      const aal2 =
+        (tokenElevado && jwtAuthenticatorAssuranceLevel(tokenElevado) === "aal2") ||
+        jwtAuthenticatorAssuranceLevel((await supabase.auth.getSession()).data.session?.access_token ?? "") === "aal2";
+      if (!aal2) {
         throw new Error("A sessão não foi elevada a AAL2. Atualize a página ou termine a sessão e entre de novo.");
       }
 
+      if (isTabLeader()) void supabase.auth.startAutoRefresh();
+      toast.success("2FA verificado com sucesso.");
       await redirectByRole();
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : "Código inválido. Tente novamente.";

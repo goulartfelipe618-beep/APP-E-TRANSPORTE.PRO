@@ -800,9 +800,6 @@ export default function SistemaConfiguracoesPage() {
       setTwoFaDialogOpen(false);
       resetTwoFaSetup({ unenrollPendingId: null });
       window.dispatchEvent(new Event("mfa-atualizado"));
-
-      // Garante que o JWT seja atualizado para aal2.
-      await supabase.auth.refreshSession();
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : "Código inválido. Tente novamente.";
       setMfaSetupError(message);
@@ -826,7 +823,6 @@ export default function SistemaConfiguracoesPage() {
           if (challenge.error || !challenge.data) throw challenge.error ?? new Error("Não foi possível validar o código.");
           const verify = await supabase.auth.mfa.verify({ factorId, challengeId: challenge.data.id, code: codigo });
           if (verify.error) throw new Error("Código inválido.");
-          await supabase.auth.refreshSession();
         },
         liberarFinanceiro: async () => {
           const { error } = await supabase.rpc("definir_bloqueio_financeiro", { p_bloquear: false });

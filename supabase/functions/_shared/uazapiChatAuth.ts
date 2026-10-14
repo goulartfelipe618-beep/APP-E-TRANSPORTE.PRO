@@ -27,7 +27,7 @@ async function tokenDaConta(admin: SupabaseClient, userId: string): Promise<stri
     .maybeSingle();
   if (!full.error) {
     const own = (full.data as { uazapi_instance_token?: string | null } | null)?.uazapi_instance_token?.trim() || null;
-    if (own) return own;
+    if (own && !(await tokenDeOutraConta(admin, own, userId))) return own;
   }
   const assigned = await admin
     .from("comunicador_uazapi_instancias")
@@ -35,7 +35,19 @@ async function tokenDaConta(admin: SupabaseClient, userId: string): Promise<stri
     .eq("assigned_user_id", userId)
     .maybeSingle();
   const token = String((assigned.data as { instance_token?: string } | null)?.instance_token || "").trim();
-  return token || null;
+  if (token && !(await tokenDeOutraConta(admin, token, userId))) return token;
+  return null;
+}
+
+async function tokenDeOutraConta(admin: SupabaseClient, token: string, userId: string): Promise<boolean> {
+  const { data } = await admin
+    .from("comunicadores_evolution")
+    .select("escopo, user_id")
+    .eq("uazapi_instance_token", token);
+  return (data || []).some((r) => {
+    if (r.escopo === "sistema") return true;
+    return r.escopo === "usuario" && typeof r.user_id === "string" && r.user_id !== userId;
+  });
 }
 
 type SessaoPronta = { userId: string; baseUrl: string; token: string; conectado: boolean };
@@ -95,6 +107,7 @@ export async function sessaoDoChat(
     telefone_conectado?: string | null;
   } | null;
   let token = linha?.uazapi_instance_token?.trim() || "";
+  if (token && (await tokenDeOutraConta(admin, token, user.id))) token = "";
   if (!token) token = (await tokenDaConta(admin, user.id)) || "";
   let baseUrl: string;
   try {
