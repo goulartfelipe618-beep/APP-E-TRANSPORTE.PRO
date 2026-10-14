@@ -22,8 +22,18 @@ function isConfirmedSyncConnected(sync: { connected: boolean; phone: string | nu
   return CONNECTED_STATUS.has((sync.state || "").trim().toLowerCase());
 }
 
+function instanciaDestaConta(
+  row: { user_id?: string | null; instance_name?: string | null } | null,
+  userId: string | null,
+): boolean {
+  if (!row || !userId || row.user_id !== userId) return false;
+  const nome = (row.instance_name || "").toLowerCase();
+  if (!nome) return false;
+  return nome.includes(userId.replace(/-/g, "").slice(0, 16));
+}
+
 export default function ComunicadorWhatsappPage() {
-  const { own, loading, reload } = useComunicadoresEvolution();
+  const { own, sessionUserId, sessionEmail, loading, reload } = useComunicadoresEvolution();
   const [qrSession, setQrSession] = useState(false);
   const [sessionDeadline, setSessionDeadline] = useState<number | null>(null);
   const [sessionQrBase64, setSessionQrBase64] = useState<string | null>(null);
@@ -212,11 +222,15 @@ export default function ComunicadorWhatsappPage() {
   }, [persistOwnPatch, trySync, own]);
 
   const qrImg = ownConnected ? null : qrSrc(sessionQrBase64);
-  const temInstancia = Boolean(own?.instance_name?.trim()) || ownConnected || own?.connection_status === "aguardando_qr";
+  const visivelNestaConta = instanciaDestaConta(own, sessionUserId);
+  const temInstancia = visivelNestaConta && (Boolean(own?.instance_name?.trim()) || ownConnected || own?.connection_status === "aguardando_qr");
   const numero = own?.telefone_conectado ? formatPhoneBrDisplay(own.telefone_conectado) : null;
 
   return (
     <div className="flex flex-col items-center gap-6 py-10">
+      {sessionEmail ? (
+        <p className="text-xs text-muted-foreground">Conta conectada no painel: {sessionEmail}</p>
+      ) : null}
       {temInstancia ? (
         <div className="flex w-full max-w-md flex-col items-center gap-3 rounded-lg border border-border bg-card p-4 text-center">
           <p className="text-sm text-foreground">
@@ -240,7 +254,11 @@ export default function ComunicadorWhatsappPage() {
             Desconectar exclui só a sua instância na UAZAPI. Depois, toque em Comunicar para gerar um QR Code novo.
           </p>
         </div>
-      ) : null}
+      ) : (
+        <p className="max-w-md text-center text-sm text-muted-foreground">
+          Esta conta ainda não tem WhatsApp próprio. Toque em Comunicar para abrir uma instância só sua.
+        </p>
+      )}
       <Button
         type="button"
         className="bg-[#FF6600] text-white hover:bg-[#FF6600]/90"

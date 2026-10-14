@@ -24,10 +24,14 @@ export function useComunicadoresEvolution(opts?: { includeUsuarioComunicador?: b
 
   const [sistema, setSistema] = useState<ComunicadorRow | null>(null);
   const [own, setOwn] = useState<ComunicadorRow | null>(null);
+  const [sessionUserId, setSessionUserId] = useState<string | null>(null);
+  const [sessionEmail, setSessionEmail] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser();
+    setSessionUserId(user?.id ?? null);
+    setSessionEmail(user?.email ?? null);
     if (!user) {
       setSistema(null);
       setOwn(null);
@@ -48,14 +52,23 @@ export function useComunicadoresEvolution(opts?: { includeUsuarioComunicador?: b
       supabase.from("comunicadores_evolution").select(COMUNICADOR_COLS).eq("escopo", "usuario").eq("user_id", user.id).maybeSingle(),
     ]);
 
+    const linha = ownRes.data ?? null;
     setSistema(sysRes.data ?? null);
-    setOwn(ownRes.data ?? null);
+    setOwn(linha && linha.user_id === user.id ? linha : null);
     setLoading(false);
   }, [includeUsuario]);
 
   useEffect(() => {
+    setOwn(null);
+    setSistema(null);
     void load();
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
+      setOwn(null);
+      setSistema(null);
+      void load();
+    });
+    return () => subscription.unsubscribe();
   }, [load]);
 
-  return { sistema, own, loading, reload: load, setSistema, setOwn };
+  return { sistema, own, sessionUserId, sessionEmail, loading, reload: load, setSistema, setOwn };
 }
