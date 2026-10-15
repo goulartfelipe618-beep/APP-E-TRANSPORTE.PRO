@@ -10,7 +10,7 @@ import {
 } from "@/lib/evolutionApi";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
+import { Loader2, QrCode, Smartphone } from "lucide-react";
 
 const QR_SESSION_MS = 10 * 60 * 1000;
 const POLL_MS = 3000;
@@ -33,7 +33,7 @@ function instanciaDestaConta(
 }
 
 export default function ComunicadorWhatsappPage() {
-  const { own, sessionUserId, sessionEmail, loading, reload } = useComunicadoresEvolution();
+  const { own, sessionUserId, loading, reload } = useComunicadoresEvolution();
   const [qrSession, setQrSession] = useState(false);
   const [sessionDeadline, setSessionDeadline] = useState<number | null>(null);
   const [sessionQrBase64, setSessionQrBase64] = useState<string | null>(null);
@@ -151,7 +151,7 @@ export default function ComunicadorWhatsappPage() {
       if (left <= 0 && !expiryNotifiedRef.current) {
         expiryNotifiedRef.current = true;
         void endQrSessionRef.current({ connected: false });
-        toast.message("Tempo do QR expirou. Toque em Comunicar para gerar outro.");
+        toast.message("O QR expirou. Toque em Escanear QR Code para gerar outro.");
       }
     }, 1000);
 
@@ -185,7 +185,7 @@ export default function ComunicadorWhatsappPage() {
         nome_dispositivo: null,
         foto_perfil_url: null,
       });
-      toast.success("WhatsApp desconectado. A instância foi excluída. Toque em Comunicar para gerar um novo QR Code.");
+      toast.success("WhatsApp desconectado desta conta.");
     } finally {
       setBusyQr(false);
     }
@@ -199,9 +199,6 @@ export default function ComunicadorWhatsappPage() {
         const detail = (pack.detail || "").toLowerCase();
         if (pack.code === "already_connected" || detail.includes("already in use")) {
           await trySync();
-          if (!isOwnEvolutionConnected(own)) {
-            toast.message("Instância já existe. Desconecte para criar um novo vínculo.");
-          }
           return;
         }
         toast.error(pack.detail || "Não foi possível gerar o QR Code.");
@@ -221,56 +218,60 @@ export default function ComunicadorWhatsappPage() {
     }
   }, [persistOwnPatch, trySync, own]);
 
-  const qrImg = ownConnected ? null : qrSrc(sessionQrBase64);
-  const visivelNestaConta = instanciaDestaConta(own, sessionUserId);
-  const temInstancia = visivelNestaConta && (Boolean(own?.instance_name?.trim()) || ownConnected || own?.connection_status === "aguardando_qr");
-  const numero = own?.telefone_conectado ? formatPhoneBrDisplay(own.telefone_conectado) : null;
+  const qrImg = qrSrc(sessionQrBase64);
+  const meuWhatsapp = instanciaDestaConta(own, sessionUserId) && Boolean(own?.telefone_conectado?.trim());
+  const numero = meuWhatsapp && own?.telefone_conectado ? formatPhoneBrDisplay(own.telefone_conectado) : null;
 
   return (
-    <div className="flex flex-col items-center gap-6 py-10">
-      {sessionEmail ? (
-        <p className="text-xs text-muted-foreground">Conta conectada no painel: {sessionEmail}</p>
-      ) : null}
-      {temInstancia ? (
-        <div className="flex w-full max-w-md flex-col items-center gap-3 rounded-lg border border-border bg-card p-4 text-center">
-          <p className="text-sm text-foreground">
-            {ownConnected ? "WhatsApp conectado" : "Instância do WhatsApp ainda existe"}
-            {own?.nome_dispositivo?.trim() ? ` · ${own.nome_dispositivo.trim()}` : ""}
-          </p>
-          {numero ? <p className="font-mono text-sm">{numero}</p> : null}
-          {own?.instance_name ? (
-            <p className="font-mono text-xs text-muted-foreground">{own.instance_name}</p>
-          ) : null}
-          <Button
-            type="button"
-            variant="destructive"
-            onClick={() => void handleDesconectar()}
-            disabled={busyQr || loading}
-          >
-            {busyQr ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-            Desconectar
-          </Button>
-          <p className="text-xs text-muted-foreground">
-            Desconectar exclui só a sua instância na UAZAPI. Depois, toque em Comunicar para gerar um QR Code novo.
-          </p>
+    <div className="mx-auto flex w-full max-w-lg flex-col px-4 py-8 sm:py-14">
+      <section className="rounded-2xl border border-border bg-card px-6 py-8 shadow-sm sm:px-10 sm:py-10">
+        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#FF6600]/15 text-[#FF6600]">
+          {numero ? <Smartphone className="h-7 w-7" /> : <QrCode className="h-7 w-7" />}
         </div>
-      ) : (
-        <p className="max-w-md text-center text-sm text-muted-foreground">
-          Esta conta ainda não tem WhatsApp próprio. Toque em Comunicar para abrir uma instância só sua.
+        <h1 className="mt-5 text-center text-2xl font-semibold tracking-tight text-foreground">Comunicador</h1>
+        <p className="mx-auto mt-2 max-w-sm text-center text-sm leading-relaxed text-muted-foreground">
+          {numero
+            ? "Este número envia as mensagens desta conta. Nenhuma outra empresa vê esta ligação."
+            : "Esta conta começa sem WhatsApp. Toque no botão para gerar o QR Code e conectar o seu número."}
         </p>
-      )}
-      <Button
-        type="button"
-        className="bg-[#FF6600] text-white hover:bg-[#FF6600]/90"
-        onClick={() => void handleConectar()}
-        disabled={busyQr || loading}
-      >
-        {busyQr ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-        Comunicar
-      </Button>
-      {qrSession && qrImg ? (
-        <img src={qrImg} alt="QR Code WhatsApp" className="h-52 w-52 object-contain" />
-      ) : null}
+
+        {numero ? (
+          <div className="mt-8 flex flex-col items-center gap-4">
+            <p className="text-center text-sm text-muted-foreground">WhatsApp desta conta</p>
+            <p className="text-center text-lg font-medium text-foreground">{numero}</p>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => void handleDesconectar()}
+              disabled={busyQr || loading}
+            >
+              {busyQr ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Desconectar
+            </Button>
+          </div>
+        ) : qrSession && qrImg ? (
+          <div className="mt-8 flex flex-col items-center gap-4">
+            <div className="rounded-2xl bg-white p-4 shadow-sm">
+              <img src={qrImg} alt="QR Code para conectar o WhatsApp" className="h-56 w-56 object-contain" />
+            </div>
+            <p className="max-w-xs text-center text-sm text-muted-foreground">
+              No celular, abra o WhatsApp, toque em Aparelhos conectados e leia este código.
+            </p>
+          </div>
+        ) : (
+          <div className="mt-8 flex justify-center">
+            <Button
+              type="button"
+              className="h-11 bg-[#FF6600] px-6 text-white hover:bg-[#FF6600]/90"
+              onClick={() => void handleConectar()}
+              disabled={busyQr || loading}
+            >
+              {busyQr ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <QrCode className="mr-2 h-4 w-4" />}
+              Escanear QR Code
+            </Button>
+          </div>
+        )}
+      </section>
     </div>
   );
 }
