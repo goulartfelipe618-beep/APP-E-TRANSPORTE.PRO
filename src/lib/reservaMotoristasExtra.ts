@@ -211,6 +211,25 @@ export async function replaceReservaMotoristasExtra(opts: {
   if (recusados.length > 0) {
     return "Um dos motoristas marcados não pertence à sua frota. A reserva não foi vinculada a ele.";
   }
+
+  const viaServidor = await supabase.rpc("replace_reserva_motoristas_extra", {
+    p_kind: opts.kind,
+    p_reserva_id: opts.reservaId,
+    p_vinculos: vinculos.map((vinculo) => ({
+      motorista_id: vinculo.motoristaId,
+      repasse: vinculo.repasse,
+    })),
+  });
+  if (!viaServidor.error) {
+    const gravados = typeof viaServidor.data === "number" ? viaServidor.data : Number(viaServidor.data);
+    if (Number.isFinite(gravados) && gravados === vinculos.length) return null;
+    return "A reserva foi salva, mas o vínculo com os outros motoristas não foi confirmado.";
+  }
+  const faltouFuncao =
+    viaServidor.error.code === "PGRST202" ||
+    /replace_reserva_motoristas_extra/i.test(viaServidor.error.message);
+  if (!faltouFuncao) return viaServidor.error.message;
+
   const ids = vinculos;
 
   const removed = await supabase

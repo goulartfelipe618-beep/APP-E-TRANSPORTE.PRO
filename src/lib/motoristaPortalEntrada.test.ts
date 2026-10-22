@@ -4,6 +4,7 @@ import {
   lerPreviewDoDono,
   lerTokenDaEntrada,
   loginDoMotoristaTrocaraOutraConta,
+  saidaDoMiniPainelEhLocal,
   sessaoPodeAbrirMiniPainelDoDono,
 } from "@/lib/motoristaPortalEntrada";
 
@@ -34,6 +35,13 @@ describe("mini painel na guia do admin", () => {
     expect(sessaoPodeAbrirMiniPainelDoDono({ sessionUserId: "admin-1", fichaUserId: "admin-1", papel: "cliente" })).toBe(true);
     expect(sessaoPodeAbrirMiniPainelDoDono({ sessionUserId: "mestre", fichaUserId: "admin-1", papel: "admin_master" })).toBe(true);
     expect(sessaoPodeAbrirMiniPainelDoDono({ sessionUserId: "outro", fichaUserId: "admin-1", papel: "cliente" })).toBe(false);
+  });
+
+  it("sair do mini painel fica neste navegador e o painel da empresa continua global", () => {
+    expect(saidaDoMiniPainelEhLocal("/frota")).toBe(true);
+    expect(saidaDoMiniPainelEhLocal("/frota/acesso/abc")).toBe(true);
+    expect(saidaDoMiniPainelEhLocal("/dashboard")).toBe(false);
+    expect(saidaDoMiniPainelEhLocal("/login")).toBe(false);
   });
 
   it("não troca a sessão quando o e-mail já aberto é outro", () => {

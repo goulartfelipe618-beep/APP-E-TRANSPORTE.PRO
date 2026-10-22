@@ -13,6 +13,14 @@ export function emailEhContaDeMotoristaPortal(email: string): boolean {
   return email.trim().toLowerCase().endsWith("@motorista-frota.local");
 }
 
+/**
+ * O mini painel continua exigindo outro navegador quando já há outra conta aberta.
+ * Sair ou expirar neste navegador não pode derrubar as outras pessoas no mesmo link.
+ */
+export function saidaDoMiniPainelEhLocal(pathname: string): boolean {
+  return pathname.startsWith("/frota");
+}
+
 /** Entrar com outro e-mail no mesmo navegador apagaria a sessão que já está aberta. */
 export function loginDoMotoristaTrocaraOutraConta(emailAtual: string | null | undefined, emailDoLink: string): boolean {
   const atual = (emailAtual ?? "").trim().toLowerCase();

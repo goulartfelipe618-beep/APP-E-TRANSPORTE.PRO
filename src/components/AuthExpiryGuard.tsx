@@ -2,6 +2,8 @@ import { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { clearAuthStartedAt, isAuthExpired, readAuthStartedAt, setAuthStartedAt } from "@/lib/authExpiry";
+import { tokenAplicativoMotoristaGuardado } from "@/lib/capacitorFrota";
+import { saidaDoMiniPainelEhLocal, tokenEntradaPeloLinkUnico } from "@/lib/motoristaPortalEntrada";
 
 const CHECK_EVERY_MS = 5 * 60 * 1000;
 
@@ -17,14 +19,27 @@ export default function AuthExpiryGuard() {
       if (expiredHandledRef.current) return;
       expiredHandledRef.current = true;
 
+      const noMiniPainel = saidaDoMiniPainelEhLocal(window.location.pathname);
+      const { data: atual } = await supabase.auth.getSession();
+      const uid = atual.session?.user?.id ?? "";
+      const tokenDoLink = uid
+        ? tokenEntradaPeloLinkUnico(uid) ?? tokenAplicativoMotoristaGuardado()
+        : tokenAplicativoMotoristaGuardado();
       try {
         clearAuthStartedAt();
-        await supabase.auth.signOut();
+        await supabase.auth.signOut({ scope: noMiniPainel ? "local" : "global" });
       } catch {
         // mesmo se falhar, garantimos redirecionamento
       }
 
-      navigate("/login", { replace: true });
+      navigate(
+        noMiniPainel
+          ? tokenDoLink
+            ? `/frota/acesso/${encodeURIComponent(tokenDoLink)}`
+            : "/aplicativo-motorista"
+          : "/login",
+        { replace: true },
+      );
     };
 
     const checkOnce = async () => {

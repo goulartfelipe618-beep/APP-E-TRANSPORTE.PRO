@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { clearAuthStartedAt } from "@/lib/authExpiry";
 import { isTabLeader, onTabLeaderChange } from "@/lib/tabLeader";
+import { saidaDoMiniPainelEhLocal, tokenEntradaPeloLinkUnico } from "@/lib/motoristaPortalEntrada";
+import { tokenAplicativoMotoristaGuardado } from "@/lib/capacitorFrota";
 import {
   clearRevokeAck,
   fetchServerRevokedAtIso,
@@ -30,15 +32,28 @@ export default function ClientSessionRevocationGuard() {
       if (revokeHandledRef.current) return;
       revokeHandledRef.current = true;
 
+      const noMiniPainel = saidaDoMiniPainelEhLocal(window.location.pathname);
+      const { data: atual } = await supabase.auth.getSession();
+      const uid = atual.session?.user?.id ?? "";
+      const tokenDoLink = uid
+        ? tokenEntradaPeloLinkUnico(uid) ?? tokenAplicativoMotoristaGuardado()
+        : tokenAplicativoMotoristaGuardado();
       try {
         clearAuthStartedAt();
         clearRevokeAck();
-        await supabase.auth.signOut();
+        await supabase.auth.signOut({ scope: noMiniPainel ? "local" : "global" });
       } catch {
         /* mesmo se falhar, redireccionamos */
       }
 
-      navigate("/login", { replace: true });
+      navigate(
+        noMiniPainel
+          ? tokenDoLink
+            ? `/frota/acesso/${encodeURIComponent(tokenDoLink)}`
+            : "/aplicativo-motorista"
+          : "/login",
+        { replace: true },
+      );
     };
 
     const syncAckFromServer = async (): Promise<void> => {

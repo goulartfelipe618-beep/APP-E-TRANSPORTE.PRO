@@ -2841,6 +2841,10 @@ export type Database = {
         Args: never
         Returns: string
       }
+      replace_reserva_motoristas_extra: {
+        Args: { p_kind: string; p_reserva_id: string; p_vinculos: Json }
+        Returns: number
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

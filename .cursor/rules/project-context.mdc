@@ -29,9 +29,11 @@ Adiciona manualmente **"+ Add new doc"** com estas URLs para o modelo usar APIs 
 
 ## Repositório GitHub
 
+Este workspace é o repositório https://github.com/goulartfelipe618-beep/APP-E-TRANSPORTE.PRO
+
 - **Owner/repo:** `goulartfelipe618-beep/APP-E-TRANSPORTE.PRO`
 - **Remote:** https://github.com/goulartfelipe618-beep/APP-E-TRANSPORTE.PRO.git
-- Branch principal: `main`. Commits e PRs vão para este remote.
+- Branch principal: `main`. Commits e PRs vão para este remote. Não usar outro owner.
 
 ## Banco remoto (não local)
 

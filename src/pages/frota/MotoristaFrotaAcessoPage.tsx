@@ -200,7 +200,7 @@ export default function MotoristaFrotaAcessoPage() {
       }
       if (!(await claimExclusiveSession())) {
         try {
-          await supabase.auth.signOut();
+          await supabase.auth.signOut({ scope: "local" });
         } catch {
           /* sessão nova não pode ficar sem ser a única */
         }
@@ -212,7 +212,7 @@ export default function MotoristaFrotaAcessoPage() {
       if (!uid || !(await confirmarEntradaPeloLinkUnico(uid, token))) {
         limparEntradaPeloLinkUnico();
         try {
-          await supabase.auth.signOut();
+          await supabase.auth.signOut({ scope: "local" });
         } catch {
           /* sem o link confirmado a sessão não permanece */
         }
@@ -254,7 +254,7 @@ export default function MotoristaFrotaAcessoPage() {
       }
       if (!(await claimExclusiveSession())) {
         try {
-          await supabase.auth.signOut();
+          await supabase.auth.signOut({ scope: "local" });
         } catch {
           /* sessão nova não pode ficar sem ser a única */
         }
@@ -266,7 +266,7 @@ export default function MotoristaFrotaAcessoPage() {
       if (!uid || !(await confirmarEntradaPeloLinkUnico(uid, token))) {
         limparEntradaPeloLinkUnico();
         try {
-          await supabase.auth.signOut();
+          await supabase.auth.signOut({ scope: "local" });
         } catch {
           /* sem o link confirmado a sessão não permanece */
         }

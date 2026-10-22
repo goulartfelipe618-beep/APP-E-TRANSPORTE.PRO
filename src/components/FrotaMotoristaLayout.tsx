@@ -100,7 +100,7 @@ export default function FrotaMotoristaLayout() {
       const token = (data?.portal_token ?? "").trim();
       if (token) destino = `/frota/acesso/${encodeURIComponent(token)}`;
     }
-    await supabase.auth.signOut();
+    await supabase.auth.signOut({ scope: "local" });
     window.location.href = destino;
   };
 

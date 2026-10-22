@@ -1,6 +1,8 @@
 import { supabase } from "@/integrations/supabase/client";
 import {
+  reservaEntraNaAgendaDoPortal,
   reservaVisivelNoPortal,
+  unirReservasPorId,
   type FichaPortalMotorista,
 } from "@/lib/frotaPortalIsolamento";
 import { motoristaMatchesAssignment } from "@/lib/motoristaReservaAssign";
@@ -198,9 +200,11 @@ function checagemDaLinha(raw: unknown): { motorista_id: string | null; owner_use
 async function listFrotaPortalReservationsFallback(fichas: FichaPortalMotorista[]): Promise<{
   transfers: FrotaPortalTransferReserva[];
   grupos: FrotaPortalGrupoReserva[];
+  extraTransferIds: string[];
+  extraGrupoIds: string[];
   error: string | null;
 }> {
-  if (fichas.length === 0) return { transfers: [], grupos: [], error: null };
+  if (fichas.length === 0) return { transfers: [], grupos: [], extraTransferIds: [], extraGrupoIds: [], error: null };
   const owners = Array.from(new Set(fichas.map((ficha) => ficha.userId)));
   const assignIds = Array.from(
     new Set(fichas.flatMap((ficha) => [ficha.id, ficha.portalAuthUserId].map((id) => id.trim()).filter(Boolean))),
@@ -215,8 +219,8 @@ async function listFrotaPortalReservationsFallback(fichas: FichaPortalMotorista[
       .in("user_id", owners)
       .in("motorista_id", assignIds),
   ]);
-  if (tRes.error) return { transfers: [], grupos: [], error: tRes.error.message };
-  if (gRes.error) return { transfers: [], grupos: [], error: gRes.error.message };
+  if (tRes.error) return { transfers: [], grupos: [], extraTransferIds: [], extraGrupoIds: [], error: tRes.error.message };
+  if (gRes.error) return { transfers: [], grupos: [], extraTransferIds: [], extraGrupoIds: [], error: gRes.error.message };
 
   const extraRows = (extraRes.error ? [] : extraRes.data ?? []) as unknown as {
     reserva_id: string;
@@ -308,7 +312,7 @@ async function listFrotaPortalReservationsFallback(fichas: FichaPortalMotorista[
       }),
     )
     .filter((r): r is FrotaPortalGrupoReserva => r?.kind === "grupo");
-  return { transfers, grupos, error: null };
+  return { transfers, grupos, extraTransferIds, extraGrupoIds, error: null };
 }
 
 export async function listFrotaPortalReservations(): Promise<{
@@ -330,21 +334,39 @@ export async function listFrotaPortalReservations(): Promise<{
   const fichas = await listarFichasDoPortalAtual();
   if (fichas.length === 0) return { transfers: [], grupos: [], error: null };
 
-  const { data, error } = await supabase.rpc("get_frota_motorista_reservas");
-  if (!error) {
-    const rows = Array.isArray(data)
-      ? data
-          .filter((raw) => reservaVisivelNoPortal(checagemDaLinha(raw), fichas))
-          .map(parseReserva)
-          .filter((r): r is FrotaPortalReserva => r != null)
-      : [];
-    return {
-      transfers: rows.filter((r): r is FrotaPortalTransferReserva => r.kind === "transfer"),
-      grupos: rows.filter((r): r is FrotaPortalGrupoReserva => r.kind === "grupo"),
-      error: null,
-    };
+  const [rpcRes, viaTabela] = await Promise.all([
+    supabase.rpc("get_frota_motorista_reservas"),
+    listFrotaPortalReservationsFallback(fichas),
+  ]);
+
+  if (rpcRes.error) {
+    return { transfers: viaTabela.transfers, grupos: viaTabela.grupos, error: viaTabela.error };
   }
-  return listFrotaPortalReservationsFallback(fichas);
+
+  const extrasTransfer = new Set(viaTabela.extraTransferIds);
+  const extrasGrupo = new Set(viaTabela.extraGrupoIds);
+  const rows = Array.isArray(rpcRes.data)
+    ? rpcRes.data
+        .filter((raw) => {
+          const checagem = checagemDaLinha(raw);
+          const id = raw && typeof raw === "object" && "id" in raw && raw.id != null ? String(raw.id) : "";
+          const kind = raw && typeof raw === "object" && "kind" in raw ? String(raw.kind) : "";
+          const extras = kind === "grupo" ? extrasGrupo : extrasTransfer;
+          return reservaEntraNaAgendaDoPortal({ ...checagem, id }, fichas, extras);
+        })
+        .map(parseReserva)
+        .filter((r): r is FrotaPortalReserva => r != null)
+    : [];
+  const transfersRpc = rows.filter((r): r is FrotaPortalTransferReserva => r.kind === "transfer");
+  const gruposRpc = rows.filter((r): r is FrotaPortalGrupoReserva => r.kind === "grupo");
+  if (viaTabela.error) {
+    return { transfers: transfersRpc, grupos: gruposRpc, error: null };
+  }
+  return {
+    transfers: unirReservasPorId(transfersRpc, viaTabela.transfers),
+    grupos: unirReservasPorId(gruposRpc, viaTabela.grupos),
+    error: null,
+  };
 }
 
 export async function updateFrotaReservaStatus(

@@ -47,7 +47,7 @@ export default function ProtectedFrotaRoute({ children }: { children: React.Reac
       if (startedAt && isAuthExpired(startedAt)) {
         clearAuthStartedAt();
         try {
-          await supabase.auth.signOut();
+          await supabase.auth.signOut({ scope: "local" });
         } catch {
           /* ignore */
         }
